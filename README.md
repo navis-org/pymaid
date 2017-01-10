@@ -12,7 +12,7 @@ skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
 ```
 
 ## Available wrappers:
-Currently pymaid features a range of wrappers to conveniently fetch data from CATMAID servers.
+Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
 Use help() to learn more about their function, parameters and usage.
 
 - add_annotations
