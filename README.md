@@ -4,7 +4,7 @@ pymaid
 Collection of Python 3 tools to interface with CATMAID servers
 
 ## Basic example:
-'''
+'''python
 from pymaid import CatmaidInstance, get_3D_skeleton
 
 myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
