@@ -1,7 +1,7 @@
 pymaid
 ==================
 
-Collection of Python 3 tools to interface with CATMAID servers
+Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers
 
 ## Basic example:
 ```python
