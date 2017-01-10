@@ -5,6 +5,7 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 ## Required packages:
 `pymaid` uses standard Python 3 libraries
+
 `catmaid_igraph` requires iGraph, SciPy, Numpy, PyLab and Matplotlib
 
 ## Basic example:
