@@ -17,8 +17,8 @@ skdata = get_3D_skeleton ( [ example_skid ], remote_instance, connector_flag = 1
 #Generate iGraph object from node data
 g = igraph_from_skeleton( skdata, remote_instance)
 
-#Cluster synapses - creates and saves plot, and returns clustering for nodes with synapses
-syn_linkage = cluster_nodes_w_synapses( g, filename = 'test.png' )
+#Cluster synapses - generates plot and returns clustering for nodes with synapses
+syn_linkage = cluster_nodes_w_synapses( g, plot_graph = True )
 
 #Find the last two clusters (= the two biggest):
 clusters = cluster.hierarchy.fcluster( syn_linkage, 2, criterion='maxclust')
