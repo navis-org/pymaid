@@ -5,14 +5,14 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 ## Basic example:
 
-### Retrieving 3D skeleton data
+### Retrieve 3D skeleton data
 ```python
 from pymaid import CatmaidInstance, get_3D_skeleton
 
 myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
 ```
-### Clustering synapses based on distance along the arbor using iGraph
+### Cluster synapses based on distance along the arbor using iGraph
 ```python
 from pymaid import CatmaidInstance, get_3D_skeleton
 from catmaid_igraph import igraph_from_skeleton, cluster_nodes_w_synapses
