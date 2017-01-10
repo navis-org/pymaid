@@ -3,6 +3,10 @@ pymaid
 
 Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 
+## Required packages:
+`pymaid` uses standard Python 3 libraries
+`catmaid_igraph` requires iGraph, SciPy, Numpy, PyLab and Matplotlib
+
 ## Basic example:
 
 ### Retrieve 3D skeleton data
