@@ -3,7 +3,11 @@ pymaid
 
 Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 
-## Required packages:
+`pymaid` is the basic library to connect to CATMAID servers and fetch data
+
+`catmaid_igraph` contains a wrapper to turn CATMAID skeletons in [iGraph](http://www.igraph.org) objects which can then be used to e.g. quickly calculate geodesic (along the arbor) distances and cluster synapses. 
+
+## Dependencies:
 `pymaid` uses standard Python 3 libraries
 
 `catmaid_igraph` requires [iGraph](http://www.igraph.org), [SciPy](http://www.scipy.org), [Numpy](http://www.scipy.org) and [Matplotlib](http://www.matplotlib.org)
