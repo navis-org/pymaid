@@ -399,7 +399,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
             if skid not in threads_closed:
                 print('Did not close thread for skid',skid)     
     else:
-        print('\n Success! %i of %i skeletons retrieved.' % ( len(threads_close) , len( to_retrieve ) ) )
+        print('\n Success! %i of %i skeletons retrieved.' % ( len(threads_closed) , len( to_retrieve ) ) )
 
     
     return (sk_data)
