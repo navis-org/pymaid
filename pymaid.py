@@ -29,6 +29,8 @@ import json
 import http.cookiejar as cj
 import time
 import base64
+import threading
+import time
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -209,43 +211,36 @@ class CatmaidInstance:
     def get_annotation_list(self, pid):        
         """ Use to parse url for retrieving list of all annotations (and their IDs!!!). Filters can be passed as POST optionally:
         
-        Filter parameters (from CATMAID Github 20/10/2015):
+        Filter parameters that can be passed as POST (from CATMAID Github 20/10/2015):
       - name: annotations
-        description: A list of (meta) annotations with which which resulting annotations should be annotated with.
-        paramType: query
+        description: A list of (meta) annotations with which which resulting annotations should be annotated with.        
         type: array
         items:
             type: integer
             description: An annotation ID
       - name: annotates
-        description: A list of entity IDs (like annotations and neurons) that should be annotated by the result set.
-        paramType: query
+        description: A list of entity IDs (like annotations and neurons) that should be annotated by the result set.        
         type: array
         items:
             type: integer
             description: An entity ID
       - name: parallel_annotations
-        description: A list of annotation that have to be used alongside the result set.
-        paramType: query
+        description: A list of annotation that have to be used alongside the result set.        
         type: array
         items:
             type: integer
             description: An annotation ID
       - name: user_id
-        description: Result annotations have to be used by this user.
-        paramType: query
+        description: Result annotations have to be used by this user.        
         type: integer
       - name: neuron_id
-        description: Result annotations will annotate this neuron.
-        paramType: query
+        description: Result annotations will annotate this neuron.        
         type: integer
       - name: skeleton_id
-        description: Result annotations will annotate the neuron modeled by this skeleton.
-        paramType: query
+        description: Result annotations will annotate the neuron modeled by this skeleton.        
         type: integer
       - name: ignored_annotations
-        description: A list of annotation names that will be excluded from the result set.
-        paramType: query
+        description: A list of annotation names that will be excluded from the result set.        
         type: array
         items:
             type: string
@@ -277,6 +272,11 @@ class CatmaidInstance:
         Returns, in JSON, [[nodes], [connectors], [tags]], with connectors and tags being empty when 0 == with_connectors and 0 == with_tags, respectively
         """
         return self.djangourl("/" + str(pid) + "/" + str(skid) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-skeleton")
+
+    def get_compact_details_url(self, pid, skid):        
+        """ Similar to compact-skeleton but if 'with_history':True is passed as GET request, returned data will include creation time and last modified.        
+        """
+        return self.djangourl("/" + str(pid) + "/skeletons/" + str(skid) + "/compact-detail")
     
     def get_compact_arbor_url(self, pid, skid, nodes_flag = 1, connector_flag = 1, tag_flag = 1):        
         """ The difference between this function and get_compact_skeleton is that the connectors contain the whole chain from the skeleton of interest to the
@@ -301,16 +301,23 @@ class CatmaidInstance:
         """
         return self.djangourl("/" + str(pid) + "/stats/user-history" )
 
-def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, silent = False ):
+def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, time_out = None, silent = False):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids
 
     Parameters:
     ----------
     skids :             single or list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
-    connector_flag :    set if connector data should be retrieved. Values = 0 or 1
-    tag_flag :          set if tags should be retrieved. Values = 0 or 1
-    silent :            if False, will print progress to console (optional, default = True)
+    remote_instance :   CATMAID instance
+                        Either pass directly to function or define globally as 'remote_instance'
+    connector_flag :    set if connector data should be retrieved. Possible values = 0/False or 1/True
+    tag_flag :          set if tags should be retrieved. Possible values = 0/False or 1/True
+    silent :            boolean
+                        If True, details of the retrieval will not be printed to the consol. Useful to not crowd terminal if it does not allow cartridge return!         
+    time_out :          integer or None
+                        After this number of second, fetching skeleton data will time out (so as to not block the system)
+                        If set to None, time out will be max( [ 20, len(skids) ] ) - e.g. 100s for 100 skeletons but at least 20s
+    get_history:        boolean
+                        if True, the returned skeleton data will contain creation date n[9] and last modified n[8] for each node -> compact-details url the 'with_history' option is used then
 
     Returns:
     -------
@@ -323,29 +330,112 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     sk_data = []
+    threads = {}
+    threads_closed = []   
+
+    if time_out is None:
+        time_out = max( [ len(skids) , 20 ] )
 
     if type(skids) != type(list()):
         to_retrieve = [skids]
     else:
         to_retrieve = skids
 
-    for skeleton_id in to_retrieve:
-        #Create URL for retrieving example skeleton from server
-        remote_compact_skeleton_url = remote_instance.get_compact_skeleton_url( 1 , skeleton_id, connector_flag, tag_flag )
+    print('Creating threads to retrieve 3D skeleton data')
+    for i, skeleton_id in enumerate(to_retrieve):
+        if get_history is False:
+            #Convert tag_flag and connector_tag to 0 or 1 if necessary
+            if type(tag_flag) != type( int() ):
+                tag_flag = int(tag_flag)
+            if type(connector_flag) != type( int() ):
+                connector_flag = int(connector_flag)
 
-        #Retrieve node_data for example skeleton
-        skeleton_data = remote_instance.fetch( remote_compact_skeleton_url )
+            #Create URL for retrieving skeleton data from server
+            remote_compact_skeleton_url = remote_instance.get_compact_skeleton_url( 1 , skeleton_id, connector_flag, tag_flag )
+        else:
+            #Convert tag_flag and connector_tag to boolean if necessary
+            if type(tag_flag) != type( bool() ):
+                tag_flag = tag_flag == 1
+            if type(connector_flag) != type( bool() ) :
+                connector_flag = connector_flag == 1
 
-        sk_data.append(skeleton_data)
+            #Create URL for retrieving skeleton data from server with history details
+            remote_compact_skeleton_url = remote_instance.get_compact_details_url( 1 , skeleton_id )
+            #For compact-details, parameters have to passed as GET 
+            remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode( {'with_history': True , 'with_tags' : tag_flag , 'with_connectors' : connector_flag  , 'with_merge_history': False } )
+            #'True'/'False' needs to be lower case
+            remote_compact_skeleton_url = remote_compact_skeleton_url.lower()
 
+        t = retrieveUrlThreaded ( remote_compact_skeleton_url, remote_instance )
+        t.start()
+        threads[skeleton_id] = t
         if not silent:
-            print('%s retrieved' % str(skeleton_id))
+            print('\r Threads: '+str(len(threads)),end='')  
 
+    print('\n Joining threads...') 
+
+    start = cur_time = time.time()
+    joined = 0
+    while cur_time <= (start + time_out) and len(sk_data) != len(threads):
+        for skid in threads:
+            if skid in threads_closed:
+                continue
+            if not threads[skid].is_alive():
+                sk_data.append(  threads[skid].join() )
+                threads_closed.append(skid)
+        time.sleep(1)
+        cur_time = time.time()
+        if not silent:
+            print('\r Closing Threads: '+ str( len( threads_closed ) ) + ' - ' + str(round(cur_time-start)) + ' s' ,end='')             
+
+    if cur_time > (start + time_out):
+        errors = 'Timeout while joining threads. Retrieved only %i of %i skeletons' % (len(sk_data),len(threads))
+        print('\n !WARNING: Timeout while joining threads. Retrieved only %i of %i skeletons' % (len(sk_data),len(threads)))  
+        for skid in threads:
+            if skid not in threads_closed:
+                print('Did not close thread for skid',skid)     
+    else:
+        print('\n Success! %i of %i skeletons retrieved.' % ( len(threads_close) , len( to_retrieve ) ) )
+
+    
     return (sk_data)
+
+class retrieveUrlThreaded(threading.Thread):
+    """ Class to retrieve a URL by threading
+    """
+    def __init__(self,url,remote_instance,post_data=None):
+        try:
+            self.url = url
+            self.post_data = post_data 
+            threading.Thread.__init__(self)
+            self.connector_flag = 1
+            self.tag_flag = 1
+            self.remote_instance = remote_instance
+        except:
+            print('!Error initiating thread for',self.kids)
+
+    def run(self):
+        """
+        Retrieve data from single url
+        """  
+        #print(self.skids)
+        if self.post_data:
+            self.data = self.remote_instance.fetch( self.url, self.post_data ) 
+        else:
+            self.data = self.remote_instance.fetch( self.url )         
+        return 
+
+    def join(self):
+        try:
+            threading.Thread.join(self)
+            return self.data
+        except:
+            print('!ERROR joining thread for',self.url)
+            return None
 
 def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1, tag_flag = 1 ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids including detailed connector data. See get_compact_arbor_url.
@@ -363,7 +453,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     sk_data = []
@@ -400,7 +490,7 @@ def retrieve_partners (skids, remote_instance = None , threshold = 1):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_connectivity_url = remote_instance.get_connectivity_url( 1 )
@@ -452,7 +542,7 @@ def retrieve_names (skids, remote_instance = None):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_get_names_url = remote_instance.get_neuronnames( 1 )
@@ -486,7 +576,7 @@ def retrieve_node_lists (skids, remote_instance = None):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     print('Retrieving %i node tables...' % len(skids))   
@@ -536,7 +626,7 @@ def get_edges (skids, remote_instance = None):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_get_edges_url = remote_instance.get_edges_url( 1 )
@@ -570,7 +660,7 @@ def get_connectors (connector_ids, remote_instance = None):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_get_connectors_url = remote_instance.get_connectors_url( 1 )
@@ -605,7 +695,7 @@ def get_review (skids, remote_instance = None):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_get_reviews_url = remote_instance.get_review_status( 1 )
@@ -639,7 +729,7 @@ def get_neuron_annotation (skid, remote_instance = None ):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     #This works with neuron_id NOT skeleton_id
@@ -674,7 +764,7 @@ def skid_exists( skid, remote_instance = None ):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_get_neuron_name = remote_instance.get_single_neuronname( 1 , skid )
@@ -699,7 +789,7 @@ def retrieve_annotation_id( annotation, remote_instance = None ):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     print('Retrieving list of annotations...')
@@ -746,16 +836,20 @@ def retrieve_skids_by_annotation(annotation, remote_instance = None ):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     print('Looking for Annotation(s):',annotation) 
     annotation_ids = retrieve_annotation_id(annotation, remote_instance)
 
-    print('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotation) ))  
+    if type(annotation) == type(list()):
+        print('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotation)-len(annotation_ids) ))  
+    elif type(annotation) == type( str() ):
+        print('Found id: %s | Unable to retrieve: %i' % ( str(annotation_ids[0]) , 1 - len(annotation_ids) ))  
+
 
     annotated_skids = []
-    print('Retrieving names of annotated neurons...')
+    print('Retrieving skids of annotated neurons...')
     for an_id in annotation_ids:
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0, 'range_length':500, 'with_annotations':False}
@@ -782,7 +876,7 @@ def get_annotations_from_list (skid_list, remote_instance = None ):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     remote_get_annotations_url = remote_instance.get_annotations_for_skid_list2( 1 )
@@ -824,7 +918,7 @@ def add_annotations ( skid_list, annotations, remote_instance = None ):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     if type(skid_list) != type(list()):
@@ -867,7 +961,7 @@ def get_contributor_statistics (skid_list, remote_instance = None):
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     get_statistics_postdata = {}    
@@ -903,7 +997,7 @@ def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, st
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     get_skeleton_list_GET_data = {'nodecount_gt':node_count}
@@ -938,7 +1032,7 @@ def retrieve_history( remote_instance = None, pid = 1, start_date = '2016-10-29'
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
     get_history_GET_data = {    'pid': pid ,
@@ -973,7 +1067,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
-            print('Please either pass a CATMAID instance or define as "remote_instance" ')
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return 
 
     def retrieve_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion ):  
