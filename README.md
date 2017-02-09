@@ -12,6 +12,8 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 `catmaid_igraph` requires [iGraph](http://www.igraph.org), [SciPy](http://www.scipy.org), [Numpy](http://www.scipy.org) and [Matplotlib](http://www.matplotlib.org)
 
+`plotneuron` requires [matplotlib](http://matplotlib.org/)
+
 ## Basic example:
 
 ### Retrieve 3D skeleton data

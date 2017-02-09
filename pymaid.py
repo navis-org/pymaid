@@ -140,9 +140,14 @@ class CatmaidInstance:
         """ Use to parse url for retrieving connectivity (does need post data).
         """
         return self.djangourl("/" + str(pid) + "/skeletons/connectivity" )
-    
-    
+
     def get_connectors_url(self, pid):
+        """ Use to retrieve list of connectors either pre- or postsynaptic a set of neurons - GET request
+        Format: { 'links': [skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ] }
+        """    
+        return self.djangourl("/" + str(pid) + "/connectors/" )
+    
+    def get_connector_details_url(self, pid):
         """ Use to parse url for retrieving info connectors (does need post data).
         """
         return self.djangourl("/" + str(pid) + "/connector/skeletons" )
@@ -158,6 +163,39 @@ class CatmaidInstance:
         """ Use to parse url for names for a list of skeleton ids (does need post data: pid, skid).  
         """
         return self.djangourl("/" + str(pid) + "/skeletons/")
+
+    def get_completed_connector_links(self,pid):
+        """ Use to parse url for retrieval of completed connector links by given user 
+        GET request: 
+        Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id, link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id, link2_confidence, creator_id ]
+        """
+        return self.djangourl("/" + str(pid) + "/connector/list/")
+
+
+    def url_to_coordinates(self, pid, coords , stack_id = 0, tool = 'tracingtool' , active_skeleton_id = None, active_node_id = None ):
+        """ Use to generate URL to a location
+
+        Parameters:
+        ----------
+        coords :    list of integers
+                    (x, y, z)
+
+        """
+        GET_data = {   'pid': pid,
+                        'xp': coords[0],
+                        'yp': coords[1],
+                        'zp': coords[2],
+                        'tool':tool,
+                        'sid0':stack_id,
+                        's0': 0
+                    }
+
+        if active_skeleton_id:
+            GET_data['active_skeleton_id'] = active_skeleton_id
+        if active_node_id:
+            GET_data['active_node_id'] = active_node_id
+
+        return( self.djangourl( '?%s' % urllib.parse.urlencode( GET_data )  ) )
 
     
     def get_user_list_url(self):
@@ -200,7 +238,14 @@ class CatmaidInstance:
             use get_annotations_for_skid_list2    
             Use to get annotations for given neuron. DOES need skid as postdata
         """
-        return self.djangourl("/" + str(pid) + "/annotations/skeletons/list" )       
+        return self.djangourl("/" + str(pid) + "/annotations/skeletons/list" )      
+
+    def get_review_details_url ( self, pid,  skid):
+        """ Use to retrieve review status for every single node of a skeleton.      
+        For some reason this needs to fetched as POST (even though actual POST data is not necessary)
+        Returns list of arbors, the nodes the contain and who has been reviewing them at what time  
+        """ 
+        return self.djangourl("/" + str(pid) + "/skeletons/" + str(skid) + "/review" )
 
     
     def get_annotations_for_skid_list2(self, pid):
@@ -274,7 +319,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(pid) + "/" + str(skid) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-skeleton")
 
     def get_compact_details_url(self, pid, skid):        
-        """ Similar to compact-skeleton but if 'with_history':True is passed as GET request, returned data will include creation time and last modified.        
+        """ Similar to compact-skeleton but if 'with_history':True is passed as GET request, returned data will include all positions a nodes/connector has ever occupied plus the creation time and last modified.        
         """
         return self.djangourl("/" + str(pid) + "/skeletons/" + str(skid) + "/compact-detail")
     
@@ -300,109 +345,68 @@ class CatmaidInstance:
         """ Use to get user history.
         """
         return self.djangourl("/" + str(pid) + "/stats/user-history" )
+  
 
-def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, time_out = None, silent = False):
-    """ Wrapper to retrieve the skeleton data for a list of skeleton ids
+def retrieve_urls_threaded( urls , remote_instance, post_data = [], time_out = None , silent = False ):
+    """ Wrapper to retrieve a list of urls using threads
 
     Parameters:
     ----------
-    skids :             single or list of skeleton ids
+    urls :              list of strings
+                        Urls to retrieve
     remote_instance :   CATMAID instance
-                        Either pass directly to function or define globally as 'remote_instance'
-    connector_flag :    set if connector data should be retrieved. Possible values = 0/False or 1/True
-    tag_flag :          set if tags should be retrieved. Possible values = 0/False or 1/True
-    silent :            boolean
-                        If True, details of the retrieval will not be printed to the consol. Useful to not crowd terminal if it does not allow cartridge return!         
+                        Either pass directly to function or define globally as 'remote_instance'       
+    post_data :         list of dicts
+                        needs to be the same size as urls
     time_out :          integer or None
-                        After this number of second, fetching skeleton data will time out (so as to not block the system)
-                        If set to None, time out will be max( [ 20, len(skids) ] ) - e.g. 100s for 100 skeletons but at least 20s
-    get_history:        boolean
-                        if True, the returned skeleton data will contain creation date n[9] and last modified n[8] for each node -> compact-details url the 'with_history' option is used then
-
-    Returns:
-    -------
-    list of 3D skeleton data in the same order as the list of skids passed as parameter: 
-        [ [ neuron1_nodes, neuron1_connectors, neuron1_tags ], [ neuron2_nodes, ... ], [... ], ... ]
-
+                        After this number of second, fetching data will time out (so as to not block the system)
+                        If set to None, time out will be max( [ 20, len(urls) ] ) - e.g. 100s for 100 skeletons but at least 20s
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
-
-    sk_data = []
+    data = [ None for u in urls ]
     threads = {}
     threads_closed = []   
 
     if time_out is None:
-        time_out = max( [ len(skids) , 20 ] )
+        time_out = max( [ len( urls ) , 20 ] ) 
 
-    if type(skids) != type(list()):
-        to_retrieve = [skids]
-    else:
-        to_retrieve = skids
-
-    print('Creating threads to retrieve 3D skeleton data')
-    for i, skeleton_id in enumerate(to_retrieve):
-        if get_history is False:
-            #Convert tag_flag and connector_tag to 0 or 1 if necessary
-            if type(tag_flag) != type( int() ):
-                tag_flag = int(tag_flag)
-            if type(connector_flag) != type( int() ):
-                connector_flag = int(connector_flag)
-
-            #Create URL for retrieving skeleton data from server
-            remote_compact_skeleton_url = remote_instance.get_compact_skeleton_url( 1 , skeleton_id, connector_flag, tag_flag )
+    print('Creating threads to retrieve data')
+    for i, url in enumerate(urls):
+        if post_data:
+            t = retrieveUrlThreaded ( url, remote_instance, post_data = post_data[i] )
         else:
-            #Convert tag_flag and connector_tag to boolean if necessary
-            if type(tag_flag) != type( bool() ):
-                tag_flag = tag_flag == 1
-            if type(connector_flag) != type( bool() ) :
-                connector_flag = connector_flag == 1
-
-            #Create URL for retrieving skeleton data from server with history details
-            remote_compact_skeleton_url = remote_instance.get_compact_details_url( 1 , skeleton_id )
-            #For compact-details, parameters have to passed as GET 
-            remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode( {'with_history': True , 'with_tags' : tag_flag , 'with_connectors' : connector_flag  , 'with_merge_history': False } )
-            #'True'/'False' needs to be lower case
-            remote_compact_skeleton_url = remote_compact_skeleton_url.lower()
-
-        t = retrieveUrlThreaded ( remote_compact_skeleton_url, remote_instance )
+            t = retrieveUrlThreaded ( url, remote_instance )
         t.start()
-        threads[skeleton_id] = t
+        threads[ str(i) ] = t
         if not silent:
-            print('\r Threads: '+str(len(threads)),end='')  
+            print('\r Threads: '+str( len ( threads ) ) ,end='')  
 
     print('\n Joining threads...') 
 
     start = cur_time = time.time()
     joined = 0
-    while cur_time <= (start + time_out) and len(sk_data) != len(threads):
-        for skid in threads:
-            if skid in threads_closed:
+    while cur_time <= (start + time_out) and len( [ d for d in data if d != None ] ) != len(threads):
+        for t in threads:
+            if t in threads_closed:
                 continue
-            if not threads[skid].is_alive():
-                sk_data.append(  threads[skid].join() )
-                threads_closed.append(skid)
+            if not threads[t].is_alive():
+                #Make sure we keep the order
+                data[ int(t) ] = threads[t].join() 
+                threads_closed.append(t)
         time.sleep(1)
         cur_time = time.time()
         if not silent:
-            print('\r Closing Threads: '+ str( len( threads_closed ) ) + ' - ' + str(round(cur_time-start)) + ' s' ,end='')             
+            print('\r Closing Threads: %i ( %is until time out )' % ( len( threads_closed ) , round( time_out - ( cur_time - start ) ) )  ,end='')             
 
-    if cur_time > (start + time_out):
-        errors = 'Timeout while joining threads. Retrieved only %i of %i skeletons' % (len(sk_data),len(threads))
-        print('\n !WARNING: Timeout while joining threads. Retrieved only %i of %i skeletons' % (len(sk_data),len(threads)))  
-        for skid in threads:
-            if skid not in threads_closed:
-                print('Did not close thread for skid',skid)     
+    if cur_time > (start + time_out):        
+        print('\n !WARNING: Timeout while joining threads. Retrieved only %i of %i urls' % (len( [ d for d in data if d != None ] ),len(threads)))  
+        for t in threads:
+            if t not in threads_closed:
+                print('Did not close thread for url:', urls[ int( t ) ] )      
     else:
-        print('\n Success! %i of %i skeletons retrieved.' % ( len(threads_closed) , len( to_retrieve ) ) )
-
+        print('\n Success! %i of %i urls retrieved.' % ( len(threads_closed) , len( urls ) ) )
     
-    return (sk_data)
+    return data
 
 class retrieveUrlThreaded(threading.Thread):
     """ Class to retrieve a URL by threading
@@ -436,6 +440,77 @@ class retrieveUrlThreaded(threading.Thread):
         except:
             print('!ERROR joining thread for',self.url)
             return None
+
+def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, time_out = None, silent = False):
+    """ Wrapper to retrieve the skeleton data for a list of skeleton ids
+
+    Parameters:
+    ----------
+    skids :             single or list of skeleton ids
+    remote_instance :   CATMAID instance
+                        Either pass directly to function or define globally as 'remote_instance'
+    connector_flag :    set if connector data should be retrieved. Possible values = 0/False or 1/True
+    tag_flag :          set if tags should be retrieved. Possible values = 0/False or 1/True
+    silent :            boolean
+                        If True, details of the retrieval will not be printed to the consol. Useful to not crowd terminal if it does not allow cartridge return!         
+    time_out :          integer or None
+                        After this number of second, fetching skeleton data will time out (so as to not block the system)
+                        If set to None, time out will be max( [ 20, len(skids) ] ) - e.g. 100s for 100 skeletons but at least 20s
+    get_history:        boolean
+                        if True, the returned skeleton data will contain creation date n[8] and last modified n[9] for each node -> compact-details url the 'with_history' option is used in this case
+                        ATTENTION: if get_history = True, nodes/connectors that have been moved since their creation will have multiple entries reflecting their changes in position! 
+                        Each state has the date it was modified as creation date and the next state's date as last modified. The most up to date state has the original creation date as last modified (full circle).
+                        The creator_id is always the original creator though.
+
+    Returns:
+    -------
+    list of 3D skeleton data in the same order as the list of skids passed as parameter: 
+        [ [ neuron1_nodes, neuron1_connectors, neuron1_tags ], [ neuron2_nodes, ... ], [... ], ... ]
+    
+
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return
+
+    if type(skids) != type(list()):
+        to_retrieve = [skids]
+    else:
+        to_retrieve = skids
+
+    #Generate URLs to retrieve
+    urls = []    
+    for i, skeleton_id in enumerate(to_retrieve):
+        if get_history is False:
+            #Convert tag_flag and connector_tag to 0 or 1 if necessary
+            if type(tag_flag) != type( int() ):
+                tag_flag = int(tag_flag)
+            if type(connector_flag) != type( int() ):
+                connector_flag = int(connector_flag)
+
+            #Create URL for retrieving skeleton data from server
+            urls.append ( remote_instance.get_compact_skeleton_url( 1 , skeleton_id, connector_flag, tag_flag ) )
+        else:
+            #Convert tag_flag and connector_tag to boolean if necessary
+            if type(tag_flag) != type( bool() ):
+                tag_flag = tag_flag == 1
+            if type(connector_flag) != type( bool() ) :
+                connector_flag = connector_flag == 1
+
+            #Create URL for retrieving skeleton data from server with history details
+            remote_compact_skeleton_url = remote_instance.get_compact_details_url( 1 , skeleton_id )
+            #For compact-details, parameters have to passed as GET 
+            remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode( {'with_history': True , 'with_tags' : tag_flag , 'with_connectors' : connector_flag  , 'with_merge_history': False } )
+            #'True'/'False' needs to be lower case
+            urls.append (  remote_compact_skeleton_url.lower() )
+
+    skdata = retrieve_urls_threaded( urls, remote_instance, time_out = time_out, silent = silent )
+
+    return skdata     
 
 def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1, tag_flag = 1 ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids including detailed connector data. See get_compact_arbor_url.
@@ -642,7 +717,58 @@ def get_edges (skids, remote_instance = None):
         
     return(edges)
 
-def get_connectors (connector_ids, remote_instance = None):
+def get_connectors ( skids, remote_instance = None, incoming = True, outgoing = True):
+    """ Wrapper to retrieve connectors for a set of neurons
+    
+    Parameters:
+    ----------
+    connector_ids :     list of connector ids; can be found e.g. from compact skeletons
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    incoming :          boolean
+                        if True, incoming connectors will be retrieved
+    outgoing :          boolean
+                        if True, outgoing connectors will be retrieved
+
+    Returns:
+    ------- 
+    list of connectors:  [skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ] 
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return    
+
+    get_connectors_GET_data = { 'with_tags': 'false' }
+
+    cn_data = []
+
+    for i,s in enumerate(skids):
+        tag = 'skeleton_ids[%i]' % i 
+        get_connectors_GET_data[tag] = str( s )
+
+    if incoming is True:
+        get_connectors_GET_data['relation_type']='presynaptic_to'
+        remote_get_connectors_url = remote_instance.get_connectors_url( 1 ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+        cn_data += remote_instance.fetch( remote_get_connectors_url )['links']
+
+    if outgoing is True:
+        get_connectors_GET_data['relation_type']='postsynaptic_to'
+        remote_get_connectors_url = remote_instance.get_connectors_url( 1 ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+        cn_data += remote_instance.fetch( remote_get_connectors_url )['links']
+
+    #Make sure we don't count the same connector twice
+    clean_cn_data = []
+    for cn in cn_data:
+        if cn not in clean_cn_data:
+            clean_cn_data.append(cn)
+
+    return clean_cn_data
+
+
+def get_connector_details (connector_ids, remote_instance = None):
     """ Wrapper to retrieve details on sets of connectors 
     
     Parameters:
@@ -663,7 +789,7 @@ def get_connectors (connector_ids, remote_instance = None):
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_get_connectors_url = remote_instance.get_connectors_url( 1 )
+    remote_get_connectors_url = remote_instance.get_connector_details_url( 1 )
 
     get_connectors_postdata = {}    
         
@@ -942,6 +1068,38 @@ def add_annotations ( skid_list, annotations, remote_instance = None ):
     print( remote_instance.fetch( add_annotations_url , add_annotations_postdata ) )
 
     return 
+
+def get_review_details ( skid_list, remote_instance = None):
+    """ Wrapper to retrieve review status (reviewer + timestamp) for each node of a given skeleton -> uses the review API
+
+    Parameters:
+    -----------
+    skid_list :         list of skeleton ids to check
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+
+    Returns:
+    -------
+    node_list :         list of reviewed nodes: [ node_id, [ [reviewer1, timestamp] ,[ reviewer2, timestamp] ] ]
+    """
+
+    node_list = []    
+    urls = []
+    post_data = []
+
+    for skid in skid_list:
+        urls.append ( remote_instance.get_review_details_url( 1 , skid ) )
+        #For some reason this needs to fetched as POST (even though actual POST data is not necessary)
+        post_data.append ( { 'placeholder' : 0 } )
+
+    rdata = retrieve_urls_threaded( urls , remote_instance, post_data = post_data, time_out = None , silent = False )           
+
+    for neuron in rdata:
+        #There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
+        #node_ids = []
+        for arbor in neuron:            
+            node_list += [ ( n['id'] , n['rids'] ) for n in arbor['sequence'] if n['rids'] ]
+
+    return node_list
             
 
 def get_contributor_statistics (skid_list, remote_instance = None):
@@ -976,7 +1134,7 @@ def get_contributor_statistics (skid_list, remote_instance = None):
 
     return(statistics)
 
-def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, start_date=[], end_date=[] ):
+def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None ):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters (see variables). If no parameters are provided, all existing skeletons are returned.
 
     Parameters:
@@ -1004,6 +1162,9 @@ def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, st
 
     if user:
         get_skeleton_list_GET_data['created_by'] = user
+
+    if reviewed_by:
+        get_skeleton_list_GET_data['reviewed_by'] = reviewed_by
     
     if start_date and end_date:
         get_skeleton_list_GET_data['from'] = ''.join( [ str(d) for d in start_date ] )
@@ -1050,7 +1211,6 @@ def retrieve_history( remote_instance = None, pid = 1, start_date = '2016-10-29'
 
 
     return remote_instance.fetch ( remote_get_history_url )
-
 
 
 def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = None ):
@@ -1222,8 +1382,8 @@ if __name__ == '__main__':
     #Retrieve synaptic partners for a set of neurons - ignore those connected by less than 3 synapses
     print ( retrieve_partners (example_skids, remote_instance, threshold = 3))
 
-    #Get 3D skeletons
-    print( get_3D_skeleton ( example_skids , remote_instance, 1 , 0 )[0][1] )
+    #Get 3D skeletons and print the first one
+    print( get_3D_skeleton ( example_skids , remote_instance, 1 , 0 )[0] )
     
     #Get list of users
     print( remote_instance.fetch ( remote_instance.get_user_list_url() ) )
