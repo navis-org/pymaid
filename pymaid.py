@@ -863,13 +863,11 @@ def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
     remote_get_annotations_url = remote_instance.get_neuron_annotations( project_id )
 
     get_annotations_postdata = {}            
-    get_annotations_postdata['neuron_id'] = int(neuronid)
-   
+    get_annotations_postdata['neuron_id'] = int(neuronid)   
 
     annotations = remote_instance.fetch( remote_get_annotations_url , get_annotations_postdata )    
         
     return(annotations) 
-
 
 
 def skid_exists( skid, remote_instance = None, project_id = 1 ):
