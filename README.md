@@ -46,7 +46,7 @@ skid = '12345'
 #Retrieve 3D skeleton data for neuron of interest
 skdata = get_3D_skeleton ( [ example_skid ], remote_instance, connector_flag = 1, tag_flag = 0 )[0]
 
-#For large neurons consider downsampling (preverses branch points, end points, synapses, etc.)
+#(Optional) Consider downsampling for large neuronns (preverses branch points, end points, synapses, etc.)
 from natpy import downsample_neuron
 skdata = downsample_neuron( skdata, 4 )
 
