@@ -20,13 +20,16 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 `natpy` uses standard Python 3 libraries
 
-## Basic example:
+## Basic examples:
 
 ### Retrieve 3D skeleton data
 ```python
 from pymaid import CatmaidInstance, get_3D_skeleton
 
+#Initiate Catmaid instance 
 myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
+
+#Retrieve skeleton data for two neurons 
 skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
 ```
 ### Cluster synapses based on distance along the arbor using iGraph
@@ -34,6 +37,7 @@ skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
 from pymaid import CatmaidInstance, get_3D_skeleton
 from catmaid_igraph import igraph_from_skeleton, cluster_nodes_w_synapses
 
+#Initiate Catmaid instance
 remote_instance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 
 #Example skid
