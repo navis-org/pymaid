@@ -175,7 +175,7 @@ def cluster_nodes_w_synapses(g, plot_graph = True):
 	Y_syn = cluster.hierarchy.ward(distance_matrix_syn)
 
 	if plot_graph:
-
+		print('Plotting graph')
 		# Compute and plot first dendrogram for all nodes.
 		fig = pylab.figure(figsize=(8,8))
 		ax1 = fig.add_axes([0.09,0.1,0.2,0.6])

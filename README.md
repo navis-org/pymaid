@@ -7,12 +7,18 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 `catmaid_igraph` contains a wrapper to turn CATMAID skeletons in [iGraph](http://www.igraph.org) objects which can then be used to e.g. quickly calculate geodesic (along the arbor) distances and cluster synapses. 
 
+`natpy` contains wrappers to downsample or cut neurons
+
+`plotneuron` is a wrapper to generate 2D morphology plots of neurons
+
 ## Dependencies:
 `pymaid` uses standard Python 3 libraries
 
 `catmaid_igraph` requires [iGraph](http://www.igraph.org), [SciPy](http://www.scipy.org), [Numpy](http://www.scipy.org) and [Matplotlib](http://www.matplotlib.org)
 
 `plotneuron` requires [matplotlib](http://matplotlib.org/)
+
+`natpy` uses standard Python 3 libraries
 
 ## Basic example:
 
@@ -36,8 +42,12 @@ skid = '12345'
 #Retrieve 3D skeleton data for neuron of interest
 skdata = get_3D_skeleton ( [ example_skid ], remote_instance, connector_flag = 1, tag_flag = 0 )[0]
 
+#For large neurons consider downsampling (preverses branch points, end points, synapses, etc.)
+from natpy import downsample_neuron
+skdata = downsample_neuron( skdata, 4 )
+
 #Generate iGraph object from node data
-g = igraph_from_skeleton( skdata, remote_instance)
+g = igraph_from_skeleton( skdata )
 
 #Cluster synapses - generates plot and returns clustering for nodes with synapses
 syn_linkage = cluster_nodes_w_synapses( g, plot_graph = True )
