@@ -114,12 +114,12 @@ class CatmaidInstance:
         """ Requires the url to connect to and the variables for POST, if any, in a dictionary. """
         if post:
             data = urllib.parse.urlencode(post)
-            data = data.encode('utf-8')
+            data = data.encode('utf-8')            
             request = urllib.request.Request(url, data = data)        
         else:
             request = urllib.request.Request(url)
 
-        self.auth(request)
+        self.auth(request)        
 
         response = self.opener.open(request)
 
@@ -146,8 +146,7 @@ class CatmaidInstance:
     
     def get_add_annotations_url(self,pid):
         """ Use to parse url to add annotations to skeleton IDs. """
-        return self.djangourl("/" + str(pid) + "/annotations/add" )
-    
+        return self.djangourl("/" + str(pid) + "/annotations/add" )    
     
     def get_connectivity_url(self, pid):
         """ Use to parse url for retrieving connectivity (does need post data). """
@@ -247,11 +246,14 @@ class CatmaidInstance:
         Returns list of arbors, the nodes the contain and who has been reviewing them at what time  
         """ 
         return self.djangourl("/" + str(pid) + "/skeletons/" + str(skid) + "/review" )
-
     
     def get_annotations_for_skid_list2(self, pid):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
         return self.djangourl("/" + str(pid) + "/skeleton/annotationlist" )
+
+    def get_logs_url(self, pid):
+        """ Use to get logs. DOES need skid as postdata. """
+        return self.djangourl("/" + str(pid) + "/logs/list" )
     
     def get_annotation_list(self, pid):        
         """ Use to parse url for retrieving list of all annotations (and their IDs!!!). Filters can be passed as POST optionally:
@@ -297,14 +299,20 @@ class CatmaidInstance:
         return self.djangourl("/" + str(pid) + "/skeleton/contributor_statistics_multiple" )     
     
     def get_annotated_url(self, pid):
-        """ #Use to parse url for retrieving annotated neurons (does need post data). """        
+        """ Use to parse url for retrieving annotated neurons (NEEDS post data). """        
         return self.djangourl("/" + str(pid) + "/annotations/query-targets" )
+
+    def get_skid_from_tnid( self, pid, tnid):
+        """ Use to parse url for retrieving the skeleton id to a single treenode id (does not need postdata) 
+        API returns dict: {"count": integer, "skeleton_id": integer}
+        """
+        return self.djangourl( "/" + str(pid) + "/skeleton/node/" + str(tnid) + "/node_count" )
     
-    def get_node_list(self, pid):
-        """ Use to parse url for retrieving list of nodes (needs post data). """
-        return self.djangourl("/" + str(pid) + "/node/list" )
+    def get_node_list_url(self, pid):
+        """ Use to parse url for retrieving list of nodes (NEEDS post data). """
+        return self.djangourl("/" + str(pid) + "/node/list" )  
     
-    def get_node_info(self, pid):
+    def get_node_info_url(self, pid):
         """ Use to parse url for retrieving user info on a single node (needs post data). """
         return self.djangourl("/" + str(pid) + "/node/user-info" )        
     
@@ -543,7 +551,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
 
     return (sk_data)
 
-def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id = 1):
+def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 1):
     """ Wrapper to retrieve the synaptic partners to neurons of interest
 
     Parameters:
@@ -551,6 +559,7 @@ def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id
     skids :             list of skeleton ids
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
     threshold :         does not seem to have any effect on CATMAID API and is therefore filtered afterwards. This threshold is applied to the total number of synapses. (optional, default = 1)
+    min_size :          minimum node count of partner
 
     Returns:
     ------- 
@@ -580,18 +589,24 @@ def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id
     #As of 08/2015, # of synapses is returned as list of nodes with 0-5 confidence: {'skid': [0,1,2,3,4,5]}
     #This is being collapsed into a single value before returning it:       
 
+    if min_size > 1:
+        review = get_review ( list(set( list(connectivity_data['incoming'].keys()) + list(connectivity_data['outgoing'].keys() )) ) , remote_instance , project_id = project_id)
+    
     for direction in ['incoming','outgoing']:
-        pop = []
+        pop = set()
         for entry in connectivity_data[direction]:
             if sum( [ sum(connectivity_data[direction][entry]['skids'][n]) for n in connectivity_data[direction][entry]['skids'] ] ) >= threshold:
                 for skid in connectivity_data[direction][entry]['skids']:                
                     connectivity_data[direction][entry]['skids'][skid] = sum(connectivity_data[direction][entry]['skids'][skid])
             else:
-                pop.append(entry)
+                pop.add(entry)
+
+            if min_size > 1:
+                if review[entry][0] < min_size:
+                    pop.add(entry)
 
         for n in pop:
             connectivity_data[direction].pop(n)
-
         
     return(connectivity_data)
     
@@ -993,7 +1008,7 @@ def retrieve_skids_by_annotation(annotation, remote_instance = None, project_id 
     print('Looking for Annotation(s):',annotation) 
     annotation_ids = retrieve_annotation_id(annotation, remote_instance)
 
-    if type(annotation) == type(list()):
+    if type(annotation) == type( list() ):
         print('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotation)-len(annotation_ids) ))  
     elif type(annotation) == type( str() ):
         print('Found id: %s | Unable to retrieve: %i' % ( str(annotation_ids[0]) , 1 - len(annotation_ids) ))
@@ -1013,7 +1028,7 @@ def retrieve_skids_by_annotation(annotation, remote_instance = None, project_id 
         
     return(annotated_skids)
 
-def get_annotations_from_list (skid_list, remote_instance = None, project_id = 1 ):
+def get_annotations_from_list(skid_list, remote_instance = None, project_id = 1 ):
     """ Wrapper to retrieve annotations for a list of skeleton ids - if a neuron has no annotations, it will not show up in returned dict
     Attention! It seems like this URL does not process more than 250 skids at a time!
 
@@ -1021,6 +1036,10 @@ def get_annotations_from_list (skid_list, remote_instance = None, project_id = 1
     ----------
     skid_list :         list of skeleton ids
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+
+    Returns:
+    --------
+
     """
 
     if remote_instance is None:
@@ -1042,13 +1061,13 @@ def get_annotations_from_list (skid_list, remote_instance = None, project_id = 1
     annotation_list_temp = remote_instance.fetch( remote_get_annotations_url , get_annotations_postdata )
 
     annotation_list = {}    
-
+    
     for skid in annotation_list_temp['skeletons']:
         annotation_list[skid] = []        
         #for entry in annotation_list_temp['skeletons'][skid]:
         for entry in annotation_list_temp['skeletons'][skid]['annotations']:
             annotation_id = entry['id']
-            annotation_list[skid].append(annotation_list_temp['annotations'][str(annotation_id)])    
+            annotation_list[skid].append(annotation_list_temp['annotations'][str(annotation_id)])      
    
     return(annotation_list) 
 
@@ -1125,7 +1144,108 @@ def get_review_details ( skid_list, remote_instance = None, project_id = 1):
             node_list += [ ( n['id'] , n['rids'] ) for n in arbor['sequence'] if n['rids'] ]
 
     return node_list
-            
+
+def get_logs (remote_instance = None, operations = [] , entries = 50 , display_start = 0, project_id = 1, search = ''):
+    """ Wrapper to retrieve contributor statistics over ALL given skeleton ids
+    
+    Parameters:
+    ----------    
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    operations :        list of strings
+                        if empty, all operations will be requested from the server
+                        possible operations: 'join_skeleton', 'change_confidence', 'rename_neuron', 'create_neuron', '  join_skeleton', 'remove_neuron'
+                        'split_skeleton', 'reroot_skeleton', 'reset_reviews', 'move_skeleton'
+    entries :           integer (default = 50)
+                        number of entries to retrieve
+    project_id :        integer (default = 1)
+                        Id of your CATMAID project
+
+    Returns:
+    -------
+    dictionary {'node_contributors': {'user_id': nodes_contributed , ...}, 'multiuser_review_minutes': XXX , 'post_contributors': {'user_id': postsynaptic_connectors_contributed}, 'construction_minutes': XXX, 'min_review_minutes': XXX, 'n_post': XXX, 'n_pre': XXX, 'pre_contributors': {'user_id': presynaptic_connectors_contributed, ...}, 'n_nodes': XXX}
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return
+
+    if not operations:
+        operations = [-1]   
+
+    logs = []
+    for op in operations:
+        get_logs_postdata =  {   'sEcho':6, 
+                                'iColumns':7, 
+                                'iDisplayStart':display_start, 
+                                'iDisplayLength':entries,
+                                'mDataProp_0':0,
+                                'sSearch_0': '',
+                                'bRegex_0':False,
+                                'bSearchable_0':False,
+                                'bSortable_0':True,
+                                'mDataProp_1':1,
+                                'sSearch_1': '',
+                                'bRegex_1':False,
+                                'bSearchable_1':False,
+                                'bSortable_1':True,
+                                'mDataProp_2':2,
+                                'sSearch_2': '',
+                                'bRegex_2':False,
+                                'bSearchable_2':False,
+                                'bSortable_2':True,
+                                'mDataProp_3':3,
+                                'sSearch_3':'',
+                                'bRegex_3':False,
+                                'bSearchable_3':False,
+                                'bSortable_3':False,
+                                'mDataProp_4':4,
+                                'sSearch_4': '',
+                                'bRegex_4':False,
+                                'bSearchable_4':False,
+                                'bSortable_4':False,
+                                'mDataProp_5':5,
+                                'sSearch_5': '',
+                                'bRegex_5':False,
+                                'bSearchable_5':False,
+                                'bSortable_5':False,
+                                'mDataProp_6':6,
+                                'sSearch_6': '',
+                                'bRegex_6':False,
+                                'bSearchable_6':False,
+                                'bSortable_6':False,
+                                'sSearch': '',
+                                'bRegex':False,
+                                'iSortCol_0':2,
+                                'sSortDir_0':'desc',
+                                'iSortingCols':1,
+                                'pid': project_id,
+                                'operation_type': op,
+                                'search_freetext': search}
+        """
+        {
+                                'sEcho': 1,
+                                'iColumns': 7,
+                                'pid' : project_id,
+                                'sSearch': '',
+                                'bRegex':False,
+                                'iDisplayStart' : display_start,                                
+                                'iDisplayLength' : entries,
+                                'operation_type' : op,
+                                'iSortCol_0':2,
+                                'sSortDir_0':'desc',
+                                'iSortingCols':1,                                
+                                'search_freetext' : search
+                                } 
+        """
+    
+        remote_get_logs_url = remote_instance.get_logs_url( project_id )
+        logs += remote_instance.fetch( remote_get_logs_url, get_logs_postdata )['aaData']
+
+    return logs
+
 
 def get_contributor_statistics (skid_list, remote_instance = None, project_id = 1):
     """ Wrapper to retrieve contributor statistics over ALL given skeleton ids
@@ -1207,11 +1327,11 @@ def retrieve_history( remote_instance = None, project_id = 1, start_date = '2016
 
     Parameters:
     ----------
-    remote_instance - CATMAID instance; either pass directly to function or define globally as 'remote_instance'
-    user - single user_id
-    node_count - minimum number of nodes
-    start_date - created after, date needs to be (year,month,day) format
-    end_date - created before, date needs to be (year,month,day) format
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    user :              single user_id
+    node_count :        minimum number of nodes
+    start_date :        created after, date needs to be (year,month,day) format
+    end_date :          created before, date needs to be (year,month,day) format
     """
 
     if remote_instance is None:
@@ -1256,7 +1376,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
 
         print(incursion,':',left, right, top, bottom, z1, z2)      
 
-        remote_nodes_list = remote_instance.get_node_list ( project_id )
+        remote_nodes_list = remote_instance.get_node_list_url ( project_id )
 
         x_y_resolution = 3.8
 

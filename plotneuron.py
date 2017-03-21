@@ -21,7 +21,7 @@ import matplotlib.lines as mlines
 import random, colorsys
 from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
-from pymaid import get_3D_skeleton
+from pymaid import get_3D_skeleton, retrieve_names
 
 def plotneuron(skids, remote_instance, *args, **kwargs):
 	""" 
@@ -35,7 +35,11 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 						list of CATMAID skeleton ids
 	remote_instance :	CATMAID remote instance
 	*args :				list of strings
-						passing neuropil names as *args will cause them to be plotted in gray				
+						neuropil names as *args will cause them to be plotted in gray
+						'synapses' will cause synapses to be plotted
+						'zoom' will zoom in on higher brain centers
+						'synapses_only' will plot only synapses
+
 	**kwargs :			tuples of (r,g,b)
 						passing neuropil names as **kwargs will render them in the provided color
 						r,g,b must be range 0-1
@@ -69,7 +73,12 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 	cre_r = [(558997, -283589), (554341, -283398), (548165, -283924), (540930, -285305), (534608, -286182), (528043, -286263), (520823, -285398), (515759, -281077), (512380, -275247), (509820, -272348), (509193, -270168), (507484, -266435), (503772, -259835), (500777, -255260), (498600, -254098), (497171, -251500), (496627, -248832), (496028, -246159), (495826, -243299), (496217, -239853), (497115, -237139), (498400, -235985), (500947, -234495), (503289, -236081), (503465, -240508), (503700, -247028), (504093, -252167), (505831, -258144), (509679, -262670), (513299, -259975), (517961, -256286), (520891, -251777), (520544, -247662), (520904, -244488), (521539, -241321), (521499, -238485), (520013, -234937), (517571, -228398), (517222, -221791), (518927, -218874), (520458, -217366), (521238, -215068), (522475, -211330), (524039, -206777), (525695, -202243), (526866, -199967), (528045, -198715), (529560, -197643), (531725, -198952), (536505, -200923), (540956, -201736), (544764, -203979), (550273, -206802), (555476, -208224), (558102, -209040), (559313, -209838), (561554, -210767), (565390, -213045), (568917, -215270), (572712, -216933), (576834, -218597), (580956, -219190), (585484, -220692), (587689, -222597), (586331, -225068), (584353, -227577), (582113, -229367), (578867, -230943), (575251, -234757), (573878, -240168), (575743, -242954), (578483, -244278), (581787, -248105), (583599, -253610), (584437, -257311), (584207, -259765), (583619, -263615), (584341, -267375), (585265, -269867), (585129, -273549), (582008, -276756), (574812, -278494), (568248, -280009), (563830, -282095), (560227, -283493), (556603, -283638), (551700, -283337), (544366, -284724), (537722, -285760), (531434, -286405), (524489, -285885), (517696, -284047), (514242, -277729), (510723, -273497), (509401, -271378), (508716, -268569), (505752, -263584), (501971, -256592), (499787, -254781), (497599, -253056), (496964, -249927), (496276, -247736), (495879, -244535), (495921, -241916), (496640, -237972), (497687, -236696), (499428, -235190), (502415, -234569), (503622, -238303), (503322, -243236), (504118, -250475), (504405, -254069), (507785, -261856), (511515, -261678), (515344, -258023), (520146, -254344), (520817, -249308), (520448, -246251), (521428, -242727), (521481, -239997), (521155, -236794), (518631, -232332), (517033, -224447), (517923, -220058), (519887, -218042), (520841, -216492), (521749, -213284), (523283, -209172), (524818, -204386), (526451, -200664), (527284, -199526), (528891, -197949), (530391, -197932), (533713, -200138), (539215, -201419), (542537, -202411), (547417, -205692), (553053, -207562), (557255, -208734), (558596, -209342), (560287, -210368), (563220, -211504), (567483, -214573), (570418, -215827), (575088, -218038), (578580, -218888), (583433, -219719), (586954, -221766), (587533, -223569), (584973, -226576), (583667, -228398), (580308, -230283), (577334, -232162), (573728, -237751), (574838, -241929), (576867, -243613), (580241, -245569), (582960, -251061), (583995, -255708), (584613, -258603), (583712, -261277), (583853, -265930), (584880, -268502), (585386, -271529), (584126, -275450), (578871, -277694), (570911, -279238), (566121, -280922), (562644, -282746)]
 	cre_l = [(675014, -280093), (669755, -278568), (664449, -276974), (658160, -277137), (653002, -279066), (649915, -279958), (645337, -280714), (637818, -281710), (633026, -282120), (629181, -282275), (623647, -281767), (618803, -280285), (615527, -276784), (613915, -272977), (612654, -269393), (610383, -265692), (606299, -262388), (602047, -258996), (599388, -256382), (598046, -252863), (595528, -248227), (592953, -244033), (593573, -240457), (595639, -237453), (597690, -234111), (599174, -228952), (598869, -224351), (599310, -221466), (601239, -218466), (603311, -216980), (605698, -217470), (608917, -218588), (614939, -218965), (620058, -217567), (623846, -216321), (629550, -216003), (635220, -215178), (639003, -213345), (643272, -210707), (649135, -209452), (654991, -208945), (659573, -208386), (662670, -208298), (666208, -209932), (670338, -212105), (673600, -213152), (677475, -216419), (681241, -219727), (682775, -221680), (683763, -226406), (683977, -233845), (684092, -240171), (683729, -245595), (682970, -248997), (683044, -250858), (681942, -253587), (681776, -258502), (683833, -263106), (686346, -265429), (688891, -268342), (690117, -272646), (689739, -277674), (685825, -280080), (680352, -280552), (676691, -280462), (672023, -279342), (667476, -277777), (661176, -276611), (655427, -278104), (651096, -279769), (648361, -280113), (641578, -281375), (634740, -281898), (631548, -282278), (626392, -282107), (621074, -281184), (616923, -278881), (614547, -274611), (613370, -271399), (611685, -267357), (608628, -264126), (603929, -260628), (600564, -257559), (598542, -254979), (597256, -250468), (593786, -246096), (592919, -242124), (594589, -238933), (596686, -235890), (598552, -231879), (599348, -226166), (598576, -222966), (600417, -219938), (602097, -217372), (604604, -217082), (607000, -218015), (611535, -218976), (618117, -218511), (621666, -216662), (626505, -216212), (632587, -215668), (637381, -214436), (640747, -212053), (646196, -209707), (652072, -209384), (657591, -208493), (661184, -208396), (664267, -208630), (668297, -211369), (672162, -212560), (675192, -214300), (679731, -218548), (682194, -220567), (683220, -223487), (684112, -230004), (683817, -237408), (684248, -242709), (683111, -247976), (683038, -249634), (682756, -252300), (681362, -255421), (682745, -261505), (685034, -264137), (687666, -266869), (689786, -270163), (690046, -275310), (688548, -279382), (682712, -280294), (679360, -280692)]
 
-	skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None, silent = True)	
+	if 'skdata' not in kwargs:
+		skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None, silent = True)	
+	else:
+		skdata = kwargs['skdata']
+
+	names = retrieve_names (skids,remote_instance )
 	fig, ax = plt.subplots(figsize = (15,7))	
 
 	args = [a.lower() for a in args]
@@ -81,7 +90,7 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 		else:
 			c = (0.9,0.9,0.9)		
 
-		brain_p = Polygon(brain, closed = True, lw = 0, fill =True, fc = c, alpha = 0.5 )
+		brain_p = Polygon(brain, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 		hole_p = Polygon(hole, closed = True, lw = 0, fill =True, fc = 'white', alpha = 1 )
 
 		ax.add_patch( brain_p )
@@ -153,11 +162,20 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 		ax.add_patch( al_r_p )
 		ax.add_patch( al_l_p )		
 
-	ax.set_ylim( ( -510000, -150000 ) )
-	ax.set_xlim( ( 200000, 1000000 ) )
+	
+	if 'zoom' in args:
+		ax.set_ylim( ( -355333, -150000 ) )
+		ax.set_xlim( ( 380000, 820000 ) )
+	else:
+		ax.set_ylim( ( -510000, -150000 ) )
+		ax.set_xlim( ( 200000, 1000000 ) )
+
 	plt.axis('off')
 
-	colormap = random_colors ( len(skdata) , color_range='RGB') 
+	if len(skdata) > 1:
+		colormap = random_colors ( len(skdata) , color_range='RGB') 
+	else:
+		colormap = [ (float(0),float(0),float(0)) ]
 
 	for i, neuron in enumerate( skdata ):
 		lines = []		
@@ -170,35 +188,45 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 		node_dict = { n[0]: n for n in neuron[0] }		
 		soma = [ n for n in neuron[0] if n[6] > 1000 ]
 		
-		for node in b_points:					
-			if node[1] == None:
-				continue
+		if 'synapses_only' not in args:
+			for node in b_points:					
+				if node[1] == None:
+					continue
 
-			parent = None
-			this_node = node
-			this_line = [ node[3:6] ]
-			while parent not in b_point_ids:				
-				#this_node = [ n for n in neuron[0] if n[0] == this_node[1] ][0]				
-				this_node = node_dict[ this_node[1] ]
-				this_line.append( this_node[3:6] )			
-				parent = list_of_parents[ this_node[0] ]
+				parent = None
+				this_node = node
+				this_line = [ node[3:6] ]
+				while parent not in b_point_ids:				
+					#this_node = [ n for n in neuron[0] if n[0] == this_node[1] ][0]				
+					this_node = node_dict[ this_node[1] ]
+					this_line.append( this_node[3:6] )			
+					parent = list_of_parents[ this_node[0] ]
 
-				if parent is None:
-					break				
+					if parent is None:
+						break
 
-			lines.append( this_line )				
-		
-		for k,l in enumerate( lines ):
-			if k == 0:
-				this_line = mlines.Line2D( [ x[0] for x in l ],[ -y[1] for y in l  ], lw = 1 , alpha = 0.7, color = colormap[i], label = '#%s' % skids[i] ) 			
-			else:
-				this_line = mlines.Line2D( [ x[0] for x in l ],[ -y[1] for y in l  ], lw = 1 , alpha = 0.7, color = colormap[i]) 
-			ax.add_line(this_line)	
+					if parent in b_point_ids:
+						this_line.append( node_dict[ parent ][3:6] )	
 
-		if soma:			
-			s = Circle( ( int( soma[0][3] ), int( -soma[0][4] ) ), radius = soma[0][6] , alpha = 0.7, fill = True, color = colormap[i] )
-			ax.add_patch(s)
+				lines.append( this_line )				
+			
+			for k,l in enumerate( lines ):
+				if k == 0:
+					this_line = mlines.Line2D( [ x[0] for x in l ],[ -y[1] for y in l  ], lw = 1 , alpha = .9 , color = colormap[i], label = '%s - #%s' % (names[skids[i]], skids[i]) ) 			
+				else:
+					this_line = mlines.Line2D( [ x[0] for x in l ],[ -y[1] for y in l  ], lw = 1 , alpha = .9 , color = colormap[i]) 
+				ax.add_line(this_line)	
 
+			if soma:			
+				s = Circle( ( int( soma[0][3] ), int( -soma[0][4] ) ), radius = soma[0][6] , alpha = .9, fill = True, color = colormap[i], zorder=4, edgecolor='none' )
+				ax.add_patch(s)
+
+		if 'synapses' in args or 'synapses_only' in args:
+			print('Plotted %i pre- and %i postsynapses' % ( len([ c for c in neuron[1] if c[2] == 0 ]), len([ c for c in neuron[1] if c[2] == 1 ]) ) )			
+			#postsynapses
+			ax.scatter( [ c[3] for c in neuron[1] if c[2] == 1 ],[ -c[4] for c in neuron[1] if c[2] == 1 ], c='blue', alpha = 1, zorder=4, edgecolor='none' )
+			#presynapses
+			ax.scatter( [ c[3] for c in neuron[1] if c[2] == 0 ],[ -c[4] for c in neuron[1] if c[2] == 0 ], c='red', alpha = 1, zorder=4, edgecolor='none' )
 
 	return fig, ax
 
