@@ -724,7 +724,7 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
     
     Parameters:
     ----------
-    connector_ids :     list of connector ids; can be found e.g. from compact skeletons
+    skids :             list of skeleton ids
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
     incoming_synapses : boolean (default = True)
                         if True, incoming synapses will be retrieved
@@ -748,6 +748,9 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
         else:
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return    
+
+    if type(skids) != type(list()):
+        skids = [skids]
 
     get_connectors_GET_data = { 'with_tags': 'false' }
 
