@@ -65,7 +65,7 @@ print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for
 
 ## Available wrappers:
 Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
-Use help() to learn more about their function, parameters and usage.
+Use e.g. `help(get_edges)` to learn more about their function, parameters and usage.
 
 - `add_annotations()`: use to add annotation(s) to neuron(s)
 - `get_3D_skeleton()`: get a neurons skeleton - i.e. what the 3D viewer in CATMAID shows
