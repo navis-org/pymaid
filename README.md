@@ -3,7 +3,7 @@ pymaid
 
 Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 
-`pymaid` is the basic library to connect to CATMAID servers and fetch data
+`pymaid` is the low level library to connect to CATMAID servers and fetch data. Most data is not reformatted after response from the server.
 
 `catmaid_igraph` contains a wrapper to turn CATMAID skeletons in [iGraph](http://www.igraph.org) objects which can then be used to e.g. quickly calculate geodesic (along the arbor) distances and cluster synapses. 
 
