@@ -76,8 +76,8 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `get_logs()`: get what the log widged shows (merges, splits, etc.)
 - `get_review()`: get review status for set of neurons
 - `get_review_details()`: get review status (reviewer + timestamp) for each individual node
-- `get_neuron_annotation()`: get annotations of a **single** neuron
-- `get_annotations_from_list()`: get annotations of a set of neurons
+- `get_neuron_annotation()`: get annotations of a **single** neuron (includes user and timestamp)
+- `get_annotations_from_list()`: get annotations of a set of neurons (annotation only)
 - `get_neurons_in_volume()`: get neurons in a defined box volume
 - `get_contributor_statistics()`: get contributors (nodes, synapses, etc) for a set of neurons
 - `retrieve_skids_by_annotation()`: get skeleton IDs that are annotated with a given annotation
