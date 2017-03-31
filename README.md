@@ -67,24 +67,27 @@ print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for
 Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
 Use help() to learn more about their function, parameters and usage.
 
-- add_annotations
-- get_3D_skeleton
-- get_arbor
-- get_edges
-- get_connectors
-- get_review
-- get_neuron_annotation
-- get_neurons_in_volume
-- get_annotations_from_list
-- get_contributor_statistics
-- retrieve_annotation_id
-- retrieve_skids_by_annotation
-- retrieve_skeleton_list
-- retrieve_history
-- retrieve_partners
-- retrieve_names
-- retrieve_node_lists
-- skid_exists
+- `add_annotations()`: use to add annotation(s) to neuron(s)
+- `get_3D_skeleton()`: get a neurons skeleton - i.e. what the 3D viewer in CATMAID shows
+- `get_arbor()`: similar to get_3D_skeleton but more detailed information on connectors
+- `get_edges()`: get edges (connections) between sets of neurons
+- `get_connectors()`: get connectors (synapses, abutting and/or gap junctions) for set of neurons
+- `get_connector_details()`: get details for connector (i.e. all neurons connected to it)
+- `get_logs()`: get what the log widged shows (merges, splits, etc.)
+- `get_review()`: get review status for set of neurons
+- `get_review_details()`: get review status (reviewer + timestamp) for each individual node
+- `get_neuron_annotation()`: get annotations of a **single** neuron
+- `get_annotations_from_list()`: get annotations of a set of neurons
+- `get_neurons_in_volume()`: get neurons in a defined box volume
+- `get_contributor_statistics()`: get contributors (nodes, synapses, etc) for a set of neurons
+- `retrieve_skids_by_annotation()`: get skeleton IDs that are annotated with a given annotation
+- `retrieve_skids_by_name()`: get skeleton IDs of neurons with given names
+- `retrieve_skeleton_list()`: retrieve neurons that fit certain criteria (e.g. user, size, dates)
+- `retrieve_history()`: retrieve project history similar to the project statistics widget
+- `retrieve_partners()`: retrieve connected partners for a list of neurons
+- `retrieve_names()`: retrieve names of a set of skeleton IDs
+- `retrieve_node_lists()`: retrieve list of nodes within given volume
+- `skid_exists()`: checks if a skeleton ID exists
 
 ## License:
 This code is under GNU GPL V3
