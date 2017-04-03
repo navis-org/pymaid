@@ -71,6 +71,9 @@ clusters = cluster.hierarchy.fcluster( syn_linkage, 2, criterion='maxclust')
 print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
 ```
 
+## Additional examples:
+Check out [/examples/](https://github.com/schlegelp/PyMaid/tree/master/examples) for a growing list of Jupyter notebooks.
+
 ## Available wrappers:
 Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
 Use e.g. `help(get_edges)` to learn more about their function, parameters and usage.
