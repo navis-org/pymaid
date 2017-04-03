@@ -18,6 +18,11 @@
 
 from pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
 import math
+import time
+try:
+	from catmaid_igraph import igraph_from_skeleton
+except:
+	print('Import of catmaid_igraph failed - likely due to iGraph package missing: cut_neuron2() will not work!')
 
 def generate_list_of_childs(skdata):
 	""" Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -102,9 +107,82 @@ def downsample_neuron ( skdata, resampling_factor):
 
 	return [ new_nodes, skdata[1] ]
 
+def cut_neuron2( skdata, cut_node, g = None ):
+	""" Uses igraph to Cut the neuron at given point and returns two new neurons. Creating
+	the iGraph is the bottleneck - if you already have it, pass it along to speed things up!
+
+	Parameter
+	---------
+	skdata : 		CATMAID skeleton data (including connector data)
+	cut_node :		ID of the node to cut
+	g (optional):	iGraph of skdata - if not provided it will be generated
+
+	Returns
+	-------
+	[1] neuron_dist :	distal to the cut
+	[2] neuron_prox :	proximal to the cut
+	"""
+	start_time = time.time()	 
+
+	if g is None:
+		#Generate iGraph -> order/indices of vertices are the same as in skdata
+		g = igraph_from_skeleton(skdata)
+
+	print('Cutting neuron...')
+	#Select nodes with the correct ID as cut node
+	cut_node_igraph = g.vs.select( node_id=int(cut_node) )
+
+	#Should have found only one cut node
+	if len(cut_node_igraph) != 1:
+		print('Error: Found %i nodes with that ID - please double check!')
+		return 
+
+	#Select the cut node's parent
+	parent_node_igraph = g.vs.select( node_id=cut_node_igraph[0]['parent_id'] )
+
+	#Get minimum cut between those two nodes (i.e. remove this one edge)
+	#Attention: for some reason, we have to make sure that source (first argument) is the higher index and target (second argument) is lower index
+	source = min( [ cut_node_igraph[0].index , parent_node_igraph[0].index  ] )
+	target = max( [ cut_node_igraph[0].index , parent_node_igraph[0].index  ] )
+
+	mc = g.st_mincut( source , target , capacity=None )
+
+	#mc.partition holds the two partitions with mc.partition[0] holding part with the source and mc.partition[1] the target
+	if g.vs.select(mc.partition[0]).select(node_id=int(cut_node)):
+		dist_partition = mc.partition[0]
+		prox_partition = mc.partition[1]
+	else:
+		dist_partition = mc.partition[1]
+		prox_partition = mc.partition[0]
+
+	#Partitions hold the indices -> now we have to translate this into node ids
+	dist_partition_ids = g.vs.select(dist_partition)['node_id']
+
+	neuron_dist = [ [] , [] ]
+	neuron_prox = [ [] , [] ]
+
+	for n in skdata[0]:
+		if n[0] in dist_partition_ids:
+			neuron_dist[0].append( n )
+		else:
+			neuron_prox[0].append( n )
+
+	#Change cut_node to be the root node in distal neuron
+	neuron_dist[0][ [ neuron_dist[0].index(e) for e in neuron_dist[0] if e[0] == int(cut_node) ][0] ][1] = None
+
+	#Add synapses
+	neuron_dist[1] = [ s for s in skdata[1] if s[0] in dist_partition_ids ]
+	neuron_prox[1] = [ s for s in skdata[1] if s[0] not in dist_partition_ids ]		
+
+	print('Cutting finished in', round ( time.time()- start_time ) , 's' )	
+	print('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
+	print('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
+
+	return neuron_dist, neuron_prox
+
 
 def cut_neuron( skdata, cut_node ):
-	""" Cuts the neurons at given point and returns two new neurons.
+	""" Cuts a neuron at given point and returns two new neurons.
 
 	Parameter
 	---------
@@ -113,19 +191,19 @@ def cut_neuron( skdata, cut_node ):
 
 	Returns
 	-------
-	neuronA :	distal to the cut
-	neuronB :	proximal to the cut
+	[1] neuron_dist :	distal to the cut
+	[2] neuron_prox :	proximal to the cut
 	"""
+	start_time = time.time()
 
 	list_of_childs  = generate_list_of_childs(skdata)
 	list_of_parents = { n[0]:n[1] for n in skdata[0] }
 
-
 	if len( list_of_childs[ cut_node ] ) == 0:
-		print('Can not cut: cut_node is a leaf node!')
+		print('Cannot cut: cut_node is a leaf node!')
 		return
 	elif list_of_parents[ cut_node ] == None:
-		print('Can not cut: cut_node is a root node!')
+		print('Cannot cut: cut_node is a root node!')
 		return
 
 	end_nodes = list ( set( [ n for n in list_of_childs if len(list_of_childs[n]) == 0 ] + [ cut_node ] ) ) 
@@ -166,16 +244,16 @@ def cut_neuron( skdata, cut_node ):
 	distal_nodes.remove( cut_node )
 	proximal_nodes = list ( set(proximal_nodes) )
 
-	neuronA = [ [ n for n in skdata[0] if n[0] in distal_nodes ] , [ c for c in skdata[1] if c[0] in distal_nodes ] ]	
-	neuronA[0].append( [ [ n[0], None , n[2], n[3], n[4], n[5], n[6], n[7] ] for n in skdata[0] if n[0] == cut_node ][0] )
+	neuron_dist = [ [ n for n in skdata[0] if n[0] in distal_nodes ] , [ c for c in skdata[1] if c[0] in distal_nodes ] ]	
+	neuron_dist[0].append( [ [ n[0], None , n[2], n[3], n[4], n[5], n[6], n[7] ] for n in skdata[0] if n[0] == cut_node ][0] )
 
-	neuronB = [ [ n for n in skdata[0] if n[0] in proximal_nodes ] , [ c for c in skdata[1] if c[0] in proximal_nodes ] ]
+	neuron_prox = [ [ n for n in skdata[0] if n[0] in proximal_nodes ] , [ c for c in skdata[1] if c[0] in proximal_nodes ] ]
 
-	print('Done!')
-	print('Distal to cut node: %i nodes' % len( neuronA[0] ) )
-	print('Proximal to cut node: %i nodes' % len( neuronB[0] ) )
+	print('Cutting done after', round ( time.time()- start_time ) , 's' )	
+	print('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
+	print('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
 
-	return neuronA, neuronB
+	return neuron_dist, neuron_prox
 
 def synapse_root_distances(skid, skdata, remote_instance, pre_skid_filter = [], post_skid_filter = [] ):    
 	""" Calculates distance of synapses to root (i.e. soma)
@@ -189,8 +267,8 @@ def synapse_root_distances(skid, skdata, remote_instance, pre_skid_filter = [], 
 
 	Returns
 	-------
-	pre_node_distances :	{'connector_id: distance_to_root[nm]'} for all presynaptic sistes of this neuron
-	post_node_distances :	{'connector_id: distance_to_root[nm]'} for all postsynaptic sites of this neuron
+	[1] pre_node_distances :	{'connector_id: distance_to_root[nm]'} for all presynaptic sistes of this neuron
+	[2] post_node_distances :	{'connector_id: distance_to_root[nm]'} for all postsynaptic sites of this neuron
 	"""
 
 	cn_details = get_connector_details ( [ c[1] for c in skdata[1] ] , remote_instance = remote_instance)   
@@ -232,10 +310,20 @@ def calc_dist(v1,v2):
     return math.sqrt(sum(((a-b)**2 for a,b in zip(v1,v2))))
 
 def walk_to_root( start_node, list_of_parents, visited_nodes ):
-    """
+    """ Walks to root from start_node and sums up geodesic distances along the way.     
+
+    Parameters:
+    -----------
     start_node :        (node_id, x,y,z)
     list_of_parents :   {node_id: (parent_id, x,y,z) }
     visited_nodes :     {node_id: distance_to_root}
+    					Make sure to not walk the same path twice by keeping track of visited
+    					nodes and their distances to soma
+
+    Returns:
+    --------
+    [1] distance_to_root
+    [2] updated visited_nodes
     """
     dist = 0
     distances_traveled = []
@@ -263,10 +351,16 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
     return round ( sum( distances_traveled ) ), visited_nodes
 
 if __name__ == '__main__':
+	"""
+	#Connect to your CATMAID server
+	#Alternatively do:
+	from pymaid import CATMAIDInstance
+	rm = CatmaidInstance( 'www.your.catmaid-server.org' , 'HTTP-USER' , 'HTTP-PASSWORD', 'TOKEN' )
+	"""
 	from connect_catmaid import connect_adult_em
-	from pymaid import get_3D_skeleton
-
 	rm = connect_adult_em()
+
+	from pymaid import get_3D_skeleton	
 
 	skdata = get_3D_skeleton( [2333007], rm)[0]     
 
