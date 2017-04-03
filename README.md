@@ -17,7 +17,7 @@ First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in term
 `pip install git+git://github.com/schlegelp/pymaid@master`  
 This command should also work to update the package.
 
-*Attention*: on Windows, the dependencies (i.e. Numpy, SciPy) will likely fail to install unless the are already part of your Python distribution (e.g. [Anaconda](https://www.continuum.io/downloads)). In that case, you can choose to install pymaid manually by downloading them into a directory of your choice and adding that path to your Python `PATH` variable.
+*Attention*: on Windows, the dependencies (i.e. Numpy and SciPy) will likely fail to install unless they are already part of your Python distribution (e.g. [Anaconda](https://www.continuum.io/downloads)). In that case, you can choose to install pymaid manually by downloading them into a directory of your choice and adding that path to your Python `PATH` variable.
 
 #### Dependencies (in case you need to install manually):
 `pymaid` uses standard Python 3 libraries
