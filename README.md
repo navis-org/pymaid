@@ -11,14 +11,22 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 `plotneuron` is a wrapper to generate 2D morphology plots of neurons
 
-## Dependencies:
+## Installation
+I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
+First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in terminal:
+`pip install git+git://github.com/schlegelp/pymaid@master`  
+This command should also work to update the package.
+
+*Attention*: on Windows, the dependencies (i.e. Numpy, SciPy) will likely fail to install unless the are already part of your Python distribution (e.g. [Anaconda](https://www.continuum.io/downloads)). In that case, you can choose to install pymaid manually by downloading them into a directory of your choice and adding that path to your Python `PATH` variable.
+
+#### Dependencies (in case you need to install manually):
 `pymaid` uses standard Python 3 libraries
 
 `catmaid_igraph` requires [iGraph](http://www.igraph.org), [SciPy](http://www.scipy.org), [Numpy](http://www.scipy.org) and [Matplotlib](http://www.matplotlib.org)
 
 `plotneuron` requires [matplotlib](http://matplotlib.org/)
 
-`natpy` uses standard Python 3 libraries
+`natpy` uses standard Python 3 libraries, [iGraph](http://www.igraph.org) is optional 
 
 ## Basic examples:
 
