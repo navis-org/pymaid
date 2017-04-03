@@ -34,11 +34,13 @@ This command should also work to update the package.
 ```python
 from pymaid import CatmaidInstance, get_3D_skeleton
 
-#Initiate Catmaid instance 
+#Initialize Catmaid instance 
 myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 
-#Retrieve skeleton data for two neurons 
-skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
+#Retrieve skeleton data for two neurons
+skdata = get_3D_skeleton ( ['12345','67890'] , myInstance )
+#e.g. skdata[0][0] holds the nodes of skeleton '12345' 
+#while skdata[0][1] holds connectors of skeleton '12345'
 ```
 ### Cluster synapses based on distance along the arbor using iGraph
 ```python
