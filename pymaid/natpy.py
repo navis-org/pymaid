@@ -16,7 +16,7 @@
     along
 """
 
-from pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
+from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
 import math
 import time
 import logging

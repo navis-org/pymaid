@@ -21,7 +21,7 @@ import matplotlib.lines as mlines
 import random, colorsys, logging
 from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
-from pymaid import get_3D_skeleton, retrieve_names
+from pymaid.pymaid import get_3D_skeleton, retrieve_names
 
 def plotneuron(skids, remote_instance, *args, **kwargs):
 	""" 
