@@ -21,13 +21,16 @@ Basic example:
 
 from pymaid import CatmaidInstance, get_3D_skeleton
 
-myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
+#HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a http authentification
+myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'HTTP_USER' , 'HTTP_PASSWORD', 'TOKEN' )
 skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
 
 Additional examples:
 -------------------
 
 Please open pymaid.py and check out if __name__ == '__main__' for additional examples
+
+Also see https://github.com/schlegelp/PyMaid for Jupyter notebooks
 
 Contents:
 -------
@@ -46,7 +49,8 @@ import http.cookiejar as cj
 import time
 import base64
 import threading
-import time
+import datetime
+import logging
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -61,15 +65,21 @@ class CatmaidInstance:
                     The http password.
     authtoken :     string
                     User token - see CATMAID documentation on how to retrieve it.
+    logger :        optional
+                    provide name for logging.getLogger if you like the CATMAID instance to log to a specific logger
+                    by default (None), a dedicated logger __name__ is created
+    debug :         boolean (optional)
+                    if True, logging level is set to 'DEBUG' (default is 'INFO')
 
     Methods
     -------
     fetch ( url, post = None )
         retrieves information from CATMAID server
     get_XXX_url ( pid , sid , X )
-        <CatmaidInstance> class contains a long list of function that generate URLs to request data from the CATMAID server.
-        Use dir(<CatmaidInstance>) to get the full list. Most of these functions require a project id (pid) and a stack id (sid)
-        some require additional parameters, for example a skeleton id (skid). 
+        <CatmaidInstance> class contains a long list of function that generate URLs 
+        to request data from the CATMAID server. Use dir(<CatmaidInstance>) to get 
+        the full list. Most of these functions require a project id (pid) and a stack 
+        id (sid) some require additional parameters, for example a skeleton id (skid). 
 
     Examples:
     --------
@@ -92,12 +102,32 @@ class CatmaidInstance:
     
     """
 
-    def __init__(self, server, authname, authpassword, authtoken):
+    def __init__(self, server, authname, authpassword, authtoken, logger = None, debug=False ):
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
         self.authtoken = authtoken
-        self.opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler())    
+        self.opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler())            
+
+        #If pymaid is not run as module, make sure logger has a at least a StreamHandler
+        if not logger:
+            self.logger = logging.getLogger(__name__) 
+            sh = logging.StreamHandler()
+            sh.setLevel(logging.DEBUG)
+            #Create formatter and add it to the handlers
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            sh.setFormatter(formatter)
+
+            self.logger.addHandler(sh)
+
+            if not debug:
+                self.logger.setLevel(logging.INFO)
+            else:
+                self.logger.setLevel(logging.DEBUG)
+        else:
+            self.logger = logging.getLogger(logger)
+
+        self.logger.info('CATMAID instance created')
 
     def djangourl(self, path):
         """ Expects the path to lead with a slash '/'. """
@@ -167,7 +197,7 @@ class CatmaidInstance:
         """ Use to parse url for names for a list of skeleton ids (does need post data: pid, skid). """
         return self.djangourl("/" + str(pid) + "/skeletons/")
 
-    def get_completed_connector_links(self,pid):
+    def get_completed_connector_links(self, pid):
         """ Use to parse url for retrieval of completed connector links by given user 
         GET request: 
         Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id, link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id, link2_confidence, creator_id ]
@@ -230,7 +260,7 @@ class CatmaidInstance:
         """
         return self.djangourl("/" + str(pid) + "/annotations/skeletons/list" )      
 
-    def get_review_details_url ( self, pid,  skid):
+    def get_review_details_url(self, pid, skid):
         """ Use to retrieve review status for every single node of a skeleton.      
         For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         Returns list of arbors, the nodes the contain and who has been reviewing them at what time  
@@ -330,7 +360,7 @@ class CatmaidInstance:
         """
         return self.djangourl("/" + str(pid) + "/skeletons/confidence-compartment-subgraph" )
     
-    def get_skeletons_from_neuron_id(self,neuron_id,pid):
+    def get_skeletons_from_neuron_id(self, neuron_id, pid):
         """ Use to get all skeletons of a given neuron (neuron_id). """
         return self.djangourl("/" + str(pid) + "/neuron/" + str(neuron_id) + '/get-all-skeletons' )
     
@@ -339,7 +369,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(pid) + "/stats/user-history" )
   
 
-def retrieve_urls_threaded( urls , remote_instance, post_data = [], time_out = None , silent = False ):
+def retrieve_urls_threaded( urls , remote_instance, post_data = [], time_out = None ):
     """ Wrapper to retrieve a list of urls using threads
 
     Parameters:
@@ -366,18 +396,18 @@ def retrieve_urls_threaded( urls , remote_instance, post_data = [], time_out = N
     if time_out is None:
         time_out = max( [ len( urls ) , 20 ] ) 
 
-    print('Creating threads to retrieve data')
+    remote_instance.logger.info('Creating %i threads to retrieve data' % len(urls) )
     for i, url in enumerate(urls):
         if post_data:
             t = retrieveUrlThreaded ( url, remote_instance, post_data = post_data[i] )
         else:
             t = retrieveUrlThreaded ( url, remote_instance )
         t.start()
-        threads[ str(i) ] = t
-        if not silent:
-            print('\r Threads: '+str( len ( threads ) ) ,end='')  
+        threads[ str(i) ] = t        
+        remote_instance.logger.debug('Threads: %i' % len ( threads ) )  
+    remote_instance.logger.info('%i threads generated.' % len(threads) )
 
-    print('\n Joining threads...') 
+    remote_instance.logger.debug('Joining threads...') 
 
     start = cur_time = time.time()
     joined = 0
@@ -391,16 +421,16 @@ def retrieve_urls_threaded( urls , remote_instance, post_data = [], time_out = N
                 threads_closed.append(t)
         time.sleep(1)
         cur_time = time.time()
-        if not silent:
-            print('\r Closing Threads: %i ( %is until time out )' % ( len( threads_closed ) , round( time_out - ( cur_time - start ) ) )  ,end='')             
+
+        remote_instance.logger.debug('Closing Threads: %i ( %is until time out )' % ( len( threads_closed ) , round( time_out - ( cur_time - start ) ) ) )             
 
     if cur_time > (start + time_out):        
-        print('\n !WARNING: Timeout while joining threads. Retrieved only %i of %i urls' % (len( [ d for d in data if d != None ] ),len(threads)))  
+        remote_instance.logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % ( len( [ d for d in data if d != None ] ), len(threads) ) )  
         for t in threads:
             if t not in threads_closed:
-                print('Did not close thread for url:', urls[ int( t ) ] )      
+                remote_instance.logger.warning('Did not close thread for url: ' + urls[ int( t ) ] )
     else:
-        print('\n Success! %i of %i urls retrieved.' % ( len(threads_closed) , len( urls ) ) )
+        remote_instance.logger.info('Success! %i of %i urls retrieved.' % ( len(threads_closed) , len( urls ) ) )
     
     return data
 
@@ -416,7 +446,7 @@ class retrieveUrlThreaded(threading.Thread):
             self.tag_flag = 1
             self.remote_instance = remote_instance
         except:
-            print('!Error initiating thread for',self.url)
+            remote_instance.logger.error('Failed to initiate thread for ' + self.url )
 
     def run(self):
         """
@@ -433,10 +463,10 @@ class retrieveUrlThreaded(threading.Thread):
             threading.Thread.join(self)
             return self.data
         except:
-            print('!ERROR joining thread for',self.url)
+            remote_instance.logger.error('Failed to join thread for ' + self.url )
             return None
 
-def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, time_out = None, silent = False, project_id = 1):
+def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, time_out = None, project_id = 1):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids
 
     Parameters:
@@ -445,14 +475,12 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     remote_instance :   CATMAID instance
                         Either pass directly to function or define globally as 'remote_instance'
     connector_flag :    set if connector data should be retrieved. Possible values = 0/False or 1/True
-    tag_flag :          set if tags should be retrieved. Possible values = 0/False or 1/True
-    silent :            boolean
-                        If True, details of the retrieval will not be printed to the consol. Useful to not crowd terminal if it does not allow cartridge return!         
+    tag_flag :          set if tags should be retrieved. Possible values = 0/False or 1/True    
     time_out :          integer or None
                         After this number of second, fetching skeleton data will time out (so as to not block the system)
                         If set to None, time out will be max( [ 20, len(skids) ] ) - e.g. 100s for 100 skeletons but at least 20s
     get_history:        boolean
-                        if True, the returned skeleton data will contain creation date n[8] and last modified n[9] for each node -> compact-details url the 'with_history' option is used in this case
+                        if True, the returned skeleton data will contain creation date ([8]) and last modified ([9]) for each node -> compact-details url the 'with_history' option is used in this case
                         ATTENTION: if get_history = True, nodes/connectors that have been moved since their creation will have multiple entries reflecting their changes in position! 
                         Each state has the date it was modified as creation date and the next state's date as last modified. The most up to date state has the original creation date as last modified (full circle).
                         The creator_id is always the original creator though.
@@ -460,8 +488,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     Returns:
     -------
     list of 3D skeleton data in the same order as the list of skids passed as parameter: 
-        [ [ [neuron1_nodes], [neuron1_connectors], [neuron1_tags] ], [ neuron2_nodes, ... ], [... ], ... ]
-    
+        [ [ [neuron1_nodes], [neuron1_connectors], [neuron1_tags] ], [ neuron2_nodes, ... ], [... ], ... ]   
 
     """
 
@@ -503,7 +530,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
             #'True'/'False' needs to be lower case
             urls.append (  remote_compact_skeleton_url.lower() )
 
-    skdata = retrieve_urls_threaded( urls, remote_instance, time_out = time_out, silent = silent )
+    skdata = retrieve_urls_threaded( urls, remote_instance, time_out = time_out )
 
     return skdata     
 
@@ -537,7 +564,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
 
         sk_data.append(arbor_data)
 
-        print('%s retrieved' % str(skeleton_id))
+        remote_instance.logger.debug('%s retrieved' % str(skeleton_id) )
 
     return (sk_data)
 
@@ -656,7 +683,7 @@ def retrieve_node_lists (skids, remote_instance = None, project_id = 1):
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    print('Retrieving %i node tables...' % len(skids))   
+    remote_instance.logger.info('Retrieving %i node table(s)...' % len(skids))   
 
     nodes = {}
 
@@ -665,23 +692,23 @@ def retrieve_node_lists (skids, remote_instance = None, project_id = 1):
 
         remote_nodes_list_url = remote_instance.get_skeleton_nodes_url( project_id , skid )
 
-        print('Retrieving node table of %s [%i of %i]...' % (str(skid),run,len(skids)), end = ' ')        
+        remote_instance.logger.debug('Retrieving node table of %s [%i of %i]...' % (str(skid),run,len(skids)))        
 
         try:
             node_list = remote_instance.fetch( remote_nodes_list_url )
         except:
-            print('Time out on first try')
+            remote_instance.logger.warning('Time out while retrieving node table - retrying...')
             time.sleep(.5)
             try:
                 node_list = remote_instance.fetch( remote_nodes_list_url )
-                print('Success on second attempt')
+                remote_instance.logger.warning('Success on second attempt!')
             except:
-                print('Unable to retrieve')
+                remote_instance.logger.errror('Unable to retrieve node table')
 
         #Data format: node_id, parent_node_id, confidence, x, y, z, radius, creator, last_edition_timestamp
 
         nodes[skid] = node_list
-        print('Done')
+        remote_instance.logger.debug('Done')
 
         run += 1    
 
@@ -695,7 +722,9 @@ def get_edges (skids, remote_instance = None):
     skids :             list of skeleton ids
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
 
-    Returns list of edges: [source_skid, target_skid, weight]
+    Returns:
+    --------
+    list of edges:      [source_skid, target_skid, weight]
 
     """
 
@@ -725,7 +754,8 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance 
+                        either pass directly to function or define globally as 'remote_instance'
     incoming_synapses : boolean (default = True)
                         if True, incoming synapses will be retrieved
     outgoing_synapses : boolean (default = True)
@@ -820,7 +850,7 @@ def get_connector_details (connector_ids, remote_instance = None, project_id = 1
 
     connectors = remote_instance.fetch( remote_get_connectors_url , get_connectors_postdata )    
 
-    print('Data for %i of %i connectors retrieved' %(len(connectors),len(connector_ids)))
+    remote_instance.logger.info('Data for %i of %i connectors retrieved' %(len(connectors),len(connector_ids)))
         
     return(connectors)
 
@@ -858,7 +888,7 @@ def get_review (skids, remote_instance = None, project_id = 1):
     return(review_status)
    
 def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
-    """ Wrapper to retrieve annotations of a SINGLE neuron
+    """ Wrapper to retrieve annotations of a SINGLE neuron - contains timestamps and user_id
     
     Parameters:
     ----------
@@ -937,7 +967,7 @@ def retrieve_annotation_id( annotation, remote_instance = None, project_id = 1 )
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    print('Retrieving list of annotations...')
+    remote_instance.logger.info('Retrieving list of annotations...')
 
     remote_annotation_list_url = remote_instance.get_annotation_list( project_id )
     annotation_list = remote_instance.fetch( remote_annotation_list_url )
@@ -948,7 +978,7 @@ def retrieve_annotation_id( annotation, remote_instance = None, project_id = 1 )
             #print(dict['name'])
             if dict['name'] == annotation:
                 annotation_id = dict['id']
-                print('Found matching annotation!')
+                remote_instance.logger.debug('Found matching annotation!')
                 break
             else:
                 annotation_id = 'not found'
@@ -963,7 +993,7 @@ def retrieve_annotation_id( annotation, remote_instance = None, project_id = 1 )
                 annotation.remove( dict['name'] )  
     
         if len(annotation) != 0:
-            print('Could not retrieve annotation id for:', annotation)
+            remote_instance.logger.warning('Could not retrieve annotation id for: ' + annotation)
 
         return(annotation_ids)  
 
@@ -1014,16 +1044,16 @@ def retrieve_skids_by_annotation(annotation, remote_instance = None, project_id 
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    print('Looking for Annotation(s):',annotation) 
+    remote_instance.logger.info('Looking for Annotation(s): ' + annotation) 
     annotation_ids = retrieve_annotation_id(annotation, remote_instance)
 
     if type(annotation) == type( list() ):
-        print('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotation)-len(annotation_ids) ))  
+        remote_instance.logger.debug('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotation)-len(annotation_ids) ))  
     elif type(annotation) == type( str() ):
-        print('Found id: %s | Unable to retrieve: %i' % ( str(annotation_ids[0]) , 1 - len(annotation_ids) ))
+        remote_instance.logger.debug('Found id: %s | Unable to retrieve: %i' % ( str(annotation_ids[0]) , 1 - len(annotation_ids) ))
 
     annotated_skids = []
-    print('Retrieving skids of annotated neurons...')
+    remote_instance.logger.info('Retrieving skids of annotated neurons...')
     for an_id in annotation_ids:
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0, 'range_length':500, 'with_annotations':False}
@@ -1048,7 +1078,7 @@ def get_annotations_from_list(skid_list, remote_instance = None, project_id = 1 
 
     Returns:
     --------
-
+    dict :              {skeleton_id : [annnotation, annotation, annotation], ... }
     """
 
     if remote_instance is None:
@@ -1090,7 +1120,6 @@ def add_annotations ( skid_list, annotations, remote_instance = None, project_id
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
 
     Returns nothing
-
     """
 
     if remote_instance is None:
@@ -1118,7 +1147,7 @@ def add_annotations ( skid_list, annotations, remote_instance = None, project_id
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str( annotations[i] )
 
-    print( remote_instance.fetch( add_annotations_url , add_annotations_postdata ) )
+    remote_instance.logger.info( remote_instance.fetch( add_annotations_url , add_annotations_postdata ) )
 
     return 
 
@@ -1144,7 +1173,7 @@ def get_review_details ( skid_list, remote_instance = None, project_id = 1):
         #For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         post_data.append ( { 'placeholder' : 0 } )
 
-    rdata = retrieve_urls_threaded( urls , remote_instance, post_data = post_data, time_out = None , silent = False )           
+    rdata = retrieve_urls_threaded( urls , remote_instance, post_data = post_data, time_out = None )           
 
     for neuron in rdata:
         #There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
@@ -1331,16 +1360,30 @@ def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, st
 
     return skid_list
 
-def retrieve_history( remote_instance = None, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08'):    
+def retrieve_history( remote_instance = None, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ):    
     """ Wrapper to retrieves CATMAID history 
+    Attention: If the time window is too large, the connection might time out which will result in an error!
 
     Parameters:
     ----------
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
-    user :              single user_id
-    node_count :        minimum number of nodes
-    start_date :        created after, date needs to be (year,month,day) format
-    end_date :          created before, date needs to be (year,month,day) format
+    user :              single user_id    
+    start_date :        created after, date needs to be (year,month,day) format - e.g. '2016-10-29'
+    end_date :          created before, date needs to be (year,month,day) format - e.g. '2017-10-29'
+    split :             boolean
+                        If True, history will be requested in bouts of 6 months
+                        Useful if you want to look at a very big time window as this can lead to gateway timeout
+
+    Returns:
+    --------
+    project_stats :     dict
+                        {   'days': ['yearmonthday','yearmonthday',...] , 
+                            'stats_table': { 'user_ID': {  'yearmonthday': {    'new_treenodes': int, 
+                                                                                'new_reviewed_nodes': int,
+                                                                                'new_connectorts': int },
+                                                        },
+                                                        } , 
+                            'daysformatted': ['day string formated', ... ] }
     """
 
     if remote_instance is None:
@@ -1350,18 +1393,49 @@ def retrieve_history( remote_instance = None, project_id = 1, start_date = '2016
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    get_history_GET_data = {    'pid': project_id ,
-                                'start_date': start_date,
-                                'end_date': end_date
-                                    }
+    rounds = []
+    if split:
+        start = datetime.datetime.strptime( start_date , "%Y-%m-%d").date()
+        end = datetime.datetime.strptime( end_date , "%Y-%m-%d").date()
 
-    remote_get_history_url = remote_instance.get_history_url( project_id )
+        remote_instance.logger.info('Retrieving %i days of history in bouts!' % (end-start).days )
 
-    remote_get_history_url += '?%s' % urllib.parse.urlencode(get_history_GET_data)
+        #First make big bouts of roughly 6 months each
+        while start < (end - datetime.timedelta(days=6*30) ) :
+            rounds.append( ( start.isoformat(), (start + datetime.timedelta(days=6*30)).isoformat() ) )
+            start += datetime.timedelta(days=6*30)
 
-    print('Retrieving user history: ',remote_get_history_url)   
+        #Append the last bit
+        if start < end:
+            rounds.append( ( start.isoformat(), end.isoformat() ) )
+    else:
+        rounds = [ ( start_date, end_date ) ]
 
-    return remote_instance.fetch ( remote_get_history_url )
+    data = []
+    for r in rounds:
+        get_history_GET_data = {    'pid': project_id ,
+                                    'start_date': r[0],
+                                    'end_date': r[1]
+                                        }
+
+        remote_get_history_url = remote_instance.get_history_url( project_id )
+
+        remote_get_history_url += '?%s' % urllib.parse.urlencode(get_history_GET_data)
+
+        remote_instance.logger.debug('Retrieving user history from %s to %s ' % ( r[0], r[1] ) )   
+
+        data.append( remote_instance.fetch ( remote_get_history_url ) )
+    
+    #Now merge data into a single dict
+    stats = dict( data[0] )
+    for d in data:
+        stats['days'] += [ e for e in d['days'] if e not in stats['days'] ]
+        stats['daysformatted'] += [ e for e in d['daysformatted'] if e not in stats['daysformatted'] ]
+
+        for u in d['stats_table']:
+            stats['stats_table'][u].update( d['stats_table'][u] )
+
+    return stats
 
 
 def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = None, project_id = 1 ):
@@ -1383,7 +1457,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
 
     def retrieve_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion, project_id ):  
 
-        print(incursion,':',left, right, top, bottom, z1, z2)      
+        remote_instance.logger.info( '%i: %i, %i, %i, %i, %i ,%i' % (incursion, left, right, top, bottom, z1, z2) )
 
         remote_nodes_list = remote_instance.get_node_list_url ( project_id )
 
@@ -1405,7 +1479,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
         
 
         if node_list[3] is True:
-            print('Incursing')   
+            remote_instance.logger.debug('Incursing')   
             incursion += 1         
             node_list = list()
             #Front left top
@@ -1478,7 +1552,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
 
             
         
-        print("Done.",len(node_list))
+        remote_instance.logger.info("Done (%i nodes)" % len(node_list) )
 
         return node_list
 
@@ -1491,12 +1565,14 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
         skeletons.add(node[7])           
 
     return list(skeletons)
+
         
 if __name__ == '__main__':
     """ Code below provides some examples for using this library and will only be executed if the file is executed directly instead of imported.
     """
 
-    #First, create CATMAID instance. Here, a separate function that holds my credentials is called but you can easily do this yourself by using: remote_instance = CatmaidInstance( server_url, http_user, http_pw, user_token )    
+    #First, create CATMAID instance. Here, a separate file (connect_catmaid) holding my credentials is called but you can easily do this yourself by using: 
+    #remote_instance = CatmaidInstance( server_url, http_user, http_pw, user_token )
     from connect_catmaid import connect_larval_em, connect_adult_em
     remote_instance = connect_adult_em()
 
@@ -1517,7 +1593,7 @@ if __name__ == '__main__':
     print( remote_instance.fetch ( remote_instance.djangourl('/version') ) )
 
     #Retrieve user history
-    print( retrieve_history( ) )
+    print( retrieve_history( remote_instance = remote_instance, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ) )
 
     #Get review status
     print( get_review( example_skids ,remote_instance ) )

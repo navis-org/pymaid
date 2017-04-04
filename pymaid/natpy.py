@@ -19,10 +19,23 @@
 from pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
 import math
 import time
+import logging
+
+#Set up logging
+module_logger = logging.getLogger('natpy')
+module_logger.setLevel(logging.DEBUG)
+#Generate stream handler
+sh = logging.StreamHandler()
+sh.setLevel(logging.INFO)
+#Create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+sh.setFormatter(formatter)
+module_logger.addHandler(sh)
+
 try:
 	from catmaid_igraph import igraph_from_skeleton
 except:
-	print('Import of catmaid_igraph failed - likely due to iGraph package missing: cut_neuron2() will not work!')
+	module_logger.error('Import of catmaid_igraph failed - likely due to iGraph package missing: cut_neuron2() will not work!')
 
 def generate_list_of_childs(skdata):
 	""" Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -35,7 +48,7 @@ def generate_list_of_childs(skdata):
 	list_of_childs :	dict()
 
 	"""
-	print('Generating list of childs...')
+	module_logger.debug('Generating list of childs...')
 	list_of_childs = { n[0] : [] for n in skdata[0] }   
 
 	for n in skdata[0]:
@@ -44,7 +57,7 @@ def generate_list_of_childs(skdata):
 		except:
 			list_of_childs[None]=[None]
 
-	print('Done')
+	module_logger.debug('Done')
 
 	return list_of_childs
 
@@ -75,7 +88,7 @@ def downsample_neuron ( skdata, resampling_factor):
 	#Walk from all fix points to the root - jump N nodes on the way
 	new_parents = {}
 
-	print('Sampling neuron down by factor of', resampling_factor)
+	module_logger.info('Sampling neuron down by factor of', resampling_factor)
 	for en in fix_points:
 		this_node = en
 
@@ -102,8 +115,8 @@ def downsample_neuron ( skdata, resampling_factor):
 
 	new_nodes = [ [ n[0], new_parents[ n[0] ] ,n[1],n[2],n[3],n[4],n[5],n[6],n[7] ] for n in skdata[0] if n[0] in new_parents ]
 
-	print('Node before:', len( skdata[0] ))
-	print('Node after:', len( new_nodes ))
+	module_logger.debug('Node before:', len( skdata[0] ))
+	module_logger.debug('Node after:', len( new_nodes ))
 
 	return [ new_nodes, skdata[1] ]
 
@@ -128,13 +141,13 @@ def cut_neuron2( skdata, cut_node, g = None ):
 		#Generate iGraph -> order/indices of vertices are the same as in skdata
 		g = igraph_from_skeleton(skdata)
 
-	print('Cutting neuron...')
+	module_logger.info('Cutting neuron...')
 	#Select nodes with the correct ID as cut node
 	cut_node_igraph = g.vs.select( node_id=int(cut_node) )
 
 	#Should have found only one cut node
 	if len(cut_node_igraph) != 1:
-		print('Error: Found %i nodes with that ID - please double check!')
+		module_logger.error('Error: Found %i nodes with that ID - please double check!')
 		return 
 
 	#Select the cut node's parent
@@ -174,9 +187,9 @@ def cut_neuron2( skdata, cut_node, g = None ):
 	neuron_dist[1] = [ s for s in skdata[1] if s[0] in dist_partition_ids ]
 	neuron_prox[1] = [ s for s in skdata[1] if s[0] not in dist_partition_ids ]		
 
-	print('Cutting finished in', round ( time.time()- start_time ) , 's' )	
-	print('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
-	print('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
+	module_logger.info('Cutting finished in', round ( time.time()- start_time ) , 's' )	
+	module_logger.info('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
+	module_logger.info('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
 
 	return neuron_dist, neuron_prox
 
@@ -200,10 +213,10 @@ def cut_neuron( skdata, cut_node ):
 	list_of_parents = { n[0]:n[1] for n in skdata[0] }
 
 	if len( list_of_childs[ cut_node ] ) == 0:
-		print('Cannot cut: cut_node is a leaf node!')
+		module_logger.warning('Cannot cut: cut_node is a leaf node!')
 		return
 	elif list_of_parents[ cut_node ] == None:
-		print('Cannot cut: cut_node is a root node!')
+		module_logger.warning('Cannot cut: cut_node is a root node!')
 		return
 
 	end_nodes = list ( set( [ n for n in list_of_childs if len(list_of_childs[n]) == 0 ] + [ cut_node ] ) ) 
@@ -214,7 +227,7 @@ def cut_neuron( skdata, cut_node ):
 	distal_nodes = []
 	proximal_nodes = []
 
-	print('Cutting neuron...')
+	module_logger.info('Cutting neuron...')
 	for i, en in enumerate(end_nodes):		
 		this_node = en
 		nodes_walked = [ en ]		
@@ -249,9 +262,9 @@ def cut_neuron( skdata, cut_node ):
 
 	neuron_prox = [ [ n for n in skdata[0] if n[0] in proximal_nodes ] , [ c for c in skdata[1] if c[0] in proximal_nodes ] ]
 
-	print('Cutting done after', round ( time.time()- start_time ) , 's' )	
-	print('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
-	print('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
+	module_logger.info('Cutting done after', round ( time.time()- start_time ) , 's' )	
+	module_logger.info('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
+	module_logger.info('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
 
 	return neuron_dist, neuron_prox
 
@@ -278,7 +291,7 @@ def synapse_root_distances(skid, skdata, remote_instance, pre_skid_filter = [], 
 	if pre_skid_filter or post_skid_filter:
 		#Filter connectors that are both pre- and postsynaptic to the skid in skid_filter 
 		filtered_cn = [ c for c in cn_details if True in [ int(f) in c[1]['postsynaptic_to'] for f in post_skid_filter ] and True in [ int(f) == c[1]['presynaptic_to'] for f in pre_skid_filter ] ]
-		print('%i of %i connectors left after filtering' % ( len( filtered_cn ) ,len( cn_details ) ) )
+		module_logger.debug('%i of %i connectors left after filtering' % ( len( filtered_cn ) ,len( cn_details ) ) )
 	else:
 		filtered_cn = cn_details 
 
@@ -286,11 +299,11 @@ def synapse_root_distances(skid, skdata, remote_instance, pre_skid_filter = [], 
 	post_node_distances = {}
 	visited_nodes = {}
 
-	print('Calculating distances to root')
+	module_logger.info('Calculating distances to root')
 	for i,cn in enumerate(filtered_cn):
 
 		if i % 10 == 0:
-			print('%i of %i' % ( i, len(filtered_cn) ) )   
+			module_logger.debug('%i of %i' % ( i, len(filtered_cn) ) )   
 
 		if cn[1]['presynaptic_to'] == int(skid) and cn[1]['presynaptic_to_node'] in list_of_parents:
 			dist, visited_nodes = walk_to_root( [ ( n[0], n[3],n[4],n[5] ) for n in skdata[0] if n[0] == cn[1]['presynaptic_to_node'] ][0] , list_of_parents, visited_nodes )
