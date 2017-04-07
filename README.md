@@ -113,7 +113,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `cluster_nodes_w_synapses()`: uses iGraph's shortest_paths_dijkstra to cluster nodes with synapses
 
 ### pymaid.plot:
-- 'plotneuron()': generates 2D plots of neurons
+- `plotneuron()`: generates 2D plots of neurons
 
 ### pymaid.cluster:
 - `synapse_distance_matrix()`: cluster synapses based on eucledian distance
