@@ -40,25 +40,34 @@ import numpy as np
 import matplotlib.pyplot as plt
 from igraph import *
 from scipy import cluster, spatial
+import logging
 
+#Set up logging
+module_logger = logging.getLogger(__name__)
+module_logger.setLevel(logging.DEBUG)
+#Generate stream handler
+sh = logging.StreamHandler()
+sh.setLevel(logging.INFO)
+#Create formatter and add it to the handlers
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+sh.setFormatter(formatter)
+module_logger.addHandler(sh)
 
-def igraph_from_skeleton(skdata,remote_instance):
-	""" Takes CATMAID skeleton data and turns it into an iGraph object
+def igraph_from_skeleton(skdata):
+	""" Takes CATMAID single skeleton data and turns it into an iGraph object
 	
 	Parameters:
-	==========
+	----------
 	skdata :			list of 3D skeleton data
-						As retrieved from CATMAID server.
-	remote_instance :	CATMAID Instance
-						See <pymaid> for example.
+						As retrieved from CATMAID server.	
 
 	Returns:
-	=======
+	-------
 	iGraph object
 
 	"""	
 
-	print('Generating graph from skeleton data...')
+	module_logger.info('Generating graph from skeleton data...')
 
 	#Generate list of vertices -> this order is retained
 	vlist = [n[0] for n in skdata[0]]
@@ -68,7 +77,7 @@ def igraph_from_skeleton(skdata,remote_instance):
 	for i, n in enumerate( skdata[0] ):
 		if n[1] == None:
 			continue
-		elist.append( ( vlist.index( n[1] ), i ) )	
+		elist.append( ( i , vlist.index( n[1] ) ) )	
 
 	#Generate graph and assign custom properties
 	g = Graph( elist , n = len( vlist ) ,  directed = True)	
@@ -82,85 +91,64 @@ def igraph_from_skeleton(skdata,remote_instance):
 	nodes_w_synapses = [ n[0] for n in skdata[1] ]
 	g.vs['has_synapse'] = [ n[0] in nodes_w_synapses for n in skdata[0] ]
 
-	#Generate weights by calculating edge lengths
+	#Generate weights by calculating edge lengths = distance between nodes
 	w = [ math.sqrt( (skdata[0][e[0]][3]-skdata[0][e[1]][3])**2 + (skdata[0][e[0]][4]-skdata[0][e[1]][4])**2 + (skdata[0][e[0]][5]-skdata[0][e[1]][5])**2 ) for e in elist ]	
 	g.es['weight'] = w
 
 	return g
 
-def synapse_distance_matrix(synapse_data, labels = None):
-	""" Takes a list of CATMAID synapses [[parent_node, connector_id, 0/1 , x, y, z ],[],...], calculates euclidian distance matrix and clusters them (WARD)
+def calculate_distance_from_root( g, synapses_only = False ):
+	""" Get distance to root for nodes with synapses
 
 	Parameters:
-	=========
-	synapse_data : 	list of synapses
-					As received from CATMAID 3D skeleton [ [parent_node, connector_id, 0/1 , x, y, z ], ... ].
-	labels :		list of strings
-					Labels for each leaf of the dendrogram (e.g. connector ids).	
+	----------
+	g : 			iGraph object
+					Holds the skeleton
+	synapses_only :	boolean
+					If True, only distances for nodes with synapses will be returned
 
 	Returns:
-	=======
-	Plots dendrogram and distance matrix
-	Returns hierachical clustering
-	"""		
+	-------	
+	Returns dict: {node_id : distance_to_root }
+	
+	"""
 
-	#Generate numpy array containing x, y, z coordinates
-	s = np.array( [ [e[3],e[4],e[5] ] for e in synapse_data ] )
+	module_logger.info('Generating distance matrix for neuron...')
 
-	#Calculate euclidean distance matrix 
-	condensed_dist_mat = spatial.distance.pdist( s , 'euclidean' )
-	squared_dist_mat = spatial.distance.squareform( condensed_dist_mat )
+	#Generate distance matrix.
+	distance_matrix = g.shortest_paths_dijkstra ( mode = 'All', weights='weight' )
 
-	# Compute and plot first dendrogram for all nodes.
-	fig = pylab.figure(figsize=(8,8))
-	ax1 = fig.add_axes([0.09,0.1,0.2,0.6])
-	Y = cluster.hierarchy.ward(squared_dist_mat)
-	Z1 = cluster.hierarchy.dendrogram(Y, orientation='left', labels = labels)
-	ax1.set_xticks([])
-	ax1.set_yticks([])
+	if synapses_only:
+		nodes = [ ( v.index, v['node_id'] ) for v in g.vs.select(has_synapse=True) ]
+	else:
+		nodes = [ ( v.index, v['node_id'] ) for v in g.vs ]
 
-	# Compute and plot second dendrogram.
-	ax2 = fig.add_axes([0.3,0.71,0.6,0.2])
-	Y = cluster.hierarchy.ward(squared_dist_mat)
-	Z2 = cluster.hierarchy.dendrogram(Y, labels = labels)
-	ax2.set_xticks([])
-	ax2.set_yticks([])
+	root = [ v.index for v in g .vs if v['parent_id'] == None ][0]
 
-	# Plot distance matrix.
-	axmatrix = fig.add_axes([0.3,0.1,0.6,0.6])
-	idx1 = Z1['leaves']
-	idx2 = Z2['leaves']	
-	D = squared_dist_mat
-	D = D[idx1,:]
-	D = D[:,idx2]
-	im = axmatrix.matshow(D, aspect='auto', origin='lower', cmap=pylab.cm.YlGnBu)
-	axmatrix.set_xticks([])
-	axmatrix.set_yticks([])
+	distances_to_root = {}
 
-	# Plot colorbar.
-	axcolor = fig.add_axes([0.91,0.1,0.02,0.6])
-	pylab.colorbar(im, cax=axcolor)
-	fig.show()	
+	for n in nodes:
+		distances_to_root[ n[1] ] = distance_matrix[ n[0] ][ root ]
 
-	return Y
+	return distances_to_root
 
 def cluster_nodes_w_synapses(g, plot_graph = True):
 	""" Cluster nodes of an iGraph object based on distance
 
 	Parameters:
-	=========
+	----------
 	g : 			iGraph object
 					Holds the skeleton.	
 	plot_graph : 	boolean
 					If true, plots a Graph.
 
 	Returns:
-	=======
+	-------
 	Plots dendrogram and distance matrix
 	Returns hierachical clustering
 	"""	
 
-	print('Generating distance matrix for neuron...')
+	module_logger.info('Generating distance matrix for neuron...')
 	#Generate distance matrix.
 	distance_matrix = g.shortest_paths_dijkstra ( mode = 'All', weights='weight' )
 
@@ -171,11 +159,11 @@ def cluster_nodes_w_synapses(g, plot_graph = True):
 	distance_matrix_syn = np.delete(distance_matrix,not_synapse_nodes,0)
 	distance_matrix_syn = np.delete(distance_matrix_syn,not_synapse_nodes,1)	
 
-	print('Clustering nodes with synapses...')		
+	module_logger.info('Clustering nodes with synapses...')		
 	Y_syn = cluster.hierarchy.ward(distance_matrix_syn)
 
 	if plot_graph:
-		print('Plotting graph')
+		module_logger.debug('Plotting graph')
 		# Compute and plot first dendrogram for all nodes.
 		fig = pylab.figure(figsize=(8,8))
 		ax1 = fig.add_axes([0.09,0.1,0.2,0.6])
@@ -183,6 +171,7 @@ def cluster_nodes_w_synapses(g, plot_graph = True):
 		Z1 = cluster.hierarchy.dendrogram(Y_all, orientation='left')
 		ax1.set_xticks([])
 		ax1.set_yticks([])
+		module_logger.debug('Plotting graph.')
 
 		# Compute and plot second dendrogram for synapse nodes only.
 		ax2 = fig.add_axes([0.3,0.71,0.6,0.2])		
@@ -190,6 +179,7 @@ def cluster_nodes_w_synapses(g, plot_graph = True):
 		ax2.set_xticks([])
 		ax2.set_yticks([])
 
+		module_logger.debug('Plotting graph..')
 		# Plot distance matrix.
 		axmatrix = fig.add_axes([0.3,0.1,0.6,0.6])
 		idx1 = Z1['leaves']
@@ -201,10 +191,11 @@ def cluster_nodes_w_synapses(g, plot_graph = True):
 		axmatrix.set_xticks([])
 		axmatrix.set_yticks([])
 
+		module_logger.debug('Plotting graph...')
 		# Plot colorbar.
 		axcolor = fig.add_axes([0.91,0.1,0.02,0.6])
 		pylab.colorbar(im, cax=axcolor)
-		fig.show()
+		fig.show()		
 		
 
 	return Y_syn

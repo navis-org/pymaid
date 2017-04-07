@@ -16,7 +16,10 @@
     along
 """
 
-from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
+try:
+	from pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
+except:
+	from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
 import math
 import time
 import logging
@@ -187,7 +190,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
 	neuron_dist[1] = [ s for s in skdata[1] if s[0] in dist_partition_ids ]
 	neuron_prox[1] = [ s for s in skdata[1] if s[0] not in dist_partition_ids ]		
 
-	module_logger.info('Cutting finished in', round ( time.time()- start_time ) , 's' )	
+	module_logger.info('Cutting finished in %is' % round ( time.time() - start_time ) )	
 	module_logger.info('Distal to cut node: %i nodes/%i synapses' % (len( neuron_dist[0] ),len( neuron_dist[1] )) )
 	module_logger.info('Proximal to cut node: %i nodes/%i synapses' % (len( neuron_prox[0] ),len( neuron_prox[1] )) )
 

@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='pymaid',
-    version='0.111',
+    version='0.12',
     packages=['pymaid',],
     license='GNU GPL V3',
     long_description=open('README.md').read(),

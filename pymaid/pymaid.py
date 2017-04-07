@@ -111,7 +111,11 @@ class CatmaidInstance:
 
         #If pymaid is not run as module, make sure logger has a at least a StreamHandler
         if not logger:
-            self.logger = logging.getLogger(__name__) 
+            self.logger = logging.getLogger(__name__)             
+        else:
+            self.logger = logging.getLogger(logger)
+
+        if not self.logger.handlers:
             sh = logging.StreamHandler()
             sh.setLevel(logging.DEBUG)
             #Create formatter and add it to the handlers
@@ -124,8 +128,6 @@ class CatmaidInstance:
                 self.logger.setLevel(logging.INFO)
             else:
                 self.logger.setLevel(logging.DEBUG)
-        else:
-            self.logger = logging.getLogger(logger)
 
         self.logger.info('CATMAID instance created')
 
@@ -335,6 +337,14 @@ class CatmaidInstance:
     def get_node_info_url(self, pid):
         """ Use to parse url for retrieving user info on a single node (needs post data). """
         return self.djangourl("/" + str(pid) + "/node/user-info" )        
+
+    def treenode_add_tag_url(self, pid, treenode_id):
+        """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
+        return self.djangourl("/" + str(pid) + "/label/treenode/" + str(treenode_id) + "/update" )
+
+    def connector_add_tag_url(self, pid, treenode_id):
+        """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
+        return self.djangourl("/" + str(pid) + "/label/connector/" + str(treenode_id) + "/update" )
     
     def get_compact_skeleton_url(self, pid, skid, connector_flag = 1, tag_flag = 1):        
         """ Use to parse url for retrieving all info the 3D viewer gets (does NOT need post data).
@@ -601,6 +611,8 @@ def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id
         connectivity_post[tag] = skid
         i +=1    
 
+
+    remote_instance.logger.info('Fetching connectivity')   
     connectivity_data = remote_instance.fetch( remote_connectivity_url , connectivity_post )
 
     #As of 08/2015, # of synapses is returned as list of nodes with 0-5 confidence: {'skid': [0,1,2,3,4,5]}
@@ -624,6 +636,8 @@ def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id
 
         for n in pop:
             connectivity_data[direction].pop(n)
+
+    remote_instance.logger.info('Done. Found %i up- %i downstream neurons' % ( len( connectivity_data['incoming']) , len( connectivity_data['outgoing']) ) )
         
     return(connectivity_data)
     
@@ -659,6 +673,8 @@ def retrieve_names (skids, remote_instance = None, project_id = 1):
         get_names_postdata[key] = skids[i]
 
     names = remote_instance.fetch( remote_get_names_url , get_names_postdata )
+
+    remote_instance.logger.info( 'Names for %i of %i skeleton IDs retrieved' % ( len( names ), len ( skids ) ) )
         
     return(names)
 
@@ -923,15 +939,52 @@ def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
         
     return(annotations) 
 
+def has_soma ( skids , remote_instance = None, project_id = 1 ):
+    """ Quick function to check if a neuron/a list of neurons have somas
+    Searches for nodes that have a 'soma' tag AND a radius > 500nm
+
+    Parameters:
+    ----------
+    skids :             single skeleton id or list of skids
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+
+    Returns
+    -------
+    dictionary :        {'skid':True,'skid1':False}
+    """
+
+    if type(skids) != type(list()):
+        skids = [skids]
+
+    skdata = get_3D_skeleton ( skids, remote_instance = remote_instance , 
+                            connector_flag = 0, tag_flag = 1, 
+                            get_history = False, time_out = None, 
+                            project_id = project_id)
+
+    d = {}
+    for i, s in enumerate(skids):
+        d[s] = False
+        if 'soma' not in skdata[i][2]:
+            continue        
+
+        for tn in skdata[i][2]['soma']:
+            if [ n for n in skdata[i][0] if n[0] == tn ][0][6] > 500:
+                d[s] = True
+
+    return d
+
 
 def skid_exists( skid, remote_instance = None, project_id = 1 ):
     """ Quick function to check if skeleton id exists
     
     Parameters:
-    skid - single skeleton id
-    remote_instance - CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    ----------
+    skid :              single skeleton id
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
 
-    Returns True if skeleton exists, False if not
+    Returns:
+    -------
+    True if skeleton exists, False if not
 
     """
 
@@ -950,14 +1003,19 @@ def skid_exists( skid, remote_instance = None, project_id = 1 ):
     else:
         return True  
 
-def retrieve_annotation_id( annotation, remote_instance = None, project_id = 1 ):
+def retrieve_annotation_id( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
     """ Wrapper to retrieve the annotation ID for single or list of annotation(s)
     
     Parameters:
     ----------
-    annotation :        single annotations or list of multiple annotations
+    annotations :       single annotations or list of multiple annotations
     remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    allow_partial :     boolean
+                        If True, will allow partial matches
 
+    Returns:
+    -------
+    dict :              {'annotation_name' : 'annotation_id', ....}
     """
 
     if remote_instance is None:
@@ -972,30 +1030,38 @@ def retrieve_annotation_id( annotation, remote_instance = None, project_id = 1 )
     remote_annotation_list_url = remote_instance.get_annotation_list( project_id )
     annotation_list = remote_instance.fetch( remote_annotation_list_url )
          
-    
-    if type(annotation) == type(str()):
-        for dict in annotation_list['annotations']:
-            #print(dict['name'])
-            if dict['name'] == annotation:
-                annotation_id = dict['id']
-                remote_instance.logger.debug('Found matching annotation!')
+    annotation_ids = {}
+    annotations_matched = set()
+
+    if type(annotations) == type(str()):
+        for d in annotation_list['annotations']:            
+            if d['name'] == annotations and allow_partial is False:                
+                annotation_ids[ d['name'] ] = d['id']
+                remote_instance.logger.debug('Found matching annotation: %s' % d['name'] )
+                annotations_matched.add( d['name'] )
                 break
-            else:
-                annotation_id = 'not found'
-    
-        return([annotation_id])  
+            elif annotations in d['name'] and allow_partial is True:
+                annotation_ids[ d['name'] ] = d['id']
+                remote_instance.logger.debug('Found matching annotation: %s' % d['name'] )      
 
-    elif type(annotation) == type(list()):
-        annotation_ids = []
-        for dict in annotation_list['annotations']:            
-            if dict['name'] in annotation:
-                annotation_ids.append( dict['id'] )
-                annotation.remove( dict['name'] )  
-    
-        if len(annotation) != 0:
-            remote_instance.logger.warning('Could not retrieve annotation id for: ' + annotation)
+        if not annotation_ids:
+            remote_instance.logger.warning('Could not retrieve annotation id for: ' + annotations )  
 
-        return(annotation_ids)  
+    elif type(annotations) == type(list()):        
+        for d in annotation_list['annotations']:            
+            if d['name'] in annotations and allow_partial is False:
+                annotation_ids[ d['name'] ] = d['id'] 
+                annotations_matched.add( d['name'] )
+                remote_instance.logger.debug('Found matching annotation: %s' % d['name'] ) 
+            elif True in [ a in d['name'] for a in annotations ] and allow_partial is True:
+                annotation_ids[ d['name'] ] = d['id']
+                annotations_matched |= set ( [ a for a in annotations if a in d['name'] ] )
+                remote_instance.logger.debug('Found matching annotation: %s' % d['name'] ) 
+    
+        if len(annotations) != len(annotations_matched):
+            remote_instance.logger.warning('Could not retrieve annotation id(s) for: ' + str( [ a for a in annotations if a not in annotations_matched ] ) )
+
+    return annotation_ids
 
 def retrieve_skids_by_name(tag, allow_partial = True, remote_instance = None, project_id = 1):
     """ Wrapper to retrieve the all neurons with matching name
@@ -1026,15 +1092,20 @@ def retrieve_skids_by_name(tag, allow_partial = True, remote_instance = None, pr
         if not allow_partial and e['type'] == 'neuron' and e['name'] == tag:
             match += e['skeleton_ids']
 
-    return list( set(match) )
+    return list( set( match ) )
 
-def retrieve_skids_by_annotation(annotation, remote_instance = None, project_id = 1 ):
+def retrieve_skids_by_annotation( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
     """ Wrapper to retrieve the all neurons annotated with given annotation(s)
     
     Parameters:
     ----------
-    annotation :        single annotations or list of multiple annotations    
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    annotations :           single annotation or list of multiple annotations    
+    remote_instance :       CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    allow_partial :         allow partial match of annotation
+
+    Returns:
+    -------
+    list :                  [skid1, skid2, skid3]
     """
 
     if remote_instance is None:
@@ -1044,17 +1115,23 @@ def retrieve_skids_by_annotation(annotation, remote_instance = None, project_id 
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_instance.logger.info('Looking for Annotation(s): ' + annotation) 
-    annotation_ids = retrieve_annotation_id(annotation, remote_instance)
+    remote_instance.logger.info('Looking for Annotation(s): ' + str(annotations) )
+    annotation_ids = retrieve_annotation_id(annotations, remote_instance, project_id = 1, allow_partial = allow_partial)
 
-    if type(annotation) == type( list() ):
-        remote_instance.logger.debug('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotation)-len(annotation_ids) ))  
-    elif type(annotation) == type( str() ):
-        remote_instance.logger.debug('Found id: %s | Unable to retrieve: %i' % ( str(annotation_ids[0]) , 1 - len(annotation_ids) ))
+    if not annotation_ids:
+        remote_instance.logger.warning('No matching annotation found! Returning None')
+        return []
+
+    if allow_partial is True:
+        remote_instance.logger.debug('Found id(s): %s (partial matches included)' % len(annotation_ids) )  
+    elif type(annotations) == type( list() ):
+        remote_instance.logger.debug('Found id(s): %s | Unable to retrieve: %i' % ( str(annotation_ids) , len(annotations)-len(annotation_ids) ))      
+    elif type(annotations) == type( str() ):
+        remote_instance.logger.debug('Found id: %s | Unable to retrieve: %i' % ( list(annotation_ids.keys())[0], 1 - len(annotation_ids) ))
 
     annotated_skids = []
-    remote_instance.logger.info('Retrieving skids of annotated neurons...')
-    for an_id in annotation_ids:
+    remote_instance.logger.info('Retrieving skids for annotationed neurons...')
+    for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0, 'range_length':500, 'with_annotations':False}
         remote_annotated_url = remote_instance.get_annotated_url( project_id )
@@ -1062,8 +1139,9 @@ def retrieve_skids_by_annotation(annotation, remote_instance = None, project_id 
         count = 0    
         for entry in neuron_list['entities']:
             if entry['type'] == 'neuron':
-                annotated_skids.append(str(entry['skeleton_ids'][0]))    
+                annotated_skids.append(str(entry['skeleton_ids'][0]))
 
+    remote_instance.logger.info('Found %i skeletons with matching annotation(s)' % len(annotated_skids) )
         
     return(annotated_skids)
 
@@ -1109,6 +1187,45 @@ def get_annotations_from_list(skid_list, remote_instance = None, project_id = 1 
             annotation_list[skid].append(annotation_list_temp['annotations'][str(annotation_id)])      
    
     return(annotation_list) 
+
+def add_tags ( node_list, tags, node_type, remote_instance = None, project_id = 1 ):
+    """ Wrapper to add tag(s) to a list of treenode(s) or connector(s)
+
+    Parameters:
+    ----------
+    node_list :         list of treenode or connector ids that will be tagged
+    tags :              list of tags(s) to add to provided treenode/connector ids
+    node_type :         string
+                        set to 'TREENODE' or 'CONNECTOR' depending on what you want to tag
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+
+    Returns confirmations from Catmaid server
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return
+
+    if type(node_list) != type(list()):
+        node_list = [ node_list ]
+
+    if type(tags) != type(list()):
+        tags = [ tags ]
+
+
+    if node_type == 'TREENODE':
+        add_tags_urls = [ remote_instance.treenode_add_tag_url( project_id, n) for n in node_list ]
+    elif node_type == 'CONNECTOR':
+        add_tags_urls = [ remote_instance.connector_add_tag_url( project_id, n) for n in node_list ]
+
+    post_data = [ {'tags': ','.join(tags) , 'delete_existing': False } for n in node_list ]
+
+    d = retrieve_urls_threaded( add_tags_urls , remote_instance, post_data = post_data, time_out = None )   
+    
+    return d
 
 def add_annotations ( skid_list, annotations, remote_instance = None, project_id = 1 ):
     """ Wrapper to add annotation(s) to a list of neuron(s)
@@ -1184,7 +1301,7 @@ def get_review_details ( skid_list, remote_instance = None, project_id = 1):
     return node_list
 
 def get_logs (remote_instance = None, operations = [] , entries = 50 , display_start = 0, project_id = 1, search = ''):
-    """ Wrapper to retrieve contributor statistics over ALL given skeleton ids
+    """ Wrapper to retrieve log (like log widget)
     
     Parameters:
     ----------    

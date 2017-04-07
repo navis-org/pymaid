@@ -3,13 +3,15 @@ pymaid
 
 Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 
-`pymaid` is the low level library to connect to CATMAID servers and fetch data. Most data is not reformatted after response from the server.
+`pymaid.pymaid` is the low level library to connect to CATMAID servers and fetch data. Most data is not reformatted after response from the server.
 
-`catmaid_igraph` contains a wrapper to turn CATMAID skeletons in [iGraph](http://www.igraph.org) objects which can then be used to e.g. quickly calculate geodesic (along the arbor) distances and cluster synapses. 
+`pymaid.igraph` contains a wrapper to turn CATMAID skeletons in [iGraph](http://www.igraph.org) objects which can then be used to e.g. quickly calculate geodesic (along the arbor) distances and cluster synapses. 
 
-`natpy` contains wrappers to downsample or cut neurons
+`pymaid.anatomy` contains wrappers to downsample or cut neurons
 
-`plotneuron` is a wrapper to generate 2D morphology plots of neurons
+`pymaid.plot` contains a wrapper to generate 2D morphology plots of neurons
+
+`pymaid.cluster' contains wrappers to cluster neurons 
 
 ## Installation
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
@@ -78,7 +80,8 @@ print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for
 ## Additional examples:
 Check out [/examples/](https://github.com/schlegelp/PyMaid/tree/master/examples) for a growing list of Jupyter notebooks.
 
-## Available wrappers:
+## Contents:
+### pymaid.pymaid:
 Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
 Use e.g. `help(get_edges)` to learn more about their function, parameters and usage.
 
@@ -103,6 +106,25 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `retrieve_names()`: retrieve names of a set of skeleton IDs
 - `retrieve_node_lists()`: retrieve list of nodes within given volume
 - `skid_exists()`: checks if a skeleton ID exists
+
+### pymaid.igraph:
+- `igraph_from_skeleton()`: generates iGraph object from CATMAID neurons
+- `calculate_distance_from_root()`: calculates geodesic (along-the-arbor) distances for nodes to root node
+- `cluster_nodes_w_synapses()`: uses iGraph's shortest_paths_dijkstra to cluster nodes with synapses
+
+### pymaid.plot:
+- 'plotneuron()': generates 2D plots of neurons
+
+### pymaid.cluster:
+- `synapse_distance_matrix()`: cluster synapses based on eucledian distance
+- `create_adjacency_matrix()`: create a Pandas dataframe containing the adjacency matrix for two sets of neurons
+- `create_connectivity_distance_matrix()`: returns distance matrix based on connectivity similarity (Jarrell et al., 2012)
+
+### pymaid.anatomy:
+- `downsample_neuron()`: take skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
+- `cut_neuron()`: virtually cuts a neuron at given treenode and returns the distal and the proximal part
+- `cut_neuron2()`: similar to above but uses iGraph (slightly faster)
+- `synapse_root_distances()`: similar to `pymaid.igraph.calculate_distance_from_root` but does not use iGraph
 
 ## License:
 This code is under GNU GPL V3
