@@ -17,7 +17,7 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
 First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in terminal:  
 
-`pip install git+git://github.com/schlegelp/pymaid@master`  
+`pip3 install git+git://github.com/schlegelp/pymaid@master`  
 
 This command should also work to update the package.
 
