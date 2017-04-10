@@ -1,7 +1,7 @@
 pymaid
 ==================
 
-Collection of [Python](ww.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
+Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 
 `pymaid.pymaid` is the low level library to connect to CATMAID servers and fetch data. Most data is not reformatted after response from the server.
 
