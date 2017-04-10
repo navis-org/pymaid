@@ -88,6 +88,7 @@ Currently **pymaid** features a range of wrappers to conveniently fetch data fro
 Use e.g. `help(get_edges)` to learn more about their function, parameters and usage.
 
 - `add_annotations()`: use to add annotation(s) to neuron(s)
+- `add_tags`: add tags to treenodes and connectors
 - `get_3D_skeleton()`: get neurons' skeleton(s) - i.e. what the 3D viewer in CATMAID shows
 - `get_arbor()`: similar to get_3D_skeleton but more detailed information on connectors
 - `get_edges()`: get edges (connections) between sets of neurons
