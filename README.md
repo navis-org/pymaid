@@ -114,7 +114,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 ### pymaid.igraph_catmaid:
 - `igraph_from_skeleton()`: generates iGraph object from CATMAID neurons
 - `calculate_distance_from_root()`: calculates geodesic (along-the-arbor) distances for nodes to root node
-- `cluster_nodes_w_synapses()`: uses iGraph's shortest_paths_dijkstra to cluster nodes with synapses
+- `cluster_nodes_w_synapses()`: uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
 
 ### pymaid.plot:
 - `plot2d()`: generates 2D plots of neurons
@@ -129,7 +129,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `downsample_neuron()`: take skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - `cut_neuron()`: virtually cuts a neuron at given treenode and returns the distal and the proximal part
 - `cut_neuron2()`: similar to above but uses iGraph (slightly faster)
-- `synapse_root_distances()`: similar to `pymaid.igraph.calculate_distance_from_root` but does not use iGraph
+- `synapse_root_distances()`: similar to `pymaid.igraph_catmaid.calculate_distance_from_root()` but does not use iGraph
 - `calc_cable()`: calculate cable length of given neuron
 
 ## License:
