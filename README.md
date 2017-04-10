@@ -11,7 +11,7 @@ Collection of [Python](ww.python.org "Python Homepage") 3 tools to interface wit
 
 `pymaid.plot` contains a wrapper to generate 2D morphology plots of neurons
 
-`pymaid.cluster' contains wrappers to cluster neurons 
+`pymaid.cluster` contains wrappers to cluster neurons 
 
 ## Installation
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
@@ -21,7 +21,7 @@ First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in term
 
 This command should also work to update the package.
 
-*Attention*: on Windows, the dependencies (i.e. Numpy and SciPy) will likely fail to install. Your best bet is to get a Python distribution that includes them (e.g. [Anaconda](https://www.continuum.io/downloads)).
+*Attention*: on Windows, the dependencies (i.e. Numpy and SciPy) will likely fail to install. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)).
 
 #### Dependencies:
 `pymaid` uses standard Python 3 libraries
