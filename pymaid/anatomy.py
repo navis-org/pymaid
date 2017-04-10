@@ -17,9 +17,9 @@
 """
 
 try:
-	from pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
+	from pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation
 except:
-	from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, retrieve_skids_by_annotation
+	from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation
 import math
 import time
 import logging
@@ -35,10 +35,13 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 sh.setFormatter(formatter)
 module_logger.addHandler(sh)
 
+from igraph_catmaid import igraph_from_skeleton
+
 try:
-	from catmaid_igraph import igraph_from_skeleton
-except:
+	from pymaid.igraph_catmaid import igraph_from_skeleton
+except:	
 	module_logger.error('Import of catmaid_igraph failed - likely due to iGraph package missing: cut_neuron2() will not work!')
+
 
 def generate_list_of_childs(skdata):
 	""" Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -74,8 +77,7 @@ def downsample_neuron ( skdata, resampling_factor):
 
 	Returns
 	-------
-	skdata :			CATMAID skeleton data (reduced)
-
+	skdata :			downsample CATMAID skeleton data 
 	"""
 
 	list_of_childs  = generate_list_of_childs(skdata)
@@ -91,7 +93,7 @@ def downsample_neuron ( skdata, resampling_factor):
 	#Walk from all fix points to the root - jump N nodes on the way
 	new_parents = {}
 
-	module_logger.info('Sampling neuron down by factor of', resampling_factor)
+	module_logger.info('Sampling neuron down by factor of %i' % resampling_factor)
 	for en in fix_points:
 		this_node = en
 
@@ -116,10 +118,9 @@ def downsample_neuron ( skdata, resampling_factor):
 				new_parents[ this_node ] = None
 				break	
 
-	new_nodes = [ [ n[0], new_parents[ n[0] ] ,n[1],n[2],n[3],n[4],n[5],n[6],n[7] ] for n in skdata[0] if n[0] in new_parents ]
+	new_nodes = [ [ n[0], new_parents[ n[0] ],n[2],n[3],n[4],n[5],n[6],n[7] ] for n in skdata[0] if n[0] in new_parents ]
 
-	module_logger.debug('Node before:', len( skdata[0] ))
-	module_logger.debug('Node after:', len( new_nodes ))
+	module_logger.info('Node before/after: %i/%i ' % ( len( skdata[0] ), len( new_nodes ) ) )	
 
 	return [ new_nodes, skdata[1] ]
 
@@ -145,23 +146,19 @@ def cut_neuron2( skdata, cut_node, g = None ):
 		g = igraph_from_skeleton(skdata)
 
 	module_logger.info('Cutting neuron...')
-	#Select nodes with the correct ID as cut node
-	cut_node_igraph = g.vs.select( node_id=int(cut_node) )
-
+	try:
+		#Select nodes with the correct ID as cut node
+		cut_node_index = g.vs.select( node_id=int(cut_node) )[0].index
 	#Should have found only one cut node
-	if len(cut_node_igraph) != 1:
+	except:
 		module_logger.error('Error: Found %i nodes with that ID - please double check!')
 		return 
 
-	#Select the cut node's parent
-	parent_node_igraph = g.vs.select( node_id=cut_node_igraph[0]['parent_id'] )
+	#Select the cut node's parent	
+	parent_node_index = g.es.select( _source = cut_node_index )[0].target
 
-	#Get minimum cut between those two nodes (i.e. remove this one edge)
-	#Attention: for some reason, we have to make sure that source (first argument) is the higher index and target (second argument) is lower index
-	source = min( [ cut_node_igraph[0].index , parent_node_igraph[0].index  ] )
-	target = max( [ cut_node_igraph[0].index , parent_node_igraph[0].index  ] )
-
-	mc = g.st_mincut( source , target , capacity=None )
+	#Now calculate the min cut
+	mc = g.st_mincut( parent_node_index , cut_node_index , capacity=None )
 
 	#mc.partition holds the two partitions with mc.partition[0] holding part with the source and mc.partition[1] the target
 	if g.vs.select(mc.partition[0]).select(node_id=int(cut_node)):
@@ -325,6 +322,34 @@ def synapse_root_distances(skid, skdata, remote_instance, pre_skid_filter = [], 
 def calc_dist(v1,v2):        
     return math.sqrt(sum(((a-b)**2 for a,b in zip(v1,v2))))
 
+def calc_cable( skdata , smoothing = 1, remote_instance = None ):
+	""" Calculates cable length in micro meter (um) of a given neuron     
+
+    Parameters:
+    -----------
+    skdata :        	either a skeleton ID or 3d skeleton data (optional)
+    					if skeleton ID, 3d skeleton data will be pulled from CATMAID server
+    smoothing :			int (default = 1)
+    					use to smooth neuron by downsampling; 1 = no smoothing     					
+    remote_instance :   CATMAID instance (optional)
+    					pass if skdata is a skeleton ID, not 3D skeleton data
+
+    Returns:
+    --------
+    cable_length [um]
+    """
+
+	if type(skdata) != type( list() ) :
+		skdata = get_3D_skeleton( [skdata], rm)[0]
+
+	if smoothing > 1:
+		skdata = downsample_neuron(skdata, smoothing)
+
+	parent_loc = { n[0] : [ p for p in skdata[0] if p[0] == n[1]][0][3:6] for n in skdata[0] if n[1] != None }
+
+	#Now add distance between all child->parents
+	return round( sum( [ calc_dist( n[3:6], parent_loc[n[0]] ) for n in skdata[0] if n[1] != None ]  )/1000, 3)
+
 def walk_to_root( start_node, list_of_parents, visited_nodes ):
     """ Walks to root from start_node and sums up geodesic distances along the way.     
 
@@ -368,18 +393,20 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
 
 if __name__ == '__main__':
 	"""
-	#Connect to your CATMAID server
-	#Alternatively do:
-	from pymaid import CATMAIDInstance
-	rm = CatmaidInstance( 'www.your.catmaid-server.org' , 'HTTP-USER' , 'HTTP-PASSWORD', 'TOKEN' )
+	FOR DEBUGGING ONLY
 	"""
+	import sys
+	sys.path.append('/Users/philipps/OneDrive/Cloudbox/Python')
+	sys.path.append('/Users/philipps/OneDrive/Cloudbox/Python/PyMaid/pymaid')
 	from connect_catmaid import connect_adult_em
 	rm = connect_adult_em()
 
+	#print(calc_cable ( 21999, smoothing = 3, remote_instance = rm) )
+
 	from pymaid import get_3D_skeleton	
 
-	skdata = get_3D_skeleton( [2333007], rm)[0]     
+	skdata = get_3D_skeleton( [21999], rm)[0]     
 
-	nA, nB = cut_neuron( skdata, 4450214 )
+	nA, nB = cut_neuron2( skdata, 132996 )
 
-	downsample_neuron ( nA , 10 )
+	#downsample_neuron ( nA , 10 )

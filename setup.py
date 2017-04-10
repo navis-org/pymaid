@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='pymaid',
-    version='0.12',
+    version='0.13',
     packages=['pymaid',],
     license='GNU GPL V3',
     long_description=open('README.md').read(),
@@ -23,6 +23,7 @@ setup(
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
 
     install_requires=[
@@ -30,5 +31,6 @@ setup(
         "scipy",
         "numpy",
         "matplotlib",
+        "plotly"
     ],
 )

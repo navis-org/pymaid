@@ -22,12 +22,34 @@ import random, colorsys, logging
 from matplotlib.patches import Polygon, Circle
 from matplotlib.collections import PatchCollection
 
-try:
-	from pymaid import get_3D_skeleton, retrieve_names
-except:
-	from pymaid.pymaid import get_3D_skeleton, retrieve_names
+import plotly.plotly as py
+import plotly.offline as pyoff
+import plotly.graph_objs as go
+import pandas as pd
+import numpy as np
 
-def plotneuron(skids, remote_instance, *args, **kwargs):
+try:
+	from pymaid import get_3D_skeleton, get_names, get_volume
+except:
+	from pymaid.pymaid import get_3D_skeleton, get_names, get_volume
+
+try:
+	import anatomy
+except:
+	from pymaid import anatomy
+
+#If plotneuron is not run as module, make sure module_logger has a at least a StreamHandler
+module_logger = logging.getLogger(__name__) 
+module_logger.setLevel(logging.INFO)
+if not module_logger.handlers:
+	sh = logging.StreamHandler()
+	sh.setLevel(logging.DEBUG)
+	#Create formatter and add it to the handlers
+	formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+	sh.setFormatter(formatter)
+	module_logger.addHandler(sh)
+
+def plot2d(skids, remote_instance, *args, **kwargs):
 	""" 
 	Retrieves 3D skeletons and generates matplotlib object.	
 	Currently plots frontal view (x,y axes). X and y limits 
@@ -54,26 +76,9 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 	Returns:
 	--------
 	fig, ax :			matplotlib figure and axe object
-	"""	
-	
-	#If plotneuron is not run as module, make sure logger has a at least a StreamHandler
-	if 'logger' in kwargs:		   
-		logger = logging.getLogger( kwargs['logger'] )
-	else:
-		logger = logging.getLogger(__name__) 
-		sh = logging.StreamHandler()
-		sh.setLevel(logging.INFO)
-		#Create formatter and add it to the handlers
-		formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-		sh.setFormatter(formatter)
+	"""		
 
-		logger.addHandler(sh)
-
-		if 'debug' in args:
-			logger.setLevel(logging.DEBUG)
-		else:
-			logger.setLevel(logging.INFO)
-
+	#Here, we define 2d outlines brain meshes/neuropils:
 	brain = [(571757, -169305), (562337, -165537), (546490, -164097), (534964, -163653), (525877, -161215), (521001, -162878), (502161, -159775), (483654, -161658), (467586, -165426), (444978, -173295), (431347, -185596), (422592, -196124), (409072, -202551), (401204, -208425), (395774, -217734), (395331, -226710), (400872, -239011), (410735, -247212), (423479, -254858), (425474, -256742), (420487, -259291), (412508, -255413), (401093, -251534), (390676, -252531), (382143, -244109), (376159, -235022), (369842, -231697), (355546, -228594), (331166, -232473), (300025, -244109), (290273, -250315), (279856, -262394), (267998, -282009), (265782, -294311), (261127, -309493), (260462, -320132), (257470, -340855), (260241, -359362), (264895, -377869), (275756, -399479), (289386, -418429), (303682, -432504), (319419, -442699), (335044, -451011), (352887, -455665), (365298, -457438), (382697, -454224), (394998, -447797), (403531, -438709), (414613, -431285), (418825, -422973), (431237, -416213), (440545, -406904), (451184, -401031), (463485, -386956), (467696, -373658), (479776, -384075), (491744, -393051), (509919, -400144), (513909, -410561), (515017, -420646), (526985, -431395), (550701, -444029), (556685, -445802), (568875, -444694), (583171, -447686), (600238, -447021), (619853, -449237), (636698, -447686), (644012, -449348), (650772, -448905), (678920, -437269), (690667, -423970), (696541, -408788), (699311, -402250), (708398, -397373), (719702, -387621), (740758, -373880), (744637, -373325), (742642, -384186), (744526, -395046), (750953, -404577), (759487, -413997), (768352, -419538), (772896, -420092), (782648, -428957), (783867, -434277), (796722, -447021), (803815, -455887), (818221, -465417), (830855, -470182), (840386, -471180), (863325, -468742), (883716, -460763), (910646, -443807), (929596, -423305), (945665, -399812), (955860, -372993), (958631, -343958), (954198, -318358), (943227, -293978), (927158, -274695), (907432, -259513), (883938, -247433), (861109, -244663), (844264, -247766), (831963, -257961), (827530, -266162), (819108, -266495), (801598, -273698), (792733, -283893), (787413, -279128), (780321, -275249), (780210, -272922), (784754, -266162), (802042, -255412), (810464, -245882), (813345, -236905), (810575, -224715), (800379, -212525), (791514, -206541), (778880, -201332), (771677, -192799), (753059, -179500), (735217, -168973), (711280, -163875), (692329, -163764), (679807, -167532), (658197, -170635), (632486, -171078), (616196, -177727), (611098, -181606), (598021, -184155), (591150, -183047), (583171, -176398)]
 	hole = [(601774, -302587), (604265, -304709), (608786, -311906), (608786, -322239), (616536, -334602), (618565, -344197), (618381, -349548), (609524, -365048), (595592, -364218), (593378, -362003), (591994, -354622), (588765, -342998), (589503, -334694), (591348, -321501), (591348, -310891), (595961, -306739)]	
 
@@ -100,7 +105,7 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 	else:
 		skdata = kwargs['skdata']
 
-	names = retrieve_names (skids,remote_instance )
+	names = get_names (skids,remote_instance )
 	fig, ax = plt.subplots(figsize = (15,7))	
 
 	args = [a.lower() for a in args]
@@ -195,7 +200,7 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 	plt.axis('off')
 
 	if len(skdata) > 1:
-		colormap = random_colors ( len(skdata) , color_range='RGB') 
+		colormap = random_colors ( len(skdata) , color_space='RGB') 
 	else:
 		colormap = [ (float(0),float(0),float(0)) ]
 
@@ -245,7 +250,7 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 				ax.add_patch(s)
 
 		if 'synapses' in args or 'synapses_only' in args:
-			logger.debug('Plotted %i pre- and %i postsynapses' % ( len([ c for c in neuron[1] if c[2] == 0 ]), len([ c for c in neuron[1] if c[2] == 1 ]) ) )			
+			module_logger.debug('Plotted %i pre- and %i postsynapses' % ( len([ c for c in neuron[1] if c[2] == 0 ]), len([ c for c in neuron[1] if c[2] == 1 ]) ) )			
 			#postsynapses
 			ax.scatter( [ c[3] for c in neuron[1] if c[2] == 1 ],[ -c[4] for c in neuron[1] if c[2] == 1 ], c='blue', alpha = 1, zorder=4, edgecolor='none' )
 			#presynapses
@@ -253,7 +258,7 @@ def plotneuron(skids, remote_instance, *args, **kwargs):
 
 	return fig, ax
 
-def random_colors (color_count,color_range='RGB'):
+def random_colors (color_count, color_space='RGB', color_range = 1):
 	""" Divides colorspace into N evenly distributed colors
 	Returns
 	-------
@@ -270,39 +275,321 @@ def random_colors (color_count,color_range='RGB'):
 	runs = int(color_count/2)   
 
 	### Create first half with low brightness; second half with high brightness and slightly shifted hue
-	if color_range == 'RGB':
+	if color_space == 'RGB':
 		for i in range(runs):
 			### High brightness
 			h = interval * i
 			s = 1
 			v =  1
 			hsv = colorsys.hsv_to_rgb(h,s,v)
-			colormap.append( ( hsv[0], hsv[1], hsv[2] ) )             
+			colormap.append( tuple( v * color_range for v in hsv ) )             
 
 			### Lower brightness, but shift hue by half an interval
 			h = interval * (i+0.5)
 			s = 1
 			v =  0.5
 			hsv = colorsys.hsv_to_rgb(h,s,v)
-			colormap.append( ( hsv[0], hsv[1], hsv[2] ) )                       
-	elif color_range == 'Grayscale':
+			colormap.append( tuple( v * color_range for v in hsv ) )              
+	elif color_space == 'Grayscale':
 		h = 0
 		s = 0
 		for i in range(color_count):
 			v = 1/color_count * i
 			hsv = colorsys.hsv_to_rgb(h,s,v)
-			colormap.append( ( hsv[0], hsv[1], hsv[2] ) )    
+			colormap.append( tuple( v * color_range for v in hsv ) )
+
+	module_logger.debug('%i random colors created: %s' % (color_count, str(colormap ) ) )	
 
 	return(colormap)
 
 
+def plot3d( skids, remote_instance, *args, **kwargs ):
+	""" 
+	Retrieves 3D skeletons and generates 3D plot using plotly.			
+
+	Parameters:
+	----------
+	skids :				list
+						list of CATMAID skeleton ids
+	remote_instance :	CATMAID remote instance
+	*args :				list of strings						
+						'connectors' will cause synapses and gap 
+						junctions to be plotted						
+	**kwargs :			'skdata' = [ 3d_skeleton, 3d_skeleton ] 
+						'names' = { skid : neuron name } 
+						'downsampling' = set downsampling of neurons 
+							before plotting (default = 8)
+						'volumes' = [ volume_name, volume_name ] 
+							-> names of volumes as in CATMAID
+	Returns:
+	--------
+	fig:				plotly 3d figure
+						use for example 
+						plotly.offline.plot(fig, filename='3d_plot.html') 
+						to generate html file and open it webbrowser 
+	"""	
+
+	#Use **kwargs to overide these parameters:
+	if 'limits' in kwargs:
+		catmaid_limits = kwargs['limits']
+	else:
+		catmaid_limits = {	#These limits refer to x/y/z in CATMAID -> will later on be inverted and switched to make 3d plot
+						'x': [200000, 1000000], #Make sure [0] < [1]!
+						'z': [-70000, 730000], #Also make sure that dimensions along all axes are the same - otherwise plot will be skewed
+						'y': [-150000, 650000] #'y': [225000, 650000]
+					}	
+
+	#Use catmaid project's limits to scale axis -> we basically have to invert everything to give the plot the right orientation
+	ax_limits= {		
+					'x': [-catmaid_limits['x'][1],-catmaid_limits['x'][0]], 
+					'z': [-catmaid_limits['z'][1], -catmaid_limits['z'][0]], 
+					'y': [-catmaid_limits['y'][1], -catmaid_limits['y'][0]]				
+				}
+	
+
+	if 'skdata' not in kwargs:
+		skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None)	
+	else:
+		skdata = kwargs['skdata']	
+
+	if 'names' not in kwargs:
+		names = get_names( skids, remote_instance )
+	else:
+		names = kwargs['names']
+
+	if 'downsampling' not in kwargs:
+		downsampling = 8
+	else:
+		downsampling = kwargs['downsampling']
+
+	module_logger.info('Preparing neurons for plotting')
+
+	#First downsample neurons
+	if downsampling > 1:
+		skdata = [ anatomy.downsample_neuron ( n, downsampling) for n in skdata ]
+
+	colormap = random_colors ( len(skdata) , color_space='RGB', color_range = 255)
+
+	trace_data = []
+	for i, neuron in enumerate(skdata):
+		module_logger.debug('Working on neuron %s' % str(skids[i]) )
+
+		#First, we have to generate slabs from the neurons		
+		#Child dicts
+		loc = anatomy.generate_list_of_childs(neuron)
+
+		#Parent dicts
+		lop = { n[0]:n[1] for n in neuron[0] }
+
+		#Coordinates
+		coords = { n[0]: n[3:6] for n in neuron[0] }
+
+		#Branch nodes
+		bn = [n for n in loc if len(loc[n]) > 1 ]
+		#Leaf nodes
+		ln = [n for n in loc if len(loc[n]) == 0 ]
+		#Root node
+		root = [n for n in neuron[0] if n[1] == None]		
+
+		module_logger.debug('Generating slabs for %i branch/end nodes' % len( ln + bn ) )
+
+		slabs = []		
+		#Now walk from each branch and leaf node to the next
+		for n in bn + ln:
+			this_slab = [n, lop[ n ]]			
+			while this_slab[-1] not in bn+ln+root:
+				try:		
+					this_slab += [ lop[ this_slab[-1] ] ]
+				except:					
+					break #will fail if root node (cause no parent)
+
+			try:
+				this_slab.remove(None)
+			except:
+				pass
+
+			slabs.append( this_slab )		
+
+		module_logger.debug('Generating traces')
+
+		#Now add traces		
+		for k,s in enumerate(slabs):
+			trace_data.append( go.Scatter3d( 	x = [ -coords[ n ][0] for n in s ],
+												y = [ -coords[ n ][2] for n in s ], #y and z are switched
+												z = [ -coords[ n ][1] for n in s ],
+												mode = 'lines',
+											    line=dict(
+											        color='rgb(%s)' % str(colormap[i]),
+											        width=5
+											    ),
+											    name = names[str( skids[i] ) ],
+											    legendgroup = names[str( skids[i] ) ],
+											    showlegend = k == 0 
+
+									) )
+		#Add soma(s):		
+		soma = [n for n in neuron[0] if n[6] > 500]
+		for n in soma:
+			trace_data.append( go.Scatter3d( 	x = [ -n[3] ],
+												y = [ -n[5] ], #y and z are switched
+												z = [ -n[4] ],
+												mode = 'marker',
+											    marker=dict(
+											        color='rgb(%s)' % str(colormap[i]),
+											        size = 3
+											    ),
+											    name = names[str( skids[i] ) ],
+											    legendgroup = names[str( skids[i] ) ],
+											    showlegend = False
+									) )	
+
+		if 'connectors' in args:			
+			#Prepare dict with properties for different types of connectors
+			if 'syn_lay' not in kwargs:
+				syn_lay = { 
+							0: { 
+								'name' : 'Presynapses',
+								'color': 'ff0000'								
+								},
+							1: {
+								'name' : 'Postsynapses',
+								'color': '0000ff'
+								},
+							2: {
+								'name' : 'Gap junctions',
+								'color': '00ff00'
+								},
+							'display' : 'circles'
+							}
+			else:
+				syn_lay = kwargs['syn_lay']
+
+			for j in syn_lay:
+				for k,s in enumerate( [ s for s in neuron[1] if s[2] == j ]):
+					if k == 0:
+						show_legend = True
+						name = syn_lay[ s[2] ]['name'] + ' of ' + names[str( skids[i] ) ]
+					else:
+						show_legend = False
+						name = 'Connector ' + str( s[1] )
+
+					if syn_lay['display'] == 'circles': 			
+						trace_data.append( go.Scatter3d( x = [ -s[3] ],
+														y = [ -s[5] ], #y and z are switched
+														z = [ -s[4] ],
+														mode = 'markers',
+													    marker=dict(
+													        color= syn_lay[ s[2] ]['color'],
+													        size = 2
+													    ),
+													    name = name,
+													    legendgroup = syn_lay[ s[2] ]['name'] + ' of ' + names[str( skids[i] ) ],
+													    showlegend = show_legend
+											) )	
+					elif syn_lay['display'] == 'lines': 
+						#Find associated treenode
+						tn = [ t for t in neuron[0] if t[0] == s[0] ][0]					
+						trace_data.append( go.Scatter3d( x = [ -tn[3], -s[3] ],
+														y = [ -tn[5], -s[5] ], #y and z are switched
+														z = [ -tn[4], -s[4] ],
+														mode = 'lines',
+													    line=dict(
+													        color= syn_lay[ s[2] ]['color'],
+													        width = 5
+													    ),
+													    name = name,
+													    legendgroup = syn_lay[ s[2] ]['name'] + ' of ' + names[str( skids[i] ) ],
+													    showlegend = show_legend
+											) )	
+
+	#Now add neuropils:
+	if 'volumes' in kwargs:
+		for v in kwargs['volumes']:
+			vertices, faces = get_volume( v, remote_instance )
+
+			if vertices:
+				trace_data.append(  go.Mesh3d(
+											x = [ -v[0] for v in vertices ],
+									        y = [ -v[2] for v in vertices ], #y and z are switched
+									        z = [ -v[1] for v in vertices ],
+									        
+									        i = [ f[0] for f in faces ],
+									        j = [ f[1] for f in faces ],
+									        k = [ f[2] for f in faces ],
+
+									        opacity = .5,
+									        color = 'rgb(220,220,200)',
+									        name= v,
+									        showlegend = True
+									) 
+								)
+
+
+
+	layout = dict(
+	    width=1200,
+	    height=800,
+	    autosize=False,
+	    title='Neuron Plot',
+	    scene=dict(
+	        xaxis=dict(
+	            gridcolor='rgb(255, 255, 255)',
+	            zerolinecolor='rgb(255, 255, 255)',
+	            showbackground=True,
+	            backgroundcolor='rgb(240, 240, 240)',	            
+	            range = ax_limits['x']
+
+	        ),
+	        yaxis=dict(
+	            gridcolor='rgb(255, 255, 255)',
+	            zerolinecolor='rgb(255, 255, 255)',
+	            showbackground=True,
+	            backgroundcolor='rgb(240, 240, 240)',	    
+	            range = ax_limits['y']
+	        ),
+	        zaxis=dict(
+	            gridcolor='rgb(255, 255, 255)',
+	            zerolinecolor='rgb(255, 255, 255)',
+	            showbackground=True,
+	            backgroundcolor='rgb(240, 240, 240)',	    
+	            range = ax_limits['z']
+	        ),
+	        camera=dict(
+	            up=dict(
+	                x=0,
+	                y=0,
+	                z=1
+	            ),
+	            eye=dict(
+	                x=-1.7428,
+	                y=1.0707,
+	                z=0.7100,
+	            )
+	        ),
+	        aspectratio = dict( x=1, y=1, z=1 ),
+	        aspectmode = 'manual'
+	    ),
+	)
+
+	fig = dict(data=trace_data, layout=layout)
+
+	module_logger.info('Done')
+
+	return fig
+
 if __name__ == '__main__':
+	import sys
+	sys.path.append('/Users/philipps/OneDrive/Cloudbox/Python')
 	from connect_catmaid import connect_adult_em
 
 	remote_instance = connect_adult_em()
 
-	fix, ax = plotneuron([1420974], remote_instance)
+	fig = plot3d( [1420974], remote_instance, *['connectors'], **{'volumes':['v13.neuropil.elmv14']} )
 
-	plt.legend()
-	plt.show()
+	pyoff.plot(fig, filename='3d_plot_test.html')
+
+	#fig, ax = plot2d([1420974], remote_instance)
+
+	#plt.legend()
+	#plt.show()
 	#plt.savefig( 'renderings/neuron_plot.png', transparent = False )

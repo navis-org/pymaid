@@ -51,6 +51,7 @@ import base64
 import threading
 import datetime
 import logging
+import re
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -255,6 +256,10 @@ class CatmaidInstance:
         """ Get list of all volumes in project. """
         return self.djangourl("/" + str(pid) + "/volumes/")    
 
+    #Get details on a given volume (mesh)
+    def get_volume_details(self, pid, volume_id):
+        return self.djangourl("/" + str(pid) + "/volumes/" + str(volume_id) )
+
     def get_annotations_for_skid_list(self, pid):
         """ ATTENTION: This does not seem to work anymore as of 20/10/2015 -> although it still exists in CATMAID code
             use get_annotations_for_skid_list2    
@@ -379,7 +384,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(pid) + "/stats/user-history" )
   
 
-def retrieve_urls_threaded( urls , remote_instance, post_data = [], time_out = None ):
+def get_urls_threaded( urls , remote_instance, post_data = [], time_out = None ):
     """ Wrapper to retrieve a list of urls using threads
 
     Parameters:
@@ -540,7 +545,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
             #'True'/'False' needs to be lower case
             urls.append (  remote_compact_skeleton_url.lower() )
 
-    skdata = retrieve_urls_threaded( urls, remote_instance, time_out = time_out )
+    skdata = get_urls_threaded( urls, remote_instance, time_out = time_out )
 
     return skdata     
 
@@ -578,7 +583,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
 
     return (sk_data)
 
-def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 1):
+def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 1):
     """ Wrapper to retrieve the synaptic partners to neurons of interest
 
     Parameters:
@@ -642,7 +647,7 @@ def retrieve_partners (skids, remote_instance = None , threshold = 1, project_id
     return(connectivity_data)
     
 
-def retrieve_names (skids, remote_instance = None, project_id = 1):
+def get_names (skids, remote_instance = None, project_id = 1):
     """ Wrapper to retrieve neurons names for a list of skeleton ids
 
     Parameters:
@@ -678,7 +683,7 @@ def retrieve_names (skids, remote_instance = None, project_id = 1):
         
     return(names)
 
-def retrieve_node_lists (skids, remote_instance = None, project_id = 1):
+def get_node_lists (skids, remote_instance = None, project_id = 1):
     """ Wrapper to retrieve treenode table for a list of skids
 
     Parameters:
@@ -1003,7 +1008,7 @@ def skid_exists( skid, remote_instance = None, project_id = 1 ):
     else:
         return True  
 
-def retrieve_annotation_id( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
+def get_annotation_id( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
     """ Wrapper to retrieve the annotation ID for single or list of annotation(s)
     
     Parameters:
@@ -1063,7 +1068,7 @@ def retrieve_annotation_id( annotations, remote_instance = None, project_id = 1,
 
     return annotation_ids
 
-def retrieve_skids_by_name(tag, allow_partial = True, remote_instance = None, project_id = 1):
+def get_skids_by_name(tag, allow_partial = True, remote_instance = None, project_id = 1):
     """ Wrapper to retrieve the all neurons with matching name
     
     Parameters:
@@ -1094,7 +1099,7 @@ def retrieve_skids_by_name(tag, allow_partial = True, remote_instance = None, pr
 
     return list( set( match ) )
 
-def retrieve_skids_by_annotation( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
+def get_skids_by_annotation( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
     """ Wrapper to retrieve the all neurons annotated with given annotation(s)
     
     Parameters:
@@ -1116,7 +1121,7 @@ def retrieve_skids_by_annotation( annotations, remote_instance = None, project_i
             return
 
     remote_instance.logger.info('Looking for Annotation(s): ' + str(annotations) )
-    annotation_ids = retrieve_annotation_id(annotations, remote_instance, project_id = 1, allow_partial = allow_partial)
+    annotation_ids = get_annotation_id(annotations, remote_instance, project_id = 1, allow_partial = allow_partial)
 
     if not annotation_ids:
         remote_instance.logger.warning('No matching annotation found! Returning None')
@@ -1223,7 +1228,7 @@ def add_tags ( node_list, tags, node_type, remote_instance = None, project_id = 
 
     post_data = [ {'tags': ','.join(tags) , 'delete_existing': False } for n in node_list ]
 
-    d = retrieve_urls_threaded( add_tags_urls , remote_instance, post_data = post_data, time_out = None )   
+    d = get_urls_threaded( add_tags_urls , remote_instance, post_data = post_data, time_out = None )   
     
     return d
 
@@ -1290,7 +1295,7 @@ def get_review_details ( skid_list, remote_instance = None, project_id = 1):
         #For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         post_data.append ( { 'placeholder' : 0 } )
 
-    rdata = retrieve_urls_threaded( urls , remote_instance, post_data = post_data, time_out = None )           
+    rdata = get_urls_threaded( urls , remote_instance, post_data = post_data, time_out = None )           
 
     for neuron in rdata:
         #There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
@@ -1434,7 +1439,7 @@ def get_contributor_statistics (skid_list, remote_instance = None, project_id = 
 
     return(statistics)
 
-def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None, project_id = 1 ):
+def get_skeleton_list( remote_instance = None , user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None, project_id = 1 ):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters (see variables). If no parameters are provided, all existing skeletons are returned.
 
     Parameters:
@@ -1477,7 +1482,7 @@ def retrieve_skeleton_list( remote_instance = None , user=None, node_count=1, st
 
     return skid_list
 
-def retrieve_history( remote_instance = None, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ):    
+def get_history( remote_instance = None, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ):    
     """ Wrapper to retrieves CATMAID history 
     Attention: If the time window is too large, the connection might time out which will result in an error!
 
@@ -1554,7 +1559,6 @@ def retrieve_history( remote_instance = None, project_id = 1, start_date = '2016
 
     return stats
 
-
 def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = None, project_id = 1 ):
     """ Retrieves neurons with processes within a defined volume. Because the API returns only a limited number of neurons at a time, the defined volume has to be chopped into smaller pieces for crowded areas - may thus take some time!
 
@@ -1572,7 +1576,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return 
 
-    def retrieve_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion, project_id ):  
+    def get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion, project_id ):  
 
         remote_instance.logger.info( '%i: %i, %i, %i, %i, %i ,%i' % (incursion, left, right, top, bottom, z1, z2) )
 
@@ -1600,7 +1604,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
             incursion += 1         
             node_list = list()
             #Front left top
-            node_list += retrieve_nodes( left, 
+            node_list += get_nodes( left, 
                                         left + (right-left)/2, 
                                         top, 
                                         top + (bottom-top)/2, 
@@ -1608,7 +1612,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z1 + (z2-z1)/2, 
                                         remote_instance, incursion )
             #Front right top
-            node_list += retrieve_nodes( left  + (right-left)/2, 
+            node_list += get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top,
                                         top + (bottom-top)/2, 
@@ -1616,7 +1620,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z1 + (z2-z1)/2, 
                                         remote_instance, incursion )
             #Front left bottom            
-            node_list += retrieve_nodes( left, 
+            node_list += get_nodes( left, 
                                         left + (right-left)/2, 
                                         top + (bottom-top)/2, 
                                         bottom, 
@@ -1624,7 +1628,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z1 + (z2-z1)/2, 
                                         remote_instance, incursion )
             #Front right bottom
-            node_list += retrieve_nodes( left  + (right-left)/2, 
+            node_list += get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top + (bottom-top)/2, 
                                         bottom, 
@@ -1632,7 +1636,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z1 + (z2-z1)/2, 
                                         remote_instance, incursion )
             #Back left top
-            node_list += retrieve_nodes( left, 
+            node_list += get_nodes( left, 
                                         left + (right-left)/2, 
                                         top, 
                                         top + (bottom-top)/2, 
@@ -1640,7 +1644,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z2, 
                                         remote_instance, incursion )
             #Back right top
-            node_list += retrieve_nodes( left  + (right-left)/2, 
+            node_list += get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top,
                                         top + (bottom-top)/2, 
@@ -1648,7 +1652,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z2, 
                                         remote_instance, incursion )
             #Back left bottom            
-            node_list += retrieve_nodes( left, 
+            node_list += get_nodes( left, 
                                         left + (right-left)/2, 
                                         top + (bottom-top)/2, 
                                         bottom, 
@@ -1656,7 +1660,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
                                         z2, 
                                         remote_instance, incursion )
             #Back right bottom
-            node_list += retrieve_nodes( left  + (right-left)/2, 
+            node_list += get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top + (bottom-top)/2, 
                                         bottom, 
@@ -1674,7 +1678,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
         return node_list
 
     incursion = 1
-    node_list = retrieve_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion , project_id )
+    node_list = get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion , project_id )
 
     #Collapse list into unique skeleton ids
     skeletons = set()
@@ -1682,6 +1686,97 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
         skeletons.add(node[7])           
 
     return list(skeletons)
+
+def get_volume( volume_name, remote_instance = None, project_id = 1 ):
+    """ Retrieves volume (mesh) and converts to set of 
+
+    Parameters:
+    ----------
+    volume_name :       string
+                        name of the volume to import - must be EXACT!
+    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    
+    """   
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return 
+
+    remote_instance.logger.info('Retrieving volume <%s>' % volume_name)
+
+    #First, get volume ID
+    get_volumes_url = remote_instance.get_volumes( project_id )
+    response =  remote_instance.fetch ( get_volumes_url )      
+
+    volume_id  = [ e['id'] for e in response if e['name'] == volume_name ]
+
+    if not volume_id:
+        remote_instance.logger.error('Did not find a matching volume for name %s' % volume_name)
+        return
+    else:
+        volume_id = volume_id[0]
+
+    #Now download volume
+    url = remote_instance.get_volume_details( project_id, volume_id )
+    response = remote_instance.fetch(url)
+
+    mesh_string = response['mesh']
+    mesh_name = response['name']
+
+    mesh_type = re.search('<(.*?) ', mesh_string).group(1)
+
+    #Now reverse engineer the mesh
+    if mesh_type  == 'IndexedTriangleSet':            
+        t = re.search("index='(.*?)'", mesh_string).group(1).split(' ')
+        faces = [ ( int( t[i] ), int( t[i+1] ), int( t[i+2] ) ) for i in range( 0, len(t) - 2 , 3 ) ]
+
+        v = re.search("point='(.*?)'", mesh_string).group(1).split(' ')
+        vertices = [ ( float( v[i] ), float( v[i+1] ), float( v[i+2] ) ) for i in range( 0,  len(v) - 2 , 3 ) ]
+
+    elif mesh_type  == 'IndexedFaceSet':
+        #For this type, each face is indexed and an index of -1 indicates the end of this face set
+        t = re.search("coordIndex='(.*?)'", mesh_string).group(1).split(' ')
+        faces = []
+        this_face = []
+        for f in t:
+            if int(f) != -1:
+                this_face.append( int(f) )
+            else:
+                faces.append( this_face )
+                this_face = []
+
+        #Make sure the last face is also appended
+        faces.append( this_face )
+
+        v = re.search("point='(.*?)'", mesh_string).group(1).split(' ')
+        vertices = [ ( float( v[i] ), float( v[i+1] ), float( v[i+2] ) ) for i in range( 0,  len(v) - 2 , 3 ) ]
+
+    else:
+        remote_instance.logger.error("Unknown volume type: %s" % mesh_type)        
+        return
+
+    #For some reason, in this format vertices occur multiple times - we have to collapse that to get a clean mesh
+    final_faces = []
+    final_vertices = []
+
+    for t in faces:
+        this_faces = []
+        for v in t:
+            if vertices[v] not in final_vertices:
+                final_vertices.append( vertices[v] )
+                
+            this_faces.append( final_vertices.index( vertices[v] ) )
+
+        final_faces.append( this_faces )
+
+    remote_instance.logger.info('Volume type: %s' % mesh_type)
+    remote_instance.logger.info('# of vertices after clean-up: %i' % len(final_vertices) )
+    remote_instance.logger.info('# of faces after clean-up: %i' % len(final_faces) )    
+
+    return final_vertices, final_faces
 
         
 if __name__ == '__main__':
@@ -1701,16 +1796,16 @@ if __name__ == '__main__':
     print(get_annotations_from_list (example_skids, remote_instance))
 
     #Retrieve names of neurons
-    print(retrieve_names (example_skids , remote_instance))    
+    print(get_names (example_skids , remote_instance))    
 
     #Retrieve skeleton ids that have a given annotation
-    print( retrieve_skids_by_annotation( example_annotation , remote_instance ) )
+    print( get_skids_by_annotation( example_annotation , remote_instance ) )
     
     #Get CATMAID version running on your server
     print( remote_instance.fetch ( remote_instance.djangourl('/version') ) )
 
     #Retrieve user history
-    print( retrieve_history( remote_instance = remote_instance, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ) )
+    print( get_history( remote_instance = remote_instance, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ) )
 
     #Get review status
     print( get_review( example_skids ,remote_instance ) )
@@ -1725,7 +1820,7 @@ if __name__ == '__main__':
     print( get_neurons_in_volume ( 0, 28218, 21000, 28128, 6050, 39000, remote_instance ))
 
     #Retrieve synaptic partners for a set of neurons - ignore those connected by less than 3 synapses
-    print ( retrieve_partners (example_skids, remote_instance, threshold = 3))
+    print ( get_partners (example_skids, remote_instance, threshold = 3))
 
     #Get 3D skeletons and print the first one
     print( get_3D_skeleton ( example_skids , remote_instance, 1 , 0 )[0] )
@@ -1734,7 +1829,7 @@ if __name__ == '__main__':
     print( remote_instance.fetch ( remote_instance.get_user_list_url() ) )
 
     #Get list of skeletons created by user 93 between 1/1/2016 and 1/10/2016. If you only provide the remote_instance, all neurons are returned
-    print( retrieve_skeleton_list(remote_instance, user=93 , node_count=1, start_date= [2016,1,1], end_date = [2016,10,1] ) )
+    print( get_skeleton_list(remote_instance, user=93 , node_count=1, start_date= [2016,1,1], end_date = [2016,10,1] ) )
 
     #Add annotations to neurons - be extremely careful with this!
     #add_annotations ( example_skids , ['test'], remote_instance )

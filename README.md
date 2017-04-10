@@ -23,20 +23,22 @@ This command should also work to update the package.
 
 *Attention*: on Windows, the dependencies (i.e. Numpy and SciPy) will likely fail to install. Your best bet is to get a Python distribution that includes them (e.g. [Anaconda](https://www.continuum.io/downloads)).
 
-#### Dependencies (in case you need to install manually):
+#### Dependencies:
 `pymaid` uses standard Python 3 libraries
 
 `catmaid_igraph` requires [iGraph](http://www.igraph.org), [SciPy](http://www.scipy.org), [Numpy](http://www.scipy.org) and [Matplotlib](http://www.matplotlib.org)
 
-`plotneuron` requires [matplotlib](http://matplotlib.org/)
+`plot` requires [matplotlib](http://matplotlib.org/) and [Plotly](http://plot.ly)
 
-`natpy` uses standard Python 3 libraries, [iGraph](http://www.igraph.org) is optional 
+`anatomy` uses standard Python 3 libraries, [iGraph](http://www.igraph.org) is optional 
+
+`cluster` requires [SciPy](http://www.scipy.org)
 
 ## Basic examples:
 
 ### Retrieve 3D skeleton data
 ```python
-from pymaid import CatmaidInstance, get_3D_skeleton
+from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
 
 #Initialize Catmaid instance 
 myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
@@ -48,8 +50,8 @@ skdata = get_3D_skeleton ( ['12345','67890'] , myInstance )
 ```
 ### Cluster synapses based on distance along the arbor using iGraph
 ```python
-from pymaid import CatmaidInstance, get_3D_skeleton
-from catmaid_igraph import igraph_from_skeleton, cluster_nodes_w_synapses
+from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
+from pymaid.igraph_catmaid import igraph_from_skeleton, cluster_nodes_w_synapses
 
 #Initiate Catmaid instance
 remote_instance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
@@ -61,7 +63,7 @@ skid = '12345'
 skdata = get_3D_skeleton ( [ example_skid ], remote_instance, connector_flag = 1, tag_flag = 0 )[0]
 
 #(Optional) Consider downsampling for large neuronns (preverses branch points, end points, synapses, etc.)
-from natpy import downsample_neuron
+from pymaid.anatomy import downsample_neuron
 skdata = downsample_neuron( skdata, 4 )
 
 #Generate iGraph object from node data
@@ -98,22 +100,24 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `get_annotations_from_list()`: get annotations of a set of neurons (annotation only)
 - `get_neurons_in_volume()`: get neurons in a defined box volume
 - `get_contributor_statistics()`: get contributors (nodes, synapses, etc) for a set of neurons
-- `retrieve_skids_by_annotation()`: get skeleton IDs that are annotated with a given annotation
-- `retrieve_skids_by_name()`: get skeleton IDs of neurons with given names
-- `retrieve_skeleton_list()`: retrieve neurons that fit certain criteria (e.g. user, size, dates)
-- `retrieve_history()`: retrieve project history similar to the project statistics widget
-- `retrieve_partners()`: retrieve connected partners for a list of neurons
-- `retrieve_names()`: retrieve names of a set of skeleton IDs
-- `retrieve_node_lists()`: retrieve list of nodes within given volume
+- `get_skids_by_annotation()`: get skeleton IDs that are annotated with a given annotation
+- `get_skids_by_name()`: get skeleton IDs of neurons with given names
+- `get_skeleton_list()`: retrieve neurons that fit certain criteria (e.g. user, size, dates)
+- `get_history()`: retrieve project history similar to the project statistics widget
+- `get_partners()`: retrieve connected partners for a list of neurons
+- `get_names()`: retrieve names of a set of skeleton IDs
+- `get_node_lists()`: retrieve list of nodes within given volume
 - `skid_exists()`: checks if a skeleton ID exists
+- `get_volume()`: get volume (verts + faces) of CATMAID volumes
 
-### pymaid.igraph:
+### pymaid.igraph_catmaid:
 - `igraph_from_skeleton()`: generates iGraph object from CATMAID neurons
 - `calculate_distance_from_root()`: calculates geodesic (along-the-arbor) distances for nodes to root node
 - `cluster_nodes_w_synapses()`: uses iGraph's shortest_paths_dijkstra to cluster nodes with synapses
 
 ### pymaid.plot:
-- 'plotneuron()': generates 2D plots of neurons
+- 'plot2d()': generates 2D plots of neurons
+- 'plot3d()': uses [Plotly](http://plot.ly) to generate 3D plots of neurons
 
 ### pymaid.cluster:
 - `synapse_distance_matrix()`: cluster synapses based on eucledian distance
@@ -125,6 +129,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `cut_neuron()`: virtually cuts a neuron at given treenode and returns the distal and the proximal part
 - `cut_neuron2()`: similar to above but uses iGraph (slightly faster)
 - `synapse_root_distances()`: similar to `pymaid.igraph.calculate_distance_from_root` but does not use iGraph
+- `calc_cable()`: calculate cable length of given neuron
 
 ## License:
 This code is under GNU GPL V3

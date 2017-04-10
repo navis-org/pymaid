@@ -70,7 +70,7 @@ def igraph_from_skeleton(skdata):
 	module_logger.info('Generating graph from skeleton data...')
 
 	#Generate list of vertices -> this order is retained
-	vlist = [n[0] for n in skdata[0]]
+	vlist = [ n[0] for n in skdata[0] ]
 	
 	#Generate list of edges based on index of vertices
 	elist = []

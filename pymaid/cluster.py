@@ -6,9 +6,9 @@ import math
 
 from scipy import cluster, spatial
 try:
-	from pymaid import retrieve_partners, retrieve_names, get_edges
+	from pymaid import get_partners, get_names, get_edges
 except:
-	from pymaid.pymaid import retrieve_partners, retrieve_names, get_edges
+	from pymaid.pymaid import get_partners, get_names, get_edges
 
 import logging
 
@@ -46,7 +46,7 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
 	#Make sure neurons are strings, not integers
 	neurons = [str(n) for n in list(set(neuronsA + neuronsB))]
 
-	neuron_names = retrieve_names( neurons, remote_instance )
+	neuron_names = get_names( neurons, remote_instance )
 
 	module_logger.info('Retrieving and filtering connectivity')
 	
@@ -133,7 +133,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
 
 	module_logger.info('Retrieving and filtering connectivity')
 	#Retrieve connectivity and apply filters
-	connectivity = retrieve_partners(neurons,remote_instance)
+	connectivity = get_partners(neurons,remote_instance)
 	for d in directions:
 		if filter_skids or exclude_skids:
 			to_delete = []
@@ -150,7 +150,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
 
 	module_logger.info('Retrieving neuron names')
 	#Retrieve names
-	neuron_names = retrieve_names( list(set(neurons+
+	neuron_names = get_names( list(set(neurons+
 										   list(connectivity['incoming']) +
 										   list(connectivity['outgoing'])
 										   )
@@ -249,7 +249,7 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
 	-----------
 	neuronA :		skeleton ID
 	neuronB :		skeleton ID
-	connectivity :	connectivity data as provided by pymaid.retrieve_partners()
+	connectivity :	connectivity data as provided by pymaid.get_partners()
 	syn_threshold :	min number of synapses for a connection to be considered
 	min_nodes :		min number of nodes for a partner to be considered
 					use this to filter fragments

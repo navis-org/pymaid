@@ -3,6 +3,6 @@ setup.py
 pymaid/__init__.py
 pymaid/anatomy.py
 pymaid/cluster.py
-pymaid/igraph.py
+pymaid/igraph_catmaid.py
 pymaid/plot.py
 pymaid/pymaid.py
