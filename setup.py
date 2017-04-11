@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='pymaid',
-    version='0.131',
+    version='0.132',
     packages=['pymaid',],
     license='GNU GPL V3',
     long_description=open('README.md').read(),
@@ -27,7 +27,7 @@ setup(
     ],
 
     install_requires=[
-        "igraph",
+        "python-igraph",
         "scipy",
         "numpy",
         "matplotlib",

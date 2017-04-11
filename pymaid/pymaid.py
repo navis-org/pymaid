@@ -67,8 +67,9 @@ class CatmaidInstance:
     authtoken :     string
                     User token - see CATMAID documentation on how to retrieve it.
     logger :        optional
-                    provide name for logging.getLogger if you like the CATMAID instance to log to a specific logger
-                    by default (None), a dedicated logger __name__ is created
+                    provide name for logging.getLogger if you like the CATMAID 
+                    instance to log to a specific logger by default (None), a 
+                    dedicated logger __name__ is created
     debug :         boolean (optional)
                     if True, logging level is set to 'DEBUG' (default is 'INFO')
 
@@ -392,12 +393,15 @@ def get_urls_threaded( urls , remote_instance, post_data = [], time_out = None )
     urls :              list of strings
                         Urls to retrieve
     remote_instance :   CATMAID instance
-                        Either pass directly to function or define globally as 'remote_instance'       
+                        Either pass directly to function or define globally 
+                        as 'remote_instance'       
     post_data :         list of dicts
                         needs to be the same size as urls
     time_out :          integer or None
-                        After this number of second, fetching data will time out (so as to not block the system)
-                        If set to None, time out will be max( [ 20, len(urls) ] ) - e.g. 100s for 100 skeletons but at least 20s
+                        After this number of second, fetching data will time 
+                        out (so as to not block the system)
+                        If set to None, time out will be max( [ 20, len(urls) ] ) 
+                        - e.g. 100s for 100 skeletons but at least 20s
 
     Returns:
     -------
@@ -488,21 +492,35 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     ----------
     skids :             single or list of skeleton ids
     remote_instance :   CATMAID instance
-                        Either pass directly to function or define globally as 'remote_instance'
-    connector_flag :    set if connector data should be retrieved. Possible values = 0/False or 1/True
-    tag_flag :          set if tags should be retrieved. Possible values = 0/False or 1/True    
+                        Either pass directly to function or define globally 
+                        as 'remote_instance'
+    connector_flag :    set if connector data should be retrieved. 
+                        Possible values = 0/False or 1/True
+    tag_flag :          set if tags should be retrieved. 
+                        Possible values = 0/False or 1/True    
     time_out :          integer or None
-                        After this number of second, fetching skeleton data will time out (so as to not block the system)
-                        If set to None, time out will be max( [ 20, len(skids) ] ) - e.g. 100s for 100 skeletons but at least 20s
+                        After this number of second, fetching skeleton data 
+                        will time out (so as to not block the system)
+                        If set to None, time out will be max( [ 20, len(skids) ] ) 
+                        - e.g. 100s for 100 skeletons but at least 20s
     get_history:        boolean
-                        if True, the returned skeleton data will contain creation date ([8]) and last modified ([9]) for each node -> compact-details url the 'with_history' option is used in this case
-                        ATTENTION: if get_history = True, nodes/connectors that have been moved since their creation will have multiple entries reflecting their changes in position! 
-                        Each state has the date it was modified as creation date and the next state's date as last modified. The most up to date state has the original creation date as last modified (full circle).
+                        if True, the returned skeleton data will contain 
+                        creation date ([8]) and last modified ([9]) for each 
+                        node -> compact-details url the 'with_history' option 
+                        is used in this case
+                        ATTENTION: if get_history = True, nodes/connectors 
+                        that have been moved since their creation will have 
+                        multiple entries reflecting their changes in position! 
+                        Each state has the date it was modified as creation 
+                        date and the next state's date as last modified. The 
+                        most up to date state has the original creation date 
+                        as last modified (full circle).
                         The creator_id is always the original creator though.
 
     Returns:
     -------
-    list of 3D skeleton data in the same order as the list of skids passed as parameter: 
+    list of 3D skeleton data in the same order as the list of skids 
+    passed as parameter: 
         [ [ [neuron1_nodes], [neuron1_connectors], [neuron1_tags] ], [ neuron2_nodes, ... ], [... ], ... ]   
 
     """
@@ -555,9 +573,12 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
-    connector_flag :    set if connector data should be retrieved. Values = 0 or 1. (optional, default = 1)
-    tag_flag :          set if tags should be retrieved. Values = 0 or 1. (optional, default = 1)
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
+    connector_flag :    set if connector data should be retrieved. 
+                        Values = 0 or 1. (optional, default = 1)
+    tag_flag :          set if tags should be retrieved. Values = 0 or 1. 
+                        (optional, default = 1)
 
     """
 
@@ -589,8 +610,12 @@ def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1,
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
-    threshold :         does not seem to have any effect on CATMAID API and is therefore filtered afterwards. This threshold is applied to the total number of synapses. (optional, default = 1)
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
+    threshold :         does not seem to have any effect on CATMAID API and is 
+                        therefore filtered afterwards. This threshold is 
+                        applied to the total number of synapses. 
+                        (optional, default = 1)
     min_size :          minimum node count of partner
 
     Returns:
@@ -653,7 +678,8 @@ def get_names (skids, remote_instance = None, project_id = 1):
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
 
     Returns:
     ------- 
@@ -689,7 +715,8 @@ def get_node_lists (skids, remote_instance = None, project_id = 1):
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
 
     Returns:
     ------- 
@@ -741,7 +768,8 @@ def get_edges (skids, remote_instance = None):
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
 
     Returns:
     --------
@@ -776,7 +804,8 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
     ----------
     skids :             list of skeleton ids
     remote_instance :   CATMAID instance 
-                        either pass directly to function or define globally as 'remote_instance'
+                        either pass directly to function or define 
+                        globally as 'remote_instance'
     incoming_synapses : boolean (default = True)
                         if True, incoming synapses will be retrieved
     outgoing_synapses : boolean (default = True)
@@ -845,8 +874,10 @@ def get_connector_details (connector_ids, remote_instance = None, project_id = 1
     
     Parameters:
     ----------
-    connector_ids :     list of connector ids; can be found e.g. from compact skeletons
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    connector_ids :     list of connector ids; can be found e.g. 
+                        from compact skeletons (get_3D_skeleton)
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     ------- 
@@ -881,7 +912,8 @@ def get_review (skids, remote_instance = None, project_id = 1):
     Parameters:
     ----------
     skids :             list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     ------- 
@@ -915,7 +947,8 @@ def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
     ----------
     skid :              string or int 
                         Single skeleton id.
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     ------- 
@@ -951,7 +984,8 @@ def has_soma ( skids , remote_instance = None, project_id = 1 ):
     Parameters:
     ----------
     skids :             single skeleton id or list of skids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns
     -------
@@ -985,7 +1019,8 @@ def skid_exists( skid, remote_instance = None, project_id = 1 ):
     Parameters:
     ----------
     skid :              single skeleton id
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     -------
@@ -1014,7 +1049,8 @@ def get_annotation_id( annotations, remote_instance = None, project_id = 1, allo
     Parameters:
     ----------
     annotations :       single annotations or list of multiple annotations
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
     allow_partial :     boolean
                         If True, will allow partial matches
 
@@ -1075,7 +1111,8 @@ def get_skids_by_name(tag, allow_partial = True, remote_instance = None, project
     ----------
     tag :               name to search for
     allow_partial :     if True, partial matches are returned too    
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
     """
 
     if remote_instance is None:
@@ -1104,9 +1141,10 @@ def get_skids_by_annotation( annotations, remote_instance = None, project_id = 1
     
     Parameters:
     ----------
-    annotations :           single annotation or list of multiple annotations    
-    remote_instance :       CATMAID instance; either pass directly to function or define globally as 'remote_instance'
-    allow_partial :         allow partial match of annotation
+    annotations :          single annotation or list of multiple annotations    
+    remote_instance :      CATMAID instance; either pass directly to function 
+                           or define globally as 'remote_instance'
+    allow_partial :        allow partial match of annotation
 
     Returns:
     -------
@@ -1157,7 +1195,8 @@ def get_annotations_from_list(skid_list, remote_instance = None, project_id = 1 
     Parameters:
     ----------
     skid_list :         list of skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     --------
@@ -1201,8 +1240,10 @@ def add_tags ( node_list, tags, node_type, remote_instance = None, project_id = 
     node_list :         list of treenode or connector ids that will be tagged
     tags :              list of tags(s) to add to provided treenode/connector ids
     node_type :         string
-                        set to 'TREENODE' or 'CONNECTOR' depending on what you want to tag
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+                        set to 'TREENODE' or 'CONNECTOR' depending on 
+                        what you want to tag
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
 
     Returns confirmations from Catmaid server
     """
@@ -1239,7 +1280,8 @@ def add_annotations ( skid_list, annotations, remote_instance = None, project_id
     ----------
     skid_list :         list of skeleton ids that will be annotated
     annotations :       list of annotation(s) to add to provided skeleton ids
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns nothing
     """
@@ -1279,7 +1321,8 @@ def get_review_details ( skid_list, remote_instance = None, project_id = 1):
     Parameters:
     -----------
     skid_list :         list of skeleton ids to check
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     -------
@@ -1310,11 +1353,14 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
     
     Parameters:
     ----------    
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
     operations :        list of strings
-                        if empty, all operations will be requested from the server
-                        possible operations: 'join_skeleton', 'change_confidence', 'rename_neuron', 'create_neuron', 'create_skeleton', 'remove_neuron'
-                        'split_skeleton', 'reroot_skeleton', 'reset_reviews', 'move_skeleton'
+                        if empty, all operations will be queried from server
+                        possible operations: 'join_skeleton', 
+                        'change_confidence', 'rename_neuron', 'create_neuron', 
+                        'create_skeleton', 'remove_neuron', 'split_skeleton', 
+                        'reroot_skeleton', 'reset_reviews', 'move_skeleton'
     entries :           integer (default = 50)
                         number of entries to retrieve
     project_id :        integer (default = 1)
@@ -1413,7 +1459,8 @@ def get_contributor_statistics (skid_list, remote_instance = None, project_id = 
     Parameters:
     ----------
     skid_list :         list of skeleton ids to check
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
 
     Returns:
     -------
@@ -1445,7 +1492,8 @@ def get_skeleton_list( remote_instance = None , user=None, node_count=1, start_d
     Parameters:
     ----------
     remote_instance :   class
-                        Your CATMAID instance; either pass directly to function or define globally as 'remote_instance'.
+                        Your CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'.
     user :              integer
                         A single user_id.
     node_count :        integer
@@ -1488,13 +1536,17 @@ def get_history( remote_instance = None, project_id = 1, start_date = '2016-10-2
 
     Parameters:
     ----------
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function 
+                        or define globally as 'remote_instance'
     user :              single user_id    
-    start_date :        created after, date needs to be (year,month,day) format - e.g. '2016-10-29'
-    end_date :          created before, date needs to be (year,month,day) format - e.g. '2017-10-29'
+    start_date :        created after, date needs to be (year,month,day) 
+                        format - e.g. '2016-10-29'
+    end_date :          created before, date needs to be (year,month,day) 
+                        format - e.g. '2017-10-29'
     split :             boolean
                         If True, history will be requested in bouts of 6 months
-                        Useful if you want to look at a very big time window as this can lead to gateway timeout
+                        Useful if you want to look at a very big time window 
+                        as this can lead to gateway timeout
 
     Returns:
     --------
@@ -1564,8 +1616,10 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
 
     Parameters:
     ----------
-    left, right, top, z1, z2 :  Coordinates defining the volumes. Need to be in nm, not pixels.
-    remote_instance :           CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    left, right, top, z1, z2 :   Coordinates defining the volumes. Need to be 
+                                 in nm, not pixels.
+    remote_instance :            CATMAID instance; either pass directly to 
+                                 function or define globally as 'remote_instance'
     
     """   
 
@@ -1694,7 +1748,8 @@ def get_volume( volume_name, remote_instance = None, project_id = 1 ):
     ----------
     volume_name :       string
                         name of the volume to import - must be EXACT!
-    remote_instance :   CATMAID instance; either pass directly to function or define globally as 'remote_instance'
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'
     
     """   
 
@@ -1784,9 +1839,7 @@ if __name__ == '__main__':
     """
 
     #First, create CATMAID instance. Here, a separate file (connect_catmaid) holding my credentials is called but you can easily do this yourself by using: 
-    #remote_instance = CatmaidInstance( server_url, http_user, http_pw, user_token )
-    from connect_catmaid import connect_larval_em, connect_adult_em
-    remote_instance = connect_adult_em()
+    remote_instance = CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'user_token' )    
 
     #Some example skids and annotation
     example_skids = [  '298953','1085816','1159799' ]
