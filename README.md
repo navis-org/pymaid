@@ -17,7 +17,7 @@ Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
 First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in terminal:  
 
-`pip3 install git+git://github.com/schlegelp/pymaid@master`  
+`pip install git+git://github.com/schlegelp/pymaid@master`  
 
 This command should also work to update the package.
 
