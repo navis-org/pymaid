@@ -35,8 +35,6 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 sh.setFormatter(formatter)
 module_logger.addHandler(sh)
 
-from igraph_catmaid import igraph_from_skeleton
-
 try:
 	from pymaid.igraph_catmaid import igraph_from_skeleton
 except:	
