@@ -520,7 +520,10 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     Returns:
     -------
     list of 3D skeleton data in the same order as the list of skids 
-    passed as parameter: 
+    passed as parameter (i.e. [neuron1,neuron2,...])
+   
+    each neuron contains: [ nodes,  ]
+
         [ [ [neuron1_nodes], [neuron1_connectors], [neuron1_tags] ], [ neuron2_nodes, ... ], [... ], ... ]   
 
     """

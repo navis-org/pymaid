@@ -1,8 +1,20 @@
 from distutils.core import setup
+import re
+
+
+VERSIONFILE="pymaid/_version.py"
+verstrline = open(VERSIONFILE, "rt").read()
+VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
+mo = re.search(VSRE, verstrline, re.M)
+if mo:
+    verstr = mo.group(1)
+else:
+    raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
+
 
 setup(
     name='pymaid',
-    version='0.132',
+    version=verstr,
     packages=['pymaid',],
     license='GNU GPL V3',
     long_description=open('README.md').read(),
@@ -27,10 +39,10 @@ setup(
     ],
 
     install_requires=[
-        "python-igraph",
-        "scipy",
-        "numpy",
-        "matplotlib",
-        "plotly"
+        "python-igraph>=0.7.1",
+        "scipy>=0.18.1",
+        "numpy>=1.12.1",
+        "matplotlib>=2.0.0",
+        "plotly>=2.0.6"
     ],
 )

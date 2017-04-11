@@ -125,8 +125,9 @@ def downsample_neuron ( skdata, resampling_factor):
    return [ new_nodes, skdata[1] ]
 
 def cut_neuron2( skdata, cut_node, g = None ):
-   """ Uses igraph to Cut the neuron at given point and returns two new neurons. Creating
-   the iGraph is the bottleneck - if you already have it, pass it along to speed things up!
+   """ Uses igraph to Cut the neuron at given point and returns two new neurons. 
+   Creating the iGraph is the bottleneck - if you already have it, pass it along 
+   to speed things up!
 
    Parameter
    ---------
