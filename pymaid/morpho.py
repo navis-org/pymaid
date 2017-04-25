@@ -210,7 +210,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
    #Example for multiple cuts 
 
    from pymaid.igraph_catmaid import igraph_from_skeleton
-   from pymaid.anatomy import cut_neuron2
+   from pymaid.morpho import cut_neuron2
    from pymaid.pymaid import get_3D_skeleton, CatmaidInstance
 
    remote_instance = CatmaidInstance( url, http_user, http_pw, token )

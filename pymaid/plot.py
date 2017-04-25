@@ -36,9 +36,9 @@ except:
    from pymaid.pymaid import get_3D_skeleton, get_names, get_volume
 
 try:
-   import anatomy
+   import morpho
 except:
-   from pymaid import anatomy
+   from pymaid import morpho
 
 #If plotneuron is not run as module, make sure module_logger has a at least a StreamHandler
 module_logger = logging.getLogger(__name__) 
@@ -74,7 +74,7 @@ def plot2d( *args, **kwargs ):
 
    2. Manually download a neuron, modify it and plot it
         skdata = pymaid.get_3D_skeleton( [12345], rm )
-        dist, prox = anatomy.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
+        dist, prox = morpho.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
         fig, ax = plot.plot2d( skdata = dist )
         matplotlib.pyplot.show()
 
@@ -279,7 +279,7 @@ def plot2d( *args, **kwargs ):
       lines = []
 
       if 'type' not in neuron.nodes:         
-         neuron = anatomy.classify_nodes( neuron )
+         neuron = morpho.classify_nodes( neuron )
 
       b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
       end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
@@ -529,7 +529,7 @@ def plot3d( *args, **kwargs ):
 
    #First downsample neurons
    if downsampling > 1:
-      skdata = pd.DataFrame( [ anatomy.downsample_neuron ( skdata.ix[i], downsampling ) for i in range( skdata.shape[0] ) ] )
+      skdata = pd.DataFrame( [ morpho.downsample_neuron ( skdata.ix[i], downsampling ) for i in range( skdata.shape[0] ) ] )
 
    trace_data = []
    for i, neuron in enumerate( skdata.itertuples() ):
@@ -539,7 +539,7 @@ def plot3d( *args, **kwargs ):
       skid = neuron.skeleton_id 
 
       if by_strahler:         
-         s_index = anatomy.calc_strahler_index( skdata.ix[i] )               
+         s_index = morpho.calc_strahler_index( skdata.ix[i] )               
 
       #First, we have to generate slabs from the neurons    
       if 'type' not in neuron.nodes:
@@ -788,16 +788,8 @@ if __name__ == '__main__':
 
    skdata = get_3D_skeleton( [27295] , remote_instance )[0]
 
-   LH, rest = anatomy.cut_neuron2 ( skdata , 2816697 )
+   LH, rest = morpho.cut_neuron2 ( skdata , 2816697 )
 
    fig = plot3d( ['27295-LH','27295-rest'], remote_instance, *['connectors'], skdata = [ LH, rest ], names={ '27295-LH' : '27295-LH' ,'27295-rest': '27295-rest' }, volumes = ['v13.LH_R'] )   
 
    pyoff.plot(fig, filename='3d_plot_test.html')
-
-   #fig = plot3d( [1420974, 27295], remote_instance, *['connectors'], volumes = ['v13.LH_R'] )
-   #pyoff.plot(fig, filename='3d_plot_test.html')
-
-   #fig, ax = plot2d([1420974], remote_instance)
-   #plt.legend()
-   #plt.show()
-   #plt.savefig( 'renderings/neuron_plot.png', transparent = False )
