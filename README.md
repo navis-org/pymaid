@@ -9,7 +9,7 @@ Pymaid has been tested with CATMAID latest release version 2017.04.20 - if you a
 
 `pymaid.igraph_catmaid` contains a wrapper to turn CATMAID skeletons in [iGraph](http://www.igraph.org) objects which can then be used to e.g. quickly calculate geodesic (along the arbor) distances and cluster synapses. 
 
-`pymaid.anatomy` contains wrappers to analyse or manipulate neuron morphology
+`pymaid.morpho` contains wrappers to analyse or manipulate neuron morphology
 
 `pymaid.plot` contains a wrapper to generate 2D or 3D morphology plots of neurons
 
@@ -32,7 +32,7 @@ This command should also work to update the package.
 
 `plot` requires [matplotlib](http://matplotlib.org/) and [Plotly](http://plot.ly)
 
-`anatomy` uses standard Python 3 libraries, [iGraph](http://www.igraph.org) is optional 
+`morpho` uses standard Python 3 libraries, [iGraph](http://www.igraph.org) is optional 
 
 `cluster` requires [SciPy](http://www.scipy.org)
 
@@ -57,7 +57,7 @@ nodes = skdata.ix[0].nodes
 coords = skdata.ix[0].connectors[ ['x','y','z'] ].as_matrix()
 
 #Classify nodes into branches, leafs and slabs:
-from pymaid.anatomy import classify_nodes
+from pymaid.morpho import classify_nodes
 df = classify_nodes( skdata.ix[0] )
 
 #This new dataframe has a new column 'type'. Let's use this to get treenode ids for all branch points
@@ -79,7 +79,7 @@ skid = '12345'
 skdata = get_3D_skeleton ( [ example_skid ], remote_instance, connector_flag = 1, tag_flag = 0 )
 
 #(Optional) Consider downsampling for large neuronns (preverses branch points, end points, synapses, etc.)
-from pymaid.anatomy import downsample_neuron
+from pymaid.morpho import downsample_neuron
 ds_neuron = downsample_neuron( skdata.ix[0] , 4 )
 
 #Generate iGraph object from node data
@@ -143,13 +143,13 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `create_connectivity_distance_matrix()`: returns distance matrix based on connectivity similarity (Jarrell et al., 2012)
 - `synapse_distance_matrix()`: cluster synapses based on eucledian distance
 
-### pymaid.anatomy:
+### pymaid.morpho:
 - `calc_cable()`: calculate cable length of given neuron
 - `calc_strahler_index()`: calculate strahler index for each node
 - `cut_neuron()`: virtually cuts a neuron at given treenode and returns the distal and the proximal part
 - `classify_nodes()`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
 - `cut_neuron2()`: similar to above but uses iGraph (slightly faster)
-- `downsample_neuron()`: take skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
+- `downsample_neuron()`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - `synapse_root_distances()`: similar to `pymaid.igraph_catmaid.calculate_distance_from_root()` but does not use iGraph
 
 
