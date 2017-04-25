@@ -27,6 +27,8 @@ import plotly.offline as pyoff
 import plotly.graph_objs as go
 import pandas as pd
 import numpy as np
+import random
+import math
 
 try:
    from pymaid import get_3D_skeleton, get_names, get_volume
@@ -49,29 +51,75 @@ if not module_logger.handlers:
    sh.setFormatter(formatter)
    module_logger.addHandler(sh)
 
-def plot2d(skids, remote_instance, *args, **kwargs):
+def plot2d( *args, **kwargs ):
    """ 
    Retrieves 3D skeletons and generates matplotlib object.  
-   Currently plots frontal view (x,y axes). X and y limits 
-   have been set to fit the adult EM volume -> adjust if necessary.
+   Currently plots only frontal view (x,y axes). 
+   X and y limits have been set to fit the adult EM volume -> adjust if necessary.
 
    Parameters:
    ----------
-   skdis :           list
-                     list of CATMAID skeleton ids
-   remote_instance : CATMAID remote instance
-   *args :           list of strings
-                     neuropil names as *args will cause them to be plotted in gray
-                     'synapses' will cause synapses to be plotted
-                     'zoom' will zoom in on higher brain centers
-                     'synapses_only' will plot only synapses                  
-   **kwargs :        tuples of (r,g,b)
-                     passing neuropil names as **kwargs will render them in the 
-                     provided color. r,g,b must be range 0-1
-                     for example: {'brain': (1,0,0), 'MB': (0,1,0)}                 
+   Provide neurons by using either one of the following kwargs
+
+   skids :           list or single skid
+   skdata :          skeleton data as retrieved by pymaid.get_3D_skeleton()
+   remote_instance : Catmaid Instance - need this too if you are passing only
+                     skids
+
+   Examples:
+
+   1. Plot two neurons and have plot2d download the skeleton data for you
+        fig, ax = plot.plot2d( skids = [12345, 45567], remote_instance = rm ) 
+        matplotlib.pyplot.show()
+
+   2. Manually download a neuron, modify it and plot it
+        skdata = pymaid.get_3D_skeleton( [12345], rm )
+        dist, prox = anatomy.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
+        fig, ax = plot.plot2d( skdata = dist )
+        matplotlib.pyplot.show()
+
+   Other (optional) arguments:
+   connectors :      boolean (default = True)
+                     Plot connectors (synapses, gap junctions, abutting)
+   connectors_only : boolean (default = False)
+                     Plot only connectors, not the neuron                  
+   zoom :            boolean (default = False)
+                     Zoom in on higher brain centers
+   auto_limits :     boolean (default = True)
+                     by default, limits are being calculated such that they 
+                     fit the neurons plotted. 
+   limits :          dict (default = None)
+                     Manually override limits for plot. Dict needs to define
+                     min and max values for each axis:
+                     { 'x' : [ int, int ], 'y' : [ int, int ] }
+
+                     If auto_limits = False and limits = None, a hard-coded 
+                     fallback is used - this may not suit your needs!
+
+   Neuropils included for FAFB(v13)
+   ---------
+   Neuropil names can be passed either as *args or as **kwargs. Passing them as
+   *args will cause them to be plotted in gray; passing neuropil names as **kwargs 
+   will render them in the provided color.
+   
+   For example: 
+   plot.plot2d(   skids = [ 12346 ], 
+                  remote_instance = rm, 
+                  'brain' = (1,0,0), 
+                  'MB' =  (0,1,0) )
+      -> plots brain in red, and mushroom body in green
+
+   plot.plot2d(   skids = [ 12346 ], 
+                  remote_instance = rm,
+                  *['brain', 'MB'] )
+      -> plots brain and mushroom body in grey                                    
 
    Currently, the following neuropils are included:
    brain, MB, LH, AL, SLP, SIP, CRE
+
+   If you want additional neuropils or work on a different project: feel free to
+   contact me to find out how to add more.
+
 
    Returns:
    --------
@@ -100,22 +148,30 @@ def plot2d(skids, remote_instance, *args, **kwargs):
    cre_r = [(558997, -283589), (554341, -283398), (548165, -283924), (540930, -285305), (534608, -286182), (528043, -286263), (520823, -285398), (515759, -281077), (512380, -275247), (509820, -272348), (509193, -270168), (507484, -266435), (503772, -259835), (500777, -255260), (498600, -254098), (497171, -251500), (496627, -248832), (496028, -246159), (495826, -243299), (496217, -239853), (497115, -237139), (498400, -235985), (500947, -234495), (503289, -236081), (503465, -240508), (503700, -247028), (504093, -252167), (505831, -258144), (509679, -262670), (513299, -259975), (517961, -256286), (520891, -251777), (520544, -247662), (520904, -244488), (521539, -241321), (521499, -238485), (520013, -234937), (517571, -228398), (517222, -221791), (518927, -218874), (520458, -217366), (521238, -215068), (522475, -211330), (524039, -206777), (525695, -202243), (526866, -199967), (528045, -198715), (529560, -197643), (531725, -198952), (536505, -200923), (540956, -201736), (544764, -203979), (550273, -206802), (555476, -208224), (558102, -209040), (559313, -209838), (561554, -210767), (565390, -213045), (568917, -215270), (572712, -216933), (576834, -218597), (580956, -219190), (585484, -220692), (587689, -222597), (586331, -225068), (584353, -227577), (582113, -229367), (578867, -230943), (575251, -234757), (573878, -240168), (575743, -242954), (578483, -244278), (581787, -248105), (583599, -253610), (584437, -257311), (584207, -259765), (583619, -263615), (584341, -267375), (585265, -269867), (585129, -273549), (582008, -276756), (574812, -278494), (568248, -280009), (563830, -282095), (560227, -283493), (556603, -283638), (551700, -283337), (544366, -284724), (537722, -285760), (531434, -286405), (524489, -285885), (517696, -284047), (514242, -277729), (510723, -273497), (509401, -271378), (508716, -268569), (505752, -263584), (501971, -256592), (499787, -254781), (497599, -253056), (496964, -249927), (496276, -247736), (495879, -244535), (495921, -241916), (496640, -237972), (497687, -236696), (499428, -235190), (502415, -234569), (503622, -238303), (503322, -243236), (504118, -250475), (504405, -254069), (507785, -261856), (511515, -261678), (515344, -258023), (520146, -254344), (520817, -249308), (520448, -246251), (521428, -242727), (521481, -239997), (521155, -236794), (518631, -232332), (517033, -224447), (517923, -220058), (519887, -218042), (520841, -216492), (521749, -213284), (523283, -209172), (524818, -204386), (526451, -200664), (527284, -199526), (528891, -197949), (530391, -197932), (533713, -200138), (539215, -201419), (542537, -202411), (547417, -205692), (553053, -207562), (557255, -208734), (558596, -209342), (560287, -210368), (563220, -211504), (567483, -214573), (570418, -215827), (575088, -218038), (578580, -218888), (583433, -219719), (586954, -221766), (587533, -223569), (584973, -226576), (583667, -228398), (580308, -230283), (577334, -232162), (573728, -237751), (574838, -241929), (576867, -243613), (580241, -245569), (582960, -251061), (583995, -255708), (584613, -258603), (583712, -261277), (583853, -265930), (584880, -268502), (585386, -271529), (584126, -275450), (578871, -277694), (570911, -279238), (566121, -280922), (562644, -282746)]
    cre_l = [(675014, -280093), (669755, -278568), (664449, -276974), (658160, -277137), (653002, -279066), (649915, -279958), (645337, -280714), (637818, -281710), (633026, -282120), (629181, -282275), (623647, -281767), (618803, -280285), (615527, -276784), (613915, -272977), (612654, -269393), (610383, -265692), (606299, -262388), (602047, -258996), (599388, -256382), (598046, -252863), (595528, -248227), (592953, -244033), (593573, -240457), (595639, -237453), (597690, -234111), (599174, -228952), (598869, -224351), (599310, -221466), (601239, -218466), (603311, -216980), (605698, -217470), (608917, -218588), (614939, -218965), (620058, -217567), (623846, -216321), (629550, -216003), (635220, -215178), (639003, -213345), (643272, -210707), (649135, -209452), (654991, -208945), (659573, -208386), (662670, -208298), (666208, -209932), (670338, -212105), (673600, -213152), (677475, -216419), (681241, -219727), (682775, -221680), (683763, -226406), (683977, -233845), (684092, -240171), (683729, -245595), (682970, -248997), (683044, -250858), (681942, -253587), (681776, -258502), (683833, -263106), (686346, -265429), (688891, -268342), (690117, -272646), (689739, -277674), (685825, -280080), (680352, -280552), (676691, -280462), (672023, -279342), (667476, -277777), (661176, -276611), (655427, -278104), (651096, -279769), (648361, -280113), (641578, -281375), (634740, -281898), (631548, -282278), (626392, -282107), (621074, -281184), (616923, -278881), (614547, -274611), (613370, -271399), (611685, -267357), (608628, -264126), (603929, -260628), (600564, -257559), (598542, -254979), (597256, -250468), (593786, -246096), (592919, -242124), (594589, -238933), (596686, -235890), (598552, -231879), (599348, -226166), (598576, -222966), (600417, -219938), (602097, -217372), (604604, -217082), (607000, -218015), (611535, -218976), (618117, -218511), (621666, -216662), (626505, -216212), (632587, -215668), (637381, -214436), (640747, -212053), (646196, -209707), (652072, -209384), (657591, -208493), (661184, -208396), (664267, -208630), (668297, -211369), (672162, -212560), (675192, -214300), (679731, -218548), (682194, -220567), (683220, -223487), (684112, -230004), (683817, -237408), (684248, -242709), (683111, -247976), (683038, -249634), (682756, -252300), (681362, -255421), (682745, -261505), (685034, -264137), (687666, -266869), (689786, -270163), (690046, -275310), (688548, -279382), (682712, -280294), (679360, -280692)]
 
-   if 'skdata' not in kwargs:
-      skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None)   
-   else:
-      skdata = kwargs['skdata']
+   remote_instance = kwargs.get('remote_instance', [])
+   skdata = kwargs.get('skdata', [])
+   skids = kwargs.get('skids', [])
+   connectors = kwargs.get('connectors', True )
+   connectors_only = kwargs.get('connectors_only', False )
+   zoom = kwargs.get('zoom', False )
+   limits = kwargs.get('limits', None )
+   auto_limits = kwargs.get('auto_limits', True )
 
-   names = get_names (skids,remote_instance )
-   fig, ax = plt.subplots(figsize = (15,7))  
+
+   if not skdata and remote_instance and skids:
+      skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None, get_abutting = True)          
+   else:
+      module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot2d).')
+      return
+   
+   fig, ax = plt.subplots(figsize = (8,8))  
+   ax.set_aspect('equal')
 
    args = [a.lower() for a in args]
    kwargs = {k.lower(): kwargs[k] for k in kwargs} 
 
    if 'brain' in args or 'brain' in kwargs:
-      if 'brain' in kwargs:
-         c = kwargs['brain']
-      else:
-         c = (0.9,0.9,0.9)    
+      c = kwargs.get('brain', (0.9,0.9,0.9) )     
 
       brain_p = Polygon(brain, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       hole_p = Polygon(hole, closed = True, lw = 0, fill =True, fc = 'white', alpha = 1 )
@@ -123,21 +179,15 @@ def plot2d(skids, remote_instance, *args, **kwargs):
       ax.add_patch( brain_p )
       ax.add_patch( hole_p )
    if 'cre' in args or 'cre' in kwargs:
-      if 'cre' in kwargs:
-         c = kwargs['cre']
-      else:
-         c = (0.8,0.8,0.8)
+      c = kwargs.get('cre', (0.8,0.8,0.8) )     
 
       cre_r_p = Polygon(cre_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       cre_l_p = Polygon(cre_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( cre_r_p )
       ax.add_patch( cre_l_p ) 
-   if 'sip' in args or 'sip' in kwargs:
-      if 'sip' in kwargs:
-         c = kwargs['sip']
-      else:
-         c = (0.8,0.8,0.8)
+   if 'sip' in args or 'sip' in kwargs:      
+      c = kwargs.get('sip', (0.8,0.8,0.8) )
 
       sip_r_p = Polygon(sip_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       sip_l_p = Polygon(sip_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
@@ -145,10 +195,7 @@ def plot2d(skids, remote_instance, *args, **kwargs):
       ax.add_patch( sip_r_p )
       ax.add_patch( sip_l_p ) 
    if 'slp' in args or 'slp' in kwargs:
-      if 'slp' in kwargs:
-         c = kwargs['slp']
-      else:
-         c = (0.8,0.8,0.8)
+      c = kwargs.get('slp', (0.8,0.8,0.8) )
 
       slp_r_p = Polygon(slp_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       slp_l_p = Polygon(slp_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
@@ -156,20 +203,15 @@ def plot2d(skids, remote_instance, *args, **kwargs):
       ax.add_patch( slp_r_p )
       ax.add_patch( slp_l_p ) 
    if 'mb' in args or 'mb' in kwargs:
-      if 'mb' in kwargs:
-         c = kwargs['mb']
-      else:
-         c = (0.8,0.8,0.8)
+      c = kwargs.get('mb', (0.8,0.8,0.8) )
+
       mb_r_p = Polygon(mb_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       mb_l_p = Polygon(mb_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( mb_r_p )
       ax.add_patch( mb_l_p )     
    if 'lh' in args or 'lh' in kwargs:
-      if 'lh' in kwargs:
-         c = kwargs['lh']
-      else:
-         c = (0.8,0.8,0.8)
+      c = kwargs.get('lh', (0.8,0.8,0.8) )
 
       lh_r_p = Polygon(lh_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       lh_l_p = Polygon(lh_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
@@ -178,83 +220,121 @@ def plot2d(skids, remote_instance, *args, **kwargs):
       ax.add_patch( lh_l_p )     
 
    if 'al' in args or 'al' in kwargs:
-      if 'al' in kwargs:
-         c = kwargs['al']
-      else:
-         c = (0.8,0.8,0.8)
+      c = kwargs.get('al', (0.8,0.8,0.8) )
 
       al_r_p = Polygon(al_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
       al_l_p = Polygon(al_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( al_r_p )
-      ax.add_patch( al_l_p )     
+      ax.add_patch( al_l_p )
 
-   
-   if 'zoom' in args:
-      ax.set_ylim( ( -355333, -150000 ) )
-      ax.set_xlim( ( 380000, 820000 ) )
+   if limits:
+      catmaid_limits = limits  
+   elif auto_limits:
+      min_x = min ( [ n.nodes.x.min() for n in skdata.itertuples() ] + [ n.connectors.x.min() for n in skdata.itertuples() ] )
+      max_x = max ( [ n.nodes.x.max() for n in skdata.itertuples() ] + [ n.connectors.x.max() for n in skdata.itertuples() ] )
+
+      min_y = min ( [ n.nodes.y.min() for n in skdata.itertuples() ] + [ n.connectors.y.min() for n in skdata.itertuples() ] )
+      max_y = max ( [ n.nodes.y.max() for n in skdata.itertuples() ] + [ n.connectors.y.max() for n in skdata.itertuples() ] )
+
+      min_z = min ( [ n.nodes.z.min() for n in skdata.itertuples() ] + [ n.connectors.z.min() for n in skdata.itertuples() ] )
+      max_z = max ( [ n.nodes.z.max() for n in skdata.itertuples() ] + [ n.connectors.z.max() for n in skdata.itertuples() ] )   
+
+      max_dim = max( [ max_x - min_x, max_y - min_y, max_z - min_z  ] ) * 1.1
+
+      #Also make sure that dimensions along all axes are the same - otherwise plot will be skewed
+      catmaid_limits = {   #These limits refer to x/y/z in CATMAID -> will later on be inverted to make 2d plot
+                  'x': [ int( (min_x + (max_x - min_x)/2 ) - max_dim/2 ), int( (min_x + (max_x - min_x)/2 ) + max_dim/2 )] , 
+                  'z': [ int( (min_z + (max_z - min_z)/2 ) - max_dim/2 ), int( (min_z + (max_z - min_z)/2 ) + max_dim/2 )] ,
+                  'y': [ int( (min_y + (max_y - min_y)/2 ) + max_dim/2 ), int( (min_y + (max_y - min_y)/2 ) - max_dim/2 )] #This needs to be inverted
+               }  #z and y need to be inverted here!      
+   elif zoom:
+      catmaid_limits = {   #These limits refer to x/y in CATMAID -> need to invert y (CATMAID coordindates start in upper left, matplotlib bottom left)
+                  'x': [380000, 820000],
+                  'y': [355333, 150000]                   
+               }
    else:
-      ax.set_ylim( ( -510000, -150000 ) )
-      ax.set_xlim( ( 200000, 1000000 ) )
+      catmaid_limits = {   #These limits refer to x/y in CATMAID -> need to invert y (CATMAID coordindates start in upper left, matplotlib bottom left)
+                  #'x': [200000, 1000000],
+                  #'y': [510000, 150000]
+                  'x': [200000, 1000000],
+                  'y': [ 730000, -70000]
+               } 
+   
+   ax.set_ylim( ( -catmaid_limits['y'][0], -catmaid_limits['y'][1] ) )
+   ax.set_xlim( ( catmaid_limits['x'][0], catmaid_limits['x'][1] ) )
 
    plt.axis('off')
 
-   if len(skdata) > 1:
+   module_logger.debug('Plot limits set to: x= %i -> %i; y = %i -> %i' % ( catmaid_limits['x'][0], catmaid_limits['x'][1], -catmaid_limits['y'][0], -catmaid_limits['y'][1] ) )
+
+   if skdata.shape[0] > 1:
       colormap = random_colors ( len(skdata) , color_space='RGB') 
    else:
       colormap = [ (float(0),float(0),float(0)) ]
 
-   for i, neuron in enumerate( skdata ):
-      lines = []     
+   #Create slabs (lines)
+   for i, neuron in enumerate( skdata.itertuples() ):
+      module_logger.debug('Working on neuron %s...' % neuron.neuron_name )
+      lines = []
 
-      #Get a list of all break points (leaf, branch, root):
-      parent_nodes = [ n[1] for n in neuron[0] if n[1] != None ]
-      list_of_parents = { n[0]:n[1] for n in neuron[0] }
-      b_points = [ n for n in neuron[0] if parent_nodes.count( n[0] ) != 1 ]
-      b_point_ids = [ n[0] for n in b_points ]
-      node_dict = { n[0]: n for n in neuron[0] }      
-      soma = [ n for n in neuron[0] if n[6] > 1000 ]
-      
-      if 'synapses_only' not in args:
-         for node in b_points:               
-            if node[1] == None:
+      if 'type' not in neuron.nodes:         
+         neuron = anatomy.classify_nodes( neuron )
+
+      b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
+      end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
+      soma = neuron.nodes[ neuron.nodes.radius > 1000 ]      
+
+      if neuron.nodes.index.name != 'treenode_id':
+         neuron.nodes.set_index('treenode_id', inplace = True )   
+
+      if not connectors_only:
+         module_logger.debug('Finding slabs... (%i branch points)' % len(b_points) )
+         for k, node in enumerate(b_points + end_points):               
+            if neuron.nodes.ix[node].parent_id == None:
                continue
+                      
+            this_line = [ node ]
+            while True: #neuron.nodes.ix[ this_line[-1] ].parent_id not in b_points
+               this_line.append( neuron.nodes.ix[ this_line[-1] ].parent_id )               
 
-            parent = None
-            this_node = node
-            this_line = [ node[3:6] ]
-            while parent not in b_point_ids:          
-               #this_node = [ n for n in neuron[0] if n[0] == this_node[1] ][0]           
-               this_node = node_dict[ this_node[1] ]
-               this_line.append( this_node[3:6] )        
-               parent = list_of_parents[ this_node[0] ]
-
-               if parent is None:
+               if neuron.nodes.ix[ this_line[-1] ].parent_id is None:
+                  module_logger.debug('Ended slab %i at root after %i nodes' % ( k , len(this_line) ) )
                   break
 
-               if parent in b_point_ids:
-                  this_line.append( node_dict[ parent ][3:6] ) 
+               if neuron.nodes.ix[ this_line[-1] ].parent_id in b_points:
+                  module_logger.debug('Ended slab %i at branch point after %i nodes' % ( k , len(this_line) ) )
+                  this_line.append( neuron.nodes.ix[ this_line[-1] ].parent_id ) 
+                  break
 
-            lines.append( this_line )           
+            lines.append( neuron.nodes.ix[ this_line ][ ['x','y','z'] ].as_matrix().tolist() )                    
          
+         module_logger.debug('Creating %i lines' % len(lines) )
+         module_logger.debug( [ len(l) for l in lines ]  )
          for k,l in enumerate( lines ):
             #User first line to assign a legend
             if k == 0:
-               this_line = mlines.Line2D( [ x[0] for x in l ],[ -y[1] for y in l  ], lw = 1 , alpha = .9 , color = colormap[i], label = '%s - #%s' % (names[ str(skids[i]) ], str(skids[i])) )        
+               this_line = mlines.Line2D( [ int(x[0]) for x in l ],[ - int(y[1]) for y in l ], lw = 1 , alpha = .9 , color = colormap[i], label = '%s - #%s' % ( neuron.neuron_name , neuron.skeleton_id ) )        
             else:
-               this_line = mlines.Line2D( [ x[0] for x in l ],[ -y[1] for y in l  ], lw = 1 , alpha = .9 , color = colormap[i]) 
+               this_line = mlines.Line2D( [ int(x[0]) for x in l ],[ - int(y[1]) for y in l ], lw = 1 , alpha = .9 , color = colormap[i]) 
             ax.add_line(this_line)  
 
-         if soma:       
-            s = Circle( ( int( soma[0][3] ), int( -soma[0][4] ) ), radius = soma[0][6] , alpha = .9, fill = True, color = colormap[i], zorder=4, edgecolor='none' )
+         for n in soma.itertuples():       
+            s = Circle( ( int( n.x ), int( -n.y ) ), radius = n.radius , alpha = .9, fill = True, color = colormap[i], zorder=4, edgecolor='none' )
             ax.add_patch(s)
 
-      if 'synapses' in args or 'synapses_only' in args:
-         module_logger.debug('Plotted %i pre- and %i postsynapses' % ( len([ c for c in neuron[1] if c[2] == 0 ]), len([ c for c in neuron[1] if c[2] == 1 ]) ) )       
+      if connectors or connectors_only:
+         module_logger.debug('Plotting %i pre- and %i postsynapses' % ( neuron.connectors[ neuron.connectors.relation == 0 ].shape[0], neuron.connectors[ neuron.connectors.relation == 1 ].shape[0] ) )       
          #postsynapses
-         ax.scatter( [ c[3] for c in neuron[1] if c[2] == 1 ],[ -c[4] for c in neuron[1] if c[2] == 1 ], c='blue', alpha = 1, zorder=4, edgecolor='none' )
+         ax.scatter( neuron.connectors[ neuron.connectors.relation == 1 ].x.tolist() , (-neuron.connectors[ neuron.connectors.relation == 1 ].y).tolist(), c='blue', alpha = 1, zorder=4, edgecolor='none', s = 2 )
          #presynapses
-         ax.scatter( [ c[3] for c in neuron[1] if c[2] == 0 ],[ -c[4] for c in neuron[1] if c[2] == 0 ], c='red', alpha = 1, zorder=4, edgecolor='none' )
+         ax.scatter( neuron.connectors[ neuron.connectors.relation == 0 ].x.tolist() , (-neuron.connectors[ neuron.connectors.relation == 0 ].y).tolist(), c='red', alpha = 1, zorder=4, edgecolor='none', s = 2 ) 
+         #gap junctions
+         ax.scatter( neuron.connectors[ neuron.connectors.relation == 2 ].x.tolist() , (-neuron.connectors[ neuron.connectors.relation == 2 ].y).tolist(), c='green', alpha = 1, zorder=4, edgecolor='none', s = 2 ) 
+         #abutting
+         ax.scatter( neuron.connectors[ neuron.connectors.relation == 3 ].x.tolist() , (-neuron.connectors[ neuron.connectors.relation == 3 ].y).tolist(), c='magenta', alpha = 1, zorder=4, edgecolor='none', s = 1 )     
+
+   module_logger.info('Done. Use matplotlib.pyplot.show() to show plot.')   
 
    return fig, ax
 
@@ -302,103 +382,187 @@ def random_colors (color_count, color_space='RGB', color_range = 1):
 
    return(colormap)
 
+def fibonacci_sphere(samples=1,randomize=True):
+   """ Calculates points on a sphere
+   """
+   rnd = 1.
+   if randomize:
+     rnd = random.random() * samples
 
-def plot3d( skids, remote_instance, *args, **kwargs ):
+   points = []
+   offset = 2./samples
+   increment = math.pi * (3. - math.sqrt(5.));
+
+   for i in range(samples):
+     y = ((i * offset) - 1) + (offset / 2);
+     r = math.sqrt(1 - pow(y,2))
+
+     phi = ((i + rnd) % samples) * increment
+
+     x = math.cos(phi) * r
+     z = math.sin(phi) * r
+
+     points.append([x,y,z])
+
+   return points
+
+def plot3d( *args, **kwargs ):
    """ 
    Retrieves 3D skeletons and generates 3D plot using plotly (http://plot.ly)        
 
    Parameters:
    ----------
+   USE EITHER <skids> or <skdata> to specify which neurons you want to plot
+
    skids :           list
                      list of CATMAID skeleton ids
+   skdata :          skeleton data as retrieved by pymaid.get_3D_skeleton()
    remote_instance : CATMAID remote instance
-   *args :           list of strings                  
-                     'connectors' will cause synapses and gap 
-                     junctions to be plotted                
-   **kwargs :        'skdata' = [ 3d_skeleton, 3d_skeleton ] 
-                     'names' = { skid : neuron name } 
-                     'downsampling' = set downsampling of neurons 
-                     before plotting (default = 8)
-                  '  volumes' = [ volume_name, volume_name ] 
-                     -> names of volumes as in CATMAID
+                     need to pass this too if you are providing only skids
+                     also necessary if you want to include volumes!
+
+   Other (optional arguments):        
+   connectors :      plot synapses and gap junctions (default = False)
+   by_strahler :     will render the neuron by strahler index (default = False)
+   cn_mesh_colors :  plot connectors using mesh colors (default = False)
+   limits :          manually override plot limits
+                     {'x' : [min,max], 'y': [min,max], 'z':[min,max]}
+   auto_limits :     autoscales plot to fit the neurons (default = False)                         
+   downsampling :    set downsampling of neurons before plotting (default = 8)
+   volumes :         list or dict of volumes names
+                     if list: [ name, name, ... }
+                     if dict: { name:(r,g,b), ... }
+   colormap :        { skid : (r,g,b), ... } (default = random colors)
+                     color must be 0-255
+   title :           plot title (default = 'Neuron plot')
+   fig_width and :   use to define figure size (default = 1440/960)
+   fig_height
+   fig_autosize :    autoscale figure size (default = False)
+                     Attention: autoscale overrides fig_width and fig_height
+
    Returns:
    --------
-   fig:           plotly 3d figure
-                  use for example 
+   fig:           dictionary to generate plotly 3d figure
+                  use for example:
                   plotly.offline.plot(fig, filename='3d_plot.html') 
                   to generate html file and open it webbrowser 
-   """   
+   """    
 
-   #Use **kwargs to overide these parameters:
-   if 'limits' in kwargs:
-      catmaid_limits = kwargs['limits']
+   skids = kwargs.get('skids', [] )
+   remote_instance = kwargs.get('remote_instance', [] )
+   pl_title = kwargs.get('title', 'Neuron Plot' )
+   skdata = kwargs.get('skdata', [] )
+   names = kwargs.get('names', [] )
+   downsampling = kwargs.get('downsampling', 8)   
+   volumes = kwargs.get('volumes', [] )
+   connectors = kwargs.get('connectors', False )
+   by_strahler = kwargs.get('by_strahler', False )    
+   cn_mesh_colors = kwargs.get('cn_mesh_colors', False )   
+   limits = kwargs.get('limits', [] )
+   auto_limits = kwargs.get('auto_limits', False )
+   auto_limits = kwargs.get('autolimits', auto_limits ) 
+   syn_lay = kwargs.get('synapse_layout', {} )    
+
+   fig_width = kwargs.get('fig_width', 1440)
+   fig_height = kwargs.get('fig_height', 960)
+   fig_autosize = kwargs.get('fig_autosize', False)
+
+   if not skdata and skids and remote_instance:
+      skdata = get_3D_skeleton ( skids, remote_instance, 
+                                                   connector_flag = 1, 
+                                                   tag_flag = 0 , 
+                                                   get_history = 
+                                                   False, 
+                                                   time_out = None,
+                                                   get_abutting = True ) 
+   elif 'nodes' in skdata.index.tolist():
+      #If skdata is just a single neuron, bring it into a proper list format
+      skdata = pd.DataFrame( [ skdata ] )
+   else:
+      module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot2d).')
+      return  
+
+   colormap = kwargs.get('colormap', {})
+
+   if not colormap:
+      if skdata.shape[0] > 1:
+         colormap = { str(n) : random_colors ( len( skdata ) , color_space='RGB', color_range = 255)[i] for i,n in enumerate( skdata.skeleton_id.tolist() ) } 
+      else:
+         colormap = { str( skdata.ix[0].skeleton_id ) : (0,0,0)  }
+
+   if limits:
+      catmaid_limits = limits  
+   elif auto_limits:
+      min_x = min ( [ n.nodes.x.min() for n in skdata.itertuples() ] + [ n.connectors.x.min() for n in skdata.itertuples() ] )
+      max_x = max ( [ n.nodes.x.max() for n in skdata.itertuples() ] + [ n.connectors.x.max() for n in skdata.itertuples() ] )
+
+      min_y = min ( [ n.nodes.y.min() for n in skdata.itertuples() ] + [ n.connectors.y.min() for n in skdata.itertuples() ] )
+      max_y = max ( [ n.nodes.y.max() for n in skdata.itertuples() ] + [ n.connectors.y.max() for n in skdata.itertuples() ] )
+
+      min_z = min ( [ n.nodes.z.min() for n in skdata.itertuples() ] + [ n.connectors.z.min() for n in skdata.itertuples() ] )
+      max_z = max ( [ n.nodes.z.max() for n in skdata.itertuples() ] + [ n.connectors.z.max() for n in skdata.itertuples() ] )   
+
+      max_dim = max( [ max_x - min_x, max_y - min_y, max_z - min_z  ] ) * 1.1
+
+      #Also make sure that dimensions along all axes are the same - otherwise plot will be skewed
+      catmaid_limits = {   #These limits refer to x/y/z in CATMAID -> will later on be inverted and switched to make 3d plot
+                  'x': [ int( (min_x + (max_x - min_x)/2 ) - max_dim/2 ), int( (min_x + (max_x - min_x)/2 ) + max_dim/2 )] , 
+                  'y': [ int( (min_z + (max_z - min_z)/2 ) - max_dim/2 ), int( (min_z + (max_z - min_z)/2 ) + max_dim/2 )] ,
+                  'z': [ int( (min_y + (max_y - min_y)/2 ) - max_dim/2 ), int( (min_y + (max_y - min_y)/2 ) + max_dim/2 )] 
+               }  #z and y need to be inverted here!      
    else:
       catmaid_limits = {   #These limits refer to x/y/z in CATMAID -> will later on be inverted and switched to make 3d plot
                   'x': [200000, 1000000], #Make sure [0] < [1]!
                   'z': [-70000, 730000], #Also make sure that dimensions along all axes are the same - otherwise plot will be skewed
-                  'y': [-150000, 650000] #'y': [225000, 650000]
-               }  
+                  'y': [-150000, 650000] 
+               } 
 
-   #Use catmaid project's limits to scale axis -> we basically have to invert everything to give the plot the right orientation
+   #Use catmaid project's limits to scale axis -> we basically have to invert 
+   #everything to give the plot the right orientation
    ax_limits= {      
                'x': [-catmaid_limits['x'][1],-catmaid_limits['x'][0]], 
                'z': [-catmaid_limits['z'][1], -catmaid_limits['z'][0]], 
                'y': [-catmaid_limits['y'][1], -catmaid_limits['y'][0]]           
-            }
-
-   if 'skdata' not in kwargs:
-      skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None)   
-   else:
-      skdata = kwargs['skdata']  
-
-   if 'names' not in kwargs:
-      names = get_names( skids, remote_instance )
-   else:
-      names = kwargs['names']
-
-   if 'downsampling' not in kwargs:
-      downsampling = 8
-   else:
-      downsampling = kwargs['downsampling']
+            }     
 
    module_logger.info('Preparing neurons for plotting')
 
    #First downsample neurons
    if downsampling > 1:
-      skdata = [ anatomy.downsample_neuron ( n, downsampling) for n in skdata ]
-
-   colormap = random_colors ( len(skdata) , color_space='RGB', color_range = 255)
+      skdata = pd.DataFrame( [ anatomy.downsample_neuron ( skdata.ix[i], downsampling ) for i in range( skdata.shape[0] ) ] )
 
    trace_data = []
-   for i, neuron in enumerate(skdata):
-      module_logger.debug('Working on neuron %s' % str(skids[i]) )
+   for i, neuron in enumerate( skdata.itertuples() ):
+      module_logger.debug('Working on neuron %s' % str( neuron.skeleton_id ) )
+
+      neuron_name = neuron.neuron_name     
+      skid = neuron.skeleton_id 
+
+      if by_strahler:         
+         s_index = anatomy.calc_strahler_index( skdata.ix[i] )               
 
       #First, we have to generate slabs from the neurons    
-      #Child dicts
-      loc = anatomy.generate_list_of_childs(neuron)
+      if 'type' not in neuron.nodes:
+         df = classify_nodes( df )
 
-      #Parent dicts
-      lop = { n[0]:n[1] for n in neuron[0] }
+      b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
+      end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
+      root = neuron.nodes[ neuron.nodes.type == 'root' ].treenode_id.tolist()
+      soma = neuron.nodes[ neuron.nodes.radius > 1000 ]          
 
-      #Coordinates
-      coords = { n[0]: n[3:6] for n in neuron[0] }
+      #Set dataframe indices to treenode IDs - will facilitate distributing nodes
+      if neuron.nodes.index.name != 'treenode_id':      
+         neuron.nodes.set_index('treenode_id', inplace = True)      
 
-      #Branch nodes
-      bn = [n for n in loc if len(loc[n]) > 1 ]
-      #Leaf nodes
-      ln = [n for n in loc if len(loc[n]) == 0 ]
-      #Root node
-      root = [n for n in neuron[0] if n[1] == None]      
-
-      module_logger.debug('Generating slabs for %i branch/end nodes' % len( ln + bn ) )
+      module_logger.debug('Generating slabs for %i branch/end nodes' % len( b_points + end_points ) )
 
       slabs = []     
       #Now walk from each branch and leaf node to the next
-      for n in bn + ln:
-         this_slab = [n, lop[ n ]]        
-         while this_slab[-1] not in bn+ln+root:
+      for n in b_points + end_points:
+         this_slab = [ n, neuron.nodes.ix[ n ].parent_id ]        
+         while this_slab[-1] not in b_points+end_points+root:
             try:     
-               this_slab += [ lop[ this_slab[-1] ] ]
+               this_slab += [ neuron.nodes.ix[ this_slab[-1] ].parent_id ]
             except:              
                break #will fail if root node (cause no parent)
 
@@ -412,39 +576,52 @@ def plot3d( skids, remote_instance, *args, **kwargs ):
       module_logger.debug('Generating traces')
 
       #Now add traces      
-      for k,s in enumerate(slabs):         
-         trace_data.append( go.Scatter3d(    x = [ -coords[ n ][0] for n in s ],
-                                             y = [ -coords[ n ][2] for n in s ], #y and z are switched
-                                             z = [ -coords[ n ][1] for n in s ],
+      for k,s in enumerate(slabs):
+         if by_strahler:
+            c = 'rgba(%i,%i,%i,%f)' % (   colormap[str( skid )][0],
+                                          colormap[str( skid )][1],
+                                          colormap[str( skid )][2], 
+                                          s_index[ s[0] ] / max( s_index.values() 
+                                       ) ) 
+         else:
+            c = 'rgb%s' % str( colormap[ str( skid ) ] ) 
+
+         trace_data.append( go.Scatter3d(    x = (-neuron.nodes.ix[ s ].x).tolist(),
+                                             y = (-neuron.nodes.ix[ s ].z).tolist(), #y and z are switched
+                                             z = (-neuron.nodes.ix[ s ].y).tolist(),
+
                                              mode = 'lines',
                                              line=dict(
-                                             color='rgb(%s)' % str(colormap[i]),
+                                             color=c,
                                              width=5
                                      ),
-                                     name = names[str( skids[i] ) ],
-                                     legendgroup = names[str( skids[i] ) ],
-                                     showlegend = k == 0 
+                                     name = neuron_name,
+                                     legendgroup = neuron_name,
+                                     showlegend = k == 0,
+                                     hoverinfo='none'
 
                            ) )
-      #Add soma(s):     
-      soma = [n for n in neuron[0] if n[6] > 500]
-      for n in soma:
-         trace_data.append( go.Scatter3d(    x = [ -n[3] ],
-                                    y = [ -n[5] ], #y and z are switched
-                                    z = [ -n[4] ],
-                                    mode = 'marker',
-                                     marker=dict(
-                                         color='rgb(%s)' % str(colormap[i]),
-                                         size = 3
-                                     ),
-                                     name = names[str( skids[i] ) ],
-                                     legendgroup = names[str( skids[i] ) ],
-                                     showlegend = False
-                           ) )   
+      #Add soma(s):           
+      fib_points = fibonacci_sphere( samples = 30 )
+      for n in soma.itertuples():        
+         trace_data.append(  go.Mesh3d(
+                                   x = [ (v[0] * n.radius/2) - n.x for v in fib_points ],
+                                   y = [ (v[1] * n.radius/2) - n.z for v in fib_points ], #y and z are switched
+                                   z = [ (v[2] * n.radius/2) - n.y for v in fib_points ],
 
-      if 'connectors' in args:         
+                                   alphahull = .5,
+                                  
+                                   color = 'rgb(%s)' % str(colormap[ str( skid ) ]),
+                                   name = neuron_name,
+                                   legendgroup = neuron_name,
+                                   showlegend = False,
+                                   hoverinfo='name'
+                           ) 
+                        )              
+
+      if connectors:  
          #Prepare dict with properties for different types of connectors
-         if 'syn_lay' not in kwargs:
+         if not syn_lay:
             syn_lay = { 
                      0: { 
                         'name' : 'Presynapses',
@@ -460,76 +637,91 @@ def plot3d( skids, remote_instance, *args, **kwargs ):
                         },
                      'display' : 'circles'
                      }
-         else:
-            syn_lay = kwargs['syn_lay']
 
-         for j in syn_lay:
-            for k,s in enumerate( [ s for s in neuron[1] if s[2] == j ]):
+         for j in [ 0,1,2 ]:
+            if cn_mesh_colors:
+               color = 'rgb%s' % str(colormap[ str( skid ) ])
+            else:
+               color = syn_lay[ j ]['color']
+
+            for k,s in enumerate( neuron.connectors[ neuron.connectors.relation == j ].itertuples() ): 
                if k == 0:
                   show_legend = True
-                  name = syn_lay[ s[2] ]['name'] + ' of ' + names[str( skids[i] ) ]
+                  name = syn_lay[ j ]['name'] + ' of ' + neuron_name
                else:
                   show_legend = False
-                  name = 'Connector ' + str( s[1] )
+                  name = 'Connector ' + str( s.connector_id )
 
                if syn_lay['display'] == 'circles':          
-                  trace_data.append( go.Scatter3d( x = [ -s[3] ],
-                                          y = [ -s[5] ], #y and z are switched
-                                          z = [ -s[4] ],
+                  trace_data.append( go.Scatter3d( 
+                                          x = [ (-s.x) ],
+                                          y = [ (-s.z) ], #y and z are switched
+                                          z = [ (-s.y) ],
                                           mode = 'markers',
                                            marker=dict(
-                                               color= syn_lay[ s[2] ]['color'],
+                                               color= color,
                                                size = 2
                                            ),
                                            name = name,
-                                           legendgroup = syn_lay[ s[2] ]['name'] + ' of ' + names[str( skids[i] ) ],
-                                           showlegend = show_legend
+                                           legendgroup = syn_lay[ j ]['name'] + ' of ' + neuron_name,
+                                           showlegend = show_legend,
+                                           hoverinfo='none'
                                  ) )   
                elif syn_lay['display'] == 'lines': 
-                  #Find associated treenode
-                  tn = [ t for t in neuron[0] if t[0] == s[0] ][0]               
-                  trace_data.append( go.Scatter3d( x = [ -tn[3], -s[3] ],
-                                          y = [ -tn[5], -s[5] ], #y and z are switched
-                                          z = [ -tn[4], -s[4] ],
+                  #Find associated treenode                              
+                  tn = neuron.nodex.ix[ s.treenode_id ]
+                  trace_data.append( go.Scatter3d( 
+                                          x = [ -tn[3], -s.x ],
+                                          y = [ -tn[5], -s.z ], #y and z are switched
+                                          z = [ -tn[4], -s.y ],
                                           mode = 'lines',
                                            line=dict(
-                                               color= syn_lay[ s[2] ]['color'],
+                                               color= color,
                                                width = 5
                                            ),
                                            name = name,
-                                           legendgroup = syn_lay[ s[2] ]['name'] + ' of ' + names[str( skids[i] ) ],
-                                           showlegend = show_legend
+                                           legendgroup = syn_lay[ j ]['name'] + ' of ' + neuron_name,
+                                           showlegend = show_legend,
+                                           hoverinfo='none'
                                  ) )   
 
-   #Now add neuropils:
-   if 'volumes' in kwargs:
-      for v in kwargs['volumes']:
-         vertices, faces = get_volume( v, remote_instance )
+      neuron.nodes.reset_index( inplace = True )
 
-         if vertices:
-            trace_data.append(  go.Mesh3d(
-                                 x = [ -v[0] for v in vertices ],
-                                   y = [ -v[2] for v in vertices ], #y and z are switched
-                                   z = [ -v[1] for v in vertices ],
-                                   
-                                   i = [ f[0] for f in faces ],
-                                   j = [ f[1] for f in faces ],
-                                   k = [ f[2] for f in faces ],
+   #Now add neuropils:   
+   for v in volumes:
+      if not remote_instance:
+         module_logger.error('Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ...>')
+         break
 
-                                   opacity = .5,
-                                   color = 'rgb(220,220,200)',
-                                   name= v,
-                                   showlegend = True
-                           ) 
-                        )
+      vertices, faces = get_volume( v, remote_instance )
+      if type(volumes) == type(list):
+         color = volumes[v]
+      else:
+         color = (220,220,220)
 
+      if vertices:
+         trace_data.append(  go.Mesh3d(
+                              x = [ -v[0] for v in vertices ],
+                                y = [ -v[2] for v in vertices ], #y and z are switched
+                                z = [ -v[1] for v in vertices ],
+                                
+                                i = [ f[0] for f in faces ],
+                                j = [ f[1] for f in faces ],
+                                k = [ f[2] for f in faces ],
 
+                                opacity = .5,
+                                color = 'rgb' + str(color),
+                                name= v,
+                                showlegend = True,
+                                hoverinfo='none'
+                        ) 
+                     )
 
    layout = dict(
-       width=1200,
-       height=800,
-       autosize=False,
-       title='Neuron Plot',
+       width= fig_width,
+       height= fig_height, 
+       autosize=fig_autosize,
+       title= pl_title,
        scene=dict(
            xaxis=dict(
                gridcolor='rgb(255, 255, 255)',
@@ -570,9 +762,15 @@ def plot3d( skids, remote_instance, *args, **kwargs ):
        ),
    )
 
+   #Neeed to remove width and height to make autosize actually matter
+   if fig_autosize:
+      layout.pop('width')
+      layout.pop('height')
+
    fig = dict(data=trace_data, layout=layout)
 
-   module_logger.info('Done')
+   module_logger.info('Done. Plotted %i nodes and %i connectors' % ( sum([ n.nodes.shape[0] for n in skdata.itertuples() ]), sum([ n.connectors.shape[0] for n in skdata.itertuples() if 'connectors' in args]) )  )
+   module_logger.info('Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
 
    return fig
 

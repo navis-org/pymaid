@@ -26,7 +26,7 @@ if not module_logger.handlers:
 
 def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = None, row_groups = {}, column_groups = {} ):
    """ Wrapper to generate a matrix for synaptic connections between neuronsA 
-       -> neuronsB (unidirectional!)
+   -> neuronsB (unidirectional!)
 
    Parameters:
    -----------
@@ -41,17 +41,19 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
 
    Returns:
    -------
-   matrix :       pandas Dataframe
+   matrix :          pandas Dataframe
    """
 
    #Make sure neurons are strings, not integers
    neurons = [str(n) for n in list(set(neuronsA + neuronsB))]
+   neuronsA = [str(n) for n in  neuronsA ]
+   neuronsB = [str(n) for n in  neuronsB ]
 
    neuron_names = get_names( neurons, remote_instance )
 
    module_logger.info('Retrieving and filtering connectivity')
    
-   edges = get_edges ( neurons , remote_instance = remote_instance)['edges']     
+   edges = get_edges ( neurons , remote_instance = remote_instance)   
 
    if row_groups:
       neurons_grouped = { str(n) : g  for g in row_groups for n in row_groups[g] }
@@ -60,21 +62,20 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
       neuronsA = sorted(list(row_groups.keys())) + [ n for n in neuronsA if n not in list(neurons_grouped.keys()) ]
 
       edge_dict = { n:{} for n in neuronsA }
-      for e in edges:
-         if str(e[0]) in neuronsA:
-            edge_dict[str(e[0])][str(e[1])] = sum(e[2])
-         elif str(e[0]) in neurons_grouped:
+      for e in edges.itertuples():
+         if str(e.source_skid) in neuronsA:
+            edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
+         elif str(e.source_skid) in neurons_grouped:
             try:
-               edge_dict[ neurons_grouped[ str(e[0]) ] ][str(e[1])] += sum(e[2])
+               edge_dict[ neurons_grouped[ str(e.source_skid) ] ][str(e.target_skid)] += e.weight
             except:
-               edge_dict[ neurons_grouped[ str(e[0]) ] ][str(e[1])] = sum(e[2])
+               edge_dict[ neurons_grouped[ str(e.source_skid) ] ][str(e.target_skid)] = e.weight
 
    else:
       edge_dict = { n:{} for n in neuronsA }
-      for e in edges:
-         if str(e[0]) in neuronsA:
-            edge_dict[str(e[0])][str(e[1])] = sum(e[2])
-
+      for e in edges.itertuples():
+         if str(e.source_skid) in neuronsA:
+            edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
    
    matrix = pd.DataFrame( np.zeros( ( len( neuronsA ), len( neuronsB ) ) ), index = neuronsA , columns = neuronsB )
 
@@ -95,8 +96,8 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
    return matrix  
 
 def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix = True):
-   """   Wrapper to calculate connectivity similarity and creates a distance 
-         matrix for a set of neurons
+   """ Wrapper to calculate connectivity similarity and creates a distance 
+   matrix for a set of neurons
 
    Parameters:
    -----------
@@ -111,10 +112,11 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
                      Attention: this might impair proper comparison:
                      e.g. neuronA and neuronB connect to neuronC with 1 and 3 
                      synapses, respectively. 
-                     If threshold = 2, then connection from A to C will be ignored!
+                     If threshold=2, then connection from A to C will be ignored!
    filter_skids :    list of skids (optional)
-                     If filter_skids is not empty, only neurons whose skids are in filter_skids will be considered 
-                     when calculating similarity score
+                     If filter_skids is not empty, only neurons whose skids are 
+                     in filter_skids will be considered when calculating 
+                     similarity score
    exclude_skids :   list of skids (optional)
                      skids to exclude from calculation of connectivity similarity
    plot_matrix :     if True, a plot will be generated (default = True)
@@ -122,65 +124,60 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
    Returns:
    --------
    dist_matrix :     Pandas dataframe containing all-by-all connectivity distance matrix 
-   cg :              Seaborn cluster grid plot (only if plot_matrix = True)
+   cg :              (only if plot_matrix = True) Seaborn cluster grid plot 
    """
 
    #Make sure neurons are strings, not integers
-   neurons = [str(n) for n in list(set(neurons))]
+   neurons = [ str(n) for n in list(set(neurons)) ]
 
    directions = []
    if upstream is True:
-      directions.append('incoming')
+      directions.append('upstream')
    if downstream is True:
-      directions.append('outgoing')
+      directions.append('downstream')
 
    module_logger.info('Retrieving and filtering connectivity')
    #Retrieve connectivity and apply filters
-   connectivity = get_partners(neurons,remote_instance)
-   for d in directions:
-      if filter_skids or exclude_skids:
-         to_delete = []
-         module_logger.info('Filtering %s connectivity. %i entries before filtering' % (d,len(connectivity[d])))
-         for entry in connectivity[d]:
-            if filter_skids and entry not in filter_skids:
-               to_delete.append(entry)
-            if exclude_skids and entry in exclude_skids:
-               to_delete.append(entry) 
+   connectivity = get_partners( neurons, remote_instance)
 
-         for skid in list(set(to_delete)):
-            connectivity[d].pop(skid) 
-         module_logger.info('%s: %i entries after filtering' % ( d, len(connectivity[d]) ) )
+   #Filter direction
+   #connectivity = connectivity[ connectivity.relation.isin(directions) ]
 
-   module_logger.info('Retrieving neuron names')
+   if filter_skids or exclude_skids:
+      module_logger.info('Filtering connectivity. %i entries before filtering' % ( connectivity.shape[0] ) )
+
+      if filter_skids:
+         connectivity = connectivity[ connectivity.neuron_name.isin( filter_skids )  ]
+
+      if exclude_skids:      
+         connectivity = connectivity[ ~connectivity.neuron_name.isin( exclude_skids )  ]
+
+      module_logger.info('%i entries after filtering' % ( connectivity.shape[0] ) )   
+
+   #Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)! 
+   #This is AFTER filtering! Total number of partners can be altered!      
+   number_of_partners = { n : { 'upstream' : connectivity[ (connectivity[str(n)] > 0) & (connectivity.relation == 'upstream') ].shape[0],
+                                'downstream' : connectivity[ (connectivity[str(n)] > 0) & (connectivity.relation == 'downstream') ].shape[0]
+                              }
+                               for n in neurons }  
+
+   module_logger.debug('Retrieving neuron names')
    #Retrieve names
-   neuron_names = get_names( list(set(neurons+
-                                 list(connectivity['incoming']) +
-                                 list(connectivity['outgoing'])
-                                 )
-                         ), remote_instance)
-
-   number_of_partners = dict([(e,{'incoming':0,'outgoing':0}) for e in neurons])
+   neuron_names = get_names( list( set( neurons + connectivity.skeleton_id.tolist() ) ), remote_instance)   
    
-   matching_scores = {} 
-
+   matching_scores = {}
    #Calculate connectivity similarity by direction
    for d in directions:    
       module_logger.info('Calculating %s similarity scores' % d)
       matching_scores[d] = pd.DataFrame( np.zeros( ( len( neurons ), len( neurons ) ) ), index = neurons, columns = neurons )
 
-      if len(connectivity) == 0:
-         module_logger.warning('No %s partners found: filtered?' % d)   
-
-      #Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)! 
-      #This is AFTER filtering! Total number of partners can be altered!      
-      for entry in connectivity[d]:
-         for skid in connectivity[d][entry]['skids']:          
-            number_of_partners[skid][d] += 1             
+      if connectivity[ connectivity.relation == d ].shape[0] == 0:
+         module_logger.warning('No %s partners found: filtered?' % d)
       
       #Compare all neurons vs all neurons
       for neuronA in neurons:       
          for neuronB in neurons:          
-            matching_indices = calc_matching_index ( neuronA, neuronB, connectivity[d], threshold, min_nodes = 500 )                
+            matching_indices = calc_matching_index ( neuronA, neuronB, connectivity[ connectivity.relation == d ] , threshold, min_nodes = 500 )                
             matching_scores[d][neuronA][neuronB] = matching_indices['vertex_normalized']
 
    #Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
@@ -195,14 +192,14 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
             dist_matrix[neuronA][neuronB] = matching_scores[directions[0]][neuronA][neuronB]
          else:
             try:
-               r_inputs = number_of_partners[neuronA]['incoming']/(number_of_partners[neuronA]['incoming']+number_of_partners[neuronA]['outgoing'])
+               r_inputs = number_of_partners[neuronA]['upstream']/(number_of_partners[neuronA]['upstream']+number_of_partners[neuronA]['downstream'])
                r_outputs = 1 - r_inputs
             except:
                module_logger.warning('Failed to calculate input/output ratio for %s assuming 50/50 (probably division by 0 error)' % str(neuronA) )
                r_inputs = 0.5
                r_outputs = 0.5
 
-            dist_matrix[neuronA][neuronB] = matching_scores['incoming'][neuronA][neuronB] * r_inputs + matching_scores['outgoing'][neuronA][neuronB] * r_outputs
+            dist_matrix[neuronA][neuronB] = matching_scores['upstream'][neuronA][neuronB] * r_inputs + matching_scores['downstream'][neuronA][neuronB] * r_outputs
 
    module_logger.info('All done.')
 
@@ -231,26 +228,36 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
 def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1 ): 
    """ Calculates various matching indices between two neurons:
    
-   matching_index =           number of shared partners divided by total number of partners
+   matching_index =           Number of shared partners divided by total number 
+                              of partners
    
-   matching_index_synapses =  number of shared synapses divided by total number of synapses 
-                              Attention! matching_index_synapses is tricky, because if neuronA 
-                              has lots of connections and neuronB only little, they will still 
-                              get a high matching index. E.g. 100 of 200 / 1 of 50 = 101/250 
+   matching_index_synapses =  Number of shared synapses divided by total number 
+                              of synapses. Attention! matching_index_synapses is 
+                              tricky, because if neuronA has lots of connections 
+                              and neuronB only little, they will still get a 
+                              high matching index. 
+                              E.g. 100 of 200 / 1 of 50 = 101/250 
                               -> matching index = 0.404
    
-   matching_index_weighted_synapses =  similar to matching_index_synapses but slightly less prone to
-                              above mentioned error: 
-                              % of shared synapses A * % of shared synapses B * 2 / (% of shared synapses A + % of shared synapses B)
-                              -> value will be between 0 and 1; if one neuronB has only few connections (percentage) to a shared partner, the final value will also be small
+   matching_index_weighted_synapses = Similar to matching_index_synapses but 
+                              slightly less prone to above mentioned error: 
+                              % of shared synapses A * % of shared synapses 
+                              B * 2 / (% of shared synapses A + % of shared 
+                              synapses B)
+                              -> value will be between 0 and 1; if one neuronB 
+                              has only few connections (percentage) to a shared 
+                              partner, the final value will also be small
    
-   vertex_normalized =           matching index that rewards shared and punishes non-shared partners
-                              Vertex similarity based on Jarrell et al., 2012: 
+   vertex_normalized =        MNatching index that rewards shared and punishes 
+                              non-shared partners. Vertex similarity based on 
+                              Jarrell et al., 2012: 
                               f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
                               x,y = edge weights to compare
                               vertex_similarity is the sum of f over all vertices
-                              C1 determines how negatively a case where one edge is much stronger than another is punished
-                              C2 determines the point where the similarity switches from negative to positive
+                              C1 determines how negatively a case where one edge 
+                              is much stronger than another is punished
+                              C2 determines the point where the similarity 
+                              switches from negative to positive
 
    Parameters:
    -----------
@@ -266,14 +273,24 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
    dict containing all initially described matching indices
    """   
 
-   n_total = 0
-   n_shared = 0
-   n_synapses_shared = 0
-   n_synapses_sharedA = 0
-   n_synapses_sharedB = 0
-   n_synapses_total = 0
-   n_synapses_totalA = 0
-   n_synapses_totalB = 0
+   #Filter small fragments 
+   connectivity = connectivity[ connectivity.num_nodes >= min_nodes ]
+
+   #Filter sub threshold
+   connectivity = connectivity[ (connectivity[neuronA] >= syn_threshold) | (connectivity[neuronB] >= syn_threshold) ]
+
+   total = connectivity[ (connectivity[neuronA] > 0) | (connectivity[neuronB] > 0) ]
+   n_total = total.shape[0]
+
+   shared = connectivity[ (connectivity[neuronA] > 0) & (connectivity[neuronB] > 0) ]
+   n_shared = shared.shape[0]  
+
+   n_synapses_sharedA = shared.sum()[neuronA]
+   n_synapses_sharedB = shared.sum()[neuronB]    
+   n_synapses_shared = n_synapses_sharedA + n_synapses_sharedB
+   n_synapses_totalA = total.sum()[neuronA]
+   n_synapses_totalB = total.sum()[neuronB]
+   n_synapses_total = n_synapses_totalA + n_synapses_totalB
 
    #Vertex similarity based on Jarrell et al., 2012
    # f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
@@ -284,50 +301,20 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
    C1 = 0.5
    C2 = 1
    vertex_similarity = 0
-   max_score = 0  
+   max_score = 0 
 
-   for entry in connectivity:          
-      if connectivity[entry]['num_nodes'] < min_nodes:
-         continue
+   #Get index of neuronA and neuronB -> itertuples unfortunately scrambles the column
+   nA_index = connectivity.columns.tolist().index(neuronA) 
+   nB_index = connectivity.columns.tolist().index(neuronB) 
 
-      A_connected = False
-      B_connected = False
+   for entry in connectivity.itertuples(index=False): #index=False neccessary otherwise nA_index is off by +1
+      a = entry[nA_index]
+      b = entry[nB_index]
 
-      if neuronA in connectivity[entry]['skids'] and entry is not neuronB and entry is not neuronA:
-         if connectivity[entry]['skids'][neuronA] >= syn_threshold:
-            n_total += 1
-            n_synapses_total += connectivity[entry]['skids'][neuronA]
-            n_synapses_totalA += connectivity[entry]['skids'][neuronA]
-            A_connected = True
-      if neuronB in connectivity[entry]['skids'] and entry is not neuronA and entry is not neuronB:
-         if connectivity[entry]['skids'][neuronB] >= syn_threshold:           
-            B_connected = True
-            n_synapses_total += connectivity[entry]['skids'][neuronB]
-            n_synapses_totalB += connectivity[entry]['skids'][neuronB]
-            #Make sure to not count this entry again if it is already connected to A
-            if A_connected is False:
-               n_total += 1
-
-      if A_connected is True and B_connected is True:
-         n_shared += 1
-         n_synapses_shared += connectivity[entry]['skids'][neuronA] + connectivity[entry]['skids'][neuronB]
-         n_synapses_sharedA += connectivity[entry]['skids'][neuronA]
-         n_synapses_sharedB += connectivity[entry]['skids'][neuronB]
-
-      if A_connected is True:
-         a = connectivity[entry]['skids'][neuronA]
-      else: 
-         a = 0
-      if B_connected is True:
-         b = connectivity[entry]['skids'][neuronB]
-      else: 
-         b = 0
-
-      #This keeps track of what the maximal vertex_index can be (for later normalisation)
-      max_score += max([a,b])
+      max_score += max( [ a , b ] )
 
       vertex_similarity += ( 
-                        min([a,b]) - C1 * max([a,b]) * math.exp(- C2 * min([a,b]))
+                        min([a,b]) - C1 * max([ a , b ]) * math.exp(- C2 * min([ a , b ]))
                            )
 
    similarity_indices = {}
@@ -354,63 +341,70 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
 
    return similarity_indices
 
-def synapse_distance_matrix(synapse_data, labels = None):
-   """ Takes a list of CATMAID synapses [[parent_node, connector_id, 0/1 , x, y, z ],[],...], 
-      calculates euclidian distance matrix and clusters them (WARD)
+def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True):
+   """ Takes a list of CATMAID synapses, calculates EUCLEDIAN distance matrix 
+   and clusters them (WARD algorithm)
 
    Parameters:
    ----------
-   synapse_data :    list of synapses
-                     As received from CATMAID 3D skeleton:
-                     [ [parent_node, connector_id, 0/1 , x, y, z ], ... ]
+   synapse_data :    Pandas dataframe
+                     Contains the connector data (df.connectors)
    labels :          list of strings
-                     Labels for each leaf of the dendrogram (e.g. connector ids).   
+                     Labels for each leaf of the dendrogram (e.g. connector ids). 
+   plot_matrix :     boolean
+                     if True, matrix figure is generated and returned
 
    Returns:
    -------
-   Plots dendrogram and distance matrix
-   Returns hierachical clustering
+   dist_matrix :     numpy distance matrix
+   fig :             (only if plot_matrix = True) matplotlib object 
    """      
 
    #Generate numpy array containing x, y, z coordinates
-   s = np.array( [ [ e[3],e[4],e[5] ] for e in synapse_data ] )
+   try:
+      s = synapse_data[ ['x','y','z'] ].as_matrix()
+   except:
+      module_logger.error('Please provide dataframe connector data of exactly a single neuron')
+      return  
 
    #Calculate euclidean distance matrix 
    condensed_dist_mat = spatial.distance.pdist( s , 'euclidean' )
    squared_dist_mat = spatial.distance.squareform( condensed_dist_mat )
 
-   # Compute and plot first dendrogram for all nodes.
-   fig = pylab.figure(figsize=(8,8))
-   ax1 = fig.add_axes([0.09,0.1,0.2,0.6])
-   Y = cluster.hierarchy.ward(squared_dist_mat)
-   Z1 = cluster.hierarchy.dendrogram(Y, orientation='left', labels = labels)
-   ax1.set_xticks([])
-   ax1.set_yticks([])
+   if plot_matrix:
+      # Compute and plot first dendrogram for all nodes.
+      fig = pylab.figure(figsize=(8,8))
+      ax1 = fig.add_axes([0.09,0.1,0.2,0.6])
+      Y = cluster.hierarchy.ward(squared_dist_mat)
+      Z1 = cluster.hierarchy.dendrogram(Y, orientation='left', labels = labels)
+      ax1.set_xticks([])
+      ax1.set_yticks([])
 
-   # Compute and plot second dendrogram.
-   ax2 = fig.add_axes([0.3,0.71,0.6,0.2])
-   Y = cluster.hierarchy.ward(squared_dist_mat)
-   Z2 = cluster.hierarchy.dendrogram(Y, labels = labels)
-   ax2.set_xticks([])
-   ax2.set_yticks([])
+      # Compute and plot second dendrogram.
+      ax2 = fig.add_axes([0.3,0.71,0.6,0.2])
+      Y = cluster.hierarchy.ward(squared_dist_mat)
+      Z2 = cluster.hierarchy.dendrogram(Y, labels = labels)
+      ax2.set_xticks([])
+      ax2.set_yticks([])
 
-   # Plot distance matrix.
-   axmatrix = fig.add_axes([0.3,0.1,0.6,0.6])
-   idx1 = Z1['leaves']
-   idx2 = Z2['leaves']  
-   D = squared_dist_mat
-   D = D[idx1,:]
-   D = D[:,idx2]
-   im = axmatrix.matshow(D, aspect='auto', origin='lower', cmap=pylab.cm.YlGnBu)
-   axmatrix.set_xticks([])
-   axmatrix.set_yticks([])
+      # Plot distance matrix.
+      axmatrix = fig.add_axes([0.3,0.1,0.6,0.6])
+      idx1 = Z1['leaves']
+      idx2 = Z2['leaves']  
+      D = squared_dist_mat
+      D = D[idx1,:]
+      D = D[:,idx2]
+      im = axmatrix.matshow(D, aspect='auto', origin='lower', cmap=pylab.cm.YlGnBu)
+      axmatrix.set_xticks([])
+      axmatrix.set_yticks([])
 
-   # Plot colorbar.
-   axcolor = fig.add_axes([0.91,0.1,0.02,0.6])
-   pylab.colorbar(im, cax=axcolor)
-   fig.show()  
+      # Plot colorbar.
+      axcolor = fig.add_axes([0.91,0.1,0.02,0.6])
+      pylab.colorbar(im, cax=axcolor)
 
-   return Y
+      return squared_dist_mat, fig
+   else:
+      return squared_dist_mat
 
 
 

@@ -6,13 +6,20 @@ Basic example:
 from pymaid import CatmaidInstance, get_3D_skeleton
 from catmaid_igraph import igraph_from_skeleton, cluster_nodes_w_synapses
 
-remote_instance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
+remote_instance = CatmaidInstance(  'www.your.catmaid-server.org', 
+                                    'user', 
+                                    'password', 
+                                    'token' 
+                                 )
 
 #Example skid
 skid = '12345'
 
 #Retrieve 3D skeleton data for neuron of interest
-skdata = get_3D_skeleton ( [ example_skid ], remote_instance, connector_flag = 1, tag_flag = 0 )[0]
+skdata = get_3D_skeleton ( [ example_skid ], 
+                           remote_instance, 
+                           connector_flag = 1, 
+                           tag_flag = 0 )[0]
 
 #Generate iGraph object from node data
 g = igraph_from_skeleton( skdata, remote_instance)
@@ -24,7 +31,7 @@ syn_linkage = cluster_nodes_w_synapses( g, plot_graph = True )
 clusters = cluster.hierarchy.fcluster( syn_linkage, 2, criterion='maxclust')
 
 #Print summary
-print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
+print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters), len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
 
 """
 
@@ -34,58 +41,62 @@ import matplotlib.pyplot as plt
 from igraph import *
 from scipy import cluster, spatial
 import logging
+import pandas as pd
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.DEBUG)
-#Generate stream handler
-sh = logging.StreamHandler()
-sh.setLevel(logging.INFO)
-#Create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-sh.setFormatter(formatter)
-module_logger.addHandler(sh)
+if not module_logger.handlers:
+   #Generate stream handler
+   sh = logging.StreamHandler()
+   sh.setLevel(logging.INFO)
+   #Create formatter and add it to the handlers
+   formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+   sh.setFormatter(formatter)
+   module_logger.addHandler(sh)
 
 def igraph_from_skeleton(skdata):
    """ Takes CATMAID single skeleton data and turns it into an iGraph object
    
    Parameters:
    ----------
-   skdata :       list of 3D skeleton data
-                  As retrieved from CATMAID server.   
+   skdata :             Pandas dataframe containing a SINGLE neuron  
 
    Returns:
    -------
-   iGraph object
+   iGraph representation of the neuron
 
    """   
+
+   if type( skdata ) == type( pd.DataFrame() ):
+      df = skdata.ix[0]
+   elif type( skdata ) == type( pd.Series() ):
+      df = skdata 
 
    module_logger.info('Generating graph from skeleton data...')
 
    #Generate list of vertices -> this order is retained
-   vlist = [ n[0] for n in skdata[0] ]
+   vlist = skdata.nodes.treenode_id.tolist()   
    
-   #Generate list of edges based on index of vertices
-   elist = []
-   for i, n in enumerate( skdata[0] ):
-      if n[1] == None:
-         continue
-      elist.append( ( i , vlist.index( n[1] ) ) )  
+   #Generate list of edges based on index of vertices   
+   elist = [ [ n.Index, vlist.index( n.parent_id )  ] for n in skdata.nodes.itertuples() if n.parent_id != None ]  
 
    #Generate graph and assign custom properties
-   g = Graph( elist , n = len( vlist ) ,  directed = True)  
-   g.vs['node_id'] = [ n[0] for n in skdata[0] ]
-   g.vs['parent_id'] = [ n[1] for n in skdata[0] ]
-   g.vs['X'] = [ n[3] for n in skdata[0] ]
-   g.vs['Y'] = [ n[4] for n in skdata[0] ]
-   g.vs['Z'] = [ n[5] for n in skdata[0] ]
+   g = Graph( elist , n = len( vlist ) ,  directed = True)     
+   g.vs['node_id'] = skdata.nodes.treenode_id.tolist()
+   g.vs['parent_id'] = skdata.nodes.parent_id.tolist()
+   g.vs['X'] = skdata.nodes.x.tolist()
+   g.vs['Y'] = skdata.nodes.y.tolist()
+   g.vs['Z'] = skdata.nodes.z.tolist()
 
    #Find nodes with synapses and assign them the custom property 'has_synapse'
-   nodes_w_synapses = [ n[0] for n in skdata[1] ]
+   nodes_w_synapses = skdata.connectors.treenode_id.tolist()
    g.vs['has_synapse'] = [ n[0] in nodes_w_synapses for n in skdata[0] ]
 
    #Generate weights by calculating edge lengths = distance between nodes
-   w = [ math.sqrt( (skdata[0][e[0]][3]-skdata[0][e[1]][3])**2 + (skdata[0][e[0]][4]-skdata[0][e[1]][4])**2 + (skdata[0][e[0]][5]-skdata[0][e[1]][5])**2 ) for e in elist ]   
+   tn_coords = skdata.nodes.ix[ [ e[0] for e in elist ]  ][ ['x','y','z' ] ].reset_index()
+   parent_coords = skdata.nodes.ix[ [ e[1] for e in elist ]  ][ [ 'x','y','z'] ].reset_index()
+   w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 )).tolist()
    g.es['weight'] = w
 
    return g
@@ -102,7 +113,7 @@ def calculate_distance_from_root( g, synapses_only = False ):
 
    Returns:
    -------  
-   Returns dict: {node_id : distance_to_root }
+   dict :            {node_id : distance_to_root }
    
    """
 

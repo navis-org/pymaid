@@ -43,6 +43,7 @@ setup(
         "scipy>=0.18.1",
         "numpy>=1.12.1",
         "matplotlib>=2.0.0",
-        "plotly>=2.0.6"
+        "plotly>=2.0.6",
+        "pandas>=0.18.1"
     ],
 )
