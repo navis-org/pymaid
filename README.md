@@ -120,6 +120,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `get_node_lists()`: retrieve list of nodes within given volume
 - `get_node_user_details()`: get details (creator, edition time, etc.) for individual nodes
 - `get_partners()`: retrieve connected partners for a list of neurons
+- `get_partners_in_volume()`: retrieve connected partners for a list of neurons within a given Catmaid volume
 - `get_review()`: get review status for set of neurons
 - `get_review_details()`: get review status (reviewer + timestamp) for each individual node
 - `get_skids_by_annotation()`: get skeleton IDs that are annotated with a given annotation

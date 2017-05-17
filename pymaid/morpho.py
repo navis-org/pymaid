@@ -18,14 +18,15 @@
 
 
 try:
-   from pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation
+   from pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation, get_volume
 except:
-   from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation
+   from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation, get_volume
 import math
 import time
 import logging
 import pandas as pd
 import numpy as np
+from scipy.spatial import ConvexHull
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
@@ -83,7 +84,7 @@ def classify_nodes ( skdata ):
    
    Parameters:
    ----------
-   skdata :             Pandas dataframe containing a SINGLE neuron
+   skdata :             Pandas dataframe containing neuron(s)
 
    Returns
    -------
@@ -92,25 +93,30 @@ def classify_nodes ( skdata ):
 
    module_logger.debug('Looking for end, branch and root points...')
 
-   list_of_childs  = generate_list_of_childs( skdata )
-   list_of_parent = { n.treenode_id : n.parent_id for n in skdata.nodes.itertuples() }   
+   #If more than one neuron
+   if type(skdata.skeleton_id) != type(str()):
+      for i in skdata.index:
+        skdata.ix[i] = classify_nodes( skdata.ix[i] )
+   else:
+     list_of_childs  = generate_list_of_childs( skdata )
+     list_of_parent = { n.treenode_id : n.parent_id for n in skdata.nodes.itertuples() }   
 
-   end_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) == 0 ]   
-   slabs = [ n for n in list_of_childs if len(list_of_childs[n]) == 1 ]
-   branch_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) > 1 ]
-   root = skdata.nodes[ skdata.nodes['parent_id'].isnull() ].treenode_id.values
+     end_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) == 0 ]   
+     slabs = [ n for n in list_of_childs if len(list_of_childs[n]) == 1 ]
+     branch_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) > 1 ]
+     root = skdata.nodes[ skdata.nodes['parent_id'].isnull() ].treenode_id.values
 
-   classes = { n : 'slab' for n in skdata.nodes.treenode_id.tolist() }
-   classes.update( { n : 'end' for n in end_nodes } )
-   classes.update( { n : 'branch' for n in branch_nodes } )
-   classes.update( { n : 'root' for n in root } )  
+     classes = { n : 'slab' for n in skdata.nodes.treenode_id.tolist() }
+     classes.update( { n : 'end' for n in end_nodes } )
+     classes.update( { n : 'branch' for n in branch_nodes } )
+     classes.update( { n : 'root' for n in root } )  
 
-   new_column = [ classes[n] for n in skdata.nodes.treenode_id.tolist() ]
-   skdata.nodes['type'] = new_column
+     new_column = [ classes[n] for n in skdata.nodes.treenode_id.tolist() ]
+     skdata.nodes['type'] = new_column
 
-   nodes_w_synapses = skdata.connectors.treenode_id.values
-   new_column = [ n in nodes_w_synapses for n in skdata.nodes.treenode_id.tolist() ]
-   skdata.nodes['has_synapses'] = new_column
+     nodes_w_synapses = skdata.connectors.treenode_id.values
+     new_column = [ n in nodes_w_synapses for n in skdata.nodes.treenode_id.tolist() ]
+     skdata.nodes['has_synapses'] = new_column
 
    return skdata
 
@@ -525,7 +531,7 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None ):
     """   
 
    if type(skdata) == type( int() ) or type(skdata) == type( str() ) :
-      skdata = get_3D_skeleton( [skdata], remote_instance)[0]
+      skdata = get_3D_skeleton( [skdata], remote_instance).ix[0]
 
    if type( skdata ) == type( pd.DataFrame() ):      
       df = skdata.ix[0].copy()
@@ -720,6 +726,40 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
     visited_nodes.update( { n: sum( distances_traveled[i:] ) for i,n in enumerate(visited_nodes) } ) 
 
     return round ( sum( distances_traveled ) ), visited_nodes
+
+def in_volume( points, volume, remote_instance ):
+    """ Uses scipy to test if points are within a given CATMAID volume.
+    The idea is to test if adding the point to the cloud would change the
+    convex hull. 
+
+    Parameters:
+    -----------
+    points :            list of points
+                        can be numpy array, pandas df or list
+    volume :            name of the CATMAID volume to test or list of vertices
+                        as returned by pymaid.get_volume()
+                        
+    remote_instance :   CATMAID instance (optional)
+                        pass if skdata is a skeleton ID, not 3D skeleton data
+
+    Returns:
+    --------
+    list of booleans :  True if in volume, False if not
+    """
+
+    if type(volume) == type(str()):
+      volume = get_volume ( volume, remote_instance )
+      verts = np.array( volume[0] )
+    else:
+      verts = np.array( volume )    
+
+    intact_hull = ConvexHull(verts)
+    intact_verts = list( intact_hull.vertices )
+
+    if type(points) == type(list()):
+      points = pd.DataFrame( points )
+
+    return [ list( ConvexHull( np.append( verts, list( [p] ), axis = 0 ) ).vertices ) == intact_verts for p in points.itertuples( index = False ) ]
 
 if __name__ == '__main__':
    """

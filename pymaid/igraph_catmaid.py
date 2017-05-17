@@ -55,6 +55,69 @@ if not module_logger.handlers:
    sh.setFormatter(formatter)
    module_logger.addHandler(sh)
 
+def igraph_from_adj_mat( adj_matrix, **kwargs ):
+   """ Takes an adjacency matrix and turns it into an iGraph object
+
+   Parameters:
+   ----------
+   adj_matrix :         Pandas dataframe 
+                        adjacency matrix - e.g. from pymaid.cluster
+
+   Optional kwargs:
+   syn_threshold :      edges with less connections will be ignored
+   syn_cutoff :         edges with more connections will be maxed at syn_cutoff
+
+   Returns:
+   -------
+   iGraph representation of network   
+
+   Example:
+   -------
+   from pymaid import pymaid, cluster, igraph_catmaid
+   from igraph import plot as gplot
+
+   remote_instance = pymaid.CatmaidInstance( URL, HTTP_USER, HTTP_PW, TOKEN )
+
+   neurons = pymaid.get_skids_by_annotation( 'right_pns' ,remote_instance)
+   mat = cluster.create_adjacency_matrix( neurons, neurons, remote_instance )
+   g = igraph_catmaid.igraph_from_adj_mat ( mat )
+
+   #Fruchterman-Reingold algorithm
+   layout = g.layout('fr')
+   gplot( g, layout = layout )
+   """   
+
+   syn_threshold = kwargs.get('syn_threshold', 1 )
+   syn_cutoff = kwargs.get('syn_cutoff', None )
+
+   cols = adj_matrix.columns.tolist()
+   rows = adj_matrix.index.tolist()
+   v = adj_matrix.values      
+
+   #Get unique neurons in adj matrix
+   neurons = list( set( cols + rows ) )   
+
+   #nonzero(): First index is row, second is column
+
+   #Get list of edges
+   edges = [ ( neurons.index ( rows[ v.nonzero()[0][i] ] ), neurons.index( cols[ v.nonzero()[1][i] ] ) ) for i in range( len( v.nonzero()[0] ) ) if v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] >= syn_threshold ]
+   weights = [ v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] for i in range( len( v.nonzero()[0] ) ) if v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] >= syn_threshold ]   
+
+   if syn_cutoff:
+      weights = [ min( e, syn_cutoff ) for e in weights ]
+
+   g = Graph(directed = True)
+
+   #Add vertices
+   g.add_vertices( len(neurons) )
+   g.vs['label'] = neurons
+
+   #Add edges
+   g.add_edges( edges )
+   g.es['weight'] = weights
+
+   return g
+
 def igraph_from_skeleton(skdata):
    """ Takes CATMAID single skeleton data and turns it into an iGraph object
    

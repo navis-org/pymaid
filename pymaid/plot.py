@@ -36,9 +36,11 @@ except:
    from pymaid.pymaid import get_3D_skeleton, get_names, get_volume
 
 try:
-   import morpho
+   import morpho, igraph_catmaid
+   import cluster as clustmaid
 except:
-   from pymaid import morpho
+   from pymaid import morpho, igraph_catmaid
+   from pymaid import cluster as clustmaid
 
 #If plotneuron is not run as module, make sure module_logger has a at least a StreamHandler
 module_logger = logging.getLogger(__name__) 
@@ -155,7 +157,7 @@ def plot2d( *args, **kwargs ):
    connectors_only = kwargs.get('connectors_only', False )
    zoom = kwargs.get('zoom', False )
    limits = kwargs.get('limits', None )
-   auto_limits = kwargs.get('auto_limits', True )
+   auto_limits = kwargs.get('auto_limits', False )
 
 
    if not skdata and remote_instance and skids:
@@ -451,7 +453,7 @@ def plot3d( *args, **kwargs ):
    skids = kwargs.get('skids', [] )
    remote_instance = kwargs.get('remote_instance', [] )
    pl_title = kwargs.get('title', 'Neuron Plot' )
-   skdata = kwargs.get('skdata', [] )
+   skdata = kwargs.get('skdata', pd.DataFrame() )
    names = kwargs.get('names', [] )
    downsampling = kwargs.get('downsampling', 8)   
    volumes = kwargs.get('volumes', [] )
@@ -467,7 +469,11 @@ def plot3d( *args, **kwargs ):
    fig_height = kwargs.get('fig_height', 960)
    fig_autosize = kwargs.get('fig_autosize', False)
 
-   if not skdata and skids and remote_instance:
+
+   if (skdata.empty and not skids) or (skids and not remote_instance):
+      module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot2d).')
+      return  
+   elif skdata.empty and skids and remote_instance:
       skdata = get_3D_skeleton ( skids, remote_instance, 
                                                    connector_flag = 1, 
                                                    tag_flag = 0 , 
@@ -477,10 +483,7 @@ def plot3d( *args, **kwargs ):
                                                    get_abutting = True ) 
    elif 'nodes' in skdata.index.tolist():
       #If skdata is just a single neuron, bring it into a proper list format
-      skdata = pd.DataFrame( [ skdata ] )
-   else:
-      module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot2d).')
-      return  
+      skdata = pd.DataFrame( [ skdata ] )   
 
    colormap = kwargs.get('colormap', {})
 
@@ -543,7 +546,7 @@ def plot3d( *args, **kwargs ):
 
       #First, we have to generate slabs from the neurons    
       if 'type' not in neuron.nodes:
-         df = classify_nodes( df )
+         neuron = morpho.classify_nodes( neuron )
 
       b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
       end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
@@ -771,6 +774,234 @@ def plot3d( *args, **kwargs ):
 
    module_logger.info('Done. Plotted %i nodes and %i connectors' % ( sum([ n.nodes.shape[0] for n in skdata.itertuples() ]), sum([ n.connectors.shape[0] for n in skdata.itertuples() if 'connectors' in args]) )  )
    module_logger.info('Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
+
+   return fig
+
+def plot_network( *args, **kwargs ):
+   """ 
+   Uses python-igraph to generate a plot in plotly
+
+   Parameters:
+   ----------
+   USE EITHER <skids> or <skdata> to specify which neurons you want to plot
+
+   skids :           list
+                     list of CATMAID skeleton ids
+   adj_mat :         Pandas dataframe
+                     adjacency matrix, e.g. from cluster.create_adjacency_matrix()
+   remote_instance : CATMAID remote instance
+                     need to pass this too if you are providing only skids
+
+   Other (optional arguments):           
+   layout :          string (default = 'fr' -> Fruchterman-Reingold)
+                     see http://igraph.org/python/doc/tutorial/tutorial.html for
+                     available layouts
+   syn_cutoff :      int (default = False)
+                     if provided, connections will be maxed at this value
+   syn_threshold :   int (default = 0)
+                     edges with less connections are ignored
+   groups :          dict 
+                     Use to group neurons. Format: { 'Group A' : [skid1, skid2, ..], }
+   colormap :        Set to 'random' (default) to assign random colors to neurons
+                     Use single tuple to assign the same color to all neurons:
+                     ( (0-255,0-255,0-255) ) 
+                     Use dict to assign rgb colors to individual neurons: 
+                     { neuron1 : (0-255,0-255,0-255), .. }
+   label_nodes :     boolean (default = True)
+                     plot neuron labels
+   label_edges :     boolean (default = True)
+                     plot edge labels
+   node_hover_text : dict
+                     provide custom hover text for neurons:
+                     { neuron1 : 'hover text', .. }
+   node_size :       node sizes
+                     use int to set node size once
+                     use dict to set size for individual nodes
+                     { neuron1 : 20, neuron2 : 5,  .. }
+
+   Returns:
+   --------
+   fig:           dictionary to generate plotly figure
+                  use for example:
+                  plotly.offline.plot(fig, filename='plot.html') 
+                  to generate html file and open it webbrowser 
+   """   
+
+   skids = kwargs.get('skids', [] )
+   adj_mat = kwargs.get('adj_mat', pd.DataFrame() )
+   g = kwargs.get('g', None )
+   remote_instance = kwargs.get('remote_instance', [] )
+   layout = kwargs.get('layout', 'fr' )  
+
+   syn_cutoff = kwargs.get('syn_cutoff', None ) 
+   syn_threshold = kwargs.get('syn_threshold', 1 ) 
+   groups = kwargs.get('groups', [] )
+   colormap =  kwargs.get('colormap', 'random' )
+
+   label_nodes = kwargs.get('label_nodes', True )
+   label_edges = kwargs.get('label_edges', True )
+   
+   node_labels = kwargs.get('node_labels', [] )
+   node_hover_text = kwargs.get('node_hover_text', [] )
+   node_size = kwargs.get('node_size', 20 )
+
+   fig_width = kwargs.get('fig_width', 1440)
+   fig_height = kwargs.get('fig_height', 960)
+   fig_autosize = kwargs.get('fig_autosize', False)  
+
+
+   if adj_mat.empty and not skids:
+      module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR an adjacency matrix. See help(plot.plot_network).')
+   elif adj_mat.empty and not g:
+      adj_mat = clustmaid.create_adjacency_matrix( skids, 
+                                                   skids, 
+                                                   remote_instance,
+                                                   syn_cutoff = syn_cutoff,
+                                                   syn_threshold = syn_threshold,
+                                                   row_groups = groups, #This is where the magic happens
+                                                   col_groups = groups #This is where the magic happens
+                                                   )   
+   if not g:
+      #Generate igraph object and apply layout
+      g = igraph_catmaid.igraph_from_adj_mat( adj_mat, syn_threshold = syn_threshold, syn_cutoff = syn_cutoff )
+
+   try:
+      layout = g.layout( layout, weights = g.es['weight'] )
+   except:
+      layout = g.layout( layout )
+   pos = layout.coords
+
+   #Prepare colors
+   if type(colormap) == type(dict()):
+      colors = colormap
+   elif colormap == 'random':
+      c = random_colors (len( g.vs ), color_space='RGB', color_range = 255)
+      colors = { v['label'] : c[i] for i,v in enumerate( g.vs ) }
+   elif type(colormap) == type(tuple()):
+      colors = { v['label'] : colormap for i,v in enumerate( g.vs ) }
+   else:
+      module_logger.error('I dont understand the colors you have provided. Please, see help(plot.plot_network).')
+      return None
+
+   edges = []   
+   annotations = []
+   for e in g.es:  
+      width = 2 +  5 * round( e['weight'] )/max( g.es['weight'] ) 
+
+      edges.append (
+                     go.Scatter( dict( 
+                                 x = [ pos[e.source][0]  , pos[ e.target ][0], None ],
+                                 y = [ pos[e.source][1]  , pos[ e.target ][1], None ],
+                                 mode = 'lines',
+                                 hoverinfo = 'text',
+                                 text = str( e['weight'] ),
+                                 line = dict( 
+                                             width = width,
+                                             color = 'rgb(255,0,0)'
+                                             )
+                                 ))
+                  )
+
+      annotations.append( dict(
+                           x=pos[e.target][0],
+                           y=pos[e.target][1],
+                           xref='x',
+                           yref='y',                           
+                           showarrow=True,
+                           align='center',
+                           arrowhead=2,
+                           arrowsize=.5,
+                           arrowwidth=width,
+                           arrowcolor='#636363',
+                           ax=pos[ e.source ][0],
+                           ay=pos[ e.source ][1],   
+                           axref='x',
+                           ayref='y', 
+                           standoff = 10                         
+                       ) )
+
+      if label_edges:
+         center_x = (pos[e.target][0] - pos[ e.source ][0])/2 + pos[ e.source ][0]
+         center_y = (pos[e.target][1] - pos[ e.source ][1])/2 + pos[ e.source ][1]
+
+         if e['weight'] == syn_cutoff:
+            t = '%i +' % int(e['weight']) 
+         else:
+            t = str( int( e['weight'] ) )
+
+         annotations.append( dict(
+                                 x=center_x,
+                                 y=center_y,
+                                 xref='x',
+                                 yref='y',                           
+                                 showarrow=False,
+                                 text = t,    
+                                 font= dict(color= 'rgb(0,0,0)' , size= 10 )
+                               )
+
+                        )
+
+
+   #Prepare hover text
+   if not node_hover_text:
+      node_hover_text = { n['label'] : n['label'] for n in g.vs }   
+
+   #Prepare node sizes
+   if type(node_size) == type(dict()):
+      n_size = [ node_size[ n['label'] ] for n in g.vs  ]
+   else:
+      n_size = node_size
+
+
+   nodes = go.Scatter( dict( 
+                        x = [ e[0] for e in pos ],
+                        y = [ e[1] for e in pos ],
+                        text = [ node_hover_text[ n['label'] ] for n in g.vs ],
+                        mode = 'markers',
+                        hoverinfo = 'text',
+                        marker = dict(
+                                    size = n_size,
+                                    color = [ 'rgb' + str( tuple( colors[ n['label'] ] ) ) for n in g.vs ]
+                                    )
+                        ))   
+
+   if label_nodes:
+      annotations += [ dict( 
+                              x = e[0],
+                              y = e[1],
+                              xref='x',
+                              yref='y',  
+                              text = g.vs[i]['label'],
+                              showarrow = False,
+                              font= dict(color= 'rgb(0,0,0)' , size= 12 )                        
+                        )
+                        for i,e in enumerate(pos) ]
+
+   layout = dict(
+       width= fig_width,
+       height= fig_height,   
+       showlegend=False,  
+       annotations = annotations,
+       xaxis=dict(
+            showline = False,
+            zeroline = False,
+            showgrid = False,
+            showticklabels = False,
+            title = ''
+        ),
+       yaxis=dict(
+            showline = False,
+            zeroline = False,
+            showgrid = False,
+            showticklabels = False,
+            title = ''
+        ),
+       hovermode = 'closest'
+   )
+
+   data = go.Data( [ nodes ] )
+   
+   fig = go.Figure( data = data, layout = layout )
 
    return fig
 

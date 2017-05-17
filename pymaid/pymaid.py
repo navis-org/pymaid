@@ -426,7 +426,7 @@ def get_urls_threaded( urls , remote_instance, post_data = [], time_out = None )
     if time_out is None:
         time_out = max( [ len( urls ) , 20 ] ) 
 
-    remote_instance.logger.info('Creating %i threads to retrieve data' % len(urls) )
+    remote_instance.logger.debug('Creating %i threads to retrieve data' % len(urls) )
     for i, url in enumerate(urls):
         if post_data:
             t = retrieveUrlThreaded ( url, remote_instance, post_data = post_data[i] )
@@ -435,7 +435,7 @@ def get_urls_threaded( urls , remote_instance, post_data = [], time_out = None )
         t.start()
         threads[ str(i) ] = t        
         remote_instance.logger.debug('Threads: %i' % len ( threads ) )  
-    remote_instance.logger.info('%i threads generated.' % len(threads) )
+    remote_instance.logger.debug('%i threads generated.' % len(threads) )
 
     remote_instance.logger.debug('Joining threads...') 
 
@@ -460,7 +460,7 @@ def get_urls_threaded( urls , remote_instance, post_data = [], time_out = None )
             if t not in threads_closed:
                 remote_instance.logger.warning('Did not close thread for url: ' + urls[ int( t ) ] )
     else:
-        remote_instance.logger.info('Success! %i of %i urls retrieved.' % ( len(threads_closed) , len( urls ) ) )
+        remote_instance.logger.debug('Success! %i of %i urls retrieved.' % ( len(threads_closed) , len( urls ) ) )
     
     return data
 
@@ -710,7 +710,76 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
                         )
     return df
 
-def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 2):
+def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1, project_id = 1, min_size = 2):
+    """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
+    of interest WITHIN a given Catmaid Volume
+
+    Parameters:
+    ----------
+    skids :             list of skeleton ids
+    volume :            string - name of volume in Catmaid
+    remote_instance :   CATMAID instance; either pass directly to function or 
+                        define globally as 'remote_instance'                        
+    threshold :         does not seem to have any effect on CATMAID API and is 
+                        therefore filtered afterwards. This threshold is 
+                        applied to the TOTAL number of synapses across all
+                        neurons!  
+                        (optional, default = 1)
+    min_size :          minimum node count of partner
+                        (optional, default = 2 -> hide single-node partner)
+
+    Returns:
+    ------- 
+    Pandas dataframe (df): 
+        neuron_name   skeleton_id   num_nodes   relation      skid1  skid2 ....
+    0   name1           skid1      node_count1  upstream      n_syn  n_syn ...
+    1   name2           skid2      node_count2  downstream    n_syn  n_syn ..   
+    2   name3           skid3      node_count3  gapjunction   n_syn  n_syn .
+    ...    
+
+    Relation can be: upstream (incoming), downstream (outgoing) of the neurons
+    of interest or gap junction
+
+    NOTE: 
+    (1) partners can show up multiple times if they are e.g. pre- AND 
+    postsynaptic
+    (2) the number of connections between two partners is not restricted to the
+    volume
+    """
+
+    try:
+       from morpho import in_volume
+    except:
+       from pymaid.morpho import in_volume
+
+    #First, get list of connectors
+    cn_data = get_connectors ( skids, remote_instance = remote_instance, 
+                              incoming_synapses = True, outgoing_synapses = True, 
+                              abutting = False, gap_junctions = True, project_id = project_id)
+
+    #Find out which connectors are in the volume of interest
+    iv = in_volume(  cn_data[ ['x','y','z'] ], volume, remote_instance )
+
+    #Get the subset of connectors within the volume
+    cn_in_volume = cn_data[ iv ].copy()
+
+    #Get details and extract connected skids
+    cn_details = get_connector_details ( cn_data[ iv ].connector_id.unique().tolist() , remote_instance = remote_instance , project_id = project_id )    
+    skids_in_volume = list( set( cn_details.presynaptic_to.tolist() + [ n for l in cn_details.postsynaptic_to.tolist() for n in l ] ))
+
+    skids_in_volume = [ str(s) for s in skids_in_volume]
+
+    #Get all connectivity
+    connectivity = get_partners(skids, remote_instance = remote_instance , 
+                                threshold = threshold, project_id = project_id, 
+                                min_size = min_size)
+
+    remote_instance.logger.warning('%i unique partners in given volume found' % len(skids_in_volume) )
+
+    #Filter and return connectivity
+    return connectivity[ connectivity.skeleton_id.isin( skids_in_volume ) ].copy().reset_index()
+
+def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 2, filt = [], directions = ['incoming','outgoing'] ):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest
 
@@ -724,7 +793,11 @@ def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1,
                         applied to the total number of synapses. 
                         (optional, default = 1)
     min_size :          minimum node count of partner
-                        (optinal, default = 2 -> hide single-node partner)
+                        (optinal, default = 2 -> hide single-node partners!)
+    filt :              list of strings (optional, default = [])
+                        filters for neuron names (partial matches sufficient)
+    directions :        list of strings - default = ['incoming', 'outgoing']
+                        use to restrict to either up- or downstream partners
 
     Returns:
     ------- 
@@ -772,27 +845,23 @@ def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1,
     connectivity_data = remote_instance.fetch( remote_connectivity_url , connectivity_post )
 
     #As of 08/2015, # of synapses is returned as list of nodes with 0-5 confidence: {'skid': [0,1,2,3,4,5]}
-    #This is being collapsed into a single value before returning it:
-
-    if min_size > 1:
-        review = get_review ( list(set( list(connectivity_data['incoming'].keys()) + list(connectivity_data['outgoing'].keys() )) ) , remote_instance , project_id = project_id)
-        review.set_index('skeleton_id', inplace=True)
+    #This is being collapsed into a single value before returning it:    
     
-    for direction in ['incoming','outgoing']:
+    for d in directions:
         pop = set()
-        for entry in connectivity_data[direction]:
-            if sum( [ sum(connectivity_data[direction][entry]['skids'][n]) for n in connectivity_data[direction][entry]['skids'] ] ) >= threshold:
-                for skid in connectivity_data[direction][entry]['skids']:                
-                    connectivity_data[direction][entry]['skids'][skid] = sum(connectivity_data[direction][entry]['skids'][skid])
+        for entry in connectivity_data[ d ]:
+            if sum( [ sum(connectivity_data[ d ][entry]['skids'][n]) for n in connectivity_data[ d ][entry]['skids'] ] ) >= threshold:
+                for skid in connectivity_data[ d ][entry]['skids']:                
+                    connectivity_data[ d ][entry]['skids'][skid] = sum(connectivity_data[ d ][entry]['skids'][skid])
             else:
                 pop.add(entry)
 
             if min_size > 1:                
-                if review.ix[entry].total_node_count < min_size:
+                if connectivity_data[ d ][entry]['num_nodes'] < min_size:
                     pop.add(entry)
 
         for n in pop:
-            connectivity_data[direction].pop(n)
+            connectivity_data[ d ].pop(n)
 
     remote_instance.logger.info('Done. Found %i up- %i downstream neurons' % ( len(connectivity_data['incoming']) , len(connectivity_data['outgoing']) ) )
 
@@ -821,6 +890,10 @@ def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1,
 
         df = pd.concat( [df , df_temp], axis = 0)
 
+    if filt:
+        f = [ True in [ f in name for f in filt ] for name in df.neuron_name.tolist() ]
+        df = df [ f ]
+
     #Reindex concatenated dataframe
     df.index = range( df.shape[0] )
         
@@ -848,6 +921,8 @@ def get_names (skids, remote_instance = None, project_id = 1):
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
+    skids = list( set(skids) )
+
     remote_get_names_url = remote_instance.get_neuronnames( project_id )
 
     get_names_postdata = {}
@@ -859,7 +934,7 @@ def get_names (skids, remote_instance = None, project_id = 1):
 
     names = remote_instance.fetch( remote_get_names_url , get_names_postdata )
 
-    remote_instance.logger.info( 'Names for %i of %i skeleton IDs retrieved' % ( len( names ), len ( skids ) ) )
+    remote_instance.logger.debug( 'Names for %i of %i skeleton IDs retrieved' % ( len( names ), len ( skids ) ) )
         
     return(names)
 
@@ -1054,7 +1129,7 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
 
     Returns:
     ------- 
-    Pandas dataframe containing the following columns.     
+    Pandas dataframe (df) containing the following columns.     
     
       skeleton_id  connector_id  x  y  z  confidence  creator_id  treenode_id  \
     0
@@ -1079,40 +1154,44 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
             return    
 
     if type(skids) != type(list()):
-        skids = [skids]
+        skids = [ skids ]
 
     get_connectors_GET_data = { 'with_tags': 'false' }
 
     cn_data = []
 
-    for i,s in enumerate(skids):
-        tag = 'skeleton_ids[%i]' % i 
-        get_connectors_GET_data[tag] = str( s )
+    #There seems to be some cap regarding how many skids you can send to the server, so we have to chop it into pieces
+    for a in range( 0, len(skids), 50 ):
+        for i,s in enumerate(skids[ a:a+50] ):
+            tag = 'skeleton_ids[%i]' % i 
+            get_connectors_GET_data[tag] = str( s )
 
-    if incoming_synapses is True:
-        get_connectors_GET_data['relation_type']='presynaptic_to'
-        remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-        cn_data += [ e + ['presynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
+        if incoming_synapses is True:
+            get_connectors_GET_data['relation_type']='presynaptic_to'
+            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            cn_data += [ e + ['presynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
 
-    if outgoing_synapses is True:
-        get_connectors_GET_data['relation_type']='postsynaptic_to'
-        remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-        cn_data += [ e + ['postsynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
+        if outgoing_synapses is True:
+            get_connectors_GET_data['relation_type']='postsynaptic_to'
+            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            cn_data += [ e + ['postsynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
 
-    if abutting is True:
-        get_connectors_GET_data['relation_type']='abutting'
-        remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-        cn_data += [ e + ['abutting'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
+        if abutting is True:
+            get_connectors_GET_data['relation_type']='abutting'
+            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            cn_data += [ e + ['abutting'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
 
-    if gap_junctions is True:
-        get_connectors_GET_data['relation_type']='gapjunction_with'
-        remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-        cn_data += [ e + ['gap_junction'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]              
+        if gap_junctions is True:
+            get_connectors_GET_data['relation_type']='gapjunction_with'
+            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            cn_data += [ e + ['gap_junction'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]              
 
     df = pd.DataFrame(  cn_data,
                         columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type' ],
                         dtype=object
                          )
+
+    remote_instance.logger.info('%i connectors for %i neurons retrieved' % ( df.shape[0], len(skids) ) )
 
     return df
 
@@ -1184,7 +1263,7 @@ def get_review (skids, remote_instance = None, project_id = 1):
     ------- 
     Pandas dataframe:
 
-        skeleton_id   neuron_name  total_node_count   nodes_reviewed
+       skeleton_id neuron_name  total_node_count nodes_reviewed percent_reviewed
     0    
     1
     2   
@@ -1216,7 +1295,7 @@ def get_review (skids, remote_instance = None, project_id = 1):
                                 review_status[s][1], 
                                 int(review_status[s][1]/review_status[s][0]*100)  
                             ] for s in review_status ],
-                        columns = ['skeleton_id', 'neuron_name', 'total_node_count', 'nodes_reviewed', '%_reviewed']
+                        columns = ['skeleton_id', 'neuron_name', 'total_node_count', 'nodes_reviewed', 'percent_reviewed']
                          )
         
     return df
@@ -1784,19 +1863,38 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
     return df
 
 
-def get_contributor_statistics (skid_list, remote_instance = None, project_id = 1):
-    """ Wrapper to retrieve contributor statistics over ALL given skeleton ids
+def get_contributor_statistics (skids, remote_instance = None, separate = False, project_id = 1):
+    """ Wrapper to retrieve contributor statistics for given skeleton ids.
+    By default, stats are given over all neurons.
     
     Parameters:
     ----------
-    skid_list :         list of skeleton ids to check
+    skids :             list of skeleton ids to check
     remote_instance :   CATMAID instance; either pass directly to function 
                         or define globally as 'remote_instance'
+    separate :          boolean (default =False)
+                        if true, stats are given per neuron
     project_id :        integer (default = 1)
                         Id of your CATMAID project
 
     Returns:
     -------
+    Pandas dataframe
+      skeleton_id node_contributors multiuser_review_minutes post_contributors ..      
+    1
+    2
+    3
+
+    ..  construction_minutes  min_review_minutes  n_postsynapses  n_presynapses .. 
+    1
+    2
+    3
+
+    .. pre_contributors  n_nodes
+    1
+    2
+    3
+
     dictionary :  { 'node_contributors': {'user_id': nodes_contributed , ...}, 
                     'multiuser_review_minutes': XXX , 
                     'post_contributors': {'user_id': n_connectors_contributed}, 
@@ -1816,17 +1914,55 @@ def get_contributor_statistics (skid_list, remote_instance = None, project_id = 
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    get_statistics_postdata = {}    
-        
-    for i in range(len(skid_list)):
-        key = 'skids[%i]' % i
-        get_statistics_postdata[key] = skid_list[i]
-    
-    
-    remote_get_statistics_url = remote_instance.get_contributions_url( project_id )
-    statistics = remote_instance.fetch( remote_get_statistics_url, get_statistics_postdata )
+    columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',  'pre_contributors',  'n_postsynapses', 'post_contributors' ,'multiuser_review_minutes','construction_minutes', 'min_review_minutes' ]
 
-    return(statistics)
+    if not separate:
+        get_statistics_postdata = {}    
+            
+        for i in range(len(skids)):
+            key = 'skids[%i]' % i
+            get_statistics_postdata[key] = skids[i]        
+        
+        remote_get_statistics_url = remote_instance.get_contributions_url( project_id )
+        stats = remote_instance.fetch( remote_get_statistics_url, get_statistics_postdata )
+
+        df = pd.DataFrame( [ [  
+                                skids,
+                                stats['n_nodes'],
+                                stats['node_contributors'],                                
+                                stats['n_pre'],
+                                stats['pre_contributors'],
+                                stats['n_post'],
+                                stats['post_contributors'],
+                                stats['multiuser_review_minutes'],
+                                stats['construction_minutes'],
+                                stats['min_review_minutes']                                
+                                ] ],
+                            columns = columns,
+                            dtype = object
+                            )
+    else:
+        get_statistics_postdata = [ { 'skids[0]' : s } for s in skids  ]
+        remote_get_statistics_url = [ remote_instance.get_contributions_url( project_id ) for s in skids  ]
+
+        stats = get_urls_threaded( remote_get_statistics_url , remote_instance, post_data = get_statistics_postdata, time_out = None )
+
+        df = pd.DataFrame( [ [  
+                                s,
+                                stats[i]['n_nodes'],
+                                stats[i]['node_contributors'],                                
+                                stats[i]['n_pre'],
+                                stats[i]['pre_contributors'],
+                                stats[i]['n_post'],
+                                stats[i]['post_contributors'],
+                                stats[i]['multiuser_review_minutes'],
+                                stats[i]['construction_minutes'],
+                                stats[i]['min_review_minutes']                                
+                                ] for i,s in enumerate(skids) ],
+                            columns = columns,
+                            dtype = object
+                            )
+    return df
 
 def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None, project_id = 1 ):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters 
@@ -2094,7 +2230,7 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
 
     return list(skeletons)
 
-def get_user_list( remote_instance ):
+def get_user_list( remote_instance = None ):
     """ Get list of users for given CATMAID server (not project specific)
 
     Parameters:
@@ -2115,6 +2251,13 @@ def get_user_list( remote_instance ):
     (2.) transpose the dataframe and (3.) turn it into a dict { user_id: { } }
     """
 
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return 
+
     user_list = remote_instance.fetch ( remote_instance.get_user_list_url() )
 
     columns = [ 'id', 'login', 'full_name', 'first_name', 'last_name', 'color' ]
@@ -2124,6 +2267,7 @@ def get_user_list( remote_instance ):
                         )
 
     df.sort_values( ['login'], inplace=True)
+    df.reset_index(inplace=True)
 
     return df
 
