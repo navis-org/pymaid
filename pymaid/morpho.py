@@ -727,7 +727,7 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
 
     return round ( sum( distances_traveled ) ), visited_nodes
 
-def in_volume( points, volume, remote_instance ):
+def in_volume( points, volume, remote_instance, approximate = False ):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 
@@ -737,10 +737,12 @@ def in_volume( points, volume, remote_instance ):
     points :            list of points
                         can be numpy array, pandas df or list
     volume :            name of the CATMAID volume to test or list of vertices
-                        as returned by pymaid.get_volume()
-                        
+                        as returned by pymaid.get_volume()                        
     remote_instance :   CATMAID instance (optional)
                         pass if skdata is a skeleton ID, not 3D skeleton data
+    approximate :       boolean (default = False)
+                        if True, bounding box around the volume is used. Will
+                        speed up calculations a lot!
 
     Returns:
     --------
@@ -751,15 +753,23 @@ def in_volume( points, volume, remote_instance ):
       volume = get_volume ( volume, remote_instance )
       verts = np.array( volume[0] )
     else:
-      verts = np.array( volume )    
+      verts = np.array( volume )
 
-    intact_hull = ConvexHull(verts)
-    intact_verts = list( intact_hull.vertices )
+    if not approximate:
+      intact_hull = ConvexHull(verts)
+      intact_verts = list( intact_hull.vertices )
 
-    if type(points) == type(list()):
-      points = pd.DataFrame( points )
+      if type(points) == type(list()):
+        points = pd.DataFrame( points )
 
-    return [ list( ConvexHull( np.append( verts, list( [p] ), axis = 0 ) ).vertices ) == intact_verts for p in points.itertuples( index = False ) ]
+      return [ list( ConvexHull( np.append( verts, list( [p] ), axis = 0 ) ).vertices ) == intact_verts for p in points.itertuples( index = False ) ]
+    else:
+      bbox = ( ( min( [ v[0] for v in verts ] ), max( [ v[0] for v in verts ] )  ),
+               ( min( [ v[1] for v in verts ] ), max( [ v[1] for v in verts ] )  ),
+               ( min( [ v[2] for v in verts ] ), max( [ v[2] for v in verts ] )  )
+              )
+      return [ False not in [  bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points.itertuples( index = False ) ]
+
 
 if __name__ == '__main__':
    """

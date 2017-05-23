@@ -783,12 +783,14 @@ def plot_network( *args, **kwargs ):
 
    Parameters:
    ----------
-   USE EITHER <skids> or <skdata> to specify which neurons you want to plot
+   USE EITHER <skids>, <adj_mat> or <graph> to specify what to plot
 
    skids :           list
                      list of CATMAID skeleton ids
    adj_mat :         Pandas dataframe
                      adjacency matrix, e.g. from cluster.create_adjacency_matrix()
+   g :               igraph object
+                     igraph representation of the network
    remote_instance : CATMAID remote instance
                      need to pass this too if you are providing only skids
 
@@ -850,8 +852,9 @@ def plot_network( *args, **kwargs ):
    fig_autosize = kwargs.get('fig_autosize', False)  
 
 
-   if adj_mat.empty and not skids:
+   if adj_mat.empty and not skids and not g:
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR an adjacency matrix. See help(plot.plot_network).')
+      return
    elif adj_mat.empty and not g:
       adj_mat = clustmaid.create_adjacency_matrix( skids, 
                                                    skids, 
@@ -874,6 +877,8 @@ def plot_network( *args, **kwargs ):
    #Prepare colors
    if type(colormap) == type(dict()):
       colors = colormap
+      #Give grey color to neurons that are not in colormap
+      colors.update( { v['label'] : (.5,.5,.5) for i,v in enumerate( g.vs ) if v['label'] not in colormap }  )
    elif colormap == 'random':
       c = random_colors (len( g.vs ), color_space='RGB', color_range = 255)
       colors = { v['label'] : c[i] for i,v in enumerate( g.vs ) }
@@ -944,14 +949,16 @@ def plot_network( *args, **kwargs ):
 
    #Prepare hover text
    if not node_hover_text:
-      node_hover_text = { n['label'] : n['label'] for n in g.vs }   
+      node_hover_text = { n['label'] : n['label'] for n in g.vs }  
+   else:
+      #Make sure all nodes are represented
+      node_hover_text.update( { n['label'] : n['label'] for n in g.vs if n['label'] not in node_hover_text } ) 
 
    #Prepare node sizes
    if type(node_size) == type(dict()):
       n_size = [ node_size[ n['label'] ] for n in g.vs  ]
    else:
       n_size = node_size
-
 
    nodes = go.Scatter( dict( 
                         x = [ e[0] for e in pos ],
@@ -1002,6 +1009,8 @@ def plot_network( *args, **kwargs ):
    data = go.Data( [ nodes ] )
    
    fig = go.Figure( data = data, layout = layout )
+
+   module_logger.info('Done! Use e.g. plotly.offline.plot(fig, filename="network_plot.html") to plot.')
 
    return fig
 

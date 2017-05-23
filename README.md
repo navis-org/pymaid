@@ -156,6 +156,9 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `in_volume()`: test if points are within given CATMAID volume
 - `synapse_root_distances()`: similar to `pymaid.igraph_catmaid.calculate_distance_from_root()` but does not use iGraph
 
+### pymaid.user_stats:
+- `get_time_invested()`: calculate the time users have spent working on a set of neurons
+
 
 ## License:
 This code is under GNU GPL V3

@@ -7,3 +7,4 @@ pymaid/igraph_catmaid.py
 pymaid/morpho.py
 pymaid/plot.py
 pymaid/pymaid.py
+pymaid/user_stats.py

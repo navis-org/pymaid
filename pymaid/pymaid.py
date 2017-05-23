@@ -158,8 +158,8 @@ class CatmaidInstance:
         """ Requires the url to connect to and the variables for POST, if any, in a dictionary. """
         if post:
             data = urllib.parse.urlencode(post)
-            data = data.encode('utf-8')            
-            request = urllib.request.Request(url, data = data)        
+            data = data.encode('utf-8')                        
+            request = urllib.request.Request(url, data = data ) #headers = {'Content-Type': 'application/json', 'Accept':'application/json'}         
         else:
             request = urllib.request.Request(url)
 
@@ -710,9 +710,10 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
                         )
     return df
 
-def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1, project_id = 1, min_size = 2):
+def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1, project_id = 1, min_size = 2, approximate = False):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
-    of interest WITHIN a given Catmaid Volume
+    of interest WITHIN a given Catmaid Volume. Attention: total number of 
+    connections returned is not restricted to that volume.
 
     Parameters:
     ----------
@@ -727,6 +728,9 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
                         (optional, default = 1)
     min_size :          minimum node count of partner
                         (optional, default = 2 -> hide single-node partner)
+    approximate :       boolean (default = False)
+                        if True, bounding box around the volume is used. Will
+                        speed up calculations a lot!
 
     Returns:
     ------- 
@@ -757,27 +761,33 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
                               incoming_synapses = True, outgoing_synapses = True, 
                               abutting = False, gap_junctions = True, project_id = project_id)
 
+    remote_instance.logger.info('%i connectors retrieved - now checking for intersection with volume...' % cn_data.shape[0] )
+
     #Find out which connectors are in the volume of interest
-    iv = in_volume(  cn_data[ ['x','y','z'] ], volume, remote_instance )
+    iv = in_volume(  cn_data[ ['x','y','z'] ], volume, remote_instance, approximate = approximate )
 
     #Get the subset of connectors within the volume
     cn_in_volume = cn_data[ iv ].copy()
 
+    remote_instance.logger.info('%i connectors in volume - retrieving connected neurons...' % cn_in_volume.shape[0] )
+
     #Get details and extract connected skids
-    cn_details = get_connector_details ( cn_data[ iv ].connector_id.unique().tolist() , remote_instance = remote_instance , project_id = project_id )    
+    cn_details = get_connector_details ( cn_in_volume.connector_id.unique().tolist() , remote_instance = remote_instance , project_id = project_id )    
     skids_in_volume = list( set( cn_details.presynaptic_to.tolist() + [ n for l in cn_details.postsynaptic_to.tolist() for n in l ] ))
 
-    skids_in_volume = [ str(s) for s in skids_in_volume]
+    skids_in_volume = [ str(s) for s in skids_in_volume ]
 
     #Get all connectivity
     connectivity = get_partners(skids, remote_instance = remote_instance , 
                                 threshold = threshold, project_id = project_id, 
-                                min_size = min_size)
-
-    remote_instance.logger.warning('%i unique partners in given volume found' % len(skids_in_volume) )
+                                min_size = min_size)    
 
     #Filter and return connectivity
-    return connectivity[ connectivity.skeleton_id.isin( skids_in_volume ) ].copy().reset_index()
+    filtered_connectivity = connectivity[ connectivity.skeleton_id.isin( skids_in_volume ) ].copy().reset_index()
+
+    remote_instance.logger.info('%i unique partners left after filtering (%i of %i connectors in given volume)' % ( len( filtered_connectivity.skeleton_id.unique() ) ,cn_in_volume.shape[0], cn_data.shape[0] ) )
+
+    return filtered_connectivity
 
 def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 2, filt = [], directions = ['incoming','outgoing'] ):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
@@ -939,11 +949,11 @@ def get_names (skids, remote_instance = None, project_id = 1):
     return(names)
 
 def get_node_user_details(treenode_ids, remote_instance = None, project_id = 1):
-    """ Wrapper to retrieve user info for a list of treenode_ids
+    """ Wrapper to retrieve user info for a list of treenode and/or connectors
 
     Parameters:
     ----------
-    treenode_ids :      list of treenode ids
+    treenode_ids :      list of treenode ids (can also be connector ids!)
     remote_instance :   CATMAID instance; either pass directly to function or 
                         define globally as 'remote_instance'
 
@@ -982,12 +992,15 @@ def get_node_user_details(treenode_ids, remote_instance = None, project_id = 1):
     data_columns = ['creation_time', 'user',  'edition_time', 'editor', 'reviewers', 'review_times' ]
 
     df = pd.DataFrame(
-                        [ [e] + [ data[e][k] for k in data_columns ] for e in data.keys() ],
+                        [ [ e ] + [ data[e][k] for k in data_columns ] for e in data.keys() ],
                         columns = ['treenode_id'] + data_columns,
                         dtype = object
-
-
                       )
+
+    df['creation_time'] = [ datetime.datetime.strptime( d[:16] , '%Y-%m-%dT%H:%M' ) for d in df['creation_time'].tolist()  ]
+    df['edition_time'] = [ datetime.datetime.strptime( d[:16] , '%Y-%m-%dT%H:%M' ) for d in df['edition_time'].tolist() ]
+    df['review_times'] = [ [ datetime.datetime.strptime( d[:16] , '%Y-%m-%dT%H:%M' ) for d in lst ] for lst in df['review_times'].tolist() ]    
+
     return df
 
 def get_node_lists (skids, remote_instance = None, project_id = 1):
@@ -1229,17 +1242,19 @@ def get_connector_details (connector_ids, remote_instance = None, project_id = 1
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_get_connectors_url = remote_instance.get_connector_details_url( project_id )
-
-    get_connectors_postdata = {}    
-        
-    for i in range(len(connector_ids)):
+    remote_get_connectors_url = remote_instance.get_connector_details_url( project_id )       
+    
+    #Depending on DATA_UPLOAD_MAX_NUMBER_FIELDS of your CATMAID server (default = 1000), we have to cut requests into batches < 1000
+    connectors = []
+    #for b in range( 0, len( connector_ids ), 999 ):
+    get_connectors_postdata = {}         
+    for i,s in enumerate( connector_ids ):    
         key = 'connector_ids[%i]' % i
-        get_connectors_postdata[key] = connector_ids[i]
+        get_connectors_postdata[key] = s #connector_ids[i]
 
-    connectors = remote_instance.fetch( remote_get_connectors_url , get_connectors_postdata )    
+    connectors += remote_instance.fetch( remote_get_connectors_url , get_connectors_postdata )
 
-    remote_instance.logger.info('Data for %i of %i connectors retrieved' %(len(connectors),len(connector_ids)))    
+    remote_instance.logger.info('Data for %i of %i unique connector IDs retrieved' %(len(connectors),len(set(connector_ids))))    
 
     columns = [ 'connector_id', 'presynaptic_to', 'postsynaptic_to', 'presynaptic_to_node', 'postsynaptic_to_node' ]
 
@@ -2242,7 +2257,7 @@ def get_user_list( remote_instance = None ):
     ------
     Pandas dataframe:
         
-        user_id     name
+        id   login   full_name   first_name   last_name   color
     0
     1
     ..

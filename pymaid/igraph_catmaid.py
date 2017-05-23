@@ -92,16 +92,26 @@ def igraph_from_adj_mat( adj_matrix, **kwargs ):
 
    cols = adj_matrix.columns.tolist()
    rows = adj_matrix.index.tolist()
+
+   #Extract values
    v = adj_matrix.values      
+   #Set values < syn_threshold to 0 -> will not show up on v.nonzero()
+   v [ v < syn_threshold ] = 0
 
    #Get unique neurons in adj matrix
    neurons = list( set( cols + rows ) )   
 
+   #Generate dict containing the indices of neurons
+   neurons_index = { n : i for i,n in enumerate( neurons ) }
+
    #nonzero(): First index is row, second is column
 
-   #Get list of edges
-   edges = [ ( neurons.index ( rows[ v.nonzero()[0][i] ] ), neurons.index( cols[ v.nonzero()[1][i] ] ) ) for i in range( len( v.nonzero()[0] ) ) if v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] >= syn_threshold ]
-   weights = [ v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] for i in range( len( v.nonzero()[0] ) ) if v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] >= syn_threshold ]   
+   #edges = [ ( neurons.index ( rows[ v.nonzero()[0][i] ] ), neurons.index( cols[ v.nonzero()[1][i] ] ) ) for i in range( len( v.nonzero()[0] ) ) if v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] >= syn_threshold ]
+   #weights = [ v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] for i in range( len( v.nonzero()[0] ) ) if v[ v.nonzero()[0][i] ][ v.nonzero()[1][i] ] >= syn_threshold ]   
+
+   #Get list of edges as indices of the vertices in the graph
+   edges = [ ( neurons_index [ rows[r] ] , neurons_index [ cols[c] ] ) for r,c in zip( v.nonzero()[0], v.nonzero()[1] ) ]    
+   weights = [ v[r][c] for r,c in zip( v.nonzero()[0], v.nonzero()[1] ) ]    
 
    if syn_cutoff:
       weights = [ min( e, syn_cutoff ) for e in weights ]
