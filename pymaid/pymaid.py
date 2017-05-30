@@ -1240,11 +1240,11 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
         # Put in dataframe
         if tag_flag == 1:
             df = pd.DataFrame(  cn_data,
-                        columns = [ 'skel_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type', 'tags'],
+                        columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type', 'tags'],
                         dtype = object)
         else:
             df = pd.DataFrame(  cn_data,
-                        columns = [ 'skel_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type'],
+                        columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type'],
                         dtype = object)
 
         remote_instance.logger.info('%i connectors for %i neurons retrieved' % ( df.shape[0], len(skids) ) )
