@@ -1120,7 +1120,7 @@ def get_edges (skids, remote_instance = None):
 
     return df
 
-def get_connectors ( skids, remote_instance = None, incoming_synapses = True, outgoing_synapses = True, abutting = False, gap_junctions = False, project_id = 1, tag_flag = 0):
+def get_connectors ( skids, remote_instance = None, incoming_synapses = True, outgoing_synapses = True, abutting = False, gap_junctions = False, project_id = 1, tag_flag = True):
     """ Wrapper to retrieve connectors for a set of neurons.
 
     Parameters:
@@ -1139,7 +1139,8 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
                         if True, gap junctions will be retrieved
     project_id :        int (default = 1)
                         ID of the CATMAID project
-    tag_flag :          set if tags of connectors should be retrieved. Possible values = 0/false or 1/True
+    tag_flag :          boolean (default = True)
+                        if True, tags of connectors will be retrieved
 
     Returns:
     -------
@@ -1150,7 +1151,7 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
     1
     ...
 
-      creation_time  edition_time type
+      creation_time  edition_time type tags
     0
     1
     ...
@@ -1186,68 +1187,56 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
         if incoming_synapses is True:
             get_connectors_GET_data['relation_type']='presynaptic_to'
             remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [ e + ['presynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
-
-            #Add tags to tags dict
-            tags_dict = remote_instance.fetch( remote_get_connectors_url )['tags']
+            data = remote_instance.fetch( remote_get_connectors_url )
+            cn_data += [ e + ['presynaptic_to'] for e in data['links'] ]
+            tags_dict = data['tags']
 
         if outgoing_synapses is True:
             get_connectors_GET_data['relation_type']='postsynaptic_to'
             remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [ e + ['postsynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
-
-            #Add tags to tags dict
-            tags_dict = dict(tags_dict, **remote_instance.fetch( remote_get_connectors_url )['tags'])
+            data = remote_instance.fetch( remote_get_connectors_url )
+            cn_data += [ e + ['postsynaptic_to'] for e in data['links'] ]
+            tags_dict = dict(tags_dict, **data['tags'])
 
         if abutting is True:
             get_connectors_GET_data['relation_type']='abutting'
             remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [ e + ['abutting'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
-
-            #Add tags to tags dict
-            tags_dict = dict(tags_dict, **remote_instance.fetch( remote_get_connectors_url )['tags'])
+            data = remote_instance.fetch( remote_get_connectors_url )
+            cn_data += [ e + ['abutting'] for e in data['links'] ]
+            tags_dict = dict(tags_dict, **data['tags'])
 
         if gap_junctions is True:
             get_connectors_GET_data['relation_type']='gapjunction_with'
             remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [ e + ['gap_junction'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
+            data = remote_instance.fetch( remote_get_connectors_url )
+            cn_data += [ e + ['gap_junction'] for e in data['links'] ]
+            tags_dict = dict(tags_dict, **data['tags'])
 
-            #Add tags to tags dict
-            tags_dict = dict(tags_dict, **remote_instance.fetch( remote_get_connectors_url )['tags'])
+    #Add tags to each connector if tag_flag is True
+    if tag_flag is True:
+        for cn in range(len(cn_data)):
+            #Get connector ID
+            cn_id = cn_data[cn][1]
 
+            if str(cn_id) in tags_dict:
+                tag = tags_dict.get(str(cn_id))
+                cn_data[cn].append(tag)
 
-        #Convert tag_flag to 0 or 1 if necessary
-        if type(tag_flag) != type( int() ):
-            tag_flag = int(tag_flag)
+            else:
+                no_tags = ['None']
+                cn_data[cn].append(no_tags)
 
-        if type(tag_flag) != type( bool() ):
-                tag_flag = tag_flag == 1
+    #Put in dataframe
+    if tag_flag is True:
+        df = pd.DataFrame(  cn_data,
+                    columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type', 'tags'],
+                    dtype = object)
+    else:
+        df = pd.DataFrame(  cn_data,
+                    columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type'],
+                    dtype = object)
 
-        #Add tags to each connector if tag_flag = 1
-        if tag_flag == 1:
-            for cn in range(len(cn_data)):
-                #Get connector ID
-                cn_id = cn_data[cn][1]
-
-                if str(cn_id) in tags_dict:
-                    tag = tags_dict.get(str(cn_id))
-                    cn_data[cn].append(tag)
-
-                else:
-                    no_tags = ['None']
-                    cn_data[cn].append(no_tags)
-
-        # Put in dataframe
-        if tag_flag == 1:
-            df = pd.DataFrame(  cn_data,
-                        columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type', 'tags'],
-                        dtype = object)
-        else:
-            df = pd.DataFrame(  cn_data,
-                        columns = [ 'skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'treenode_id', 'creation_time', 'edition_time' , 'type'],
-                        dtype = object)
-
-        remote_instance.logger.info('%i connectors for %i neurons retrieved' % ( df.shape[0], len(skids) ) )
+    remote_instance.logger.info('%i connectors for %i neurons retrieved' % ( df.shape[0], len(skids) ) )
 
     return df
 
