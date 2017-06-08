@@ -608,7 +608,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
             else:
                 skdata[i][1] += [ [ c[7], c[1], 3, c[2], c[3], c[4], c[8], None ]  for c in cn['links'] ]
 
-    names = get_names( to_retrieve, remote_instance )
+    names = get_names( to_retrieve, remote_instance, project_id = project_id )
 
     if not get_history:
         df = pd.DataFrame( [ [
