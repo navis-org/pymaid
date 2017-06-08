@@ -43,7 +43,7 @@ if not module_logger.handlers:
 
 try:
    from pymaid.igraph_catmaid import igraph_from_skeleton
-except:  
+except:
    from igraph_catmaid import igraph_from_skeleton
 
 
@@ -52,7 +52,7 @@ def generate_list_of_childs( skdata ):
 
    Parameter:
    ---------
-   skdata :        Pandas dataframe containing a SINGLE neuron 
+   skdata :        Pandas dataframe containing a SINGLE neuron
 
    Returns:
    -------
@@ -60,11 +60,11 @@ def generate_list_of_childs( skdata ):
 
    """
    module_logger.debug('Generating list of childs...')
-   
+
    try:
       nodes = skdata.ix[0].nodes
    except:
-      nodes = skdata.nodes   
+      nodes = skdata.nodes
 
    list_of_childs = { n.treenode_id : [] for n in nodes.itertuples() }
 
@@ -72,7 +72,7 @@ def generate_list_of_childs( skdata ):
       try:
          list_of_childs[ n.parent_id ].append( n.treenode_id )
       except:
-         list_of_childs[None]=[None]   
+         list_of_childs[None]=[None]
 
    module_logger.debug('Done')
 
@@ -81,7 +81,7 @@ def generate_list_of_childs( skdata ):
 def classify_nodes ( skdata ):
    """ Takes list of nodes and classifies them as end nodes, branches, slabs
    and root
-   
+
    Parameters:
    ----------
    skdata :             Pandas dataframe containing neuron(s)
@@ -99,9 +99,9 @@ def classify_nodes ( skdata ):
         skdata.ix[i] = classify_nodes( skdata.ix[i] )
    else:
      list_of_childs  = generate_list_of_childs( skdata )
-     list_of_parent = { n.treenode_id : n.parent_id for n in skdata.nodes.itertuples() }   
+     list_of_parent = { n.treenode_id : n.parent_id for n in skdata.nodes.itertuples() }
 
-     end_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) == 0 ]   
+     end_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) == 0 ]
      slabs = [ n for n in list_of_childs if len(list_of_childs[n]) == 1 ]
      branch_nodes = [ n for n in list_of_childs if len(list_of_childs[n]) > 1 ]
      root = skdata.nodes[ skdata.nodes['parent_id'].isnull() ].treenode_id.values
@@ -109,7 +109,7 @@ def classify_nodes ( skdata ):
      classes = { n : 'slab' for n in skdata.nodes.treenode_id.tolist() }
      classes.update( { n : 'end' for n in end_nodes } )
      classes.update( { n : 'branch' for n in branch_nodes } )
-     classes.update( { n : 'root' for n in root } )  
+     classes.update( { n : 'root' for n in root } )
 
      new_column = [ classes[n] for n in skdata.nodes.treenode_id.tolist() ]
      skdata.nodes['type'] = new_column
@@ -121,12 +121,12 @@ def classify_nodes ( skdata ):
    return skdata
 
 def downsample_neuron ( skdata, resampling_factor):
-   """ Downsamples a neuron by a given factor. Preserves root, leafs, 
+   """ Downsamples a neuron by a given factor. Preserves root, leafs,
    branchpoints and synapse nodes
-   
+
    Parameter
    ---------
-   skdata :             Pandas dataframe containing a SINGLE neuron 
+   skdata :             Pandas dataframe containing a SINGLE neuron
    resampling_factor :  Factor by which to reduce the node count
 
    Returns
@@ -134,15 +134,15 @@ def downsample_neuron ( skdata, resampling_factor):
    skdata :             downsampled Pandas Dataframe
    """
 
-   try: 
+   try:
      skdata.nodes.shape[1]
    except:
      module_logger.warning('Please pass dataframe for a single neuron. Use e.g. df.ix[0]')
      return skdata
 
-   if skdata.nodes.shape[0] == 0: 
+   if skdata.nodes.shape[0] == 0:
      module_logger.warning('Unable to downsample: no nodes in neuron')
-     return skdata 
+     return skdata
 
    if type( skdata ) == type( pd.DataFrame() ):
       df = skdata.ix[0].copy()
@@ -150,13 +150,13 @@ def downsample_neuron ( skdata, resampling_factor):
       df = skdata.copy()
 
    module_logger.info('Preparing to downsample neuron...')
-   
-   list_of_parents = { n.treenode_id : n.parent_id for n in df.nodes.itertuples() }   
+
+   list_of_parents = { n.treenode_id : n.parent_id for n in df.nodes.itertuples() }
 
    if 'type' not in df.nodes:
       df = classify_nodes( df )
-   
-   fix_points = df.nodes[ (df.nodes.type != 'slab') | (df.nodes.has_synapses == True) ].treenode_id.values      
+
+   fix_points = df.nodes[ (df.nodes.type != 'slab') | (df.nodes.has_synapses == True) ].treenode_id.values
 
    #Walk from all fix points to the root - jump N nodes on the way
    new_parents = {}
@@ -166,38 +166,38 @@ def downsample_neuron ( skdata, resampling_factor):
       this_node = en
 
       while True:
-         stop = False         
+         stop = False
          np = list_of_parents[ this_node ]
          if np != None:
-            for i in range( resampling_factor ):         
-               if np in fix_points:             
-                  new_parents[ this_node ] = np             
-                  stop = True                            
+            for i in range( resampling_factor ):
+               if np in fix_points:
+                  new_parents[ this_node ] = np
+                  stop = True
                   break
-               else:             
+               else:
                   np = list_of_parents [ np ]
 
             if stop is True:
-               break       
+               break
             else:
                new_parents[ this_node ] = np
-               this_node = np       
+               this_node = np
          else:
             new_parents[ this_node ] = None
-            break   
-   
-   new_nodes = df.nodes[[ n.treenode_id in new_parents for n in df.nodes.itertuples() ] ]   
+            break
+
+   new_nodes = df.nodes[[ n.treenode_id in new_parents for n in df.nodes.itertuples() ] ]
    new_nodes.parent_id = [ new_parents[ n.treenode_id ] for n in new_nodes.itertuples() ]
 
-   module_logger.info('Nodes before/after: %i/%i ' % ( len( df.nodes ), len( new_nodes ) ) ) 
+   module_logger.info('Nodes before/after: %i/%i ' % ( len( df.nodes ), len( new_nodes ) ) )
 
    df.nodes = new_nodes
 
    return df
 
 def cut_neuron2( skdata, cut_node, g = None ):
-   """ Uses igraph to Cut the neuron at given point and returns two new neurons. 
-   Creating the iGraph is the bottleneck - if you already have it, pass it along 
+   """ Uses igraph to Cut the neuron at given point and returns two new neurons.
+   Creating the iGraph is the bottleneck - if you already have it, pass it along
    to speed things up (see example below)!
 
    Parameter
@@ -213,7 +213,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
 
    Example:
    -------
-   #Example for multiple cuts 
+   #Example for multiple cuts
 
    from pymaid.igraph_catmaid import igraph_from_skeleton
    from pymaid.morpho import cut_neuron2
@@ -230,16 +230,16 @@ def cut_neuron2( skdata, cut_node, g = None ):
    nA, nB = cut_neuron2( skeleton_data, cut_node1, g = g )
 
    #Second cut
-   nA, nB = cut_neuron2( skeleton_data, cut_node2, g = g )  
+   nA, nB = cut_neuron2( skeleton_data, cut_node2, g = g )
    """
-   start_time = time.time()  
+   start_time = time.time()
 
    module_logger.info('Cutting neuron.' )
 
    if type( skdata ) == type( pd.DataFrame() ):
       df = skdata.ix[0].copy()
    elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()  
+      df = skdata.copy()
 
    if g is None:
       #Generate iGraph -> order/indices of vertices are the same as in skdata
@@ -252,9 +252,9 @@ def cut_neuron2( skdata, cut_node, g = None ):
    #Should have found only one cut node
    except:
       module_logger.error('Error: Found no treenodes with ID %s - please double check!' % str( cut_node ) )
-      return 
+      return
 
-   #Select the cut node's parent 
+   #Select the cut node's parent
    parent_node_index = g.es.select( _source = cut_node_index )[0].target
 
    #Now calculate the min cut
@@ -269,33 +269,33 @@ def cut_neuron2( skdata, cut_node, g = None ):
       prox_partition = mc.partition[0]
 
    #Partitions hold the indices -> now we have to translate this into node ids
-   dist_partition_ids = g.vs.select(dist_partition)['node_id']   
-   prox_partition_ids = g.vs.select(prox_partition)['node_id']   
+   dist_partition_ids = g.vs.select(dist_partition)['node_id']
+   prox_partition_ids = g.vs.select(prox_partition)['node_id']
 
    #Set dataframe indices to treenode IDs - will facilitate distributing nodes
    if df.nodes.index.name != 'treenode_id':
-      df.nodes.set_index( 'treenode_id' , inplace = True )   
+      df.nodes.set_index( 'treenode_id' , inplace = True )
 
    neuron_dist = pd.DataFrame( [ [
                                   df.neuron_name + '_dist',
-                                  df.skeleton_id,                            
+                                  df.skeleton_id,
                                   df.nodes.ix[ dist_partition_ids ],
-                                  df.connectors[ [ c.treenode_id in dist_partition_ids for c in df.connectors.itertuples() ] ].reset_index(),                                  
-                                  df.tags 
-                              ]], 
+                                  df.connectors[ [ c.treenode_id in dist_partition_ids for c in df.connectors.itertuples() ] ].reset_index(),
+                                  df.tags
+                              ]],
                               columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
                               dtype=object
-                              ).ix[0]   
+                              ).ix[0]
 
-   neuron_dist.nodes.ix[ cut_node ].parent_id = None   
+   neuron_dist.nodes.ix[ cut_node ].parent_id = None
 
-   neuron_prox = pd.DataFrame( [[ 
+   neuron_prox = pd.DataFrame( [[
                                   df.neuron_name + '_prox',
-                                  df.skeleton_id,                            
+                                  df.skeleton_id,
                                   df.nodes.ix[ prox_partition_ids ],
-                                  df.connectors[ [ c.treenode_id not in dist_partition_ids for c in df.connectors.itertuples() ] ].reset_index(),                                  
+                                  df.connectors[ [ c.treenode_id not in dist_partition_ids for c in df.connectors.itertuples() ] ].reset_index(),
                                   df.tags
-                              ]], 
+                              ]],
                               columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
                               dtype=object
                               ).ix[0]
@@ -303,14 +303,14 @@ def cut_neuron2( skdata, cut_node, g = None ):
    #Reclassify cut node in distal as 'root' and its parent in proximal as 'end'
    if 'type' in df.nodes:
       neuron_prox.nodes.ix[ cut_node ].type = 'end'
-      neuron_dist.nodes.ix[ cut_node ].type = 'root'  
+      neuron_dist.nodes.ix[ cut_node ].type = 'root'
 
    #Now reindex dataframes
    neuron_dist.nodes.reset_index( inplace = True )
    neuron_prox.nodes.reset_index( inplace = True )
    df.nodes.reset_index( inplace = True )
 
-   module_logger.info('Cutting finished in %is' % round ( time.time() - start_time ) ) 
+   module_logger.info('Cutting finished in %is' % round ( time.time() - start_time ) )
    module_logger.info('Distal to cut node: %i nodes/%i synapses' % ( neuron_dist.nodes.shape[0], neuron_dist.connectors.shape[0] ) )
    module_logger.info('Proximal to cut node: %i nodes/%i synapses' % ( neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]  ) )
 
@@ -318,7 +318,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
 
 
 def cut_neuron( skdata, cut_node ):
-   """ Cuts a neuron at given point and returns two new neurons.   
+   """ Cuts a neuron at given point and returns two new neurons.
 
    Parameter
    ---------
@@ -330,7 +330,7 @@ def cut_neuron( skdata, cut_node ):
    [1] neuron_dist : distal to the cut
    [2] neuron_prox : proximal to the cut
 
-   If you intend doing multiple cuts, consider using cut_neuron2() instead.    
+   If you intend doing multiple cuts, consider using cut_neuron2() instead.
    """
    start_time = time.time()
 
@@ -339,10 +339,10 @@ def cut_neuron( skdata, cut_node ):
    if type( skdata ) == type( pd.DataFrame() ):
       df = skdata.ix[0].copy()
    elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()  
+      df = skdata.copy()
 
-   list_of_childs  = generate_list_of_childs( skdata )   
-   list_of_parents = { n.treenode_id : n.parent_id for n in df.nodes.itertuples() }   
+   list_of_childs  = generate_list_of_childs( skdata )
+   list_of_parents = { n.treenode_id : n.parent_id for n in df.nodes.itertuples() }
 
    if 'type' not in df.nodes:
       df = classify_nodes( df )
@@ -366,58 +366,58 @@ def cut_neuron( skdata, cut_node ):
    proximal_nodes = []
 
    module_logger.info('Cutting neuron...')
-   for i, en in enumerate( end_nodes.tolist() + [ cut_node ] ):     
+   for i, en in enumerate( end_nodes.tolist() + [ cut_node ] ):
       this_node = en
-      nodes_walked = [ en ]      
-      while True:                         
-         this_node = list_of_parents[ this_node ]        
+      nodes_walked = [ en ]
+      while True:
+         this_node = list_of_parents[ this_node ]
          nodes_walked.append( this_node )
 
          #Stop if this node is the cut node
-         if this_node == cut_node:           
+         if this_node == cut_node:
             distal_nodes += nodes_walked
             break
          #Stop if this node is the root node
-         elif this_node == root:          
-            proximal_nodes += nodes_walked            
+         elif this_node == root:
+            proximal_nodes += nodes_walked
             break
-         #Stop if we have seen this branchpoint before   
-         elif this_node in branch_nodes:           
-            if this_node in distal_nodes:             
+         #Stop if we have seen this branchpoint before
+         elif this_node in branch_nodes:
+            if this_node in distal_nodes:
                distal_nodes += nodes_walked
-               break          
-            elif this_node in proximal_nodes:               
+               break
+            elif this_node in proximal_nodes:
                proximal_nodes += nodes_walked
                break
 
    #Set dataframe indices to treenode IDs - will facilitate distributing nodes
    if df.nodes.index.name != 'treenode_id':
-      df.nodes.set_index( 'treenode_id' , inplace = True )   
-   
+      df.nodes.set_index( 'treenode_id' , inplace = True )
+
    distal_nodes = list ( set( distal_nodes ) )
    proximal_nodes = list ( set( proximal_nodes ) )
 
    neuron_dist = pd.DataFrame( [ [
                                   df.neuron_name + '_dist',
-                                  df.skeleton_id,                            
+                                  df.skeleton_id,
                                   df.nodes.ix[ distal_nodes ],
-                                  df.connectors[ [ c.treenode_id in distal_nodes for c in df.connectors.itertuples() ] ].reset_index(),                                  
-                                  df.tags 
-                              ]], 
+                                  df.connectors[ [ c.treenode_id in distal_nodes for c in df.connectors.itertuples() ] ].reset_index(),
+                                  df.tags
+                              ]],
                               columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
                               dtype=object
                               ).ix[0]
 
    neuron_dist.nodes.ix[ cut_node ].parent_id = None
-   neuron_dist.nodes.ix[ cut_node ].type = 'root'   
+   neuron_dist.nodes.ix[ cut_node ].type = 'root'
 
-   neuron_prox = pd.DataFrame( [[ 
+   neuron_prox = pd.DataFrame( [[
                                   df.neuron_name + '_prox',
-                                  df.skeleton_id,                            
+                                  df.skeleton_id,
                                   df.nodes.ix[ proximal_nodes ],
-                                  df.connectors[ [ c.treenode_id not in distal_nodes for c in df.connectors.itertuples() ] ].reset_index(),                                  
+                                  df.connectors[ [ c.treenode_id not in distal_nodes for c in df.connectors.itertuples() ] ].reset_index(),
                                   df.tags
-                              ]], 
+                              ]],
                               columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
                               dtype=object
                               ).ix[0]
@@ -430,40 +430,40 @@ def cut_neuron( skdata, cut_node ):
    neuron_prox.nodes.reset_index( inplace = True )
    df.nodes.reset_index( inplace = True )
 
-   module_logger.info('Cutting finished in %is' % round ( time.time() - start_time ) ) 
+   module_logger.info('Cutting finished in %is' % round ( time.time() - start_time ) )
    module_logger.info('Distal to cut node: %i nodes/%i synapses' % ( neuron_dist.nodes.shape[0], neuron_dist.connectors.shape[0] ) )
    module_logger.info('Proximal to cut node: %i nodes/%i synapses' % ( neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]  ) )
 
    return neuron_dist, neuron_prox
 
-def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_skid_filter = [] ):    
-   """ Calculates geodesic (along the arbor) distance of synapses to root 
+def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_skid_filter = [] ):
+   """ Calculates geodesic (along the arbor) distance of synapses to root
    (i.e. soma)
 
    Parameter
-   ---------   
+   ---------
    skdata :             Pandas dataframe containing a SINGLE neuron
-   pre_skid_filter :    (optional) if provided, only synapses from these 
+   pre_skid_filter :    (optional) if provided, only synapses from these
                         neurons will be processed
-   post_skid_filter :   (optional) if provided, only synapses to these neurons 
+   post_skid_filter :   (optional) if provided, only synapses to these neurons
                         will be processed
 
    Returns
    -------
-   [1] pre_node_distances :   {'connector_id: distance_to_root[nm]'} for all 
+   [1] pre_node_distances :   {'connector_id: distance_to_root[nm]'} for all
                               presynaptic sistes of this neuron
-   [2] post_node_distances :  {'connector_id: distance_to_root[nm]'} for all 
+   [2] post_node_distances :  {'connector_id: distance_to_root[nm]'} for all
                               postsynaptic sites of this neuron
    """
 
    if type( skdata ) == type( pd.DataFrame() ):
       df = skdata.ix[0].copy()
    elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy() 
+      df = skdata.copy()
 
    #Reindex dataframe to treenode
    if df.nodes.index.name != 'treenode_id':
-      df.nodes.set_index( 'treenode_id' , inplace = True )   
+      df.nodes.set_index( 'treenode_id' , inplace = True )
 
    #Calculate distance to parent for each node
    tn_coords = skdata.nodes[ ['x','y','z' ] ].reset_index()
@@ -471,16 +471,16 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
    w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 )).tolist()
 
    #Get connector details
-   cn_details = get_connector_details (  skdata.connectors.connector_id.tolist() , remote_instance = remote_instance)   
+   cn_details = get_connector_details (  skdata.connectors.connector_id.tolist() , remote_instance = remote_instance)
 
-   list_of_parents = { n[0]: (n[1], n[3], n[4], n[5] ) for n in skdata[0] }    
+   list_of_parents = { n[0]: (n[1], n[3], n[4], n[5] ) for n in skdata[0] }
 
    if pre_skid_filter or post_skid_filter:
-      #Filter connectors that are both pre- and postsynaptic to the skid in skid_filter 
+      #Filter connectors that are both pre- and postsynaptic to the skid in skid_filter
       filtered_cn = [ c for c in cn_details.itertuples() if True in [ int(f) in c.postsynaptic_to for f in post_skid_filter ] and True in [ int(f) == c.presynaptic_to for f in pre_skid_filter ] ]
       module_logger.debug('%i of %i connectors left after filtering' % ( len( filtered_cn ) , cn_details.shape[0] ) )
    else:
-      filtered_cn = cn_details 
+      filtered_cn = cn_details
 
    pre_node_distances = {}
    post_node_distances = {}
@@ -490,7 +490,7 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
    for i,cn in enumerate(filtered_cn):
 
       if i % 10 == 0:
-         module_logger.debug('%i of %i' % ( i, len(filtered_cn) ) )   
+         module_logger.debug('%i of %i' % ( i, len(filtered_cn) ) )
 
       if cn[1]['presynaptic_to'] == int(skdata.skeleton_id) and cn[1]['presynaptic_to_node'] in list_of_parents:
          dist, visited_nodes = walk_to_root( [ ( n[0], n[3],n[4],n[5] ) for n in skdata[0] if n[0] == cn[1]['presynaptic_to_node'] ][0] , list_of_parents, visited_nodes )
@@ -499,71 +499,73 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
 
       if int(skdata.skeleton_id) in cn[1]['postsynaptic_to']:
          for nd in cn[1]['postsynaptic_to_node']:
-            if nd in list_of_parents:                    
-               dist, visited_nodes = walk_to_root( [ ( n[0], n[3],n[4],n[5] ) for n in skdata[0] if n[0] == nd ][0] , list_of_parents, visited_nodes )                
+            if nd in list_of_parents:
+               dist, visited_nodes = walk_to_root( [ ( n[0], n[3],n[4],n[5] ) for n in skdata[0] if n[0] == nd ][0] , list_of_parents, visited_nodes )
 
                post_node_distances[ nd ] = dist
 
    #Reindex dataframe
    df.nodes.reset_index( inplace = True )
-         
+
    return pre_node_distances, post_node_distances
 
-def calc_dist(v1,v2):        
+def calc_dist(v1,v2):
     return math.sqrt(sum(((a-b)**2 for a,b in zip(v1,v2))))
 
-def calc_cable( skdata , smoothing = 1, remote_instance = None ):
-   """ Calculates cable length in micro meter (um) of a given neuron     
+def calc_cable( skdata , smoothing = 1, remote_instance = None, project_id = 1):
+   """ Calculates cable length in micro meter (um) of a given neuron
 
     Parameters:
     -----------
-    skdata :         Either a skeleton ID or Pandas dataframe containing 3d 
-                     skeleton data. If skeleton ID, 3d skeleton data will be 
+    skdata :         Either a skeleton ID or Pandas dataframe containing 3d
+                     skeleton data. If skeleton ID, 3d skeleton data will be
                      pulled from CATMAID server
     smoothing :      int (default = 1)
-                     use to smooth neuron by downsampling; 1 = no smoothing                  
+                     use to smooth neuron by downsampling; 1 = no smoothing
     remote_instance :   CATMAID instance (optional)
                         pass if skdata is a skeleton ID, not 3D skeleton data
+    project_id :     default is 1
 
     Returns:
     --------
     cable_length [um]
-    """   
+    """
 
    if type(skdata) == type( int() ) or type(skdata) == type( str() ) :
-      skdata = get_3D_skeleton( [skdata], remote_instance).ix[0]
+      skdata = get_3D_skeleton( [skdata], remote_instance, project_id = project_id).ix[0]
 
-   if type( skdata ) == type( pd.DataFrame() ):      
+   if type( skdata ) == type( pd.DataFrame() ):
       df = skdata.ix[0].copy()
    elif type( skdata ) == type( pd.Series() ):
       df = skdata.copy()
 
    if smoothing > 1:
-      df = downsample_neuron( df, smoothing )   
+      df = downsample_neuron( df, smoothing )
 
    if df.nodes.index.name != 'treenode_id':
       df.nodes.set_index( 'treenode_id' , inplace = True )
 
    #Calculate distance to parent for each node
    tn_coords = df.nodes[ ['x','y','z' ] ].reset_index()
-   parent_coords = df.nodes.ix[ [ n for n in df.nodes.parent_id.tolist() ] ][ [ 'x','y','z'] ].reset_index()   
+   parent_coords = df.nodes.ix[ [ n for n in df.nodes.parent_id.tolist() ] ][ [ 'x','y','z'] ].reset_index()
 
    #Calculate distances between nodes and their parents
    w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 ))
 
    #Remove nan value (at parent node)
-   w = w[ np.logical_not( np.isnan(w) ) ]   
+   w = w[ np.logical_not( np.isnan(w) ) ]
 
    df.nodes.reset_index( inplace = True )
 
    #Return sum of all distances
+   
    return np.sum( w ) / 1000
 
 def calc_strahler_index( skdata ):
-    """ Calculates Strahler Index -> starts with index of 1 at each leaf, at 
+    """ Calculates Strahler Index -> starts with index of 1 at each leaf, at
     forks with varying incoming strahler index, the highest index
-    is continued, at forks with the same incoming strahler index, highest 
-    index + 1 is continued. Starts with end nodes, then works its way from 
+    is continued, at forks with the same incoming strahler index, highest
+    index + 1 is continued. Starts with end nodes, then works its way from
     branch nodes to branch nodes up to root node
 
     Parameters:
@@ -574,18 +576,18 @@ def calc_strahler_index( skdata ):
     -------
     strahler_indices :    dictionary
                           { treenode_id : strahler_index }
-    """    
+    """
 
     start_time = time.time()
 
-    module_logger.info('Preparing to calculate Strahler indices...')   
+    module_logger.info('Preparing to calculate Strahler indices...')
 
-    if type( skdata ) == type( pd.DataFrame() ):      
+    if type( skdata ) == type( pd.DataFrame() ):
       df = skdata.ix[0].copy()
     elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()    
+      df = skdata.copy()
 
-    #Make sure dataframe is not indexed by treenode_id for preparing lists 
+    #Make sure dataframe is not indexed by treenode_id for preparing lists
     df.nodes.reset_index( inplace = True )
 
     #Find branch, root and end nodes
@@ -598,31 +600,31 @@ def calc_strahler_index( skdata ):
 
     #Generate dicts for childs and parents
     list_of_childs = generate_list_of_childs( skdata )
-    #list_of_parents = { n[0]:n[1] for n in skdata[0] } 
+    #list_of_parents = { n[0]:n[1] for n in skdata[0] }
 
     #Reindex according to treenode_id
     if df.nodes.index.name != 'treenode_id':
       df.nodes.set_index( 'treenode_id' , inplace = True )
 
-    module_logger.info('Generating Strahler indices...')    
+    module_logger.info('Generating Strahler indices...')
 
-    strahler_index = { n : None for n in list_of_childs if n != None }                
+    strahler_index = { n : None for n in list_of_childs if n != None }
 
     starting_points = end_nodes
-    
+
     nodes_processed = []
 
     while starting_points:
-        module_logger.debug('New starting point. Remaining: %i' % len( starting_points ) )        
+        module_logger.debug('New starting point. Remaining: %i' % len( starting_points ) )
         new_starting_points = []
         starting_points_done = []
 
-        for i,en in enumerate(starting_points):            
-            this_node = en                     
+        for i,en in enumerate(starting_points):
+            this_node = en
 
             module_logger.debug('%i of %i ' % ( i ,len(starting_points) ) )
 
-            #Calculate index for this branch                
+            #Calculate index for this branch
             previous_indices = []
             for child in list_of_childs[this_node]:
                 previous_indices.append(strahler_index[child])
@@ -634,7 +636,7 @@ def calc_strahler_index( skdata ):
             elif previous_indices.count(max(previous_indices)) >= 2:
                 this_branch_index = max(previous_indices) + 1
             else:
-                this_branch_index = max(previous_indices)                            
+                this_branch_index = max(previous_indices)
 
             nodes_processed.append( this_node )
             starting_points_done.append( this_node )
@@ -643,14 +645,14 @@ def calc_strahler_index( skdata ):
             #Find parent
             spine = [ this_node ]
 
-            #parent_node = list_of_parents [ this_node ]              
+            #parent_node = list_of_parents [ this_node ]
             parent_node = df.nodes.ix[ this_node ].parent_id
 
             while parent_node not in branch_nodes and parent_node != None:
                 this_node = parent_node
-                parent_node = None                
-                
-                spine.append( this_node )                                 
+                parent_node = None
+
+                spine.append( this_node )
                 nodes_processed.append(this_node)
 
                 #Find next parent
@@ -660,11 +662,11 @@ def calc_strahler_index( skdata ):
                   #Will fail if at root (no parent)
                   break
 
-            strahler_index.update( { n : this_branch_index for n in spine } )                 
+            strahler_index.update( { n : this_branch_index for n in spine } )
 
             #The last this_node is either a branch node or the root
             #If a branch point: check, if all its childs have already been processed
-            node_ready = True 
+            node_ready = True
             for child in list_of_childs[ parent_node ]:
                 if child not in nodes_processed:
                     node_ready = False
@@ -674,27 +676,27 @@ def calc_strahler_index( skdata ):
 
         #Remove those starting_points that were successfully processed in this run before the next iteration
         for node in starting_points_done:
-            starting_points.remove(node)        
+            starting_points.remove(node)
 
         #Add new starting points
         starting_points += new_starting_points
 
     df.nodes.reset_index( inplace = True )
 
-    module_logger.info('Done in %is' % round(time.time() -  start_time ) ) 
+    module_logger.info('Done in %is' % round(time.time() -  start_time ) )
 
     return strahler_index
 
 def walk_to_root( start_node, list_of_parents, visited_nodes ):
-    """ Helper function for synapse_root_distances(): 
-    Walks to root from start_node and sums up geodesic distances along the way.     
+    """ Helper function for synapse_root_distances():
+    Walks to root from start_node and sums up geodesic distances along the way.
 
     Parameters:
     -----------
     start_node :        (node_id, x,y,z)
     list_of_parents :   {node_id: (parent_id, x,y,z) }
     visited_nodes :     {node_id: distance_to_root}
-                        Make sure to not walk the same path twice by keeping 
+                        Make sure to not walk the same path twice by keeping
                         track of visited nodes and their distances to soma
 
     Returns:
@@ -705,7 +707,7 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
     dist = 0
     distances_traveled = []
     nodes_seen = []
-    this_node = start_node    
+    this_node = start_node
 
     #Walk to root
     while list_of_parents[ this_node[0] ][0] != None:
@@ -723,21 +725,21 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
         this_node = parent
 
     #Update visited_nodes
-    visited_nodes.update( { n: sum( distances_traveled[i:] ) for i,n in enumerate(visited_nodes) } ) 
+    visited_nodes.update( { n: sum( distances_traveled[i:] ) for i,n in enumerate(visited_nodes) } )
 
     return round ( sum( distances_traveled ) ), visited_nodes
 
 def in_volume( points, volume, remote_instance, approximate = False ):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
-    convex hull. 
+    convex hull.
 
     Parameters:
     -----------
     points :            list of points
                         can be numpy array, pandas df or list
     volume :            name of the CATMAID volume to test or list of vertices
-                        as returned by pymaid.get_volume()                        
+                        as returned by pymaid.get_volume()
     remote_instance :   CATMAID instance (optional)
                         pass if skdata is a skeleton ID, not 3D skeleton data
     approximate :       boolean (default = False)
@@ -783,9 +785,9 @@ if __name__ == '__main__':
 
    #print(calc_cable ( 21999, smoothing = 3, remote_instance = rm) )
 
-   from pymaid import get_3D_skeleton  
+   from pymaid import get_3D_skeleton
 
-   skdata = get_3D_skeleton( [21999], rm)[0]     
+   skdata = get_3D_skeleton( [21999], rm)[0]
 
    nA, nB = cut_neuron2( skdata, 132996 )
 
