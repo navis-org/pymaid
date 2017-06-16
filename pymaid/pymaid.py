@@ -54,6 +54,7 @@ import datetime
 import logging
 import re
 import pandas as pd
+import numpy as np
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -118,7 +119,7 @@ class CatmaidInstance:
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
-        self.authtoken = authtoken
+        self.authtoken = authtoken        
         self.opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler())            
 
         #If pymaid is not run as module, make sure logger has a at least a StreamHandler
@@ -155,10 +156,16 @@ class CatmaidInstance:
             request.add_header("X-Authorization", "Token {}".format(self.authtoken))
 
     def fetch(self, url, post=None):
-        """ Requires the url to connect to and the variables for POST, if any, in a dictionary. """
+        """ Requires the url to connect to and the variables for POST, if any, in a dictionary. """        
         if post:
+            #Convert booleans into lower case strings
+            for v in post:
+                if type( post[v] ) == type( bool() ):
+                    post[v] = str( post[v] ).lower()
+
             data = urllib.parse.urlencode(post)
-            data = data.encode('utf-8')                        
+            data = data.encode('utf-8')          
+            self.logger.debug('Encoded postdata: %s' % data)              
             request = urllib.request.Request(url, data = data ) #headers = {'Content-Type': 'application/json', 'Accept':'application/json'}         
         else:
             request = urllib.request.Request(url)
@@ -251,11 +258,11 @@ class CatmaidInstance:
         """ Use to parse url for a SINGLE neuron (will also give you neuronID). """
         return self.djangourl("/" + str(pid) + "/skeleton/" + str(skid) + "/neuronname" )    
     
-    def get_review_status(self, pid):
+    def get_review_status_url(self, pid):
         """ Use to get skeletons review status. """
         return self.djangourl("/" + str(pid) + "/skeletons/review-status" )
     
-    def get_neuron_annotations(self, pid):
+    def get_neuron_annotations_url(self, pid):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
         return self.djangourl("/" + str(pid) + "/annotations/table-list" )
     
@@ -406,7 +413,7 @@ def get_urls_threaded( urls , remote_instance, post_data = [], time_out = None )
     remote_instance :   CATMAID instance
                         Either pass directly to function or define globally 
                         as 'remote_instance'       
-    post_data :         list of dicts
+    post_data :         list of dicts (optional)
                         needs to be the same size as urls
     time_out :          integer or None
                         After this number of second, fetching data will time 
@@ -518,7 +525,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
                         will time out (so as to not block the system)
                         If set to None, time out will be max([ 20, len(skids) ]) 
                         -> e.g. 100s for 100 skeletons but at least 20s
-    get_history:        boolean
+    get_history:        boolean (default = False)
                         if True, the returned skeleton data will contain 
                         creation date ([8]) and last modified ([9]) for each 
                         node -> compact-details url the 'with_history' option 
@@ -626,8 +633,8 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
         df = pd.DataFrame( [ [ 
                                 names[ str(to_retrieve[i]) ],
                                 str(to_retrieve[i]),                            
-                                pd.DataFrame( n[0], columns = ['treenode_id','parent_id','creator_id','x','y','z','radius','confidence','creation_date','last_modified'], dtype = object ),
-                                pd.DataFrame( n[1], columns = ['treenode_id','connector_id','relation','x','y','z','creation_date','last_modified'], dtype = object ),
+                                pd.DataFrame( n[0], columns = ['treenode_id','parent_id','creator_id','x','y','z','radius','confidence','last_modified','creation_date'], dtype = object ),
+                                pd.DataFrame( n[1], columns = ['treenode_id','connector_id','relation','x','y','z','last_modified','creation_date'], dtype = object ),
                                 n[2]  ]
                                  for i,n in enumerate( skdata ) 
                             ], 
@@ -1292,7 +1299,7 @@ def get_review (skids, remote_instance = None, project_id = 1):
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_get_reviews_url = remote_instance.get_review_status( project_id )
+    remote_get_reviews_url = remote_instance.get_review_status_url( project_id )
 
     get_review_postdata = {}    
         
@@ -1300,9 +1307,9 @@ def get_review (skids, remote_instance = None, project_id = 1):
         key = 'skeleton_ids[%i]' % i
         get_review_postdata[key] = str(skids[i])
 
-    review_status = remote_instance.fetch( remote_get_reviews_url , get_review_postdata )  
-
     names = get_names(skids, remote_instance)
+
+    review_status = remote_instance.fetch( remote_get_reviews_url , get_review_postdata )      
 
     df = pd.DataFrame ( [ [     s,
                                 names[ str(s) ],  
@@ -1350,7 +1357,7 @@ def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
     remote_get_neuron_name = remote_instance.get_single_neuronname_url( project_id , skid )
     neuronid = remote_instance.fetch( remote_get_neuron_name )['neuronid']
 
-    remote_get_annotations_url = remote_instance.get_neuron_annotations( project_id )
+    remote_get_annotations_url = remote_instance.get_neuron_annotations_url( project_id )
 
     get_annotations_postdata = {}            
     get_annotations_postdata['neuron_id'] = int(neuronid)   
@@ -1393,14 +1400,18 @@ def has_soma ( skids , remote_instance = None, project_id = 1 ):
                             get_history = False, time_out = None, 
                             project_id = project_id)
 
+    skdata.set_index('skeleton_id', inplace=True)
+
     d = {}
     for i, s in enumerate(skids):
         d[s] = False
-        if 'soma' not in skdata[i][2]:
-            continue        
+        if 'soma' not in skdata.ix[s].tags:
+            continue
 
-        for tn in skdata[i][2]['soma']:
-            if [ n for n in skdata[i][0] if n[0] == tn ][0][6] > 500:
+        skdata.ix[s].nodes.set_index('treenode_id', inplace=True)
+
+        for tn in skdata.ix[s].tags['soma']:
+            if skdata.ix[s].nodes.ix[tn].radius > 500:
                 d[s] = True
 
     return d
@@ -1641,20 +1652,27 @@ def get_annotations_from_list(skid_list, remote_instance = None, project_id = 1 
    
     return(annotation_list) 
 
-def add_tags ( node_list, tags, node_type, remote_instance = None, project_id = 1 ):
-    """ Wrapper to add tag(s) to a list of treenode(s) or connector(s)
+def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_existing = False, project_id = 1 ):
+    """ Wrapper to add or remove tag(s) for a list of treenode(s) or connector(s)
+    In order to remove tags, 
 
     Parameters:
     ----------
-    node_list :         list of treenode or connector ids that will be tagged
+    node_list :         list of treenode or connector IDs to edit
     tags :              list of tags(s) to add to provided treenode/connector ids
+                        use tags = '' and delete_existing = True to remove all 
+                        tags from a set of nodes.
     node_type :         string
-                        set to 'TREENODE' or 'CONNECTOR' depending on 
-                        what you want to tag
+                        set to 'TREENODE' or 'CONNECTOR' depending on what node
+                        type your IDs are for (different API endpoints!)
+    delete_existing :   boolean (default = False)
+                        This needs to be set to True if you want to delete a tag.
+                        Otherwise, your tags (even if empty) will not override
+                        existing tags.
     remote_instance :   CATMAID instance; either pass directly to function or 
                         define globally as 'remote_instance'
 
-    Returns confirmations from Catmaid server
+    Returns confirmation from Catmaid server
     """
 
     if remote_instance is None:
@@ -1670,13 +1688,12 @@ def add_tags ( node_list, tags, node_type, remote_instance = None, project_id = 
     if type(tags) != type(list()):
         tags = [ tags ]
 
-
     if node_type == 'TREENODE':
         add_tags_urls = [ remote_instance.treenode_add_tag_url( project_id, n) for n in node_list ]
     elif node_type == 'CONNECTOR':
         add_tags_urls = [ remote_instance.connector_add_tag_url( project_id, n) for n in node_list ]
 
-    post_data = [ {'tags': ','.join(tags) , 'delete_existing': False } for n in node_list ]
+    post_data = [ {'tags': ','.join(tags) , 'delete_existing': delete_existing } for n in node_list ]
 
     d = get_urls_threaded( add_tags_urls , remote_instance, post_data = post_data, time_out = None )   
     
@@ -1922,6 +1939,9 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
                    }
     """
 
+    if type(skids) != type( list() ):
+        skids = [ skids ]
+
     if remote_instance is None:
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
@@ -1929,7 +1949,7 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',  'pre_contributors',  'n_postsynapses', 'post_contributors' ,'multiuser_review_minutes','construction_minutes', 'min_review_minutes' ]
+    columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',  'pre_contributors',  'n_postsynapses', 'post_contributors' ,'multiuser_review_minutes','construction_minutes', 'min_review_minutes' ]    
 
     if not separate:
         get_statistics_postdata = {}    
@@ -1999,7 +2019,7 @@ def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_da
                         Only consider neurons created before.
 
     Returns:
-    list :              [ skid, skid, skid ]
+    list :              [ skid, skid, skid, ... ]
     """
 
     if remote_instance is None:
@@ -2109,16 +2129,181 @@ def get_history( remote_instance = None, project_id = 1, start_date = '2016-10-2
 
     return stats
 
-def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = None, project_id = 1 ):
-    """ Retrieves neurons with processes within a defined volume. Because the 
-    API returns only a limited number of neurons at a time, the defined volume 
-    has to be chopped into smaller pieces for crowded areas - may thus take 
-    some time!
+def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, project_id = 1, coord_format = 'NM', resolution = ( 4, 4, 50) ):      
+    """
+    Parameters:
+    ----------
+    left, right, :               Coordinates defining the volume 
+    top, bottom,                 Can be given in nm or pixels+slices.  
+    z1, z2                       Check <coord_format>!
+
+    remote_instance :            CATMAID instance; either pass directly to 
+                                 function or define globally as 'remote_instance'
+
+    coord_format :               string ( default = 'NM')
+                                 define whether provided coordinates are in 
+                                 nanometer ('NM') or in pixels/slices ('PIXEL')
+
+    resolution :                 x/y/z resolution in nm (default = ( 4, 4, 50 ) )
+                                 used to transform to nm if limits are given in pixels    
+
+    Returns:
+    -------
+    dictionary containing
+
+    'treenodes' = pandas DataFrame
+
+        id  parent_id x  y  z  confidence   radius   skeleton_id   edition_time  user_id
+    0
+    1
+    2
+
+    'connectors' = pandas DataFrame:
+
+        id  x  y  z  confidence  edition_time  user_id  partners
+    0
+    1
+    2
+
+    'labels' : { treenode_id : [ labels ] }
+
+    'node_limit_reached' : boolean - if true, we have reached the node limit
+    
+    """
+
+    #Set resolution to 1:1 if coordinates are already in nm
+    if coord_format == 'NM':
+        resolution = (1,1,1)
+
+    remote_nodes_list = remote_instance.get_node_list_url ( project_id )    
+    
+    node_list_postdata = {      
+                                'left':left * resolution[0],
+                                'right':right * resolution[0],
+                                'top': top * resolution[1],
+                                'bottom': bottom * resolution[1],
+                                'z1': z1 * resolution[2],
+                                'z2': z2 * resolution[2],
+                                'atnid':-1, #Atnid seems to be related to fetching the active node too (will be ignored if atnid = -1)
+                                'labels': False,                                
+                                'limit' : 3500, #This limits the number of nodes -> default is 3500
+
+                            }
+
+    node_list = remote_instance.fetch( remote_nodes_list , node_list_postdata )  
+
+    data = { 'treenodes' : pd.DataFrame( [   [ i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], datetime.datetime.fromtimestamp( int(i[8]) ), i[9], ] 
+                                            for i in node_list[0] ], 
+                                            columns = ['id', 'parent_id' , 'x', 'y', 'z', 'confidence', 'radius', 'skeleton_id', 'edition_time', 'user_id'],
+                                            dtype = object ),
+            'connectors':  pd.DataFrame( [   [ i[0], i[1], i[2], i[3], i[4], datetime.datetime.fromtimestamp( int(i[5]) ), i[6], i[7] ] 
+                                            for i in node_list[1] ], 
+                                            columns = ['id', 'x', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
+                                            dtype = object ),
+            'labels':      node_list[3],
+            'node_limit_reached' : node_list[4],                        
+            }
+
+    return data
+
+def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, min_size = 1, only_soma = False, project_id = 1 ):
+    """ Retrieves neurons with processes within CATMAID volumes. This function
+    uses the BOUNDING BOX around the volume as proxy and queries for neurons
+    that enter/exit that bounding box --> will therefore not catch fragments
+    of neurons that reside entirely within the volume! If you need ALL neurons
+    within a given volume, consider using pymaid.get_neurons_in_box()
+
+    Warning ahead: depending on the number of nodes in that volume, this 
+    can take quite a while!
 
     Parameters:
     ----------
-    left, right, top, z1, z2 :   Coordinates defining the volumes. Need to be 
-                                 in nm, not pixels.
+    volumes :                   single or list of CATMAID volumes
+    remote_instance :           CATMAID instance; either pass directly to 
+                                function or define globally as 'remote_instance'
+    intersect :                 boolean (default = True)
+                                if multiple volumes are provided, this parameter
+                                determines if neurons have to be in all of the
+                                neuropils or just a single 
+    min_size :                  integer ( default = 1 )
+                                minimum size (in nodes) for neurons to be returned
+    only_soma :                 boolean ( default = False )
+                                if True, only neurons with a soma will be returned
+
+    Returns:
+    --------
+    list :                      [ skeleton_id, skeleton_id, ... ]
+    """  
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return 
+
+    if type(volumes) != type(list()):
+        volumes = [ volumes ] 
+
+    neurons = []
+
+    for v in volumes:
+        volume = get_volume ( v , remote_instance )
+        verts = np.array( volume[0] )
+
+        bbox = ( ( int ( min( [ v[0] for v in verts ] ) ) , int(  max( [ v[0] for v in verts ] )  ) ),
+               ( int ( min( [ v[1] for v in verts ] ) ) , int( max( [ v[1] for v in verts ] )  ) ),
+               ( int( min( [ v[2] for v in verts ] ) ), int(  max( [ v[2] for v in verts ] )  ) )
+              )
+
+        remote_instance.logger.info( 'Retrieving nodes in volume: %s...' % v )
+        temp = get_neurons_in_box ( bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[2][0], bbox[2][1], remote_instance = remote_instance, project_id = project_id )        
+
+        if not intersect:
+            neurons += temp
+        else:
+            neurons += [ temp ]
+
+    if intersect:
+        #Filter for neurons that show up in all neuropils
+        neurons = [ n for l in neurons for n in l if False not in [ n in v for v in neurons ] ]    
+
+    if min_size > 1:
+        remote_instance.logger.info( 'Filtering neurons for size...')
+        rev = get_review( list(set(neurons)), remote_instance, project_id )
+        neurons = rev[ rev.total_node_count > min_size ].skeleton_id.tolist()    
+
+    if only_soma:
+        remote_instance.logger.info( 'Filtering neurons for somas...')
+        soma = has_soma( list(set(neurons)), remote_instance, project_id )
+        neurons = [ n for n in neurons if soma[n] == True ]
+
+    remote_instance.logger.info( 'Done. %i unique neurons found in volume(s): %s' % ( len(set(neurons)), (',').join(volumes) ) )
+
+    return list(set(neurons))
+
+
+def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = None, unit = 'NM', project_id = 1, **kwargs ):
+    """ Retrieves neurons with processes within a defined volume. Because the 
+    API returns only a limited number of neurons at a time, the defined volume 
+    has to be chopped into smaller pieces for crowded areas - may thus take 
+    some time! Unlike pymaid.get_neurons_in_volume(), this function will 
+    retrieve ALL neurons within the box - not just the once entering/exiting.
+
+    Parameters:
+    ----------
+    left, right, :               Coordinates defining the volumes. 
+    top, bottom,                 
+    z1, z2
+
+    unit :                       string (default = 'NM')
+                                 set to either 'NM' (nanometers) or 'PIXEL' depending 
+                                 on what unit your coordinates have. Attention:
+                                 'PIXEL' will also assume that Z1/Z2 is in slices.                                 
+                                 By default, a X/Y resolution of 3.8nm and a Z
+                                 resolution of 35nm is assumed. Pass 'xy_res' and
+                                 'z_res' as **kwargs to override this.
+
     remote_instance :            CATMAID instance; either pass directly to 
                                  function or define globally as 'remote_instance'
     
@@ -2134,114 +2319,139 @@ def get_neurons_in_volume ( left, right, top, bottom, z1, z2, remote_instance = 
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return 
 
+    x_y_resolution = kwargs.get('xy_res', 3.8 )
+    z_resolution = kwargs.get('z_res', 35 )    
+
+    if unit == 'PIXEL':
+        left *= x_y_resolution
+        right *= x_y_resolution
+        top *= x_y_resolution
+        bottom *= x_y_resolution       
+        z1 *= z_resolution 
+        z2 *= z_resolution 
+
     def get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion, project_id ):  
 
-        remote_instance.logger.info( '%i: %i, %i, %i, %i, %i ,%i' % (incursion, left, right, top, bottom, z1, z2) )
+        #remote_instance.logger.info( '%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (incursion, left, right, top, bottom, z1, z2) )
+        #remote_instance.logger.info( 'Incursion %i' % incursion )
 
-        remote_nodes_list = remote_instance.get_node_list_url ( project_id )
-
-        x_y_resolution = 3.8
-
-        #Atnid seems to be related to fetching the active node too (will be ignored if atnid = -1)
-        node_list_postdata = {      'left':left * x_y_resolution,
-                                    'right':right * x_y_resolution,
-                                    'top': top * x_y_resolution,
-                                    'bottom': bottom * x_y_resolution,
+        remote_nodes_list = remote_instance.get_node_list_url ( project_id )        
+        
+        node_list_postdata = {      
+                                    'left':left,
+                                    'right':right,
+                                    'top': top,
+                                    'bottom': bottom ,
                                     'z1': z1,
                                     'z2': z2,
-                                    'atnid':-1,
-                                    'labels': False
+                                    'atnid':-1, #Atnid seems to be related to fetching the active node too (will be ignored if atnid = -1)
+                                    'labels': False,
+                                    'limit' : 1000000 #Maximum number of nodes returned per query - default appears to be 3500 (on Github) but it appears as if this is overriden by server settings anyway!
                                 }
 
-        node_list = remote_instance.fetch( remote_nodes_list , node_list_postdata )
+        node_list = remote_instance.fetch( remote_nodes_list , node_list_postdata )        
 
-        
-
-        if node_list[3] is True:
-            remote_instance.logger.debug('Incursing')   
-            incursion += 1         
+        if node_list[3] is True:            
+            remote_instance.logger.debug('Incursing.')   
+            incursion += 8         
             node_list = list()
             #Front left top
-            node_list += get_nodes( left, 
+            temp, incursion = get_nodes( left, 
                                         left + (right-left)/2, 
                                         top, 
                                         top + (bottom-top)/2, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp            
+
             #Front right top
-            node_list += get_nodes( left  + (right-left)/2, 
+            temp, incursion = get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top,
                                         top + (bottom-top)/2, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+
             #Front left bottom            
-            node_list += get_nodes( left, 
+            temp, incursion =get_nodes( left, 
                                         left + (right-left)/2, 
                                         top + (bottom-top)/2, 
                                         bottom, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+
             #Front right bottom
-            node_list += get_nodes( left  + (right-left)/2, 
+            temp, incursion = get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top + (bottom-top)/2, 
                                         bottom, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+
             #Back left top
-            node_list += get_nodes( left, 
+            temp, incursion = get_nodes( left, 
                                         left + (right-left)/2, 
                                         top, 
                                         top + (bottom-top)/2, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+            
             #Back right top
-            node_list += get_nodes( left  + (right-left)/2, 
+            temp, incursion = get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top,
                                         top + (bottom-top)/2, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+            
             #Back left bottom            
-            node_list += get_nodes( left, 
+            temp, incursion = get_nodes( left, 
                                         left + (right-left)/2, 
                                         top + (bottom-top)/2, 
                                         bottom, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+
             #Back right bottom
-            node_list += get_nodes( left  + (right-left)/2, 
+            temp, incursion = get_nodes( left  + (right-left)/2, 
                                         right, 
                                         top + (bottom-top)/2, 
                                         bottom, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion )
+                                        remote_instance, incursion, project_id )
+            node_list += temp
+
         else:
             #If limit not reached, node list is still an array of 4
-            return node_list[0]
-
-            
+            return node_list[0], incursion - 1           
         
-        remote_instance.logger.info("Done (%i nodes)" % len(node_list) )
+        remote_instance.logger.info("%i Incursion complete (%i nodes received)" % ( incursion, len(node_list) ) )
 
-        return node_list
+        return node_list, incursion
 
     incursion = 1
-    node_list = get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion , project_id )
+    node_list, incursion = get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion , project_id )
 
     #Collapse list into unique skeleton ids
     skeletons = set()
     for node in node_list:                       
-        skeletons.add(node[7])           
+        skeletons.add(node[7])     
+
+    remote_instance.logger.info("Done: %i nodes from %i unique neurons retrieved." % ( len(node_list), len(skeletons) ) )      
 
     return list(skeletons)
 
@@ -2426,8 +2636,8 @@ if __name__ == '__main__':
     #Retrieve synaptic partners for a set of neurons - ignore those connected by less than 3 synapses
     print ( get_partners (example_skids, remote_instance, threshold = 3))
 
-    #Get 3D skeletons and print the first one
-    print( get_3D_skeleton ( example_skids , remote_instance, 1 , 0 )[0] )
+    #Get 3D skeletons and print the list
+    print( get_3D_skeleton ( example_skids , remote_instance, 1 , 0 ) )
     
     #Get list of users
     print( remote_instance.fetch ( remote_instance.get_user_list_url() ) )

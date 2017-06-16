@@ -164,7 +164,7 @@ def igraph_from_skeleton(skdata):
 
    #Find nodes with synapses and assign them the custom property 'has_synapse'
    nodes_w_synapses = skdata.connectors.treenode_id.tolist()
-   g.vs['has_synapse'] = [ n[0] in nodes_w_synapses for n in skdata[0] ]
+   g.vs['has_synapse'] = [ n in nodes_w_synapses for n in skdata.nodes.treenode_id.tolist() ]
 
    #Generate weights by calculating edge lengths = distance between nodes
    tn_coords = skdata.nodes.ix[ [ e[0] for e in elist ]  ][ ['x','y','z' ] ].reset_index()
@@ -174,25 +174,38 @@ def igraph_from_skeleton(skdata):
 
    return g
 
-def calculate_distance_from_root( g, synapses_only = False ):
-   """ Get distance to root for nodes with synapses
+def dist_from_root( data , synapses_only = False, return_graph = False ):
+   """ Get distance to root in nano meter (nm) for all treenodes 
 
    Parameters:
    ----------
-   g :               iGraph object
-                     Holds the skeleton
-   synapses_only :   boolean
+   data :            iGraph object OR pandas DataFrame
+                     Holds the skeleton data
+   synapses_only :   boolean (default = False)
                      If True, only distances for nodes with synapses will be returned
+   return_graph :    boolean (default = False)
+                     If True, graph representation is returned on top of other results
 
    Returns:
    -------  
+   if g is a graph object:      
    dict :            {node_id : distance_to_root }
-   
-   """
 
-   module_logger.info('Generating distance matrix for neuron...')
+   if g is a pandas DataFrame:
+   pandas DataFrame with df.nodes.dist_to_root holding the distances to root
+
+   if return_graph is True:
+   the graph object is return in addition to dict/pd DataFrame
+
+   """   
+
+   if type(data) == type( Graph() ):
+      g = data
+   else:
+      g = igraph_from_skeleton( data )
 
    #Generate distance matrix.
+   module_logger.info('Generating distance matrix for neuron...')
    distance_matrix = g.shortest_paths_dijkstra ( mode = 'All', weights='weight' )
 
    if synapses_only:
@@ -207,7 +220,15 @@ def calculate_distance_from_root( g, synapses_only = False ):
    for n in nodes:
       distances_to_root[ n[1] ] = distance_matrix[ n[0] ][ root ]
 
-   return distances_to_root
+   if type(data) == type( Graph()):
+      if return_graph:
+         return distances_to_root, g
+      return distances_to_root
+   else:
+      data.nodes['dist_to_root'] = [ distances_to_root[ n ] for n in data.nodes.treenode_id.tolist() ]
+      if return_graph:         
+         return data, g   
+      return data
 
 def cluster_nodes_w_synapses(g, plot_graph = True):
    """ Cluster nodes of an iGraph object based on distance

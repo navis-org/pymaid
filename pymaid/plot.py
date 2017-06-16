@@ -430,7 +430,7 @@ def plot3d( *args, **kwargs ):
    limits :          manually override plot limits
                      {'x' : [min,max], 'y': [min,max], 'z':[min,max]}
    auto_limits :     autoscales plot to fit the neurons (default = False)                         
-   downsampling :    set downsampling of neurons before plotting (default = 8)
+   downsampling :    set downsampling of neurons before plotting (default = 10)
    volumes :         list or dict of volumes names
                      if list: [ name, name, ... }
                      if dict: { name:(r,g,b), ... }
@@ -448,14 +448,14 @@ def plot3d( *args, **kwargs ):
                   use for example:
                   plotly.offline.plot(fig, filename='3d_plot.html') 
                   to generate html file and open it webbrowser 
-   """    
+   """      
 
    skids = kwargs.get('skids', [] )
    remote_instance = kwargs.get('remote_instance', [] )
    pl_title = kwargs.get('title', 'Neuron Plot' )
    skdata = kwargs.get('skdata', pd.DataFrame() )
    names = kwargs.get('names', [] )
-   downsampling = kwargs.get('downsampling', 8)   
+   downsampling = kwargs.get('downsampling', 10)   
    volumes = kwargs.get('volumes', [] )
    connectors = kwargs.get('connectors', False )
    by_strahler = kwargs.get('by_strahler', False )    
@@ -463,7 +463,8 @@ def plot3d( *args, **kwargs ):
    limits = kwargs.get('limits', [] )
    auto_limits = kwargs.get('auto_limits', False )
    auto_limits = kwargs.get('autolimits', auto_limits ) 
-   syn_lay = kwargs.get('synapse_layout', {} )    
+   syn_lay = kwargs.get('synapse_layout', {} )
+   connectors_only = kwargs.get('connectors_only', False )    
 
    fig_width = kwargs.get('fig_width', 1440)
    fig_height = kwargs.get('fig_height', 960)
@@ -477,8 +478,7 @@ def plot3d( *args, **kwargs ):
       skdata = get_3D_skeleton ( skids, remote_instance, 
                                                    connector_flag = 1, 
                                                    tag_flag = 0 , 
-                                                   get_history = 
-                                                   False, 
+                                                   get_history = False, 
                                                    time_out = None,
                                                    get_abutting = True ) 
    elif 'nodes' in skdata.index.tolist():
@@ -489,7 +489,7 @@ def plot3d( *args, **kwargs ):
 
    if not colormap:
       if skdata.shape[0] > 1:
-         colormap = { str(n) : random_colors ( len( skdata ) , color_space='RGB', color_range = 255)[i] for i,n in enumerate( skdata.skeleton_id.tolist() ) } 
+         colormap = { str(n) : random_colors ( len( skdata ) , color_space='RGB', color_range = 255)[i] for i,n in enumerate( skdata.skeleton_id.tolist() ) }          
       else:
          colormap = { str( skdata.ix[0].skeleton_id ) : (0,0,0)  }
 
@@ -531,8 +531,11 @@ def plot3d( *args, **kwargs ):
    module_logger.info('Preparing neurons for plotting')
 
    #First downsample neurons
-   if downsampling > 1:
+   if downsampling > 1 and not connectors_only:
+      module_logger.info('Downsampling neurons...')  
+      morpho.module_logger.setLevel('ERROR')    
       skdata = pd.DataFrame( [ morpho.downsample_neuron ( skdata.ix[i], downsampling ) for i in range( skdata.shape[0] ) ] )
+      morpho.module_logger.setLevel('INFO')
 
    trace_data = []
    for i, neuron in enumerate( skdata.itertuples() ):
@@ -541,88 +544,89 @@ def plot3d( *args, **kwargs ):
       neuron_name = neuron.neuron_name     
       skid = neuron.skeleton_id 
 
-      if by_strahler:         
-         s_index = morpho.calc_strahler_index( skdata.ix[i] )               
+      if not connectors_only:
+        if by_strahler:         
+           s_index = morpho.calc_strahler_index( skdata.ix[i], return_dict = True )               
 
-      #First, we have to generate slabs from the neurons    
-      if 'type' not in neuron.nodes:
-         neuron = morpho.classify_nodes( neuron )
+        #First, we have to generate slabs from the neurons    
+        if 'type' not in neuron.nodes:
+           neuron = morpho.classify_nodes( neuron )
 
-      b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
-      end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
-      root = neuron.nodes[ neuron.nodes.type == 'root' ].treenode_id.tolist()
-      soma = neuron.nodes[ neuron.nodes.radius > 1000 ]          
+        b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
+        end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
+        root = neuron.nodes[ neuron.nodes.type == 'root' ].treenode_id.tolist()
+        soma = neuron.nodes[ neuron.nodes.radius > 1000 ]          
 
-      #Set dataframe indices to treenode IDs - will facilitate distributing nodes
-      if neuron.nodes.index.name != 'treenode_id':      
-         neuron.nodes.set_index('treenode_id', inplace = True)      
+        #Set dataframe indices to treenode IDs - will facilitate distributing nodes
+        if neuron.nodes.index.name != 'treenode_id':      
+           neuron.nodes.set_index('treenode_id', inplace = True)      
 
-      module_logger.debug('Generating slabs for %i branch/end nodes' % len( b_points + end_points ) )
+        module_logger.debug('Generating slabs for %i branch/end nodes' % len( b_points + end_points ) )
 
-      slabs = []     
-      #Now walk from each branch and leaf node to the next
-      for n in b_points + end_points:
-         this_slab = [ n, neuron.nodes.ix[ n ].parent_id ]        
-         while this_slab[-1] not in b_points+end_points+root:
-            try:     
-               this_slab += [ neuron.nodes.ix[ this_slab[-1] ].parent_id ]
-            except:              
-               break #will fail if root node (cause no parent)
+        slabs = []     
+        #Now walk from each branch and leaf node to the next
+        for n in b_points + end_points:
+           this_slab = [ n, neuron.nodes.ix[ n ].parent_id ]        
+           while this_slab[-1] not in b_points+end_points+root:
+              try:     
+                 this_slab += [ neuron.nodes.ix[ this_slab[-1] ].parent_id ]
+              except:              
+                 break #will fail if root node (cause no parent)
 
-         try:
-            this_slab.remove(None)
-         except:
-            pass
+           try:
+              this_slab.remove(None)
+           except:
+              pass
 
-         slabs.append( this_slab )     
+           slabs.append( this_slab )     
 
-      module_logger.debug('Generating traces')
+        module_logger.debug('Generating traces')
 
-      #Now add traces      
-      for k,s in enumerate(slabs):
-         if by_strahler:
-            c = 'rgba(%i,%i,%i,%f)' % (   colormap[str( skid )][0],
-                                          colormap[str( skid )][1],
-                                          colormap[str( skid )][2], 
-                                          s_index[ s[0] ] / max( s_index.values() 
-                                       ) ) 
-         else:
-            c = 'rgb%s' % str( colormap[ str( skid ) ] ) 
+        #Now add traces      
+        for k,s in enumerate(slabs):
+           if by_strahler:
+              c = 'rgba(%i,%i,%i,%f)' % (   colormap[str( skid )][0],
+                                            colormap[str( skid )][1],
+                                            colormap[str( skid )][2], 
+                                            s_index[ s[0] ] / max( s_index.values() 
+                                         ) ) 
+           else:
+              c = 'rgb%s' % str( colormap[ str( skid ) ] ) 
 
-         trace_data.append( go.Scatter3d(    x = (-neuron.nodes.ix[ s ].x).tolist(),
-                                             y = (-neuron.nodes.ix[ s ].z).tolist(), #y and z are switched
-                                             z = (-neuron.nodes.ix[ s ].y).tolist(),
+           trace_data.append( go.Scatter3d(    x = (-neuron.nodes.ix[ s ].x).tolist(),
+                                               y = (-neuron.nodes.ix[ s ].z).tolist(), #y and z are switched
+                                               z = (-neuron.nodes.ix[ s ].y).tolist(),
 
-                                             mode = 'lines',
-                                             line=dict(
-                                             color=c,
-                                             width=5
-                                     ),
+                                               mode = 'lines',
+                                               line=dict(
+                                               color=c,
+                                               width=5
+                                       ),
+                                       name = neuron_name,
+                                       legendgroup = neuron_name,
+                                       showlegend = k == 0,
+                                       hoverinfo='none'
+
+                             ) )
+        #Add soma(s):           
+        fib_points = fibonacci_sphere( samples = 30 )
+        for n in soma.itertuples():        
+           trace_data.append(  go.Mesh3d(
+                                     x = [ (v[0] * n.radius/2) - n.x for v in fib_points ],
+                                     y = [ (v[1] * n.radius/2) - n.z for v in fib_points ], #y and z are switched
+                                     z = [ (v[2] * n.radius/2) - n.y for v in fib_points ],
+
+                                     alphahull = .5,
+                                    
+                                     color = 'rgb(%s)' % str(colormap[ str( skid ) ]),
                                      name = neuron_name,
                                      legendgroup = neuron_name,
-                                     showlegend = k == 0,
-                                     hoverinfo='none'
+                                     showlegend = False,
+                                     hoverinfo='name'
+                             ) 
+                          )              
 
-                           ) )
-      #Add soma(s):           
-      fib_points = fibonacci_sphere( samples = 30 )
-      for n in soma.itertuples():        
-         trace_data.append(  go.Mesh3d(
-                                   x = [ (v[0] * n.radius/2) - n.x for v in fib_points ],
-                                   y = [ (v[1] * n.radius/2) - n.z for v in fib_points ], #y and z are switched
-                                   z = [ (v[2] * n.radius/2) - n.y for v in fib_points ],
-
-                                   alphahull = .5,
-                                  
-                                   color = 'rgb(%s)' % str(colormap[ str( skid ) ]),
-                                   name = neuron_name,
-                                   legendgroup = neuron_name,
-                                   showlegend = False,
-                                   hoverinfo='name'
-                           ) 
-                        )              
-
-      if connectors:  
+      if connectors or connectors_only:  
          #Prepare dict with properties for different types of connectors
          if not syn_lay:
             syn_lay = { 
@@ -704,7 +708,7 @@ def plot3d( *args, **kwargs ):
 
       if vertices:
          trace_data.append(  go.Mesh3d(
-                              x = [ -v[0] for v in vertices ],
+                                x = [ -v[0] for v in vertices ],
                                 y = [ -v[2] for v in vertices ], #y and z are switched
                                 z = [ -v[1] for v in vertices ],
                                 
@@ -772,7 +776,7 @@ def plot3d( *args, **kwargs ):
 
    fig = dict(data=trace_data, layout=layout)
 
-   module_logger.info('Done. Plotted %i nodes and %i connectors' % ( sum([ n.nodes.shape[0] for n in skdata.itertuples() ]), sum([ n.connectors.shape[0] for n in skdata.itertuples() if 'connectors' in args]) )  )
+   module_logger.info('Done. Plotted %i nodes and %i connectors' % ( sum([ n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only]), sum([ n.connectors.shape[0] for n in skdata.itertuples() if connectors or connectors_only ]) )  )
    module_logger.info('Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
 
    return fig

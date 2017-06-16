@@ -111,7 +111,64 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
 
    module_logger.info('Finished')
 
-   return matrix  
+   return matrix
+
+def group_matrix ( mat, row_groups = {} , col_groups = {}, method = 'AVERAGE' ):
+   """ Takes a matrix or a pandas Dataframe and groups values by keys provided.  
+
+   Parameters:
+   ---------
+   mat :          pandas or numpy matrix
+   row_groups/ :  dictionaries =  { 'group name' : [ member1, member2, ... ], .. }
+   col_groups     for pandas DataFrames members need to be column or index, for
+                  np they need to be slices indices
+   method :       method by which groups are collapsed
+                  can be 'AVERAGE', 'MAX' or 'MIN'
+
+   Returns:
+   -------
+   pandas DataFrame
+   """
+
+   #Convert numpy array to DataFrame
+   if type(mat) == type( np.zeros( [0] ) ):
+      mat = pd.DataFrame( mat )
+
+   if not row_groups:      
+      row_groups = { r : [r] for r in mat.index.tolist() }
+   if not col_groups:
+      col_groups = { c : [c] for c in mat.columns.tolist() }
+
+   clean_col_groups = {}
+   clean_row_groups = {}
+
+   not_found = []
+   for row in row_groups:      
+      not_found += [ r for r in row_groups[row] if r not in mat.index.tolist() ]
+      clean_row_groups[row] = [ r for r in row_groups[row] if r in mat.index.tolist() ]
+   for col in col_groups:
+      not_found += [ c for c in col_groups[col] if c not in mat.columns.tolist() ]
+      clean_col_groups[col] = [ c for c in col_groups[col] if c in mat.columns.tolist() ]
+
+   module_logger.warning('Unable to find the following indices - will skip them: %s' % ', '.join( list(set(not_found))) )
+
+   new_mat = pd.DataFrame( np.zeros( ( len( clean_row_groups ), len( clean_col_groups ) ) ), index = clean_row_groups.keys() , columns = clean_col_groups.keys() )
+
+   for row in clean_row_groups:
+      for col in clean_col_groups:
+         values = [ [ mat.ix[ r ][ c ] for c in clean_col_groups[col] ] for r in clean_row_groups[row]  ]
+         flat_values =  [ v for l in values for v in l ]         
+         try:
+            if method == 'AVERAGE':           
+               new_mat.ix[ row ][ col ] = sum(flat_values)/len(flat_values)
+            if method == 'MAX':
+               new_mat.ix[ row ][ col ] = max(flat_values)
+            if method == 'MIN':
+               new_mat.ix[ row ][ col ] = min(flat_values)
+         except:
+               new_mat.ix[ row ][ col ] = 0
+
+   return new_mat
 
 def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix = True, min_nodes = 2, similarity = 'vertex_normalized'):
    """ Wrapper to calculate connectivity similarity and creates a distance 
@@ -197,6 +254,10 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
    #Calculate connectivity similarity by direction
    for d in directions:  
       this_cn = connectivity[ connectivity.relation == d ]
+
+      #Prepare connectivity subsets:
+      cn_subsets = { n : this_cn[n] > 0 for n in neurons }
+
       module_logger.info('Calculating %s similarity scores' % d)
       matching_scores[d] = pd.DataFrame( np.zeros( ( len( neurons ), len( neurons ) ) ), index = neurons, columns = neurons )
       if this_cn.shape[0] == 0:
@@ -206,7 +267,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
       for i, neuronA in enumerate(neurons):  
          print('%s (%i of %i)' % ( str( neuronA), i, len(neurons) ), end = ', ')         
          for neuronB in neurons:          
-            matching_indices = calc_matching_index ( neuronA, neuronB, this_cn, vertex_score = vertex_score )                
+            matching_indices = calc_matching_index ( neuronA, neuronB, this_cn, vertex_score = vertex_score, nA_cn = cn_subsets[neuronA], nB_cn = cn_subsets[neuronB] )                
             matching_scores[d][neuronA][neuronB] = matching_indices[similarity]
 
    #Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
@@ -247,7 +308,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
       plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
 
       #Increase padding
-      cg.fig.subplots_adjust(right=.8, top=.95, bottom=.2)     
+      cg.fig.subplots_adjust(right=.8, top=.95, bottom=.2)
 
       return dist_matrix, cg
 
@@ -298,21 +359,27 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
                      use this to filter fragments   
    vertex_score :    (default = True)
                      if False, no vertex score is returned (much faster!)
+   nA_cn/nB_cn :     list of booleans
+                     subsets of the connectivity that connect to either neuronA
+                     or neuronB -> if not provided, will be calculated -> time
+                     consuming
 
    Returns:
    -------
    dict containing all initially described matching indices
    """   
 
+   if min_nodes > 1:
+      connectivity = connectivity[ connectivity.num_nodes > min_nodes ]
+
    vertex_score = kwargs.get('vertex_score', True )   
+   nA_cn = kwargs.get('nA_cn', connectivity[neuronA] >= syn_threshold ) 
+   nB_cn = kwargs.get('nB_cn', connectivity[neuronB] >= syn_threshold )    
 
-   #Filter sub threshold
-   connectivity = connectivity[ (connectivity[neuronA] >= syn_threshold) | (connectivity[neuronB] >= syn_threshold) ]
-
-   total = connectivity[ (connectivity[neuronA] > 0) | (connectivity[neuronB] > 0) ]
+   total = connectivity[ nA_cn | nB_cn ]
    n_total = total.shape[0]
 
-   shared = connectivity[ (connectivity[neuronA] > 0) & (connectivity[neuronB] > 0) ]
+   shared = connectivity[ nA_cn & nB_cn ]
    n_shared = shared.shape[0]  
 
    n_synapses_sharedA = shared.sum()[neuronA]
@@ -332,6 +399,7 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
    C2 = 1
    vertex_similarity = 0
    max_score = 0 
+   similarity_indices = {}
 
    if vertex_score:
       #Get index of neuronA and neuronB -> itertuples unfortunately scrambles the column
@@ -340,7 +408,7 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
 
       #Go over all entries in which either neuron has at least a single connection
       #If both have 0 synapses, similarity score would not change at all anyway
-      for entry in connectivity[ (connectivity[ neuronA ] > 0) | (connectivity[ neuronB ] > 0) ].itertuples(index=False): #index=False neccessary otherwise nA_index is off by +1
+      for entry in total.itertuples(index=False): #index=False neccessary otherwise nA_index is off by +1
          a = entry[nA_index]
          b = entry[nB_index]
 
@@ -348,9 +416,7 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
 
          vertex_similarity += ( 
                            min([ a , b ]) - C1 * max([ a , b ]) * math.exp(- C2 * min([ a , b ]))
-                              )
-
-      similarity_indices = {}
+                              )      
 
       try: 
          similarity_indices['vertex_normalized'] = ( vertex_similarity + C1 * max_score ) / ( ( 1 + C1 ) * max_score) 

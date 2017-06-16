@@ -13,7 +13,11 @@ Pymaid has been tested with CATMAID latest release version 2017.04.20 - if you a
 
 `pymaid.plot` contains a wrapper to generate 2D or 3D morphology plots of neurons
 
-`pymaid.cluster` contains wrappers to cluster neurons 
+`pymaid.cluster` contains wrappers to cluster neurons
+
+`pymaid.rmaid` provides an interface with R libraries ([nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) ) using [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/)
+
+`pymaid.user_stats` contains functions for user stats and contributions
 
 ## Installation
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
@@ -104,7 +108,7 @@ Currently **pymaid** features a range of wrappers to conveniently fetch data fro
 Use e.g. `help(get_edges)` to learn more about their function, parameters and usage.
 
 - `add_annotations()`: use to add annotation(s) to neuron(s)
-- `add_tags()`: add tags to treenodes and connectors
+- `edit_tags()`: edit (add/remove) tags of treenodes and connectors
 - `get_3D_skeleton()`: get neurons' skeleton(s) - i.e. what the 3D viewer in CATMAID shows
 - `get_arbor()`: similar to get_3D_skeleton but more detailed information on connectors
 - `get_annotations_from_list()`: get annotations of a set of neurons (annotation only)
@@ -144,6 +148,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 ### pymaid.cluster:
 - `create_adjacency_matrix()`: create a Pandas dataframe containing the adjacency matrix for two sets of neurons
 - `create_connectivity_distance_matrix()`: returns distance matrix based on connectivity similarity (Jarrell et al., 2012)
+- `group_matrix()`: groups matrix by columns or rows - use to e.g. collapse connectivity matrix into groups of neurons
 - `synapse_distance_matrix()`: cluster synapses based on eucledian distance
 
 ### pymaid.morpho:
@@ -154,11 +159,19 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `cut_neuron2()`: similar to above but uses iGraph (slightly faster)
 - `downsample_neuron()`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - `in_volume()`: test if points are within given CATMAID volume
+- `longest_neurite()`: prunes neuron to its longest neurite
+- `reroot_neuron()`: reroot neuron to a specific node
 - `synapse_root_distances()`: similar to `pymaid.igraph_catmaid.calculate_distance_from_root()` but does not use iGraph
+
+### pymaid.rmaid:
+- `init_rcatmaid()`: initialize connection with Catmaid server in R
+- `data2py()`: wrapper to convert R data to Python
+- `neuron2py()`: converts R neuron and neuronlist objects to Pymaid neurons
+- `neuron2r()`: converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
 
 ### pymaid.user_stats:
 - `get_time_invested()`: calculate the time users have spent working on a set of neurons
-
+- `get_user_contributions()`: returns contributions per user for a set of neurons
 
 ## License:
 This code is under GNU GPL V3

@@ -42,9 +42,9 @@ if not module_logger.handlers:
   module_logger.addHandler(sh)
 
 try:
-   from pymaid.igraph_catmaid import igraph_from_skeleton
+   from pymaid.igraph_catmaid import igraph_from_skeleton, dist_from_root
 except:  
-   from igraph_catmaid import igraph_from_skeleton
+   from igraph_catmaid import igraph_from_skeleton, dist_from_root
 
 
 def generate_list_of_childs( skdata ):
@@ -195,6 +195,129 @@ def downsample_neuron ( skdata, resampling_factor):
 
    return df
 
+def longest_neurite( skdata, root_to_soma = False ):
+   """ Returns a neuron consisting only of the longest neurite
+
+   Parameter:
+   ---------
+   skdata :       Pandas dataframe containing a SINGLE neuron
+   root_to_soma : boolean (default = False)
+                  If true, neuron will be rerooted to soma.
+                  Soma is the node with >1000 radius
+
+   Returns:
+   --------
+   pandas DataFrame
+   """
+
+   if type( skdata ) == type( pd.DataFrame() ):
+      df = skdata.ix[0].copy()
+   elif type( skdata ) == type( pd.Series() ):
+      df = skdata.copy()  
+
+   if root_to_soma:   
+      soma = df.nodes[ df.nodes.radius > 1000 ].reset_index()      
+      if soma.shape[0] != 1:
+         module_logger.error('Unable to reroot: No or multiple soma found for neuron %s ' % df.neuron_name ) 
+         return
+      if soma.ix[0].parent_id != None:
+         df = reroot_neuron( skdata, soma.ix[0].treenode_id )
+   
+   #This here needs to be optimised -> takes so long because it calculates distances between ALL pairs of nodes
+   #Instead: calculate only from root to each node?
+   df, g = dist_from_root( df, return_graph = True )   
+
+   df.nodes.sort_values('dist_to_root', inplace=True, ascending = False)
+   df.nodes.reset_index(inplace=True, drop = True)   
+
+   tip = df.nodes.ix[0].treenode_id
+   root = df.nodes[ df.nodes.parent_id.isnull() ].reset_index().ix[0].treenode_id
+
+   tip_index = g.vs.select( node_id=int(tip) )[0].index
+   root_index = g.vs.select( node_id=int(root) )[0].index
+
+   shortest_path = g.get_shortest_paths( tip_index ,to = root_index, mode='ALL' )
+
+   tn_to_preverse = [ [ g.vs[i]['node_id'] for i in p ] for p in shortest_path ][0]    
+
+   df.nodes = df.nodes [ df.nodes.treenode_id.isin( tn_to_preverse ) ].reset_index( drop = True)
+
+   return df
+     
+
+def reroot_neuron( skdata, new_root, g = None ):
+   """ Uses igraph to reroot the neuron at given point. Creating the iGraph is the 
+   bottleneck - if you already have it, pass it along to speed things up (see example 
+   below)!
+
+   Parameter
+   ---------
+   skdata :       Pandas dataframe containing a SINGLE neuron
+   new_root :     node ID or a tag of the node to reroot to
+   g (optional):  iGraph of skdata - if not provided it will be generated
+
+   Returns:
+   --------
+   pandas DataFrame containing the rerooted neuron
+   """
+
+   if type( skdata ) == type( pd.DataFrame() ):
+      df = skdata.ix[0].copy()
+   elif type( skdata ) == type( pd.Series() ):
+      df = skdata.copy()  
+
+   #Make sure to copy nodes
+   df.nodes = df.nodes.copy()
+
+   #If cut_node is a tag, rather than a ID, try finding that node  
+   if type(new_root) == type( str() ):
+      if new_root not in df.tags:
+         module_logger.error('Error: Found no treenodes with tag %s - please double check!' % str( new_root ) )
+         return 
+      elif len( df.tags[new_root] ) > 1:
+         module_logger.error('Error: Found multiple treenodes with tag %s - please double check!' % str( new_root ) )
+         return
+      else:
+         new_root = df.tags[new_root][0]
+
+   if df.nodes.set_index('treenode_id').ix[ new_root ].parent_id == None:
+      module_logger.error('Error: New root is old root!')
+      return df
+
+   if not g:
+      #Generate iGraph -> order/indices of vertices are the same as in skdata
+      g = igraph_from_skeleton(df)
+
+   try:
+      #Select nodes with the correct ID as cut node
+      new_root_index = g.vs.select( node_id=int(new_root) )[0].index
+   #Should have found only one cut node
+   except:
+      module_logger.error('Error: Found no treenodes with ID %s - please double check!' % str( new_root ) )
+      return 
+
+   #get_shortest_paths() returns a list of paths from the new root to every other node
+   #format is [ root_node, node1, node2, node3, ... , node 10 ]
+   #all we need is the last (treenode_id) and the second last node ( its new parent )   
+   shortest_paths = g.get_shortest_paths( new_root_index ,to = None, mode='ALL' )
+
+   new_paths = [ [ g.vs[i]['node_id'] for i in p ] for p in shortest_paths ]   
+
+   df.nodes.set_index('treenode_id', inplace = True )
+   
+   for p in new_paths:
+      if len( p ) > 1:
+         df.nodes.ix[ p[-1] ].parent_id = p[-2]
+      else:
+         df.nodes.ix[ p[-1] ].parent_id = None
+
+   df.nodes.reset_index( inplace=True ) 
+
+   module_logger.info('Info: %s #%s successfully rerooted' % ( df.neuron_name, df.skeleton_id ) )
+
+   return df
+
+
 def cut_neuron2( skdata, cut_node, g = None ):
    """ Uses igraph to Cut the neuron at given point and returns two new neurons. 
    Creating the iGraph is the bottleneck - if you already have it, pass it along 
@@ -203,7 +326,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
    Parameter
    ---------
    skdata :       Pandas dataframe containing a SINGLE neuron
-   cut_node :     ID of the node to cut
+   cut_node :     node ID or a tag of the node to cut
    g (optional):  iGraph of skdata - if not provided it will be generated
 
    Returns
@@ -243,9 +366,21 @@ def cut_neuron2( skdata, cut_node, g = None ):
 
    if g is None:
       #Generate iGraph -> order/indices of vertices are the same as in skdata
-      g = igraph_from_skeleton(skdata)
+      g = igraph_from_skeleton(df)
 
-   module_logger.info('Cutting neuron...')
+   #If cut_node is a tag, rather than a ID, try finding that node
+   if type(cut_node) == type( str() ):
+      if cut_node not in df.tags:
+        module_logger.error('Error: Found no treenodes with tag %s - please double check!' % str( cut_node ) )
+        return 
+      elif len( df.tags[cut_node] ) > 1:
+        module_logger.error('Error: Found multiple treenodes with tag %s - please double check!' % str( cut_node ) )
+        return
+      else:
+        cut_node = df.tags[cut_node][0]
+
+   module_logger.debug('Cutting neuron...')
+
    try:
       #Select nodes with the correct ID as cut node
       cut_node_index = g.vs.select( node_id=int(cut_node) )[0].index
@@ -310,9 +445,8 @@ def cut_neuron2( skdata, cut_node, g = None ):
    neuron_prox.nodes.reset_index( inplace = True )
    df.nodes.reset_index( inplace = True )
 
-   module_logger.info('Cutting finished in %is' % round ( time.time() - start_time ) ) 
-   module_logger.info('Distal to cut node: %i nodes/%i synapses' % ( neuron_dist.nodes.shape[0], neuron_dist.connectors.shape[0] ) )
-   module_logger.info('Proximal to cut node: %i nodes/%i synapses' % ( neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]  ) )
+   module_logger.debug('Cutting finished in %is' % round ( time.time() - start_time ) ) 
+   module_logger.info('Distal: %i nodes/%i synapses| |Proximal: %i nodes/%i synapses' % ( neuron_dist.nodes.shape[0], neuron_dist.connectors.shape[0],neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0] ) )   
 
    return neuron_dist, neuron_prox
 
@@ -323,7 +457,7 @@ def cut_neuron( skdata, cut_node ):
    Parameter
    ---------
    skdata :       Pandas dataframe containing a SINGLE neuron
-   cut_node :     ID of the node to cut
+   cut_node :     node ID or a tag of the node to cut
 
    Returns
    -------
@@ -346,6 +480,17 @@ def cut_neuron( skdata, cut_node ):
 
    if 'type' not in df.nodes:
       df = classify_nodes( df )
+
+   #If cut_node is a tag, rather than a ID, try finding that node
+   if type( cut_node ) == type( str() ):
+      if cut_node not in df.tags:
+        module_logger.error('Error: Found no treenodes with tag %s - please double check!' % str( cut_node ) )
+        return 
+      elif len( df.tags[ cut_node ] ) > 1:
+        module_logger.error('Error: Found multiple treenodes with tag %s - please double check!' % str( cut_node ) )
+        return
+      else:
+        cut_node = df.tags[ cut_node ][0]
 
    if len( list_of_childs[ cut_node ] ) == 0:
       module_logger.warning('Cannot cut: cut_node is a leaf node!')
@@ -512,22 +657,55 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
 def calc_dist(v1,v2):        
     return math.sqrt(sum(((a-b)**2 for a,b in zip(v1,v2))))
 
-def calc_cable( skdata , smoothing = 1, remote_instance = None ):
+def fix_neuron ( skdata ):
+    """ Helper to fix morphology of neurons after some virtual operation 
+    (i.e. cutting, merging, etc. ):
+    (1) nodes w/o parents - sets their parent_id to None
+    (2) connectors w/o parent nodes - removes them
+
+    Parameters:
+    ----------
+    skdata :          pandas DataFrame containing a SINGLE neuron
+
+    Returns:
+    -------
+    cleaned-up pandas DataFrame
+    """
+
+    #Check for new root node(s) and set their parent_id to None
+    skdata.nodes.loc[ ~skdata.nodes.parent_id.isin( skdata.nodes.treenode_id.tolist() ), 'parent_id' ] = None
+
+    #Check and remove disconnected connectors
+    skdata.connectors = skdata.connectors[ skdata.connectors.treenode_id.isin( skdata.nodes.treenode_id.tolist() ) ] 
+
+    if skdata.nodes.loc[ ~skdata.nodes.parent_id.isin( skdata.nodes.treenode_id.tolist() ), 'parent_id' ].shape[0] > 1:
+      module_logger.warning('Warning: %s #%s - multiple nodes w/o a parent detected!' % ( skdata.neuron_name ,str(skdata.skeleton_id) ) ) 
+
+    return skdata
+
+def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = False ):
    """ Calculates cable length in micro meter (um) of a given neuron     
 
     Parameters:
     -----------
-    skdata :         Either a skeleton ID or Pandas dataframe containing 3d 
-                     skeleton data. If skeleton ID, 3d skeleton data will be 
-                     pulled from CATMAID server
-    smoothing :      int (default = 1)
-                     use to smooth neuron by downsampling; 1 = no smoothing                  
+    skdata :            Either a skeleton ID or Pandas dataframe containing 3d 
+                        skeleton data. If skeleton ID, 3d skeleton data will be 
+                        pulled from CATMAID server
+    smoothing :         int (default = 1)
+                        use to smooth neuron by downsampling; 1 = no smoothing                  
     remote_instance :   CATMAID instance (optional)
                         pass if skdata is a skeleton ID, not 3D skeleton data
+    return_skdata :     boolean (default = False)
+                        If True: instead of the final cable length, a dataframe
+                        containing the distance to each treenode's parent
 
     Returns:
     --------
-    cable_length [um]
+    cable_length [um]   
+
+    OR (if return_skdata = True)
+
+    pandas DataFrame with df.nodes.parent_dist containing the distances to parent
     """   
 
    if type(skdata) == type( int() ) or type(skdata) == type( str() ) :
@@ -537,6 +715,9 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None ):
       df = skdata.ix[0].copy()
    elif type( skdata ) == type( pd.Series() ):
       df = skdata.copy()
+
+   #Copy node data too
+   df.nodes = df.nodes.copy()
 
    if smoothing > 1:
       df = downsample_neuron( df, smoothing )   
@@ -551,15 +732,16 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None ):
    #Calculate distances between nodes and their parents
    w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 ))
 
-   #Remove nan value (at parent node)
-   w = w[ np.logical_not( np.isnan(w) ) ]   
-
    df.nodes.reset_index( inplace = True )
 
-   #Return sum of all distances
-   return np.sum( w ) / 1000
+   if return_skdata:      
+      df.nodes['parent_dist'] =  [ v / 1000 for v in list(w) ]
+      return df    
 
-def calc_strahler_index( skdata ):
+   # #Remove nan value (at parent node) and return sum of all distances
+   return np.sum( w[ np.logical_not( np.isnan(w) ) ] ) / 1000
+
+def calc_strahler_index( skdata, return_dict = False ):
     """ Calculates Strahler Index -> starts with index of 1 at each leaf, at 
     forks with varying incoming strahler index, the highest index
     is continued, at forks with the same incoming strahler index, highest 
@@ -569,16 +751,17 @@ def calc_strahler_index( skdata ):
     Parameters:
     ----------
     skdata :              skeleton data from pymaid.get_3D_skeleton()
+    return_dict :         boolean (default = False)
+                          If True, a dict is returned instead of the dataframe
 
     Returns:
     -------
-    strahler_indices :    dictionary
-                          { treenode_id : strahler_index }
+    skdata with new column: skdata.nodes.strahler_index    
     """    
 
-    start_time = time.time()
+    module_logger.info('Calculating Strahler indices...')
 
-    module_logger.info('Preparing to calculate Strahler indices...')   
+    start_time = time.time()     
 
     if type( skdata ) == type( pd.DataFrame() ):      
       df = skdata.ix[0].copy()
@@ -586,7 +769,7 @@ def calc_strahler_index( skdata ):
       df = skdata.copy()    
 
     #Make sure dataframe is not indexed by treenode_id for preparing lists 
-    df.nodes.reset_index( inplace = True )
+    df.nodes.reset_index( inplace = True, drop = True )
 
     #Find branch, root and end nodes
     if 'type' not in df.nodes:
@@ -602,9 +785,7 @@ def calc_strahler_index( skdata ):
 
     #Reindex according to treenode_id
     if df.nodes.index.name != 'treenode_id':
-      df.nodes.set_index( 'treenode_id' , inplace = True )
-
-    module_logger.info('Generating Strahler indices...')    
+      df.nodes.set_index( 'treenode_id' , inplace = True )        
 
     strahler_index = { n : None for n in list_of_childs if n != None }                
 
@@ -681,9 +862,14 @@ def calc_strahler_index( skdata ):
 
     df.nodes.reset_index( inplace = True )
 
+    df.nodes['strahler_index'] = [ strahler_index[n] for n in df.nodes.treenode_id.tolist() ] 
+
     module_logger.info('Done in %is' % round(time.time() -  start_time ) ) 
 
-    return strahler_index
+    if return_dict:
+      return strahler_index
+
+    return df
 
 def walk_to_root( start_node, list_of_parents, visited_nodes ):
     """ Helper function for synapse_root_distances(): 
@@ -727,14 +913,14 @@ def walk_to_root( start_node, list_of_parents, visited_nodes ):
 
     return round ( sum( distances_traveled ) ), visited_nodes
 
-def in_volume( points, volume, remote_instance, approximate = False ):
+def in_volume( points, volume, remote_instance, approximate = False, ignore_axis = [] ):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 
 
     Parameters:
     -----------
-    points :            list of points
+    points :            list of points; format [ [ x, y , z ], [  ] ]
                         can be numpy array, pandas df or list
     volume :            name of the CATMAID volume to test or list of vertices
                         as returned by pymaid.get_volume()                        
@@ -743,6 +929,11 @@ def in_volume( points, volume, remote_instance, approximate = False ):
     approximate :       boolean (default = False)
                         if True, bounding box around the volume is used. Will
                         speed up calculations a lot!
+    ignore_axis :       list of integers ( default = None )
+                        Provide axes that should be ignored. Only works when
+                        approximate = True. For example ignore_axis = [0,1]
+                        will ignore x and y axis, and include nodes that fit
+                        within z axis of the bounding box.
 
     Returns:
     --------
@@ -764,10 +955,14 @@ def in_volume( points, volume, remote_instance, approximate = False ):
 
       return [ list( ConvexHull( np.append( verts, list( [p] ), axis = 0 ) ).vertices ) == intact_verts for p in points.itertuples( index = False ) ]
     else:
-      bbox = ( ( min( [ v[0] for v in verts ] ), max( [ v[0] for v in verts ] )  ),
+      bbox = [ ( min( [ v[0] for v in verts ] ), max( [ v[0] for v in verts ] )  ),
                ( min( [ v[1] for v in verts ] ), max( [ v[1] for v in verts ] )  ),
                ( min( [ v[2] for v in verts ] ), max( [ v[2] for v in verts ] )  )
-              )
+              ]
+
+      for a in ignore_axis:
+        bbox[a] = ( float('-inf'), float('inf') )
+
       return [ False not in [  bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points.itertuples( index = False ) ]
 
 
