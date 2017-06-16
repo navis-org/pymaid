@@ -40,6 +40,8 @@ This command should also work to update the package.
 
 `cluster` requires [SciPy](http://www.scipy.org)
 
+`rmaid` requires [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/)
+
 ## Basic examples:
 
 ### Retrieve 3D skeleton data
