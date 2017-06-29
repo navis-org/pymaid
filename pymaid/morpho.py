@@ -94,10 +94,10 @@ def classify_nodes ( skdata ):
    module_logger.debug('Looking for end, branch and root points...')
 
    #If more than one neuron
-   if type(skdata.skeleton_id) != type(str()):
-      for i in skdata.index:
+   if type(skdata) == type( pd.DataFrame() ):
+      for i,n in enumerate(skdata.itertuples()):        
         skdata.ix[i] = classify_nodes( skdata.ix[i] )
-   else:
+   elif type(skdata) == type( pd.Series() ) or str(type(skdata)) == "<class 'pandas.core.frame.Pandas'>":
      list_of_childs  = generate_list_of_childs( skdata )
      list_of_parent = { n.treenode_id : n.parent_id for n in skdata.nodes.itertuples() }   
 
@@ -114,9 +114,11 @@ def classify_nodes ( skdata ):
      new_column = [ classes[n] for n in skdata.nodes.treenode_id.tolist() ]
      skdata.nodes['type'] = new_column
 
-     nodes_w_synapses = skdata.connectors.treenode_id.values
+     nodes_w_synapses = skdata.connectors.treenode_id.tolist()     
      new_column = [ n in nodes_w_synapses for n in skdata.nodes.treenode_id.tolist() ]
      skdata.nodes['has_synapses'] = new_column
+   else:
+      module_logger.error('Unknown neuron type: %s' % str( type(skdata) ) )
 
    return skdata
 
@@ -192,6 +194,8 @@ def downsample_neuron ( skdata, resampling_factor):
    module_logger.info('Nodes before/after: %i/%i ' % ( len( df.nodes ), len( new_nodes ) ) ) 
 
    df.nodes = new_nodes
+
+   df.nodes.reset_index(inplace=True)
 
    return df
 

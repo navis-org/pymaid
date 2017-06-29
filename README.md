@@ -29,12 +29,14 @@ This command should also work to update the package.
 
 *Attention*: on Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)).
 
-#### Dependencies:
+#### External libraries used:
+Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install all external dependencies. You may run into problems on Windows, thus here a list in case you are trying to install manually (check out `install_requires` in [setup.py](https://raw.githubusercontent.com/schlegelp/PyMaid/master/setup.py) for version info):
+
 `pymaid` requires [Pandas](http://pandas.pydata.org/)
 
 `catmaid_igraph` requires [iGraph](http://www.igraph.org), [SciPy](http://www.scipy.org), [Numpy](http://www.scipy.org) and [Matplotlib](http://www.matplotlib.org)
 
-`plot` requires [matplotlib](http://matplotlib.org/) and [Plotly](http://plot.ly)
+`plot` requires [matplotlib](http://matplotlib.org/), [vispy](http://vispy.org/) and [Plotly](http://plot.ly)
 
 `morpho` uses standard Python 3 libraries, [iGraph](http://www.igraph.org) is optional 
 
@@ -47,6 +49,7 @@ This command should also work to update the package.
 ### Retrieve 3D skeleton data
 ```python
 from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
+from pymaid.plot import plot3d
 
 #Initialize Catmaid instance 
 myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
@@ -69,6 +72,8 @@ df = classify_nodes( skdata.ix[0] )
 #This new dataframe has a new column 'type'. Let's use this to get treenode ids for all branch points
 branch_points = df.nodes[ df.nodes.type == 'branch' ].treenode_id
 
+#Plot neuron
+plot3d( skdata = skdata )
 ```
 ### Cluster synapses based on distance along the arbor using iGraph
 ```python
@@ -144,7 +149,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 
 ### pymaid.plot:
 - `plot2d()`: generates 2D plots of neurons
-- `plot3d()`: uses [Plotly](http://plot.ly) to generate 3D plots of neurons
+- `plot3d()`: uses either [Vispy](http://vispy.org) or [Plotly](http://plot.ly) to generate 3D plots of neurons
 - `plot_network()`: uses iGraph and [Plotly](http://plot.ly) to generate network plots
 
 ### pymaid.cluster:
@@ -167,7 +172,8 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 
 ### pymaid.rmaid:
 - `init_rcatmaid()`: initialize connection with Catmaid server in R
-- `data2py()`: wrapper to convert R data to Python
+- `data2py()`: wrapper to convert R data to Python 
+- `nblast()`: wrapper to use Nat's NBLAST on Pymaid neurons
 - `neuron2py()`: converts R neuron and neuronlist objects to Pymaid neurons
 - `neuron2r()`: converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
 

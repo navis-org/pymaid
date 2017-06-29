@@ -45,6 +45,7 @@ setup(
         "matplotlib>=2.0.0",
         "plotly>=2.0.6",
         "pandas>=0.18.1",
-        "rpy2>=2.8.5"
+        "rpy2>=2.8.5",
+        "vispy>=0.4.0"
     ],
 )

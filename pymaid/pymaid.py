@@ -76,6 +76,14 @@ class CatmaidInstance:
     debug :         boolean (optional)
                     if True, logging level is set to 'DEBUG' (default is 'INFO')
 
+    Returns:
+    -------
+    CatmaidInstance :   Holds credentials and performs fetch operations. 
+                        You can either pass this object to each function 
+                        individually or define module wide by using e.g:
+                        
+                        pymaid.remote_instance = CatmaidInstance
+
     Methods
     -------
     fetch ( url, post = None )
@@ -111,8 +119,7 @@ class CatmaidInstance:
                                     'user', 
                                     'password', 
                                     'token' )
-    skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )
-    
+    skeleton_data = get_3D_skeleton ( ['12345','67890'] , myInstance )    
     """
 
     def __init__(self, server, authname, authpassword, authtoken, logger = None, debug=False ):
@@ -142,7 +149,7 @@ class CatmaidInstance:
             else:
                 self.logger.setLevel(logging.DEBUG)
 
-        self.logger.info('CATMAID instance created')
+        self.logger.info('CATMAID instance created. See help(CatmaidInstance) to learn how to define globally.')
 
     def djangourl(self, path):
         """ Expects the path to lead with a slash '/'. """
@@ -562,8 +569,8 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     3 (abutting)
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in globals():
+    if remote_instance is None:        
+        if 'remote_instance' in globals():            
             remote_instance = globals()['remote_instance']
         else:
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
@@ -601,10 +608,11 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
         remote_instance.logger.debug('Retrieving abutting connectors for %i neurons' % len(to_retrieve) )
         urls = []        
 
-        for s in skids: 
+        for s in to_retrieve: 
             get_connectors_GET_data = { 'skeleton_ids[0]' : str( s ),
                                         'relation_type' : 'abutting' }                    
-            urls.append ( remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data) )           
+            urls.append ( remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data) )       
+            print(urls)    
 
         cn_data = get_urls_threaded( urls, remote_instance, time_out = time_out )
 
@@ -615,6 +623,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
             else:
                 skdata[i][1] += [ [ c[7], c[1], 3, c[2], c[3], c[4], c[8], None ]  for c in cn['links'] ]   
 
+    #Get neuron names
     names = get_names( to_retrieve, remote_instance )   
 
     if not get_history:        
