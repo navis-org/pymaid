@@ -250,28 +250,30 @@ def longest_neurite( skdata, root_to_soma = False ):
      
 
 def reroot_neuron( skdata, new_root, g = None ):
-   """ Uses igraph to reroot the neuron at given point. Creating the iGraph is the 
-   bottleneck - if you already have it, pass it along to speed things up (see example 
-   below)!
+   """ Uses igraph to reroot the neuron at given point. 
 
    Parameter
    ---------
-   skdata :       Pandas dataframe containing a SINGLE neuron
+   skdata :       Pandas DataFrame or Series containing a SINGLE neuron
    new_root :     node ID or a tag of the node to reroot to
-   g (optional):  iGraph of skdata - if not provided it will be generated
+   g (optional):  iGraph of skdata - if not provided it will be 
+                  taken from skdata or generated
 
    Returns:
    --------
-   pandas DataFrame containing the rerooted neuron
+   pandas Series containing the rerooted neuron
    """
 
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0].copy()
-   elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()  
+   start_time = time.time()
 
-   #Make sure to copy nodes
-   df.nodes = df.nodes.copy()
+   if type( skdata ) == type( pd.DataFrame() ):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0]
+      else:
+        module_logger.error('%i neurons provided. Please provide only a single neuron!' % skdata.shape[0] )
+        return
+   elif type( skdata ) == type ( pd.Series() ):
+      df = skdata
 
    #If cut_node is a tag, rather than a ID, try finding that node  
    if type(new_root) == type( str() ):
@@ -288,10 +290,19 @@ def reroot_neuron( skdata, new_root, g = None ):
       module_logger.error('Error: New root is old root!')
       return df
 
-   if not g:
+   if not g and df.graph == None:
       #Generate iGraph -> order/indices of vertices are the same as in skdata
       g = igraph_from_skeleton(df)
+      df.graph = g
+   elif df.graph != None:
+      g = df.graph    
 
+   #Now that we have generated the graph, make sure to make all further work on a copy!
+   df = skdata.copy()  
+   #Make sure to copy nodes/connectors as well (essentially everything that is a DataFrame itself)
+   df.nodes = df.nodes.copy()
+   df.connectors = df.connectors.copy()
+ 
    try:
       #Select nodes with the correct ID as cut node
       new_root_index = g.vs.select( node_id=int(new_root) )[0].index
@@ -300,27 +311,73 @@ def reroot_neuron( skdata, new_root, g = None ):
       module_logger.error('Error: Found no treenodes with ID %s - please double check!' % str( new_root ) )
       return 
 
+   if 'type' not in df.nodes:
+      df = classify_nodes(df)   
+
+   leaf_nodes = df.nodes[ df.nodes.type == 'end' ].treenode_id.tolist()
+   leaf_indices = [ v.index for v in g.vs if v['node_id'] in leaf_nodes ]
+
+   shortest_paths = g.get_shortest_paths( new_root_index, to = leaf_indices, mode='ALL' )   
+
+   #Convert indices to treenode ids
+   new_paths = [ [ g.vs[i]['node_id'] for i in p ] for p in shortest_paths ]
+
+   #Remove root node to root node (path length == 1)
+   new_paths = [ n for n in new_paths if len(n) > 1 ]   
+
+   new_parents = {}
+   new_edges = []
+   for p in new_paths:
+     new_parents.update( { p[-i] : p[-i-1] for i in range( 1, len( p ) ) } )        
+   new_parents.update( { new_root : 0 } ) #This is a placeholder! Can't set this yet otherwise .astype(int) will fail
+
+   df.nodes.set_index('treenode_id', inplace = True ) #Set index to treenode_id
+   df.nodes.parent_id = [ new_parents[n] for n in df.nodes.index.tolist() ] #index is currently the treenode_id    
+   df.nodes.parent_id = df.nodes.parent_id.values.astype(int) #first convert everything to int
+   df.nodes.parent_id = df.nodes.parent_id.values.astype(object) #then back to object so that we can add a 'None'
+   df.nodes.loc[new_root,'parent_id'] = None #Set parent_id to None (previously 0 as placeholder)   
+   df.nodes.reset_index( inplace=True ) #Reset index
+
+   #Recalculate graph
+   df.graph = igraph_from_skeleton(df)
+
+   """
    #get_shortest_paths() returns a list of paths from the new root to every other node
    #format is [ root_node, node1, node2, node3, ... , node 10 ]
-   #all we need is the last (treenode_id) and the second last node ( its new parent )   
-   shortest_paths = g.get_shortest_paths( new_root_index ,to = None, mode='ALL' )
+   #all we need is the last (treenode_id) and the second last node ( its new parent )      
+   
+   shortest_paths = g.get_shortest_paths( new_root_index, to = None, mode='ALL' )   
 
    new_paths = [ [ g.vs[i]['node_id'] for i in p ] for p in shortest_paths ]   
 
-   df.nodes.set_index('treenode_id', inplace = True )
-   
-   for p in new_paths:
-      if len( p ) > 1:
-         df.nodes.ix[ p[-1] ].parent_id = p[-2]
-      else:
-         df.nodes.ix[ p[-1] ].parent_id = None
+   #Remove root node to root node (path length == 1)
+   new_paths = [ n for n in new_paths if len(n) > 1 ]
 
+   df.nodes.set_index('treenode_id', inplace = True )
+
+   new_parents = { p[-1] : p[-2] for p in new_paths }      
+   new_parents.update( { new_root : 0 } ) #This is a placeholder! Can't set this yet otherwise .astype(int) will fail
+
+   df.nodes.parent_id = [ new_parents[n] for n in df.nodes.index.tolist() ] #index is currently the treenode_id    
+   df.nodes.parent_id = df.nodes.parent_id.values.astype(int) #first convert everything to int
+   df.nodes.parent_id = df.nodes.parent_id.values.astype(object) #then back to object so that we can add a 'None'
+
+   df.nodes.loc[new_root,'parent_id'] = None
+   
    df.nodes.reset_index( inplace=True ) 
 
-   module_logger.info('Info: %s #%s successfully rerooted' % ( df.neuron_name, df.skeleton_id ) )
+   #Now also update the graph
+   new_edges = [ [ n[-1], n[-2] ] for n in shortest_paths if len(n) > 1 ]
+   #Delete all edges
+   df.graph.delete_edges(None)
+   #Add new edges
+   df.graph.add_edges(new_edges)
+
+   """
+
+   module_logger.info('Info: %s #%s successfully rerooted (%s s)' % ( df.neuron_name, df.skeleton_id, round(time.time()-start_time,1) ) )
 
    return df
-
 
 def cut_neuron2( skdata, cut_node, g = None ):
    """ Uses igraph to Cut the neuron at given point and returns two new neurons. 
@@ -368,9 +425,12 @@ def cut_neuron2( skdata, cut_node, g = None ):
    elif type( skdata ) == type( pd.Series() ):
       df = skdata.copy()  
 
-   if g is None:
+   if g is None and df.graph == None:
       #Generate iGraph -> order/indices of vertices are the same as in skdata
       g = igraph_from_skeleton(df)
+      df.graph = g
+   elif df.graph != None:
+      g = df.graph
 
    #If cut_node is a tag, rather than a ID, try finding that node
    if type(cut_node) == type( str() ):
@@ -393,8 +453,13 @@ def cut_neuron2( skdata, cut_node, g = None ):
       module_logger.error('Error: Found no treenodes with ID %s - please double check!' % str( cut_node ) )
       return 
 
-   #Select the cut node's parent 
-   parent_node_index = g.es.select( _source = cut_node_index )[0].target
+   #Select the cut node's parent
+   try:
+      parent_node_index = g.es.select( _source = cut_node_index )[0].target
+   except:    
+      module_logger.error('Unable to find parent for cut node. Cut node = root?')
+      raise
+
 
    #Now calculate the min cut
    mc = g.st_mincut( parent_node_index , cut_node_index , capacity=None )
@@ -402,10 +467,17 @@ def cut_neuron2( skdata, cut_node, g = None ):
    #mc.partition holds the two partitions with mc.partition[0] holding part with the source and mc.partition[1] the target
    if g.vs.select(mc.partition[0]).select(node_id=int(cut_node)):
       dist_partition = mc.partition[0]
+      dist_graph = mc.subgraph(0)
       prox_partition = mc.partition[1]
+      prox_graph = mc.subgraph(1)
    else:
       dist_partition = mc.partition[1]
+      dist_graph = mc.subgraph(1)
       prox_partition = mc.partition[0]
+      prox_graph = mc.subgraph(0)
+
+   #Set parent_id of distal fragment's graph to None
+   dist_graph.vs.select( node_id=int(cut_node) )[0]['parent_id'] = None 
 
    #Partitions hold the indices -> now we have to translate this into node ids
    dist_partition_ids = g.vs.select(dist_partition)['node_id']   
@@ -420,29 +492,31 @@ def cut_neuron2( skdata, cut_node, g = None ):
                                   df.skeleton_id,                            
                                   df.nodes.ix[ dist_partition_ids ],
                                   df.connectors[ [ c.treenode_id in dist_partition_ids for c in df.connectors.itertuples() ] ].reset_index(),                                  
-                                  df.tags 
+                                  df.tags,
+                                  dist_graph
                               ]], 
-                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
+                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags','graph'],
                               dtype=object
                               ).ix[0]   
 
-   neuron_dist.nodes.ix[ cut_node ].parent_id = None   
+   neuron_dist.nodes.loc[ cut_node ,'parent_id'] = None   
 
    neuron_prox = pd.DataFrame( [[ 
                                   df.neuron_name + '_prox',
                                   df.skeleton_id,                            
                                   df.nodes.ix[ prox_partition_ids ],
                                   df.connectors[ [ c.treenode_id not in dist_partition_ids for c in df.connectors.itertuples() ] ].reset_index(),                                  
-                                  df.tags
+                                  df.tags,
+                                  prox_graph
                               ]], 
-                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
+                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags', 'graph'],
                               dtype=object
-                              ).ix[0]
+                              ).ix[0] 
 
    #Reclassify cut node in distal as 'root' and its parent in proximal as 'end'
-   if 'type' in df.nodes:
-      neuron_prox.nodes.ix[ cut_node ].type = 'end'
-      neuron_dist.nodes.ix[ cut_node ].type = 'root'  
+   if 'type' in df.nodes:      
+      neuron_dist.nodes.loc[ cut_node, 'type'] = 'root'  
+      neuron_prox.nodes.loc[ df.nodes.ix[cut_node].parent_id, 'type' ] = 'end'
 
    #Now reindex dataframes
    neuron_dist.nodes.reset_index( inplace = True )
@@ -454,8 +528,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
 
    return neuron_dist, neuron_prox
 
-
-def cut_neuron( skdata, cut_node ):
+def _cut_neuron( skdata, cut_node ):
    """ Cuts a neuron at given point and returns two new neurons.   
 
    Parameter

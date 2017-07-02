@@ -267,7 +267,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
       for i, neuronA in enumerate(neurons):  
          print('%s (%i of %i)' % ( str( neuronA), i, len(neurons) ), end = ', ')         
          for neuronB in neurons:          
-            matching_indices = calc_matching_index ( neuronA, neuronB, this_cn, vertex_score = vertex_score, nA_cn = cn_subsets[neuronA], nB_cn = cn_subsets[neuronB] )                
+            matching_indices = _calc_matching_index ( neuronA, neuronB, this_cn, vertex_score = vertex_score, nA_cn = cn_subsets[neuronA], nB_cn = cn_subsets[neuronB] )                
             matching_scores[d][neuronA][neuronB] = matching_indices[similarity]
 
    #Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
@@ -315,8 +315,8 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
    return dist_matrix
 
 
-def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1, **kwargs ): 
-   """ Calculates various matching indices between two neurons:
+def _calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1, **kwargs ): 
+   """ Calculates and returns various matching indices between two neurons.   
    
    matching_index =           Number of shared partners divided by total number 
                               of partners
@@ -338,7 +338,7 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
                               has only few connections (percentage) to a shared 
                               partner, the final value will also be small
    
-   vertex_normalized =        MNatching index that rewards shared and punishes 
+   vertex_normalized =        Matching index that rewards shared and punishes 
                               non-shared partners. Vertex similarity based on 
                               Jarrell et al., 2012: 
                               f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
@@ -440,7 +440,7 @@ def calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_
 
    return similarity_indices
 
-def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True):
+def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True, method = 'ward'):
    """ Takes a list of CATMAID synapses, calculates EUCLEDIAN distance matrix 
    and clusters them (WARD algorithm)
 
@@ -452,6 +452,8 @@ def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True):
                      Labels for each leaf of the dendrogram (e.g. connector ids). 
    plot_matrix :     boolean
                      if True, matrix figure is generated and returned
+   method :          method used for hierarchical clustering (scipy.cluster.hierarchy.linkage)
+                     possible values: 'single', 'ward', 'complete', 'average', 'weighted', 'centroid'
 
    Returns:
    -------
@@ -474,14 +476,14 @@ def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True):
       # Compute and plot first dendrogram for all nodes.
       fig = pylab.figure(figsize=(8,8))
       ax1 = fig.add_axes([0.09,0.1,0.2,0.6])
-      Y = cluster.hierarchy.ward(squared_dist_mat)
+      Y = cluster.hierarchy.linkage(squared_dist_mat, method = method)
       Z1 = cluster.hierarchy.dendrogram(Y, orientation='left', labels = labels)
       ax1.set_xticks([])
       ax1.set_yticks([])
 
       # Compute and plot second dendrogram.
       ax2 = fig.add_axes([0.3,0.71,0.6,0.2])
-      Y = cluster.hierarchy.ward(squared_dist_mat)
+      Y = cluster.hierarchy.linkage(squared_dist_mat, method = method)
       Z2 = cluster.hierarchy.dendrogram(Y, labels = labels)
       ax2.set_xticks([])
       ax2.set_yticks([])

@@ -24,10 +24,15 @@ from pymaid import rmaid
 
 import matplotlib.pyplot as plt
 
+from rpy2.robjects.packages import importr
+
+#Load nat as module
+nat = importr('nat')
+
 #Initialise Catmaid instance
 rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 
-#Fetch a neuron in CATMAID
+#Fetch a neuron in Python CATMAID
 skid = 123456
 n = pymaid.get_3D_skeleton( skid, rm )
 
@@ -37,8 +42,8 @@ rcatmaid = rmaid.init_rcatmaid( rm )
 #Convert pymaid neuron to R neuron (works with neuron and neuronlist objects)
 n_r = rmaid.neuron2r( n.ix[0] )
 
-#Use some nat function
-n_pruned = cat.prune_by_strahler( n_r )
+#Use nat to prune the neuron
+n_pruned = nat.prune_by_strahler( n_r )
 
 #Convert back to pymaid object
 n_py = rmaid.neuron2py( n_pruned, rm )
@@ -46,9 +51,11 @@ n_py = rmaid.neuron2py( n_pruned, rm )
 #Nblast pruned neuron (assumes FlyCircuit database is saved locally)
 results = rmaid.nblast( n_pruned )
 
-#Plot nblast scores distribution
-results.plot.hist(alpha=.5)
-plt.show()
+#Sort results by mu score
+results.sort('mu_score')
+
+#Plot top hits
+results.plot( hits = 3 )
 """
 
 import logging
@@ -334,7 +341,7 @@ def neuron2r ( neuron ):
     into what rcatmaid expects as a response from a CATMAID server, then
     we are calling the same functions as in rcatmaid's read.neuron.catmaid().
 
-    Attention: Currently, the project ID saved as part of neuronlist objects
+    Attention: Currently, the project ID saved as part of R neuronlist objects
     is ALWAYS 1.   
     """
 
@@ -540,6 +547,10 @@ def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = Fa
 
     #Plot histogram of results
     nbl.plot.hist(alpha=.5)
+
+    #Sort and plot the first hits
+    nbl.sort('mu_score')
+    nbl.plot(hits = 4)
     """    
 
     start_time = time.time()

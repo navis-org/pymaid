@@ -1075,7 +1075,8 @@ def plot3d( *args, **kwargs ):
    for v in volumes: 
       if 'verts' not in volumes[v]:
          if not remote_instance:
-            module_logger.error('Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ...>')
+            module_logger.error('Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ... >')
+            return
          else:
             verts, faces = get_volume( v, remote_instance ) 
       else:
@@ -1100,7 +1101,7 @@ def plot3d( *args, **kwargs ):
    min_z = min ( [ n.nodes.z.min() for n in skdata.itertuples() ] + [ n.connectors.z.min() for n in skdata.itertuples() ] + [ n.points.z.min() for n in dotprops.itertuples() ] )
    max_z = max ( [ n.nodes.z.max() for n in skdata.itertuples() ] + [ n.connectors.z.max() for n in skdata.itertuples() ] + [ n.points.z.max() for n in dotprops.itertuples() ] )           
 
-   module_logger.info('Preparing neurons for plotting')
+   module_logger.info('Preparing neurons for plotting...')
    #First downsample neurons
    if downsampling > 1 and not connectors_only and not skdata.empty:
       module_logger.info('Downsampling neurons...')  

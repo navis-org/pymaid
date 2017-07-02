@@ -42,6 +42,7 @@ from igraph import *
 from scipy import cluster, spatial
 import logging
 import pandas as pd
+import time
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
@@ -128,53 +129,67 @@ def igraph_from_adj_mat( adj_matrix, **kwargs ):
 
    return g
 
-def igraph_from_skeleton(skdata):
+def igraph_from_skeleton( skdata, append = True ):
    """ Takes CATMAID single skeleton data and turns it into an iGraph object
    
    Parameters:
    ----------
-   skdata :             Pandas dataframe containing a SINGLE neuron  
+   skdata :             Pandas dataframe containing either a single or multiple neurons
+   append :             boolean (default = True)
+                        Unless False, graph is automatically appended to the dataframe
 
    Returns:
    -------
-   iGraph representation of the neuron
+   iGraph representation of the neuron 
 
-   """   
-
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0]
+   """
+   if type( skdata ) == type( pd.DataFrame() ):            
+      return [ igraph_from_skeleton( skdata.ix[i] ) for i in range( skdata.shape[0] ) ]
    elif type( skdata ) == type( pd.Series() ):
       df = skdata 
 
    module_logger.info('Generating graph from skeleton data...')
 
    #Generate list of vertices -> this order is retained
-   vlist = skdata.nodes.treenode_id.tolist()   
-   
+   vlist = df.nodes.treenode_id.tolist()
+
+   #Get list of edges as indices (needs to exclude root node)
+   tn_index_with_parent = df.nodes[ ~df.nodes.parent_id.isnull() ].index.tolist()
+   parent_ids = df.nodes[ ~df.nodes.parent_id.isnull() ].parent_id.tolist()
+   df.nodes['temp_index'] = df.nodes.index #add temporary column
+   parent_index = df.nodes.set_index('treenode_id').ix[ parent_ids ]['temp_index'].tolist()
+   df.nodes.drop('temp_index', axis = 1, inplace=True) #remove temporary column
+
    #Generate list of edges based on index of vertices   
-   elist = [ [ n.Index, vlist.index( n.parent_id )  ] for n in skdata.nodes.itertuples() if n.parent_id != None ]  
+   elist = list( zip( tn_index_with_parent , parent_index ) )      
+   
+   #Save this as backup
+   #elist = [ [ n.Index, vlist.index( n.parent_id )  ] for n in df.nodes.itertuples() if n.parent_id != None ]     
 
    #Generate graph and assign custom properties
    g = Graph( elist , n = len( vlist ) ,  directed = True)     
-   g.vs['node_id'] = skdata.nodes.treenode_id.tolist()
-   g.vs['parent_id'] = skdata.nodes.parent_id.tolist()
-   g.vs['X'] = skdata.nodes.x.tolist()
-   g.vs['Y'] = skdata.nodes.y.tolist()
-   g.vs['Z'] = skdata.nodes.z.tolist()
+   g.vs['node_id'] = df.nodes.treenode_id.tolist()
+   g.vs['parent_id'] = df.nodes.parent_id.tolist()
+   g.vs['X'] = df.nodes.x.tolist()
+   g.vs['Y'] = df.nodes.y.tolist()
+   g.vs['Z'] = df.nodes.z.tolist()
 
    #Find nodes with synapses and assign them the custom property 'has_synapse'
-   nodes_w_synapses = skdata.connectors.treenode_id.tolist()
-   g.vs['has_synapse'] = [ n in nodes_w_synapses for n in skdata.nodes.treenode_id.tolist() ]
+   nodes_w_synapses = df.connectors.treenode_id.tolist()
+   g.vs['has_synapse'] = [ n in nodes_w_synapses for n in df.nodes.treenode_id.tolist() ]
 
    #Generate weights by calculating edge lengths = distance between nodes
-   tn_coords = skdata.nodes.ix[ [ e[0] for e in elist ]  ][ ['x','y','z' ] ].reset_index()
-   parent_coords = skdata.nodes.ix[ [ e[1] for e in elist ]  ][ [ 'x','y','z'] ].reset_index()
+   tn_coords = df.nodes.ix[ [ e[0] for e in elist ]  ][ ['x','y','z' ] ].reset_index()
+   parent_coords = df.nodes.ix[ [ e[1] for e in elist ]  ][ [ 'x','y','z'] ].reset_index()
    w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 )).tolist()
    g.es['weight'] = w
 
+   if append:
+      df.graph = g      
+
    return g
 
-def dist_from_root( data , synapses_only = False, return_graph = False ):
+def dist_from_root( data , synapses_only = False ):
    """ Get distance to root in nano meter (nm) for all treenodes 
 
    Parameters:
@@ -183,8 +198,7 @@ def dist_from_root( data , synapses_only = False, return_graph = False ):
                      Holds the skeleton data
    synapses_only :   boolean (default = False)
                      If True, only distances for nodes with synapses will be returned
-   return_graph :    boolean (default = False)
-                     If True, graph representation is returned on top of other results
+                     (only makes sense if input is a Graph)
 
    Returns:
    -------  
@@ -192,17 +206,23 @@ def dist_from_root( data , synapses_only = False, return_graph = False ):
    dict :            {node_id : distance_to_root }
 
    if g is a pandas DataFrame:
-   pandas DataFrame with df.nodes.dist_to_root holding the distances to root
+   pandas DataFrame with df.nodes.dist_to_root holding the distances to root  
 
-   if return_graph is True:
-   the graph object is return in addition to dict/pd DataFrame
-
-   """   
+   """ 
 
    if type(data) == type( Graph() ):
       g = data
+   elif type(data) == type( pd.DataFrame() ): 
+      return [ dist_from_root( data.ix[i] ) for i in range( data.shape[0] ) ]
+   elif type(data) == type( pd.Series() ):
+      if data.graph == None:
+         g = igraph_from_skeleton( data )
+      else:
+         g = data.graph
    else:
-      g = igraph_from_skeleton( data )
+      module_logger.warning('Unknown data type: %s' % str(type(data)))
+
+   print(data.neuron_name, data.skeleton_id)
 
    #Generate distance matrix.
    module_logger.info('Generating distance matrix for neuron...')
@@ -213,7 +233,7 @@ def dist_from_root( data , synapses_only = False, return_graph = False ):
    else:
       nodes = [ ( v.index, v['node_id'] ) for v in g.vs ]
 
-   root = [ v.index for v in g .vs if v['parent_id'] == None ][0]
+   root = [ v.index for v in g.vs if v['parent_id'] == None ][0]
 
    distances_to_root = {}
 
@@ -221,13 +241,9 @@ def dist_from_root( data , synapses_only = False, return_graph = False ):
       distances_to_root[ n[1] ] = distance_matrix[ n[0] ][ root ]
 
    if type(data) == type( Graph()):
-      if return_graph:
-         return distances_to_root, g
       return distances_to_root
    else:
-      data.nodes['dist_to_root'] = [ distances_to_root[ n ] for n in data.nodes.treenode_id.tolist() ]
-      if return_graph:         
-         return data, g   
+      data.nodes['dist_to_root'] = [ distances_to_root[ n ] for n in data.nodes.treenode_id.tolist() ]        
       return data
 
 def cluster_nodes_w_synapses(g, plot_graph = True):

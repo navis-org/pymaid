@@ -55,6 +55,7 @@ import logging
 import re
 import pandas as pd
 import numpy as np
+import datetime
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -554,18 +555,20 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     Returns:
     --------
     Pandas dataframe (df): 
-        neuron_name   skeleton_id   nodes   connectors  tags
-    0   name1           skid1      node_df   conn_df    dict 
-    1   name2           skid2      node_df   conn_df    dict
-    2   name3           skid3      node_df   conn_df    dict
+        neuron_name   skeleton_id   nodes   connectors  tags   graph
+    0   name1           skid1      node_df   conn_df    dict   None
+    1   name2           skid2      node_df   conn_df    dict   None
+    2   name3           skid3      node_df   conn_df    dict   None
     ...
 
-    neuron_name and skeleton_id are strings
-    nodes and connectors are Pandas dataframes themselves
-    tags is a dict: { 'tag' : [ treenode_id, treenode_id, ... ] }
+    <neuron_name> and <skeleton_id> are strings
+    <nodes> and <connectors> are Pandas dataframes themselves
+    <tags> is a dict: { 'tag' : [ treenode_id, treenode_id, ... ] }
+    <graph> is the iGraph representation of a neuron. This will be added
+    on first use.
 
     Dataframe column titles should be self explanatory with one exception:
-    conn_df['relation']: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction),
+    connectors['relation']: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction),
     3 (abutting)
     """
 
@@ -650,6 +653,9 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
                             columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
                             dtype=object
                             )
+
+    #Placeholder for igraph representations of neurons
+    df['graph'] = None
 
     return df    
 
@@ -2057,35 +2063,69 @@ def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_da
 
     return skid_list
 
-def get_history( remote_instance = None, project_id = 1, start_date = '2016-10-29', end_date = '2016-11-08', split = True ):    
+def get_history( remote_instance = None, project_id = 1, start_date = (datetime.date.today()-datetime.timedelta(days=7)).isoformat() , end_date = datetime.date.today().isoformat(), split = True ):    
     """ Wrapper to retrieves CATMAID history 
     Attention: If the time window is too large, the connection might time out 
-    which will result in an error!
+    which will result in an error! Make sure split = True to avoid that.
 
     Parameters:
     ----------
     remote_instance :   CATMAID instance; either pass directly to function 
                         or define globally as 'remote_instance'
     user :              single user_id    
-    start_date :        created after, date needs to be (year,month,day) 
-                        format - e.g. '2016-10-29'
-    end_date :          created before, date needs to be (year,month,day) 
-                        format - e.g. '2017-10-29'
+    start_date/ :       dates can be:
+    end_date                - datetime.date
+                            - datetime.datetime
+                            - string ( YYYY-MM-DD format, e.g. '2016-03-09' )    
     split :             boolean
                         If True, history will be requested in bouts of 6 months
                         Useful if you want to look at a very big time window 
                         as this can lead to gateway timeout
 
     Returns:
-    --------
-    dict :        { 'days': [ date , date , ...], 
-                    'stats_table': { user_ID: { date : { 'new_treenodes': int, 
-                                                         'new_reviewed_nodes': int,
-                                                         'new_connectorts': int },
-                                                     },
-                                                   } , 
-                         'daysformatted': [ days_formated, ... ] }
+    -------
+    pandas Series:
+
+    cable :             DataFrame containing cable created in nm. 
+                        Rows = users, columns = dates
+    connector_links :   DataFrame containing connector links created. 
+                        Rows = users, columns = dates   
+    reviewed :          DataFrame containing nodes reviewed. 
+                        Rows = users, columns = dates
+    user_details :      user list from pymaid.get_user_list()
+
+    Example:
+    -------
+    #get last week's history (using the default start/end dates)
+    hist = pymaid.get_history( remote_instance = rm ) 
+
+    #Plot cable created by all users over time
+    import matplotlib.pyplot as plt
+    hist.cable.T.plot()
+    plt.show()
+
+    #Collapse users and plot sum of cable over time
+    hist.cable.sum(0).plot()
+    plt.show()
+
+    #Plot single users cable (index by user login name)
+    hist.cable.ix['schlegelp'].T.plot()
+    plt.show()
+
+    #Sum up cable created this week by all users
+    hist.cable.values.sum()
     """
+
+    def constructor_helper( data, key, days ):
+        """ Helper to extract variable from data returned by CATMAID server
+        """  
+        temp = []
+        for d in days:
+            try:
+                temp.append( data[d][key] )                
+            except:
+                temp.append( 0 )
+        return temp
 
     if remote_instance is None:
         if 'remote_instance' in globals():
@@ -2093,6 +2133,16 @@ def get_history( remote_instance = None, project_id = 1, start_date = '2016-10-2
         else:
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
+
+    if type(start_date) == type(datetime.date.today()):
+        start_date = start_date.isoformat()
+    elif type(start_date) == type(datetime.datetime.now()):
+        start_date = start_date.isoformat()[:10]
+
+    if type(end_date) == type(datetime.date.today()):
+        end_date = end_date.isoformat()
+    elif type(end_date) == type(datetime.datetime.now()):
+        end_date = end_date.isoformat()[:10]
 
     rounds = []
     if split:
@@ -2136,7 +2186,24 @@ def get_history( remote_instance = None, project_id = 1, start_date = '2016-10-2
         for u in d['stats_table']:
             stats['stats_table'][u].update( d['stats_table'][u] )
 
-    return stats
+    user_list =  get_user_list(remote_instance).set_index('id')
+    user_list.index = user_list.index.astype(str)
+
+    df = pd.Series( [
+                    pd.DataFrame(   [ constructor_helper( stats['stats_table'][u], 'new_treenodes', stats['days'] ) for u in stats['stats_table'] ],
+                                    index = [ user_list.ix[u].login for u in stats['stats_table'].keys() ], 
+                                    columns = [ datetime.datetime.strptime( d, '%Y%m%d' ).date() for d in stats['days'] ] ),
+                    pd.DataFrame(   [ constructor_helper( stats['stats_table'][u], 'new_connectors', stats['days'] ) for u in stats['stats_table'] ],
+                                    index = [ user_list.ix[u].login for u in stats['stats_table'].keys() ], 
+                                    columns = [ datetime.datetime.strptime( d, '%Y%m%d' ).date() for d in stats['days'] ] ),
+                    pd.DataFrame(   [ constructor_helper( stats['stats_table'][u], 'new_reviewed_nodes', stats['days'] ) for u in stats['stats_table'] ],
+                                    index = [ user_list.ix[u].login for u in stats['stats_table'].keys() ], 
+                                    columns = [ datetime.datetime.strptime( d, '%Y%m%d' ).date() for d in stats['days'] ] ),
+                    user_list.reset_index()
+                    ],                    
+                    index = [ 'cable', 'connector_links', 'reviewed', 'user_details' ]
+                    )
+    return df
 
 def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, project_id = 1, coord_format = 'NM', resolution = ( 4, 4, 50) ):      
     """
@@ -2481,8 +2548,11 @@ def get_user_list( remote_instance = None ):
     1
     ..
 
-    Use user_list.set_index('id').T.to_dict() to (1.) set user ID as index, 
-    (2.) transpose the dataframe and (3.) turn it into a dict { user_id: { } }
+    To convert into a {user_id : details} dict, use 
+    user_list.set_index('id').T.to_dict() to: 
+    (1.) set user ID as index, 
+    (2.) transpose the dataframe and 
+    (3.) turn it into a dict { user_id: { } }
     """
 
     if remote_instance is None:

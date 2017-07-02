@@ -161,9 +161,9 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 ### pymaid.morpho:
 - `calc_cable()`: calculate cable length of given neuron
 - `calc_strahler_index()`: calculate strahler index for each node
-- `cut_neuron()`: virtually cuts a neuron at given treenode and returns the distal and the proximal part
 - `classify_nodes()`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
-- `cut_neuron2()`: similar to above but uses iGraph (slightly faster)
+- `cut_neuron()`: virtually cuts a neuron at given treenode and returns the distal and the proximal part
+- `cut_neuron2()`: similar to above but uses iGraph (faster). Recommended to use this over `cut_neuron()`
 - `downsample_neuron()`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - `in_volume()`: test if points are within given CATMAID volume
 - `longest_neurite()`: prunes neuron to its longest neurite
