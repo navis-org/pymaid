@@ -15,18 +15,15 @@
     You should have received a copy of the GNU General Public License
     along
 """
-
-
-try:
-   from pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation, get_volume
-except:
-   from pymaid.pymaid import get_3D_skeleton, get_connectors, get_connector_details, get_skids_by_annotation, get_volume
+   
 import math
 import time
 import logging
 import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
+
+from pymaid import pymaid, igraph_catmaid, core
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
@@ -41,18 +38,14 @@ if not module_logger.handlers:
   sh.setFormatter(formatter)
   module_logger.addHandler(sh)
 
-try:
-   from pymaid.igraph_catmaid import igraph_from_skeleton, dist_from_root
-except:  
-   from igraph_catmaid import igraph_from_skeleton, dist_from_root
-
 
 def generate_list_of_childs( skdata ):
    """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
 
    Parameter:
    ---------
-   skdata :        Pandas dataframe containing a SINGLE neuron 
+   skdata :             CatmaidNeuron, CatmaidNeuronList, Pandas DataFrame or
+                        Series containing a SINGLE neuron
 
    Returns:
    -------
@@ -61,10 +54,14 @@ def generate_list_of_childs( skdata ):
    """
    module_logger.debug('Generating list of childs...')
    
-   try:
-      nodes = skdata.ix[0].nodes
-   except:
-      nodes = skdata.nodes   
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      nodes = skdata.nodes
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        nodes = skdata.ix[0].nodes
+      else:
+        module_logger.error('Please pass a SINGLE neuron.')
+        raise Exception   
 
    list_of_childs = { n.treenode_id : [] for n in nodes.itertuples() }
 
@@ -84,7 +81,8 @@ def classify_nodes ( skdata ):
    
    Parameters:
    ----------
-   skdata :             Pandas dataframe containing neuron(s)
+   skdata :             CatmaidNeuron, CatmaidNeuronList, Pandas DataFrame or
+                        Series containing neuron(s)
 
    Returns
    -------
@@ -94,10 +92,10 @@ def classify_nodes ( skdata ):
    module_logger.debug('Looking for end, branch and root points...')
 
    #If more than one neuron
-   if type(skdata) == type( pd.DataFrame() ):
-      for i,n in enumerate(skdata.itertuples()):        
+   if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      for i,n in range(len(skdata)):
         skdata.ix[i] = classify_nodes( skdata.ix[i] )
-   elif type(skdata) == type( pd.Series() ) or str(type(skdata)) == "<class 'pandas.core.frame.Pandas'>":
+   elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):   
      list_of_childs  = generate_list_of_childs( skdata )
      list_of_parent = { n.treenode_id : n.parent_id for n in skdata.nodes.itertuples() }   
 
@@ -122,34 +120,54 @@ def classify_nodes ( skdata ):
 
    return skdata
 
-def downsample_neuron ( skdata, resampling_factor):
-   """ Downsamples a neuron by a given factor. Preserves root, leafs, 
+def downsample_neuron ( skdata, resampling_factor, inplace=False):
+   """ Downsamples neuron(s) by a given factor. Preserves root, leafs, 
    branchpoints and synapse nodes
    
    Parameter
    ---------
-   skdata :             Pandas dataframe containing a SINGLE neuron 
+   skdata :             CatmaidNeuron, CatmaidNeuronList, Pandas DataFrame or
+                        Series containing neuron(s)
    resampling_factor :  Factor by which to reduce the node count
+   inplace :            boolean (default = True)
+                        if True, will modify original data
 
    Returns
    -------
    skdata :             downsampled Pandas Dataframe
    """
 
+   """
    try: 
      skdata.nodes.shape[1]
    except:
      module_logger.warning('Please pass dataframe for a single neuron. Use e.g. df.ix[0]')
      return skdata
+   """  
 
-   if skdata.nodes.shape[0] == 0: 
-     module_logger.warning('Unable to downsample: no nodes in neuron')
-     return skdata 
-
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0].copy()
+   if isinstance( skdata, pd.DataFrame):
+      return pd.DataFrame( [ downsample_neuron( skdata.ix[i], resampling_factor, inplace=inplace ) for i in range( skdata.shape[0] ) ] )
+   elif isinstance( skdata, core.CatmaidNeuronList ):
+      return core.CatmaidNeuronList( [ downsample_neuron( skdata.ix[i], resampling_factor, inplace=inplace ) for i in range( skdata.shape[0] ) ] )
+   elif isinstance( skdata, pd.Series):
+      if not inplace:
+        df = skdata.copy()
+        df.nodes = df.nodes.copy()
+        df.connectors = df.connectors.copy()
+      else:
+        df = skdata
+   elif isinstance( skdata, core.CatmaidNeuron ):
+      if not inplace:
+        df = core.CatmaidNeuron( skdata )
+      else:
+        df = skdata
    else:
-      df = skdata.copy()
+      module_logger.error('Unexpected datatype: %s' % str( type( skdata )))
+      raise ValueError
+
+   if df.nodes.shape[0] == 0: 
+     module_logger.warning('Unable to downsample: no nodes in neuron')
+     return df 
 
    module_logger.info('Preparing to downsample neuron...')
    
@@ -188,7 +206,7 @@ def downsample_neuron ( skdata, resampling_factor):
             new_parents[ this_node ] = None
             break   
    
-   new_nodes = df.nodes[[ n.treenode_id in new_parents for n in df.nodes.itertuples() ] ]   
+   new_nodes = df.nodes[ [ n.treenode_id in new_parents for n in df.nodes.itertuples() ] ]   
    new_nodes.parent_id = [ new_parents[ n.treenode_id ] for n in new_nodes.itertuples() ]
 
    module_logger.info('Nodes before/after: %i/%i ' % ( len( df.nodes ), len( new_nodes ) ) ) 
@@ -197,39 +215,48 @@ def downsample_neuron ( skdata, resampling_factor):
 
    df.nodes.reset_index(inplace=True)
 
-   return df
+   if not inplace:
+    return df
 
 def longest_neurite( skdata, root_to_soma = False ):
    """ Returns a neuron consisting only of the longest neurite
 
    Parameter:
    ---------
-   skdata :       Pandas dataframe containing a SINGLE neuron
-   root_to_soma : boolean (default = False)
-                  If true, neuron will be rerooted to soma.
-                  Soma is the node with >1000 radius
+   skdata :             CatmaidNeuron, CatmaidNeuronList, Pandas DataFrame or
+                        Series containing a SINGLE neuron
+   root_to_soma :       boolean (default = False)
+                        If true, neuron will be rerooted to soma.
+                        Soma is the node with >1000 radius
 
    Returns:
    --------
    pandas DataFrame
    """
 
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0].copy()
-   elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()  
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0]
+      else:
+        module_logger.error('%i neurons provided. Please provide only a single neuron!' % skdata.shape[0] )
+        raise Exception 
+
+   df = df.copy()
 
    if root_to_soma:   
       soma = df.nodes[ df.nodes.radius > 1000 ].reset_index()      
       if soma.shape[0] != 1:
-         module_logger.error('Unable to reroot: No or multiple soma found for neuron %s ' % df.neuron_name ) 
-         return
+         module_logger.error('Unable to reroot: None or multiple soma found for neuron %s ' % df.neuron_name ) 
+         raise Exception         
       if soma.ix[0].parent_id != None:
-         df = reroot_neuron( skdata, soma.ix[0].treenode_id )
+         df = reroot_neuron( df, soma.ix[0].treenode_id )
    
    #This here needs to be optimised -> takes so long because it calculates distances between ALL pairs of nodes
    #Instead: calculate only from root to each node?
-   df, g = dist_from_root( df, return_graph = True )   
+   df = igraph_catmaid.dist_from_root( df )   
+   g = df.igraph
 
    df.nodes.sort_values('dist_to_root', inplace=True, ascending = False)
    df.nodes.reset_index(inplace=True, drop = True)   
@@ -246,8 +273,7 @@ def longest_neurite( skdata, root_to_soma = False ):
 
    df.nodes = df.nodes [ df.nodes.treenode_id.isin( tn_to_preverse ) ].reset_index( drop = True)
 
-   return df
-     
+   return df     
 
 def reroot_neuron( skdata, new_root, g = None ):
    """ Uses igraph to reroot the neuron at given point. 
@@ -264,16 +290,16 @@ def reroot_neuron( skdata, new_root, g = None ):
    pandas Series containing the rerooted neuron
    """
 
-   start_time = time.time()
-
-   if type( skdata ) == type( pd.DataFrame() ):
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
       if skdata.shape[0] == 1:
         df = skdata.ix[0]
       else:
         module_logger.error('%i neurons provided. Please provide only a single neuron!' % skdata.shape[0] )
-        return
-   elif type( skdata ) == type ( pd.Series() ):
-      df = skdata
+        raise Exception 
+
+   start_time = time.time()
 
    #If cut_node is a tag, rather than a ID, try finding that node  
    if type(new_root) == type( str() ):
@@ -290,12 +316,16 @@ def reroot_neuron( skdata, new_root, g = None ):
       module_logger.error('Error: New root is old root!')
       return df
 
-   if not g and df.graph == None:
-      #Generate iGraph -> order/indices of vertices are the same as in skdata
-      g = igraph_from_skeleton(df)
-      df.graph = g
-   elif df.graph != None:
-      g = df.graph    
+   if not g: 
+      if isinstance(df, core.CatmaidNeuron):
+        g = df.igraph
+      elif instance(df, pd.Series):
+        if df.igraph != None:
+          #Generate iGraph -> order/indices of vertices are the same as in skdata
+          g = igraph_catmaid.igraph_from_skeleton(df)
+          df.igraph = g
+        else:
+          g = df.igraph
 
    #Now that we have generated the graph, make sure to make all further work on a copy!
    df = skdata.copy()  
@@ -339,47 +369,13 @@ def reroot_neuron( skdata, new_root, g = None ):
    df.nodes.reset_index( inplace=True ) #Reset index
 
    #Recalculate graph
-   df.graph = igraph_from_skeleton(df)
-
-   """
-   #get_shortest_paths() returns a list of paths from the new root to every other node
-   #format is [ root_node, node1, node2, node3, ... , node 10 ]
-   #all we need is the last (treenode_id) and the second last node ( its new parent )      
+   df.igraph = igraph_catmaid.igraph_from_skeleton(df)
    
-   shortest_paths = g.get_shortest_paths( new_root_index, to = None, mode='ALL' )   
-
-   new_paths = [ [ g.vs[i]['node_id'] for i in p ] for p in shortest_paths ]   
-
-   #Remove root node to root node (path length == 1)
-   new_paths = [ n for n in new_paths if len(n) > 1 ]
-
-   df.nodes.set_index('treenode_id', inplace = True )
-
-   new_parents = { p[-1] : p[-2] for p in new_paths }      
-   new_parents.update( { new_root : 0 } ) #This is a placeholder! Can't set this yet otherwise .astype(int) will fail
-
-   df.nodes.parent_id = [ new_parents[n] for n in df.nodes.index.tolist() ] #index is currently the treenode_id    
-   df.nodes.parent_id = df.nodes.parent_id.values.astype(int) #first convert everything to int
-   df.nodes.parent_id = df.nodes.parent_id.values.astype(object) #then back to object so that we can add a 'None'
-
-   df.nodes.loc[new_root,'parent_id'] = None
-   
-   df.nodes.reset_index( inplace=True ) 
-
-   #Now also update the graph
-   new_edges = [ [ n[-1], n[-2] ] for n in shortest_paths if len(n) > 1 ]
-   #Delete all edges
-   df.graph.delete_edges(None)
-   #Add new edges
-   df.graph.add_edges(new_edges)
-
-   """
-
    module_logger.info('Info: %s #%s successfully rerooted (%s s)' % ( df.neuron_name, df.skeleton_id, round(time.time()-start_time,1) ) )
 
    return df
 
-def cut_neuron2( skdata, cut_node, g = None ):
+def cut_neuron( skdata, cut_node, g = None ):
    """ Uses igraph to Cut the neuron at given point and returns two new neurons. 
    Creating the iGraph is the bottleneck - if you already have it, pass it along 
    to speed things up (see example below)!
@@ -399,38 +395,42 @@ def cut_neuron2( skdata, cut_node, g = None ):
    -------
    #Example for multiple cuts 
 
-   from pymaid.igraph_catmaid import igraph_from_skeleton
-   from pymaid.morpho import cut_neuron2
-   from pymaid.pymaid import get_3D_skeleton, CatmaidInstance
+   >>> from pymaid.igraph_catmaid import igraph_catmaid.igraph_from_skeleton
+   >>> from pymaid.morpho import cut_neuron2
+   >>> from pymaid.pymaid import pymaid.get_3D_skeleton, CatmaidInstance
 
-   remote_instance = CatmaidInstance( url, http_user, http_pw, token )
+   >>> remote_instance = CatmaidInstance( url, http_user, http_pw, token )
 
-   skeleton_dataframe = get_3D_skeleton( skeleton_id, remote_instance )
+   >>> skeleton_dataframe =pymaid.get_3D_skeleton(skeleton_id,remote_instance)
 
    #Generate igraph object once (time consuming step) and reuse for each cut
-   g = igraph_from_skeleton( skeleton_dataframe )
+   >>> g = igraph_catmaid.igraph_from_skeleton( skeleton_dataframe )
 
    #First cut
-   nA, nB = cut_neuron2( skeleton_data, cut_node1, g = g )
+   >>> nA, nB = cut_neuron2( skeleton_data, cut_node1, g = g )
 
    #Second cut
-   nA, nB = cut_neuron2( skeleton_data, cut_node2, g = g )  
+   >>> nA, nB = cut_neuron2( skeleton_data, cut_node2, g = g )  
    """
    start_time = time.time()  
 
-   module_logger.info('Cutting neuron.' )
+   module_logger.info('Cutting neuron...' )
 
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0].copy()
-   elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()  
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata.copy()
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0].copy()
+      else:
+        module_logger.error('%i neurons provided. Please provide only a single neuron!' % skdata.shape[0] )
+        raise Exception 
 
-   if g is None and df.graph == None:
+   if g is None:
+      g = df.igraph
+
+   if g is None:
       #Generate iGraph -> order/indices of vertices are the same as in skdata
-      g = igraph_from_skeleton(df)
-      df.graph = g
-   elif df.graph != None:
-      g = df.graph
+      g = igraph_catmaid.igraph_from_skeleton(df)         
 
    #If cut_node is a tag, rather than a ID, try finding that node
    if type(cut_node) == type( str() ):
@@ -495,7 +495,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
                                   df.tags,
                                   dist_graph
                               ]], 
-                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags','graph'],
+                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags','igraph'],
                               dtype=object
                               ).ix[0]   
 
@@ -509,7 +509,7 @@ def cut_neuron2( skdata, cut_node, g = None ):
                                   df.tags,
                                   prox_graph
                               ]], 
-                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags', 'graph'],
+                              columns = ['neuron_name','skeleton_id','nodes','connectors','tags', 'igraph'],
                               dtype=object
                               ).ix[0] 
 
@@ -529,7 +529,8 @@ def cut_neuron2( skdata, cut_node, g = None ):
    return neuron_dist, neuron_prox
 
 def _cut_neuron( skdata, cut_node ):
-   """ Cuts a neuron at given point and returns two new neurons.   
+   """ Cuts a neuron at given point and returns two new neurons. Does not use
+   igraph (slower)
 
    Parameter
    ---------
@@ -547,10 +548,14 @@ def _cut_neuron( skdata, cut_node ):
 
    module_logger.info('Preparing to cut neuron...' )
 
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0].copy()
-   elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()  
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata.copy()
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0].copy()
+      else:
+        module_logger.error('%i neurons provided. Please provide only a single neuron!' % skdata.shape[0] )
+        raise Exception 
 
    list_of_childs  = generate_list_of_childs( skdata )   
    list_of_parents = { n.treenode_id : n.parent_id for n in df.nodes.itertuples() }   
@@ -678,10 +683,14 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
                               postsynaptic sites of this neuron
    """
 
-   if type( skdata ) == type( pd.DataFrame() ):
-      df = skdata.ix[0].copy()
-   elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy() 
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0]
+      else:
+        module_logger.error('%i neurons provided. Currently, only a single neuron is supported!' % skdata.shape[0] )
+        raise Exception 
 
    #Reindex dataframe to treenode
    if df.nodes.index.name != 'treenode_id':
@@ -693,7 +702,7 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
    w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 )).tolist()
 
    #Get connector details
-   cn_details = get_connector_details (  skdata.connectors.connector_id.tolist() , remote_instance = remote_instance)   
+   cn_details = pymaid.get_connector_details (  skdata.connectors.connector_id.tolist() , remote_instance = remote_instance)   
 
    list_of_parents = { n[0]: (n[1], n[3], n[4], n[5] ) for n in skdata[0] }    
 
@@ -780,18 +789,22 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = 
     --------
     cable_length [um]   
 
-    OR (if return_skdata = True)
-
-    pandas DataFrame with df.nodes.parent_dist containing the distances to parent
+    OR if return_skdata = True:
+        skdata with <nodes.parent_dist> containing the distances to parent
     """   
 
-   if type(skdata) == type( int() ) or type(skdata) == type( str() ) :
-      skdata = get_3D_skeleton( [skdata], remote_instance).ix[0]
+   if isinstance(skdata, int) or isinstance(skdata, str):
+      skdata = pymaid.get_3D_skeleton( [skdata], remote_instance).ix[0]
 
-   if type( skdata ) == type( pd.DataFrame() ):      
-      df = skdata.ix[0].copy()
-   elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()
+   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata
+   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0]
+      elif not return_skdata:
+        return sum( [ calc_cable( skdata.ix[i] ) for i in range(skdata.shape[0]) ] )
+      else:
+        return core.CatmaidNeuronList( [ calc_cable( skdata.ix[i], return_skdata = return_skdata ) for i in range(skdata.shape[0]) ] )
 
    #Copy node data too
    df.nodes = df.nodes.copy()
@@ -827,9 +840,9 @@ def calc_strahler_index( skdata, return_dict = False ):
 
     Parameters:
     ----------
-    skdata :              skeleton data from pymaid.get_3D_skeleton()
+    skdata :              skeleton data from pymaid.pymaid.get_3D_skeleton()
     return_dict :         boolean (default = False)
-                          If True, a dict is returned instead of the dataframe
+                          If True, a dict is returned instead of the dataframe    
 
     Returns:
     -------
@@ -838,12 +851,15 @@ def calc_strahler_index( skdata, return_dict = False ):
 
     module_logger.info('Calculating Strahler indices...')
 
-    start_time = time.time()     
+    start_time = time.time()   
 
-    if type( skdata ) == type( pd.DataFrame() ):      
-      df = skdata.ix[0].copy()
-    elif type( skdata ) == type( pd.Series() ):
-      df = skdata.copy()    
+    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+      df = skdata
+    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+      if skdata.shape[0] == 1:
+        df = skdata.ix[0]
+      else:
+        return [ calc_strahler_index( skdata.ix[i] ) for i in range(skdata.shape[0]) ]        
 
     #Make sure dataframe is not indexed by treenode_id for preparing lists 
     df.nodes.reset_index( inplace = True, drop = True )
@@ -1000,7 +1016,7 @@ def in_volume( points, volume, remote_instance, approximate = False, ignore_axis
     points :            list of points; format [ [ x, y , z ], [  ] ]
                         can be numpy array, pandas df or list
     volume :            name of the CATMAID volume to test or list of vertices
-                        as returned by pymaid.get_volume()                        
+                        as returned by pymaid.pymaid.get_volume()                        
     remote_instance :   CATMAID instance (optional)
                         pass if skdata is a skeleton ID, not 3D skeleton data
     approximate :       boolean (default = False)
@@ -1018,7 +1034,7 @@ def in_volume( points, volume, remote_instance, approximate = False, ignore_axis
     """
 
     if type(volume) == type(str()):
-      volume = get_volume ( volume, remote_instance )
+      volume = pymaid.get_volume ( volume, remote_instance )
       verts = np.array( volume[0] )
     else:
       verts = np.array( volume )
@@ -1041,24 +1057,3 @@ def in_volume( points, volume, remote_instance, approximate = False, ignore_axis
         bbox[a] = ( float('-inf'), float('inf') )
 
       return [ False not in [  bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points.itertuples( index = False ) ]
-
-
-if __name__ == '__main__':
-   """
-   FOR DEBUGGING ONLY
-   """
-   import sys
-   sys.path.append('/Users/philipps/OneDrive/Cloudbox/Python')
-   sys.path.append('/Users/philipps/OneDrive/Cloudbox/Python/PyMaid/pymaid')
-   from connect_catmaid import connect_adult_em
-   rm = connect_adult_em()
-
-   #print(calc_cable ( 21999, smoothing = 3, remote_instance = rm) )
-
-   from pymaid import get_3D_skeleton  
-
-   skdata = get_3D_skeleton( [21999], rm)[0]     
-
-   nA, nB = cut_neuron2( skdata, 132996 )
-
-   #downsample_neuron ( nA , 10 )

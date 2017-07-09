@@ -1,16 +1,31 @@
+"""
+    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+    Copyright (C) 2017 Philipp Schlegel
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along
+"""
+
 import pylab
 import numpy as np 
 import matplotlib.pyplot as plt
 import pandas as pd
 import math
-
-from scipy import cluster, spatial
-try:
-   from pymaid import get_partners, get_names, get_edges
-except:
-   from pymaid.pymaid import get_partners, get_names, get_edges
-
 import logging
+from scipy import cluster, spatial
+
+from pymaid import pymaid, core
+
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
@@ -46,16 +61,23 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
    matrix :          pandas Dataframe
    """
 
+   #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
+   try:   
+      neuronsA = list( neuronsA.skeleton_id )   
+      neuronsB = list( neuronsB.skeleton_id )
+   except:
+      pass
+
    #Make sure neurons are strings, not integers
    neurons = list( set( [str(n) for n in list(set(neuronsA + neuronsB))] ) )
    neuronsA = list( set( [str(n) for n in  neuronsA ] ) )
    neuronsB = list( set( [str(n) for n in  neuronsB ] ) )
 
-   neuron_names = get_names( neurons, remote_instance )
+   neuron_names = pymaid.get_names( neurons, remote_instance )
 
    module_logger.info('Retrieving and filtering connectivity')
    
-   edges = get_edges ( neurons , remote_instance = remote_instance)   
+   edges = pymaid.get_edges ( neurons , remote_instance = remote_instance)   
 
    if row_groups or col_groups:
       rows_grouped = { str(n) : g for g in row_groups for n in row_groups[g] }
@@ -201,9 +223,16 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
 
    Returns:
    --------
-   dist_matrix :     Pandas dataframe containing all-by-all connectivity distance matrix 
+   dist_matrix :     Pandas dataframe containing all-by-all connectivity 
+                     distance matrix 
    cg :              (only if plot_matrix = True) Seaborn cluster grid plot 
    """
+
+   #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
+   try:
+      neurons = list( neurons.skeleton_id )
+   except:
+      pass
 
    #Make sure neurons are strings, not integers
    neurons = [ str(n) for n in list(set(neurons)) ]
@@ -217,7 +246,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
    module_logger.info('Retrieving and filtering connectivity')
 
    #Retrieve connectivity and apply filters
-   connectivity = get_partners( neurons, remote_instance, min_size = min_nodes, threshold = threshold )
+   connectivity = pymaid.get_partners( neurons, remote_instance, min_size = min_nodes, threshold = threshold )
 
    #Filter direction
    #connectivity = connectivity[ connectivity.relation.isin(directions) ]
@@ -242,7 +271,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
 
    module_logger.debug('Retrieving neuron names')
    #Retrieve names
-   neuron_names = get_names( list( set( neurons + connectivity.skeleton_id.tolist() ) ), remote_instance)   
+   neuron_names = pymaid.get_names( list( set( neurons + connectivity.skeleton_id.tolist() ) ), remote_instance)   
    
    matching_scores = {}
 
@@ -452,8 +481,10 @@ def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True, met
                      Labels for each leaf of the dendrogram (e.g. connector ids). 
    plot_matrix :     boolean
                      if True, matrix figure is generated and returned
-   method :          method used for hierarchical clustering (scipy.cluster.hierarchy.linkage)
-                     possible values: 'single', 'ward', 'complete', 'average', 'weighted', 'centroid'
+   method :          method used for hierarchical clustering 
+                     (scipy.cluster.hierarchy.linkage)
+                     possible values: 'single', 'ward', 'complete', 'average', 
+                     'weighted', 'centroid'
 
    Returns:
    -------

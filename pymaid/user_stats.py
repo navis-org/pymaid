@@ -16,11 +16,7 @@
     along
 """
 
-try:
-   from pymaid import get_3D_skeleton, get_user_list, get_node_user_details, get_contributor_statistics
-except:
-   from pymaid.pymaid import get_3D_skeleton, get_user_list, get_node_user_details, get_contributor_statistics
-
+from pymaid.pymaid import get_3D_skeleton, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids
 import logging
 import pandas as pd
 
@@ -37,7 +33,7 @@ if not module_logger.handlers:
   sh.setFormatter(formatter)
   module_logger.addHandler(sh)
 
-def get_user_contributions( skids, remote_instance ):
+def get_user_contributions( x , remote_instance ):
    """
    Takes a list of skeleton IDs and returns nodes and synapses contributed by each user.
    This is essentially a wrapper for pymaid.get_contributor_statistics() - if you are 
@@ -46,9 +42,12 @@ def get_user_contributions( skids, remote_instance ):
 
    Parameters:
    -----------
-   skids :        single or list of skeleton IDs
-   remote_instance : Catmaid Instance
-   
+   x :                Which neurons to check. Can be either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, must be exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+   remote_instance :  Catmaid Instance   
 
    Returns:
    -------
@@ -59,6 +58,8 @@ def get_user_contributions( skids, remote_instance ):
    1
    2
    """
+
+   skids = eval_skids(x, remote_instance)
 
    user_list = get_user_list( remote_instance ).set_index('id')
 
@@ -81,19 +82,23 @@ def get_user_contributions( skids, remote_instance ):
 
    return pd.DataFrame( [ [  user_list.ix[ int(u) ].last_name, stats['nodes'][u] , stats['presynapses'][u], stats['postsynapses'][u] ] for u in all_users ] , columns = [ 'user', 'nodes' ,'presynapses', 'postsynapses' ] ).sort_values('nodes', ascending = False).reset_index()
 
-def get_time_invested( skids, remote_instance, interval = 1, minimum_actions = 1 ):
+def get_time_invested( x, remote_instance, interval = 1, minimum_actions = 1 ):
    """
    Takes a list of skeleton IDs and calculates the time each user has spent working
    on this set of neurons.
 
    Parameters:
    -----------
-   skids :        single or list of skeleton IDs
-   remote_instance : Catmaid Instance
-   interval :        integer (default = 1)
-                  size of the bins in minutes
-   minimum_actions :   integer (default = 1)
-                  minimum number of actions per bin to be counted as active
+   x :                Which neurons to check. Can be either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, must be exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+   remote_instance :  Catmaid Instance
+   interval :         integer (default = 1)
+                      size of the bins in minutes
+   minimum_actions :  integer (default = 1)
+                      minimum number of actions per bin to be counted as active
 
    Returns:
    -------
@@ -110,6 +115,8 @@ def get_time_invested( skids, remote_instance, interval = 1, minimum_actions = 1
    Please note that this does currently not take placement of postsynaptic nodes
    into account!
    """
+
+   skids =  eval_skids(x, remote_instance )
 
    #Need this later for pandas TimeGrouper
    bin_width = '%iMin' % interval

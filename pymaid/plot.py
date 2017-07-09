@@ -35,17 +35,8 @@ import random
 import math
 from colorsys import hsv_to_rgb
 
-try:
-   from pymaid import get_3D_skeleton, get_names, get_volume
-except:
-   from pymaid.pymaid import get_3D_skeleton, get_names, get_volume
-
-try:
-   import morpho, igraph_catmaid
-   import cluster as clustmaid
-except:
-   from pymaid import morpho, igraph_catmaid
-   from pymaid import cluster as clustmaid
+from pymaid import morpho, igraph_catmaid, core, pymaid
+from pymaid import cluster as clustmaid
 
 #If plotneuron is not run as module, make sure module_logger has a at least a StreamHandler
 module_logger = logging.getLogger(__name__) 
@@ -69,21 +60,23 @@ def plot2d( *args, **kwargs ):
    Provide neurons by using either one of the following kwargs
 
    skids :           list or single skid
-   skdata :          skeleton data as retrieved by pymaid.get_3D_skeleton()
+   skdata :          skeleton data as retrieved by pymaid.pymaid.get_3D_skeleton()
    remote_instance : Catmaid Instance - need this too if you are passing only
                      skids
 
    Examples:
 
-   1. Plot two neurons and have plot2d download the skeleton data for you
-        fig, ax = plot.plot2d( skids = [12345, 45567], remote_instance = rm ) 
-        matplotlib.pyplot.show()
+   1. Plot two neurons and have plot2d download the skeleton data for you:
 
-   2. Manually download a neuron, modify it and plot it
-        skdata = pymaid.get_3D_skeleton( [12345], rm )
-        dist, prox = morpho.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
-        fig, ax = plot.plot2d( skdata = dist )
-        matplotlib.pyplot.show()
+   >>> fig, ax = plot.plot2d( skids = [12345, 45567], remote_instance = rm ) 
+   >>> matplotlib.pyplot.show()
+
+   2. Manually download a neuron, modify it and plot it:
+
+   >>> skdata = pymaid.pymaid.get_3D_skeleton( [12345], rm )
+   >>> dist, prox = morpho.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
+   >>> fig, ax = plot.plot2d( skdata = dist )
+   >>> matplotlib.pyplot.show()
 
    Other (optional) arguments:
    connectors :      boolean (default = True)
@@ -109,17 +102,19 @@ def plot2d( *args, **kwargs ):
    *args will cause them to be plotted in gray; passing neuropil names as **kwargs 
    will render them in the provided color.
    
-   For example: 
-   plot.plot2d(   skids = [ 12346 ], 
-                  remote_instance = rm, 
-                  'brain' = (1,0,0), 
-                  'MB' =  (0,1,0) )
-      -> plots brain in red, and mushroom body in green
+   Examples:
 
-   plot.plot2d(   skids = [ 12346 ], 
-                  remote_instance = rm,
-                  *['brain', 'MB'] )
-      -> plots brain and mushroom body in grey                                    
+   #Plots brain in red, and mushroom body in green:
+   >>> plot.plot2d(  skids = [ 12346 ], 
+   ...               remote_instance = rm, 
+   ...               'brain' = (1,0,0), 
+   ...               'MB' =  (0,1,0) )
+      
+   #Plots brain and mushroom body in grey
+   >>> plot.plot2d(   skids = [ 12346 ], 
+   ...               remote_instance = rm,
+   ...               *['brain', 'MB'] )
+   
 
    Currently, the following neuropils are included:
    brain, MB, LH, AL, SLP, SIP, CRE
@@ -166,8 +161,10 @@ def plot2d( *args, **kwargs ):
 
 
    if not skdata and remote_instance and skids:
-      skdata = get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None, get_abutting = True)          
-   else:
+      skdata = pymaid.get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None, get_abutting = True)
+   elif isinstance(skdata, pd.Series) or isinstance( skdata, core.CatmaidNeuron):
+      skdata = core.CatmaidNeuronList(skdata)
+   elif not skdata:
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot2d).')
       return
    
@@ -427,7 +424,7 @@ def plot3d( *args, **kwargs ):
 
    skids :           list
                      list of CATMAID skeleton ids
-   skdata :          skeleton data as retrieved by pymaid.get_3D_skeleton()
+   skdata :          skeleton data as retrieved by pymaid.pymaid.get_3D_skeleton()
    dotprops :        pandas DataFrame containing neurons as dotprops 
                      Format:  index    name    points        vect
                               1        str     DataFrame      DataFrame
@@ -439,6 +436,8 @@ def plot3d( *args, **kwargs ):
    remote_instance : CATMAID remote instance
                      need to pass this too if you are providing only skids
                      also necessary if you want to include volumes!
+                     If possible, will try to get remote instance from
+                     neuron object.                     
 
    backend :         string (default = 'vispy')
                      Can be 'vispy' or 'plotly': 
@@ -455,7 +454,7 @@ def plot3d( *args, **kwargs ):
    limits :          manually override plot limits
                      {'x' : [min,max], 'y': [min,max], 'z':[min,max]}
    auto_limits :     autoscales plot to fit the neurons (default = True)                         
-   downsampling :    set downsampling of neurons before plotting (default = 10)
+   downsampling :    set downsampling of neurons before plotting (default = None)
    volumes :         volumes to plot. Can be:
                         1. Volume name (str): e.g. "v13.LH_R"
                         2. List of names: e.g. ['v13.LH_R', 'v13.LH_L']
@@ -465,7 +464,7 @@ def plot3d( *args, **kwargs ):
                            e.g. {'my_neuropil': { 'verts': [ ], 'faces' : [], 'color': () }}
                      If no color is provided, default (220,220,220) is used
    colormap :        { skid : (r,g,b), ... } (default = random colors)
-                     color must be 0-255   
+                     color must be 0-255
    fig_width and :   use to define figure/window size (default = 1440/960)
    fig_height
 
@@ -486,7 +485,7 @@ def plot3d( *args, **kwargs ):
                   use for example:
                   plotly.offline.plot(fig, filename='3d_plot.html') 
                   to generate html file and open it webbrowser 
-   """      
+   """   
 
    def _plot3d_vispy():
       """
@@ -543,7 +542,7 @@ def plot3d( *args, **kwargs ):
                radius = min( soma.ix[ soma.index[0] ].radius*scale_factor, 10 )
                sp = create_sphere( 5, 5, radius = radius )               
                s = scene.visuals.Mesh( vertices = sp.get_vertices() + soma.ix[ soma.index[0] ][['x','y','z']].as_matrix()*scale_factor, faces = sp.get_faces(), color = neuron_color  )
-               view.add(s)         
+               view.add(s)
 
          if connectors or connectors_only:  
             for j in [ 0,1,2 ]:
@@ -690,6 +689,7 @@ def plot3d( *args, **kwargs ):
       #Generate sphere for somas
       fib_points = fibonacci_sphere( samples = 30 )
 
+      module_logger.info('Generating traces...')
       for i, neuron in enumerate( skdata.itertuples() ):
          module_logger.debug('Working on neuron %s' % str( neuron.skeleton_id ) )
 
@@ -730,10 +730,9 @@ def plot3d( *args, **kwargs ):
               except:
                  pass
 
-              slabs.append( this_slab )     
+              slabs.append( this_slab )                
 
-           module_logger.debug('Generating traces')
-
+           module_logger.debug('Generating traces...')
            #Now make traces   
            x_coords = []
            y_coords = []   
@@ -777,7 +776,7 @@ def plot3d( *args, **kwargs ):
            #Add soma(s):                   
            for n in soma.itertuples():  
               try:
-                  color = 'rgb(%s)' % str(colormap[ str( skid ) ])
+                  color = 'rgb%s' % str( colormap[ str( skid ) ] )                  
               except:
                   color ='rgb(10,10,10)'              
               trace_data.append(  go.Mesh3d(
@@ -895,6 +894,8 @@ def plot3d( *args, **kwargs ):
                              ) 
                           )
 
+      module_logger.info('Traced done.')
+
       #Now add neuropils:      
       for v in volumes_data:
          if volumes_data[v]['verts']:            
@@ -983,7 +984,7 @@ def plot3d( *args, **kwargs ):
 
    #Parameters for neurons
    names = kwargs.get('names', [] )
-   downsampling = kwargs.get('downsampling', 10)      
+   downsampling = kwargs.get('downsampling', 1)      
    connectors = kwargs.get('connectors', False )
    by_strahler = kwargs.get('by_strahler', False )    
    cn_mesh_colors = kwargs.get('cn_mesh_colors', False )      
@@ -1036,21 +1037,28 @@ def plot3d( *args, **kwargs ):
 
    if backend != 'plotly' and backend != 'vispy':
       module_logger.error('Unknown backend: %s. See help(plot.plot3d).' % str(backend) )
-      return  
+      return
+
+   if isinstance(skdata, pd.Series):
+      #If skdata is just a single neuron, bring it into a proper list format
+      skdata = pd.DataFrame( [ skdata ] )   
+   
+   if isinstance(skdata, core.CatmaidNeuron):
+      skdata = core.CatmaidNeuronList( skdata )
+
+   if not remote_instance and isinstance(skdata, core.CatmaidNeuronList):
+      remote_instance = skdata._remote_instance
 
    if (skdata.empty and dotprops.empty and not skids) or (skids and not remote_instance):
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot3d).')
       return  
    elif skdata.empty and skids and remote_instance:
-      skdata = get_3D_skeleton ( skids, remote_instance, 
-                                                   connector_flag = 1, 
-                                                   tag_flag = 0 , 
-                                                   get_history = False, 
-                                                   time_out = None,
-                                                   get_abutting = True ) 
-   elif 'nodes' in skdata.index.tolist():
-      #If skdata is just a single neuron, bring it into a proper list format
-      skdata = pd.DataFrame( [ skdata ] )   
+      skdata = pymaid.get_3D_skeleton (    skids, remote_instance, 
+                                    connector_flag = 1, 
+                                    tag_flag = 0 , 
+                                    get_history = False, 
+                                    time_out = None,
+                                    get_abutting = True )
 
    colormap = kwargs.get( 'colormap', {} )
 
@@ -1078,7 +1086,7 @@ def plot3d( *args, **kwargs ):
             module_logger.error('Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ... >')
             return
          else:
-            verts, faces = get_volume( v, remote_instance ) 
+            verts, faces = pymaid.get_volume( v, remote_instance ) 
       else:
          verts = volumes[v]['verts']
          faces = volumes[v]['faces']
@@ -1106,8 +1114,11 @@ def plot3d( *args, **kwargs ):
    if downsampling > 1 and not connectors_only and not skdata.empty:
       module_logger.info('Downsampling neurons...')  
       morpho.module_logger.setLevel('ERROR')    
-      skdata = pd.DataFrame( [ morpho.downsample_neuron ( skdata.ix[i], downsampling ) for i in range( skdata.shape[0] ) ] )
+      skdata = morpho.downsample_neuron ( skdata, downsampling ) 
       morpho.module_logger.setLevel('INFO')
+      module_logger.info('Downsampling finished.') 
+   elif skdata.shape[0] > 30:
+       module_logger.info('Large dataset detected. Consider using the <downsampling> parameter if you encounter bad performance.') 
 
    if backend == 'plotly':
       return _plot3d_plotly()   
@@ -1164,7 +1175,7 @@ def plot_network( *args, **kwargs ):
                   use for example:
                   plotly.offline.plot(fig, filename='plot.html') 
                   to generate html file and open it webbrowser 
-   """   
+   """
 
    skids = kwargs.get('skids', [] )
    adj_mat = kwargs.get('adj_mat', pd.DataFrame() )
@@ -1186,8 +1197,7 @@ def plot_network( *args, **kwargs ):
 
    fig_width = kwargs.get('fig_width', 1440)
    fig_height = kwargs.get('fig_height', 960)
-   fig_autosize = kwargs.get('fig_autosize', False)  
-
+   fig_autosize = kwargs.get('fig_autosize', False)
 
    if adj_mat.empty and not skids and not g:
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR an adjacency matrix. See help(plot.plot_network).')
@@ -1200,7 +1210,7 @@ def plot_network( *args, **kwargs ):
                                                    syn_threshold = syn_threshold,
                                                    row_groups = groups, #This is where the magic happens
                                                    col_groups = groups #This is where the magic happens
-                                                   )   
+                                                   )
    if not g:
       #Generate igraph object and apply layout
       g = igraph_catmaid.igraph_from_adj_mat( adj_mat, syn_threshold = syn_threshold, syn_cutoff = syn_cutoff )
@@ -1349,7 +1359,7 @@ def plot_network( *args, **kwargs ):
 
    module_logger.info('Done! Use e.g. plotly.offline.plot(fig, filename="network_plot.html") to plot.')
 
-   return fig
+   return fig   
 
 if __name__ == '__main__':
    """
@@ -1363,7 +1373,7 @@ if __name__ == '__main__':
 
    remote_instance = connect_adult_em()
 
-   skdata = get_3D_skeleton( [27295] , remote_instance )[0]
+   skdata = pymaid.get_3D_skeleton( [27295] , remote_instance )[0]
 
    LH, rest = morpho.cut_neuron2 ( skdata , 2816697 )
 

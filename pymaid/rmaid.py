@@ -34,7 +34,7 @@ rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 
 #Fetch a neuron in Python CATMAID
 skid = 123456
-n = pymaid.get_3D_skeleton( skid, rm )
+n = pymaid.pymaid.get_3D_skeleton( skid, rm )
 
 #Initialize R's rcatmaid 
 rcatmaid = rmaid.init_rcatmaid( rm )
@@ -68,12 +68,7 @@ import numpy as np
 
 from colorsys import hsv_to_rgb
 
-try:
-    from pymaid import get_names, get_3D_skeleton
-    from plot import plot3d
-except:
-    from pymaid.pymaid import get_names, get_3D_skeleton
-    from pymaid.plot import plot3d
+from pymaid import core, pymaid, plot
 
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
@@ -189,7 +184,7 @@ def data2py ( data, **kwargs ):
     """   
 
     if 'neuronlistfh' in cl(data):
-        module_logger.error('On-demand neuronlist found. Conversion cancelled to prevent loading large datasets in memory. Please use rmaid.dotprops2py() and "subset" parameter.')
+        module_logger.error('On-demand neuronlist found. Conversion cancelled to prevent loading large datasets in memory. Please use rmaid.dotprops2py() and its "subset" parameter.')
         return None
     elif 'neuronlist' in cl(data):
         if 'catmaidneuron' in cl(data[0]): 
@@ -252,8 +247,8 @@ def data2py ( data, **kwargs ):
         return data
 
 def neuron2py ( neuron, remote_instance = None ):
-    """ Converts an rcatmaid neuron or neuronlist object to a standard Python 
-    PyMaid neuron.
+    """ Converts an rcatmaid neuron or neuronlist object to a standard PyMaid 
+    CatmaidNeuronList.
 
     ATTENTION: node creator and confidence are not included in R's neuron/neuronlist
     and will be imported as <None>
@@ -266,7 +261,7 @@ def neuron2py ( neuron, remote_instance = None ):
 
     Returns:
     -------
-    pandas DataFrame
+    pymaid CatmaidNeuronList
     """
 
     if 'rpy2' in str( type(neuron) ):
@@ -285,7 +280,7 @@ def neuron2py ( neuron, remote_instance = None ):
 
     #Nat function may return neuron objects that have ONLY nodes - no connectors, skeleton_id, name or tags! 
     if 'skid' in neuron and remote_instance:
-        neuron_names = get_names( [ n[0] for n in neuron.skid.tolist() ], remote_instance )    
+        neuron_names = pymaid.get_names( [ n[0] for n in neuron.skid.tolist() ], remote_instance )    
     elif 'skid' in neuron and not remote_instance:
         neuron_names = { n[0] : 'NA' for n in neuron.skid.tolist() }
         module_logger.warning('Please provide a remote instance if you want to add neuron name.')
@@ -331,7 +326,7 @@ def neuron2py ( neuron, remote_instance = None ):
                             dtype=object
                             )
 
-    return df
+    return core.CatmaidNeuronList( df )
 
 def neuron2r ( neuron ):
     """ Converts a PyMaid neuron or list of neurons (DataFrames) to the 
@@ -345,7 +340,7 @@ def neuron2r ( neuron ):
     is ALWAYS 1.   
     """
 
-    if type( neuron ) == pd.DataFrame:
+    if isinstance(neuron, pd.DataFrame) or isinstance(neuron, core.CatmaidNeuronList):
         """
         The way neuronlist are constructed is a bit more complicated:
         They are essentially named lists { 'neuronA' : neuronobject, ... }
@@ -377,7 +372,7 @@ def neuron2r ( neuron ):
 
         return nlist
 
-    elif type ( neuron ) == pd.Series:     
+    elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):     
         n = neuron
         #First convert into format that rcatmaid expects as server response      
 
@@ -400,7 +395,7 @@ def neuron2r ( neuron ):
             soma_id = robjects.r('NULL')
 
         #Generate nat neuron
-        n_r = nat.as_neuron( swc, origin = soma_id, skid = n.skeleton_id )
+        n_r = nat.as_neuron( swc, origin = int(soma_id), skid = n.skeleton_id )
          
         #Convert back to python dict so that we can add additional data
         n_py = { n_r.names[i] : n_r[i] for i in range(len(n_r)) }
@@ -477,10 +472,10 @@ def dotprops2py( dp, subset = None ):
 
 
 def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = False, normalised=True, UseAlpha = False, mirror = True, reference = 'nat.flybrains::FCWB' ) :
-    """ Wrapper to use R's nblast (https://github.com/jefferis/nat).
-    Provide neuron to nblast either as skeleton ID or neuron object.
-    This essentially recapitulates what elmr's (https://github.com/jefferis/elmr)
-    nblast_fafb does.
+    """ Wrapper to use R's nblast (https://github.com/jefferis/nat). Provide 
+    neuron to nblast either as skeleton ID or neuron object. This essentially 
+    recapitulates what elmr's (https://github.com/jefferis/elmr) nblast_fafb 
+    does.
 
     Parameters:
     ----------
@@ -488,7 +483,7 @@ def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = Fa
 
                         This can be either
                         1. A single skeleton ID
-                        2. PyMaid neuron from e.g. pymaid.get_3D_skeleton()
+                        2. PyMaid neuron from e.g. pymaid.pymaid.get_3D_skeleton()
                         3. RCatmaid neuron object
 
     remote_instance :   Catmaid Instance (optional)
@@ -596,7 +591,7 @@ def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = Fa
         if not remote_instance:
             module_logger.error('You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        rn = neuron2r(  get_3D_skeleton( neuron, remote_instance ).ix[0] )
+        rn = neuron2r(  pymaid.get_3D_skeleton( neuron, remote_instance ).ix[0] )
     else:
         module_logger.error('Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
         return
@@ -711,7 +706,7 @@ class nbl_results:
         self.res.reset_index( inplace=True, drop =True )
 
     def plot( self, hits = 5, plot_neuron = True, plot_brain = True, **kwargs ):
-        """ Wrapper to plot nblast hits using pymaid.plot.plot3d()
+        """ Wrapper to plot nblast hits using pymaid.plot.plot.plot3d()
 
         Parameters:
         ----------
@@ -729,18 +724,18 @@ class nbl_results:
         plot_brain :    boolean (default =True)
                         if True, the reference brain will be plotted
 
-        kwargs :    parameters passed to plot3d. See help(pymaid.plot.plot3d)
+        kwargs :    parameters passed to plot.plot3d. See help(pymaid.plot.plot.plot3d)
                     for details.
 
         Returns:
         -------
-        Depending on the backends used by plot.plot3d():
+        Depending on the backends used by plot.plot.plot3d():
 
         vispy (default):    canvas, view
         plotly:             figure
 
         You can specify the backend by using e.g. backend = 'plotly' in **kwargs.
-        See help(pymaid.plot.plot3d) for details.
+        See help(pymaid.plot.plot.plot3d) for details.
         """
 
         nl = self.get_dps( hits )
@@ -776,13 +771,13 @@ class nbl_results:
                                     'colormap' : cmap,
                                     'volumes' : volumes,
                                     'downsampling' : 1 } )                              
-                return plot3d( **kwargs )
+                return plot.plot3d( **kwargs )
             else:
                 kwargs.update( {    'dotprops' : dotprops2py( nl ), 
                                     'colormap' : cmap,
                                     'volumes' : volumes,
                                     'downsampling' : 1 } ) 
-                return plot3d( **kwargs )
+                return plot.plot3d( **kwargs )
 
     def get_dps( self, entries ):
         """ Wrapper to retrieve dotproducts from DPS database (neuronlistfh) 
