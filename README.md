@@ -60,7 +60,8 @@ n = CatmaidNeuron( '12345', remote_instance = myInstance )
 #Retrieve a list of skeletons using an annotation
 nl = get_3D_skeleton ( 'annotation:example_neurons' , myInstance )
 
-#nl is a CatmaidNeuron object that manages data. Notice that some entries show as 'NA' because that data has not yet been retrieved/calculated
+#nl is a CatmaidNeuronList object that manages data:
+#Notice that some entries show as 'NA' because that data has not yet been retrieved/calculated
 print(nl)
 
 #You can subset the neurons based on their properties
@@ -129,7 +130,7 @@ Primary attributes:
 - `tags`: node tags
 - `annotations`: list of neuron(s) annotations
 - `cable_length`: cable length(s) in nm
-- 'review_status': review status of neuron(s)
+- `review_status`: review status of neuron(s)
 
 ### pymaid.core.CatmaidNeuronList:
 Representation of a **list** of Catmaid neurons. Can be minimally initialized with just a skeleton ID.
@@ -188,7 +189,7 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `calc_cable()`: calculate cable length of given neuron
 - `calc_strahler_index()`: calculate strahler index for each node
 - `classify_nodes()`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
-- `cut_neuron()`: similar to above but uses iGraph (faster). Recommended to use this over `cut_neuron()`
+- `cut_neuron()`: cut neuron at a node or node tag
 - `downsample_neuron()`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - `in_volume()`: test if points are within given CATMAID volume
 - `longest_neurite()`: prunes neuron to its longest neurite
