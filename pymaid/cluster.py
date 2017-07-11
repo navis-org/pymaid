@@ -1,20 +1,19 @@
-"""
-    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
-    Copyright (C) 2017 Philipp Schlegel
+#    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+#    Copyright (C) 2017 Philipp Schlegel
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along
-"""
 
 import pylab
 import numpy as np 
@@ -25,7 +24,6 @@ import logging
 from scipy import cluster, spatial
 
 from pymaid import pymaid, core
-
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
@@ -43,24 +41,25 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
    """ Wrapper to generate a matrix for synaptic connections between neuronsA 
    -> neuronsB (unidirectional!)
 
-   Parameters:
-   -----------
-   neuronsA :        list of skids
-   neuronsB :        list of skids
+   Parameters
+   ----------
+   neuronsA :        list of skeleton IDs
+   neuronsB :        list of skeleton IDs
    remote_instance : CATMAID instance
-   syn_cutoff  :     integer (default = None)
-                     if set, will cut off synapses above given value
-   syn_threshold  :  integer (default = 1)
-                     if set, will cut off synapses below given value
-   row_groups /:     dict (optional)
-   col_groups        use to collapse neuronsA/B into groups
-                     example: {'Group1': [skid1,skid2,skid3], 'Group2' : [] }
+   syn_cutoff :      int, optional
+                     If set, will cut off synapses above given value. 
+                     Default = None
+   syn_threshold :   int, optional
+                     If set, will cut off synapses below given value. 
+                     Default = None
+   row_groups, col_groups : dict, optional
+                     Use to collapse neuronsA/B into groups: 
+                     ``{'Group1': [skid1,skid2,skid3], 'Group2' : [] }``
 
-   Returns:
+   Returns
    -------
    matrix :          pandas Dataframe
    """
-
    #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
    try:   
       neuronsA = list( neuronsA.skeleton_id )   
@@ -138,16 +137,17 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
 def group_matrix ( mat, row_groups = {} , col_groups = {}, method = 'AVERAGE' ):
    """ Takes a matrix or a pandas Dataframe and groups values by keys provided.  
 
-   Parameters:
-   ---------
-   mat :          pandas or numpy matrix
-   row_groups/ :  dictionaries =  { 'group name' : [ member1, member2, ... ], .. }
-   col_groups     for pandas DataFrames members need to be column or index, for
-                  np they need to be slices indices
-   method :       method by which groups are collapsed
-                  can be 'AVERAGE', 'MAX' or 'MIN'
+   Parameters
+   ----------
+   mat :                      {pandas DataFrame, numpy matrix}
+   row_groups, col_groups :   dicts, optional 
+                              For pandas DataFrames members need to be column 
+                              or index, for np they need to be slices indices:  
+                        ``{ 'group name' : [ member1, member2, ... ], .. }``
+   method :                   {'AVERAGE', 'MAX', 'MIN'} 
+                              Method by which groups are collapsed.
 
-   Returns:
+   Returns
    -------
    pandas DataFrame
    """
@@ -196,36 +196,41 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
    """ Wrapper to calculate connectivity similarity and creates a distance 
    matrix for a set of neurons. Uses Ward's algorithm for clustering.
 
-   Parameters:
-   -----------
-   neurons :         list of skids
-   remote_instance : CATMAID instance
-   upstream :        boolean (default=True)
-                     if True, upstream partners will be considered
-   downstream :      boolean (default=True)
-                     if True, downstream partners will be considered
-   threshold :       int (default = 1)
-                     Only partners with >= this synapses are considered. 
-                     Attention: this might impair proper comparison:
-                     e.g. neuronA and neuronB connect to neuronC with 1 and 3 
-                     synapses, respectively. 
-                     If threshold=2, then connection from A to C will be ignored!
-   min_nodes :       int (default = 2)
-                     minimum number of nodes for a partners to be considered
-   filter_skids :    list of skids (optional)
-                     If filter_skids is not empty, only neurons whose skids are 
-                     in filter_skids will be considered when calculating 
-                     similarity score
-   exclude_skids :   list of skids (optional)
-                     skids to exclude from calculation of connectivity similarity
-   plot_matrix :     if True, a plot will be generated (default = True)
+   Parameters
+   ----------
+   neurons :            list of skeleton IDs
+   remote_instance :    CATMAID instance
+   upstream :           bool, optional
+                        If True, upstream partners will be considered. 
+                        Default = True
+   downstream :         bool, optional
+                        If True, downstream partners will be considered. 
+                        Default = True
+   threshold :          int, optional 
+                        Only partners with >= this synapses are considered. 
+                        Default = 1. Attention: this might impair proper 
+                        comparison: e.g. neuronA and neuronB connect to neuronC 
+                        with 1 and 3 synapses, respectively. If threshold=2, 
+                        then connection from A to C will be ignored!
+   min_nodes :          int, optional
+                        Minimum number of nodes for a partners to be 
+                        considered. Default = 2
+   filter_skids :       list of skeleton IDs, optional
+                        If filter_skids is not empty, only neurons whose skids 
+                        are in filter_skids will be considered when 
+                        calculating similarity score
+   exclude_skids :      list of skeleton IDs, optional
+                        Neurons to exclude from calculation of connectivity 
+                        similarity
+   plot_matrix :        bool, optional
+                        If True, a plot will be generated. Default = True
 
-
-   Returns:
-   --------
-   dist_matrix :     Pandas dataframe containing all-by-all connectivity 
-                     distance matrix 
-   cg :              (only if plot_matrix = True) Seaborn cluster grid plot 
+   Returns
+   -------
+   dist_matrix :        Pandas dataframe 
+                        Distance matrix containing all-by-all connectivity 
+   cg :                 Seaborn cluster grid plot 
+                        Only if ``plot_matrix = True``
    """
 
    #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
@@ -345,57 +350,65 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
 
 
 def _calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1, **kwargs ): 
-   """ Calculates and returns various matching indices between two neurons.   
-   
-   matching_index =           Number of shared partners divided by total number 
-                              of partners
-   
-   matching_index_synapses =  Number of shared synapses divided by total number 
-                              of synapses. Attention! matching_index_synapses is 
-                              tricky, because if neuronA has lots of connections 
-                              and neuronB only little, they will still get a 
-                              high matching index. 
-                              E.g. 100 of 200 / 1 of 50 = 101/250 
-                              -> matching index = 0.404
-   
-   matching_index_weighted_synapses = Similar to matching_index_synapses but 
-                              slightly less prone to above mentioned error: 
-                              % of shared synapses A * % of shared synapses 
-                              B * 2 / (% of shared synapses A + % of shared 
-                              synapses B)
-                              -> value will be between 0 and 1; if one neuronB 
-                              has only few connections (percentage) to a shared 
-                              partner, the final value will also be small
-   
-   vertex_normalized =        Matching index that rewards shared and punishes 
-                              non-shared partners. Vertex similarity based on 
-                              Jarrell et al., 2012: 
-                              f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
-                              x,y = edge weights to compare
-                              vertex_similarity is the sum of f over all vertices
-                              C1 determines how negatively a case where one edge 
-                              is much stronger than another is punished
-                              C2 determines the point where the similarity 
-                              switches from negative to positive                        
+   """ Calculates and returns various matching indices between two neurons.
 
-   Parameters:
-   -----------
+   Parameters
+   ----------
    neuronA :         skeleton ID
    neuronB :         skeleton ID
-   connectivity :    connectivity data as provided by pymaid.get_partners()
-   syn_threshold :   min number of synapses for a connection to be considered
-   min_nodes :       min number of nodes for a partner to be considered
-                     use this to filter fragments   
-   vertex_score :    (default = True)
-                     if False, no vertex score is returned (much faster!)
-   nA_cn/nB_cn :     list of booleans
-                     subsets of the connectivity that connect to either neuronA
-                     or neuronB -> if not provided, will be calculated -> time
-                     consuming
+   connectivity :    pandas DataFrame
+                     Connectivity data as provided by ``pymaid.get_partners()``
+   syn_threshold :   int, optional
+                     Min number of synapses for a connection to be considered. 
+                     Default = 1
+   min_nodes :       int, optional  
+                     Min number of nodes for a partner to be considered use 
+                     this to filter fragments. Default = 1
+   vertex_score :    bool, optional      
+                     If False, no vertex score is returned (much faster!). 
+                     Default = True
+   nA_cn/nB_cn :     list of bools
+                     Subsets of the connectivity that connect to either 
+                     neuronA or neuronB -> if not provided, will be calculated 
+                     -> time consuming
 
-   Returns:
+   Returns
    -------
-   dict containing all initially described matching indices
+   dict 
+                     Containing all initially described matching indices
+
+   Notes
+   -----
+   |matching_index =           Number of shared partners divided by total number 
+   |                           of partners
+   
+   |matching_index_synapses =  Number of shared synapses divided by total number 
+   |                           of synapses. Attention! matching_index_synapses 
+   |                           is tricky, because if neuronA has lots of 
+   |                           connections and neuronB only little, they will 
+   |                           still get a high matching index. 
+   |                           E.g. 100 of 200 / 1 of 50 = 101/250 
+   |                           -> ``matching index = 0.404``
+   
+   |matching_index_weighted_synapses = Similar to matching_index_synapses but 
+   |                           slightly less prone to above mentioned error: 
+   |                           % of shared synapses A * % of shared synapses 
+   |                           B * 2 / (% of shared synapses A + % of shared 
+   |                           synapses B)
+   |                           -> value will be between 0 and 1; if one neuronB 
+   |                           has only few connections (percentage) to a shared 
+   |                           partner, the final value will also be small
+   |
+   |vertex_normalized =        Matching index that rewards shared and punishes 
+   |                           non-shared partners. Vertex similarity based on 
+   |                           Jarrell et al., 2012: 
+   |                           f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
+   |                           x,y = edge weights to compare
+   |                           vertex_similarity is the sum of f over all vertices
+   |                           C1 determines how negatively a case where one edge 
+   |                           is much stronger than another is punished
+   |                           C2 determines the point where the similarity 
+   |                           switches from negative to positive 
    """   
 
    if min_nodes > 1:
@@ -473,23 +486,24 @@ def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True, met
    """ Takes a list of CATMAID synapses, calculates EUCLEDIAN distance matrix 
    and clusters them (WARD algorithm)
 
-   Parameters:
+   Parameters
    ----------
    synapse_data :    Pandas dataframe
                      Contains the connector data (df.connectors)
-   labels :          list of strings
-                     Labels for each leaf of the dendrogram (e.g. connector ids). 
-   plot_matrix :     boolean
-                     if True, matrix figure is generated and returned
-   method :          method used for hierarchical clustering 
-                     (scipy.cluster.hierarchy.linkage)
-                     possible values: 'single', 'ward', 'complete', 'average', 
-                     'weighted', 'centroid'
+   labels :          list of str, optional
+                     Labels for each leaf of the dendrogram 
+                     (e.g. connector ids). 
+   plot_matrix :     boolean, optional
+                     If True, matrix figure is generated and returned
+   method : {'single', 'ward', 'complete', 'average', 'weighted', 'centroid'}        
+                     Method used for hierarchical clustering from
+                     ``(scipy.cluster.hierarchy.linkage)`` 
 
-   Returns:
+   Returns
    -------
    dist_matrix :     numpy distance matrix
-   fig :             (only if plot_matrix = True) matplotlib object 
+   fig :             matplotlib object 
+                     Only if plot_matrix = True
    """      
 
    #Generate numpy array containing x, y, z coordinates

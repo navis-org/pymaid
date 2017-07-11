@@ -1,52 +1,43 @@
+#    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+#    Copyright (C) 2017 Philipp Schlegel
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along
+
 """ Collection of tools to turn CATMAID neurons into iGraph objects to 
 efficiently calculate distances and cluster synapses.
 
-
-    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
-    Copyright (C) 2017 Philipp Schlegel
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along
-
-
-Basic example:
-------------
-
+Examples
+--------
 >>> from pymaid import CatmaidInstance, get_3D_skeleton
 >>> from catmaid_igraph import igraph_from_skeleton, cluster_nodes_w_synapses
-
->>> remote_instance = CatmaidInstance(  'www.your.catmaid-server.org', 
-                                       'user', 
-                                       'password', 
-                                       'token' 
-                                    )
-
-#Example skid
+>>> remote_instance = CatmaidInstance(    'www.your.catmaid-server.org', 
+...                                       'user', 
+...                                       'password', 
+...                                       'token' 
+...                                    )
+>>> #Example skid
 >>> skid = '12345'
-
-#Retrieve 3D skeleton data for neuron of interest
+>>> #Retrieve 3D skeleton data for neuron of interest
 >>> skdata = get_3D_skeleton ( [ example_skid ], 
-                             remote_instance, 
-                              connector_flag = 1, 
-                              tag_flag = 0 )[0]
-
-#Cluster synapses - generates plot and returns clustering for nodes with synapses
+...                             remote_instance, 
+...                              connector_flag = 1, 
+...                              tag_flag = 0 )[0]
+>>> #Cluster synapses - generates plot and returns clustering for nodes with synapses
 >>> syn_linkage = cluster_nodes_w_synapses( skdata, plot_graph = True )
-
-#Find the last two clusters (= the two biggest):
+>>> #Find the last two clusters (= the two biggest):
 >>> clusters = cluster.hierarchy.fcluster( syn_linkage, 2, criterion='maxclust')
-
-#Print summary
+>>> #Print summary
 >>> print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters), 
 ... len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
 
@@ -78,34 +69,32 @@ from pymaid import core
 def igraph_from_adj_mat( adj_matrix, **kwargs ):
    """ Takes an adjacency matrix and turns it into an iGraph object
 
-   Parameters:
+   Parameters
    ----------
-   adj_matrix :         Pandas dataframe 
-                        adjacency matrix - e.g. from pymaid.cluster
+   adj_matrix :      Pandas dataframe 
+                     Adjacency matrix - e.g. from pymaid.cluster   
+   syn_threshold :   int, optional     
+                     Edges with less connections will be ignored
+   syn_cutoff :      int, optional
+                     Edges with more connections will be maxed at syn_cutoff
 
-   Optional kwargs:
-   syn_threshold :      edges with less connections will be ignored
-   syn_cutoff :         edges with more connections will be maxed at syn_cutoff
-
-   Returns:
+   Returns
    -------
-   iGraph representation of network   
+   iGraph object
+                     Representation of network   
 
-   Example:
-   -------
+   Examples
+   --------
    >>> from pymaid import pymaid, cluster, igraph_catmaid
    >>> from igraph import plot as gplot
-
    >>> remote_instance = pymaid.CatmaidInstance(   URL, 
-                                                   HTTP_USER, 
-                                                   HTTP_PW, 
-                                                   TOKEN )
-
+   ...                                             HTTP_USER, 
+   ...                                             HTTP_PW, 
+   ...                                             TOKEN )
    >>> neurons = pymaid.get_skids_by_annotation( 'right_pns' ,remote_instance)
    >>> mat = cluster.create_adjacency_matrix(neurons,neurons,remote_instance)
    >>> g = igraph_catmaid.igraph_from_adj_mat ( mat )
-
-   #Fruchterman-Reingold algorithm
+   >>> #Use fruchterman-Reingold algorithm
    >>> layout = g.layout('fr')
    >>> gplot( g, layout = layout )
    """   
@@ -154,15 +143,18 @@ def igraph_from_adj_mat( adj_matrix, **kwargs ):
 def igraph_from_skeleton( skdata, append = True ):
    """ Takes CATMAID single skeleton data and turns it into an iGraph object
    
-   Parameters:
+   Parameters
    ----------
-   skdata :             Pandas dataframe containing either a single or multiple neurons
-   append :             boolean (default = True)
-                        Unless False, graph is automatically appended to the dataframe
+   skdata :          {Pandas dataframe, CatmaidNeuron}
+                     Containing either a single or multiple neurons
+   append :          bool, optional
+                     Unless False, graph is automatically appended to the 
+                     dataframe. Default = True
 
-   Returns:
+   Returns
    -------
-   iGraph representation of the neuron 
+   iGraph object
+                     Representation of the neuron 
 
    """
    if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):            
@@ -214,21 +206,23 @@ def igraph_from_skeleton( skdata, append = True ):
 def dist_from_root( data , synapses_only = False ):
    """ Get distance to root in nano meter (nm) for all treenodes 
 
-   Parameters:
+   Parameters
    ----------
-   data :            iGraph object OR pandas DataFrame
+   data :            {iGraph object, pandas DataFrame, CatmaidNeuron}
                      Holds the skeleton data
-   synapses_only :   boolean (default = False)
-                     If True, only distances for nodes with synapses will be returned
-                     (only makes sense if input is a Graph)
+   synapses_only :   bool, optional
+                     If True, only distances for nodes with synapses will be 
+                     returned (only makes sense if input is a Graph). Default = False
 
    Returns:
-   -------  
-   if g is a graph object:      
-   dict :            {node_id : distance_to_root }
+   -------     
+   dict             
+                     Only if ``data`` is a graph object. 
+                     Format ``{node_id : distance_to_root }``
 
-   if g is a pandas DataFrame:
-   pandas DataFrame with df.nodes.dist_to_root holding the distances to root  
+   pandas DataFrame 
+                     Only if ``data`` is a pandas DataFrame:. With 
+                     ``df.nodes.dist_to_root`` holding the distances to root. 
 
    """ 
 
@@ -273,16 +267,17 @@ def dist_from_root( data , synapses_only = False ):
 def cluster_nodes_w_synapses(data, plot_graph = True):
    """ Cluster nodes of an iGraph object based on distance
 
-   Parameters:
+   Parameters
    ----------
-   data :         CatmaidNeuron or iGraph object                  
-   plot_graph :   boolean
-                  If true, plots a Graph.
+   data :         {CatmaidNeuron, iGraph object}
+   plot_graph :   boolean, optional
+                  If true, plots a Graph. Default = True
 
-   Returns:
+   Returns
    -------
-   Plots dendrogram and distance matrix
-   Returns hierachical clustering
+   cluster :      scipy clustering
+                  Plots dendrogram + distance matrix and returns hierachical 
+                  clustering
    """   
 
    if isinstance(data, Graph):

@@ -1,21 +1,19 @@
-""" 
-This module contains definitions for neuron classes
-    
-    Copyright (C) 2017 Philipp Schlegel
+#    Copyright (C) 2017 Philipp Schlegel
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along
+#    You should have received a copy of the GNU General Public License
+#    along
 
+""" This module contains definitions for neuron classes
 """
 
 import datetime
@@ -28,69 +26,93 @@ import random
 from pymaid import igraph_catmaid, morpho, pymaid, plot   
 
 class CatmaidNeuron:
-    """ Catmaid neuron object holding neuron data: nodes, connectors, name, etc.
-    
-    Examples:
-    --------
+    """ 
+    Catmaid neuron object holding neuron data: nodes, connectors, name, etc.
 
-    #Initialize with just a Skeleton ID 
-    >>> n = CatmaidNeuron( 123456 )
+    Notes
+    -----
+    CatmaidNeuron can be minimally constructed from just a skeleton ID. 
+    Other parameters (nodes, connectors, neuron name, annotations, etc.) 
+    will then be retrieved from the server 'on-demand'. 
 
-    #Add CatmaidInstance for convenience
-    >>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
-    >>> n.remote_instance = rm
+    Ideally, a CatmaidNeuron is constructed from a pandas DataFrame (df)
+    containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
+    df.tags
 
-    #Retrieve data from server on-demand
-    >>> n.nodes
-    CatmaidNeuron - INFO - Retrieving skeleton data...    f
+    Parameters
+    ----------
+    x :             data to construct neuron from
+                    1. skeleton ID or
+                    2. pandas DataFrame or Series from pymaid.get_3D_skeleton() or
+                    3. CatmaidNeuron (will create a deep copy)
+
+                    This will override other, redundant attributes
+    remote_instance :   CatmaidInstance, optional
+                        Storing this makes it more convenient to retrieve e.g. 
+                        neuron annotations, review status, etc.
+    project_id :        integer, optional 
+                        Default = 1
+    meta_data :         dict, optional
+                        any additional data
+    copy :              boolean, optional
+                        If true, DataFrames are copied [.copy()] before being 
+                        assigned to the neuron object to prevent 
+                        backpropagation of subsequent changes to the data. 
+                        Default = True
+
+    Attributes
+    ----------
+    skeleton_id :       str
+                        This neurons skeleton ID
+    neuron_name :       str
+                        This neurons name
+    nodes :             pandas DataFrame
+                        Contains complete treenode table
+    connectors :        pandas DataFrame
+                        Contains complete connector table
+    date_retrieved :    ``datetime`` object
+                        Timestamp of data retrieval
+    tags :              dict
+                        Treenode tags
+    annotations :       list
+                        This neuron's annotations
+    igraph :            ``iGraph`` object
+                        iGraph representation of this neuron
+    review_status :     int
+                        This neuron's review status
+    n_branch_nodes :    int
+                        Number of branch nodes
+    n_end_nodes :       int
+                        Number of end nodes
+    cable_length :      float
+                        Cable length in micrometers [um]    
+
+    Examples
+    --------    
+    >>> from pymaid.core import CatmaidNeuron
+    >>> from pymaid.pymaid import CatmaidInstance
+    >>> # Initialize a new neuron
+    >>> n = CatmaidNeuron( 123456 ) 
+    >>> # Initialize Catmaid connections
+    >>> rm = CatmaidInstance(server_url, http_user, http_pw, token) 
+    >>> #Add CatmaidInstance to the neuron for convenience    
+    >>> n.remote_instance = rm 
+    >>> # Retrieve node data from server on-demand
+    >>> n.nodes 
+    CatmaidNeuron - INFO - Retrieving skeleton data...
         treenode_id  parent_id  creator_id  x  y  z radius confidence
     0   ...
     ...
-
-
-    #Initialize with skeleton data
+    >>> #Initialize with skeleton data
     >>> n = pymaid.get_3D_skeleton( 123456, remote_instance = rm )
-
-    #Get annotations from server
+    >>> # Get annotations from server
     >>> n.annotations
     [ 'annotation1', 'annotation2' ]
-
-    #Force update of annotations
+    >>> Force update of annotations
     >>> n.get_annotations()
-
     """
 
-    def __init__(self, x, remote_instance=None, project_id=1, meta_data=None, copy=True):
-        """ The constructor.
-
-        CatmaidNeuron can be minimally constructed from just a skeleton ID. 
-        Other parameters (nodes, connectors, neuron name, annotations, etc.) 
-        will then be retrieved from the server 'on-demand'. 
-
-        Ideally, a CatmaidNeuron is constructed from a pandas DataFrame (df)
-        containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
-        df.tags
-
-        Attributes:
-        ----------
-        x :                 can be:
-                                1. skeleton ID
-                                2. pandas DataFrame or Series from 
-                                   pymaid.get_3D_skeleton()
-                                3. CatmaidNeuron (will create a deep copy)                         
-                            This will override other, redundant attributes.         
-
-        remote_instance :   CatmaidInstance (optional, default = None)
-                            storing this makes it more convenient to retrieve e.g. 
-                            neuron annotations, review status, etc.
-        project_id :        integer (default = 1)
-        meta_data :         any additional data 
-        copy :              boolean (default = True)
-                            If true, DataFrames are copied [.copy()] before 
-                            being assigned to the neuron object to prevent 
-                            backpropagation of subsequent changes to the data.
-
-        """        
+    def __init__(self, x, remote_instance=None, project_id=1, meta_data=None, copy=True):        
         self.logger = logging.getLogger('CatmaidNeuron')
 
         if not self.logger.handlers:
@@ -114,7 +136,7 @@ class CatmaidNeuron:
         self.date_retrieved = datetime.datetime.now().isoformat()
         self._is_copy = copy
 
-        if isinstance( x, pd.Series ) or isinstance( x, CatmaidNeuron ):
+        if isinstance( x, pd.Series ) or isinstance( x, CatmaidNeuron ):            
             if 'type' not in x.nodes:
                 x  = morpho.classify_nodes( x )
 
@@ -126,6 +148,9 @@ class CatmaidNeuron:
 
                 self.df.nodes = self.df.nodes.copy()
                 self.df.connectors = self.df.connectors.copy()
+
+                if self.df.igraph != None:
+                    self.df.igraph = self.df.igraph.copy()
 
             self.skeleton_id = self.df.skeleton_id
             self.neuron_name = self.df.neuron_name
@@ -142,8 +167,10 @@ class CatmaidNeuron:
                 self._meta_data = x._meta_data
                 self.date_retrieved = x.date_retrieved
 
-                if 'igraph' in x.__dict__:
+                if 'igraph' in x.__dict__:                    
                     self.igraph = x.igraph
+                    if copy:
+                        self.igraph = self.igraph.copy()                
         else:
             try: 
                 int( x ) #Check if this is a skeleton ID
@@ -204,15 +231,20 @@ class CatmaidNeuron:
         return self.copy()
 
     def copy(self):
+        """Create a copy of the neuron"""
         return CatmaidNeuron( self, copy = True )
 
     def get_skeleton(self, remote_instance = None, **kwargs ):
-        """Get skeleton data for neuron using pymaid.get_3D_skeleton()        
-        kwargs :        will be passed to pymaid.get_3D_skeleton()
-                        e.g. to get the full treenode history use:
-                        n.get_skeleton( with_history = True )
-                        or to get abutting connectors:
-                        n.get_skeleton( get_abutting = True )
+        """Get skeleton data for neuron using pymaid.get_3D_skeleton() 
+
+        Parameters
+        ----------       
+        **kwargs
+                    Will be passed to pymaid.get_3D_skeleton()
+                    e.g. to get the full treenode history use:
+                    n.get_skeleton( with_history = True )
+                    or to get abutting connectors:
+                    n.get_skeleton( get_abutting = True )
         """
         if not remote_instance and not self._remote_instance:
             raise Exception('Get_skeleton - Unable to connect to server without remote_instance. See help(core.CatmaidNeuron) to learn how to assign.')            
@@ -235,6 +267,7 @@ class CatmaidNeuron:
         return
 
     def get_igraph( self ):
+        """Calculate igraph representation of neuron """
         level = igraph_catmaid.module_logger.level
         igraph_catmaid.module_logger.setLevel('WARNING')
         self.igraph = igraph_catmaid.igraph_from_skeleton( self.df )
@@ -263,16 +296,24 @@ class CatmaidNeuron:
         return self.annotations
 
     def plot2d(self, **kwargs):
-        """Plot neuron using pymaid.plot.plot2d()        
-        kwargs :        will be passed to plot.plot2d() 
-                        see help(plot.plot3d) for a list of keywords                        
+        """Plot neuron using pymaid.plot.plot2d()   
+
+        Parameters
+        ----------     
+        **kwargs         
+                Will be passed to plot.plot2d() 
+                See help(plot.plot3d) for a list of keywords                        
         """         
         return plot.plot2d( skdata = self, **kwargs )
 
     def plot3d(self, **kwargs):
-        """Plot neuron using pymaid.plot.plot3d()        
-        kwargs :        will be passed to plot.plot3d() 
-                        see help(plot.plot3d) for a list of keywords                        
+        """Plot neuron using pymaid.plot.plot3d()  
+
+        Parameters
+        ----------      
+        **kwargs
+                Will be passed to plot.plot3d() 
+                See help(plot.plot3d) for a list of keywords                        
         """         
         return plot.plot3d( skdata = CatmaidNeuronList(self), **kwargs )
 
@@ -288,25 +329,40 @@ class CatmaidNeuron:
         return self.neuron_name
 
     def downsample(self, factor = 5):        
-        """Downsample the neuron by factor X
-        Parameters:
+        """Downsample the neuron by given factor 
+
+        Parameters
         ----------
-        factor :      int (default =5)
-                      factor by which to downsample the neurons
+        factor :    int, optional
+                    Factor by which to downsample the neurons. Default = 5
         """
         morpho.downsample_neuron ( self, factor, inplace=True)
         self.get_igraph()
 
+    def reroot(self, new_root):        
+        """Downsample the neuron by given factor 
+
+        Parameters
+        ----------
+        new_root :  {int, str}
+                    Either treenode ID or node tag
+        """
+        morpho.reroot_neuron( self, new_root, inplace=True)
+        self.get_igraph()
+
     def update(self, remote_instance = None ):
-        """Reload neuron from server. Currently only updates name, nodes,
-        connectors and tags.
+        """Reload neuron from server. 
+
+        Notes
+        -----
+        Currently only updates name, nodes, connectors and tags.
         """
         if not remote_instance and not self._remote_instance:
             self.logger.error('Get_update: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        n = get_3D_skeleton( self.skeleton_id, remote_instance = remote_instance )
+        n = pymaid.get_3D_skeleton( self.skeleton_id, remote_instance = remote_instance )
         self.__init__(n, self._remote_instance, self._project_id, self._meta_data)
 
     def __str__(self):        
@@ -324,85 +380,97 @@ class CatmaidNeuron:
         else:
             cable = self.cable_length
 
-        self._repr = pd.Series( [ type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, cable, review_status, annotations != None, igraph != None, tags != None ],
-                                 index = [ 'type','neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes', 'cable_length', 'review_status', 'annotations', 'igraph', 'tags' ]
+        self._repr = pd.Series( [ type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, cable, review_status, annotations != None, igraph != None, tags != None, self._remote_instance != None ],
+                                 index = [ 'type','neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes', 'cable_length', 'review_status', 'annotations', 'igraph', 'tags', 'remote_instance' ]
                                 )
         return str( self._repr )    
 
 
 class CatmaidNeuronList:
     """ Catmaid neuron list. It is designed to work in many ways much like a 
-    pandas DataFrame by supporting e.g. .ix[], .itertuples(), .empty, .copy()    
+    pandas DataFrame by supporting e.g. .ix[], .itertuples(), .empty, .copy() 
 
-    Examples:
+    Notes
+    -----
+    CatmaidNeuronList can be minimally constructed from just skeleton IDs. 
+    Other parameters (nodes, connectors, neuron name, annotations, etc.) 
+    will then be retrieved from the server 'on-demand'. 
+
+    Ideally, a CatmaidNeuron is constructed from a pandas DataFrame (df)
+    containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
+    df.tags for a set of neurons.
+
+    Parameters
+    ----------
+    x :                 data to construct neuron from
+                        1. skeleton ID or
+                        2. pandas DataFrame or Series from `pymaid.get_3D_skeleton()` or
+                        3. CatmaidNeuron (will create a deep copy)
+
+                        This will override other, redundant attributes
+    remote_instance :   CatmaidInstance, optional
+                        Storing this makes it more convenient to retrieve e.g. 
+                        neuron annotations, review status, etc.
+    project_id :        integer, optional 
+                        Default = 1
+    meta_data :         dict, optional
+                        Any additional data
+    copy :              boolean, optional
+                        If true, DataFrames are copied [.copy()] before being 
+                        assigned to the neuron object to prevent 
+                        backpropagation of subsequent changes to the data. 
+                        Default = True   
+
+    Attributes
+    ----------
+    skeleton_id :       list of str
+                        Neurons' skeleton IDs
+    neuron_name :       list of str
+                        Neurons' names
+    nodes :             list of pandas DataFrame
+                        Neurons' complete treenode tables
+    connectors :        list of pandas DataFrame
+                        Neurons' complete connector tables
+    tags :              list of dict
+                        Neurons' treenode tags
+    annotations :       list of list
+                        Neurons' annotations    
+    review_status :     list of int
+                        Neurons' review status
+    n_branch_nodes :    list of int
+                        Number of branch nodes  for each neuron
+    n_end_nodes :       list of int
+                        Number of end nodes for each neuron
+    cable_length :      list of float
+                        Cable length in micrometers [um]
+
+    Examples
     --------
-
-    #Initialize with just a Skeleton ID 
+    >>> #Initialize with just a Skeleton ID 
     >>> nl = CatmaidNeuronList( [ 123456, 45677 ] )
-
-    #Add CatmaidInstance to neurons in neuronlist
+    >>> #Add CatmaidInstance to neurons in neuronlist
     >>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
     >>> nl.assign_remote_instance( rm )
-
-    #Retrieve review status from server on-demand
+    >>> #Retrieve review status from server on-demand
     >>> nl.review_status
     array([ 90, 10 ])
-
-    #Initialize with skeleton data
+    >>> #Initialize with skeleton data
     >>> nl = pymaid.get_3D_skeleton( [ 123456, 45677 ], remote_instance = rm )
-
-    #Get annotations from server
+    >>> #Get annotations from server
     >>> nl.annotations
     [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
-
-    #Index using node count
+    >>>Index using node count
     >>> subset = nl [ nl.n_nodes > 6000 ]
-
-    #Index by skeleton ID 
+    >>> Index by skeleton ID 
     >>> subset = nl [ '123456' ]
-
-    #Index by neuron name
+    >>> #Index by neuron name
     >>> subset = nl [ 'name1' ]
-
-    #Concatenate lists
+    >>> #Concatenate lists
     >>> nl += pymaid.get_3D_skeleton( [ 912345 ], remote_instance = rm )
 
     """
 
     def __init__(self, x, remote_instance=None, project_id=1, copy=True ):
-        """ The constructor.
-
-        CatmaidNeuronList can be minimally constructed from just skeleton IDs. 
-        Other parameters (nodes, connectors, neuron name, annotations, etc.) 
-        will then be retrieved from the server 'on-demand'. 
-
-        Ideally, a CatmaidNeuron is constructed from a pandas DataFrame (df)
-        containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
-        df.tags for a set of neurons.
-
-        Attributes:
-        ----------
-        x :                 can be:
-                                1. List of skeleton IDs or CatmaidNeurons
-                                2. pandas DataFrame 
-                                      e.g. from pymaid.get_3D_skeleton()
-                                3. CatmaidNeuronList
-        skeleton_id :       list of skeleton IDs
-        df:                 pandas DataFrame or Series
-                            e.g. from pymaid.get_3D_skeleton()
-                            This will override skeleton ID!
-        remote_instance :   CatmaidInstance (optional, default = None)
-                            storing this makes it more convenient to retrieve e.g. 
-                            neuron annotations, review status, etc.
-        project_id :        integer (default = 1)
-        meta_data :         any additional data 
-        copy :              boolean (default = True)
-                            If true, DataFrames (nodes and connectors) are 
-                            copied [.copy()] before being assigned to the 
-                            neuron object to prevent backpropagation of 
-                            subsequent changes to the data.
-
-        """
         self.logger = logging.getLogger('CatmaidNeuronList')
         if not self.logger.handlers:
             sh = logging.StreamHandler()
@@ -426,7 +494,7 @@ class CatmaidNeuronList:
             if not isinstance(n, CatmaidNeuron) or copy is True:
                 self.neurons[i] = CatmaidNeuron( n, remote_instance = remote_instance, project_id = project_id, copy = copy )
 
-        self.ix = IXIndexer(self.neurons, self.logger)                   
+        self.ix = _IXIndexer(self.neurons, self.logger)                   
 
     def __str__(self):
         return self.__repr__()
@@ -446,10 +514,10 @@ class CatmaidNeuronList:
             else:
                 cable = n.cable_length
 
-            d.append( [ neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes, cable, review_status, annotations != None, igraph != None,tags != None] )
+            d.append( [ neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes, cable, review_status, annotations != None, igraph != None,tags != None, n._remote_instance != None] )
 
         self._repr = pd.DataFrame( data = d,
-                                   columns = ['neuron_name','skeleton_id','n_nodes','n_connectors','n_branch_nodes','n_end_nodes','cable_length','review_status','annotations','igraph','tags' ]
+                                   columns = ['neuron_name','skeleton_id','n_nodes','n_connectors','n_branch_nodes','n_end_nodes','cable_length','review_status','annotations','igraph','tags', 'remote_instance' ]
                                 )        
         return str( self._repr )
 
@@ -553,17 +621,21 @@ class CatmaidNeuronList:
 
     def downsample(self, factor = 5):
         """Downsamples all neurons by factor X
-        Parameters:
+        
+        Parameters
         ----------
-        factor :             int (default =5)
-                            factor by which to downsample the neurons
+        factor :    int, optional
+                    Factor by which to downsample the neurons. Default = 5
         """
         for n in self.neurons:
             n.downsample( downsampling = factor )
 
     def get_skeletons(self, skip_existing = False):
-        """Helper function to fill in/update skeleton data of neurons. Will
-        change/update nodes, connectors, df, tags, date_retrieved and 
+        """Helper function to fill in/update skeleton data of neurons. 
+
+        Notes
+        -----
+        Will change/update nodes, connectors, df, tags, date_retrieved and 
         neuron_name. Will also generate new igraph representation to match 
         nodes/connectors.
         """
@@ -595,15 +667,23 @@ class CatmaidNeuronList:
 
     def plot3d(self, **kwargs):
         """Plot neuron using pymaid.plot.plot3d()        
-        kwargs :        will be passed to plot.plot3d() 
-                        see help(plot.plot3d) for a list of keywords                        
+
+        Parameters
+        ---------
+        **kwargs
+                will be passed to plot.plot3d() 
+                see help(plot.plot3d) for a list of keywords                        
         """         
         return plot.plot3d( skdata = self, **kwargs )
 
     def plot2d(self, **kwargs):
         """Plot neuron using pymaid.plot.plot2d()        
-        kwargs :        will be passed to plot.plot2d() 
-                        see help(plot.plot3d) for a list of keywords                        
+
+        Parameters
+        ---------
+        **kwargs        
+                will be passed to plot.plot2d() 
+                see help(plot.plot3d) for a list of keywords                        
         """         
         return plot.plot2d( skdata = self, **kwargs )
 
@@ -645,10 +725,11 @@ class CatmaidNeuronList:
         return self.copy()
 
     def copy(self):
+        """Return copy of this CatmaidNeuronList """
         return CatmaidNeuronList( self, copy = True )
 
 
-class IXIndexer():
+class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow
     indexing similar to pandas DataFrames using df.ix[0]. This is really 
     just a helper to allow code to operate on CatmaidNeuron the same way

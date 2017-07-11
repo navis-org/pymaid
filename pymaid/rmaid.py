@@ -1,61 +1,53 @@
+#    Copyright (C) 2017 Philipp Schlegel
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along
+
 """ 
-A collection of tools to interace with CATMAID R libraries (e.g. nat, catnat, elmr, rcatmaid)
-See https://github.com/jefferis and https://github.com/alexanderbates
-    
-    Copyright (C) 2017 Philipp Schlegel
+A collection of tools to interace with CATMAID R libraries (e.g. nat, catnat, 
+elmr, rcatmaid). 
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Notes
+-----
+See https://github.com/jefferis and https://github.com/alexanderbates    
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along
-
-Basic example:
--------------
-from pymaid import pymaid
-from pymaid import rmaid
-
-import matplotlib.pyplot as plt
-
-from rpy2.robjects.packages import importr
-
-#Load nat as module
-nat = importr('nat')
-
-#Initialise Catmaid instance
-rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
-
-#Fetch a neuron in Python CATMAID
-skid = 123456
-n = pymaid.pymaid.get_3D_skeleton( skid, rm )
-
-#Initialize R's rcatmaid 
-rcatmaid = rmaid.init_rcatmaid( rm )
-
-#Convert pymaid neuron to R neuron (works with neuron and neuronlist objects)
-n_r = rmaid.neuron2r( n.ix[0] )
-
-#Use nat to prune the neuron
-n_pruned = nat.prune_by_strahler( n_r )
-
-#Convert back to pymaid object
-n_py = rmaid.neuron2py( n_pruned, rm )
-
-#Nblast pruned neuron (assumes FlyCircuit database is saved locally)
-results = rmaid.nblast( n_pruned )
-
-#Sort results by mu score
-results.sort('mu_score')
-
-#Plot top hits
-results.plot( hits = 3 )
+Examples
+--------
+>>> from pymaid import pymaid
+>>> from pymaid import rmaid
+>>> import matplotlib.pyplot as plt
+>>> from rpy2.robjects.packages import importr
+>>> #Load nat as module
+>>> nat = importr('nat')
+>>> #Initialise Catmaid instance
+>>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
+>>> #Fetch a neuron in Python CATMAID
+>>> skeleton_id = 123456
+>>> n = pymaid.pymaid.get_3D_skeleton( skeleton_id, rm )
+>>> #Initialize R's rcatmaid 
+>>> rcatmaid = rmaid.init_rcatmaid( rm )
+>>> Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
+>>> n_r = rmaid.neuron2r( n.ix[0] )
+>>> #Use nat to prune the neuron
+>>> n_pruned = nat.prune_by_strahler( n_r )
+>>> #Convert back to pymaid object
+>>> n_py = rmaid.neuron2py( n_pruned, rm )
+>>> #Nblast pruned neuron (assumes FlyCircuit database is saved locally)
+>>> results = rmaid.nblast( n_pruned )
+>>> #Sort results by mu score
+>>> results.sort('mu_score')
+>>> #Plot top hits
+>>> results.plot( hits = 3 )
 """
 
 import logging
@@ -104,23 +96,28 @@ def init_rcatmaid ( **kwargs ):
     """ This function initializes the R catmaid package from Jefferis 
     (https://github.com/jefferis/rcatmaid) and returns an instance of it
 
-    Parameters:
+    Parameters
     ----------
-    remote_instance :    CATMAID instance from pymaid.pymaid.CatmaidInstance()
-                        is used to extract credentials. This overrides other credentials!
-    server :             string (optional)
-                        use this to set server URL if no remote_instance is provided
-    authname :           string (optional)
-                        use this to set http user if no remote_instance is provided
-    authpassword :       string (optional)
-                        use this to set http password if no remote_instance is provided
-    authtoken :          string (optional)
-                        use this to set user tokenif no remote_instance is provided
+    remote_instance :   CATMAID instance from pymaid.pymaid.CatmaidInstance()
+                        This is used to extract credentials. Overrides other 
+                        credentials provided!
+    server :            str, optional
+                        Use this to set server URL if no remote_instance is 
+                        provided
+    authname :          str, optional
+                        Use this to set http user if no remote_instance is 
+                        provided
+    authpassword :      str, optional
+                        Use this to set http password if no remote_instance 
+                        is provided
+    authtoken :         str, optional
+                        Use this to set user tokenif no remote_instance is 
+                        provided
 
-    Returns:
+    Returns
     ------- 
-    catmaid :            robject containing Catmaid library
-
+    catmaid
+                        robject representing the rcatmaid library
     """
 
     remote_instance = kwargs.get( 'remote_instance', None )
@@ -162,23 +159,23 @@ def init_rcatmaid ( **kwargs ):
     return catmaid
 
 def data2py ( data, **kwargs ):
-    """ Takes data object from rcatmaid (e.g. 'catmaidneuron' from read.neuron.catmaid)
-    and converts into Python Data. 
+    """ Takes data object from rcatmaid (e.g. 'catmaidneuron' from 
+    read.neuron.catmaid) and converts into Python Data. 
 
-    Please note that:
+    Notes
+    -----
     (1) Most R data comes as list (even if only 1 entry). This is preserved.
     (2) R lists with headers are converted to dictionaries
     (3) R DataFrames are converted to Pandas DataFrames
     (4) R nblast results are converted to Pandas DataFrames but only the top
         100 hits for which we have reverse scores!
 
-
-    Parameters:
+    Parameters
     ----------
-    data :        any kind of R data 
-                  Can be nested (e.g. list of lists)!
+    data         
+        Any kind of R data. Can be nested (e.g. list of lists)!
 
-    Returns:
+    Returns
     -------
     converted data
     """   
@@ -250,16 +247,19 @@ def neuron2py ( neuron, remote_instance = None ):
     """ Converts an rcatmaid neuron or neuronlist object to a standard PyMaid 
     CatmaidNeuronList.
 
-    ATTENTION: node creator and confidence are not included in R's neuron/neuronlist
+    Notes
+    -----
+    Node creator and confidence are not included in R's neuron/neuronlist
     and will be imported as <None>
 
-    Parameters:
+    Parameters
     ----------
     neuron :            R neuron or neuronlist
-    remote_instance :   CATMAID instance (optional)
-                        provide if you want neuron names to be updated from 
+    remote_instance :   CATMAID instance, optional
+                        Provide if you want neuron names to be updated from. 
+                        Default=None
 
-    Returns:
+    Returns
     -------
     pymaid CatmaidNeuronList
     """
@@ -331,13 +331,24 @@ def neuron2py ( neuron, remote_instance = None ):
 def neuron2r ( neuron ):
     """ Converts a PyMaid neuron or list of neurons (DataFrames) to the 
     corresponding neuron/neuronlist object in R.
-
+    
+    Notes
+    -----
     The way this works is essentially converting the PyMaid object back
     into what rcatmaid expects as a response from a CATMAID server, then
     we are calling the same functions as in rcatmaid's read.neuron.catmaid().
 
     Attention: Currently, the project ID saved as part of R neuronlist objects
     is ALWAYS 1.   
+
+    Parameters
+    ----------
+    neuron : {CatmaidNeuron, CatmaidNeuronList, pandas DataFrame}
+
+    Returns
+    -------
+    R neuron
+        Either R neuron or neuronlist depending on input.
     """
 
     if isinstance(neuron, pd.DataFrame) or isinstance(neuron, core.CatmaidNeuronList):
@@ -438,15 +449,16 @@ def neuron2r ( neuron ):
 def dotprops2py( dp, subset = None ):
     """ Converts dotprops into pandas DataFrame.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
+    dp :        dotprops neuronlist or neuronlistfh
+    subset :    {list of str, list of indices }, optional
+                Neuron names or indices. Default = None.
 
-    dp :            dotprops neuronlist or neuronlistfh
-    subset :        neuron names or indices (optional, default = None)
-
-    Returns:
+    Returns
     -------
-    pandas Dataframe:
+    pandas Dataframe
+        Contains dotprops. Can be passed to `plot.plot3d( dotprops = df )`
     """ 
 
     #Check if list is on demand
@@ -477,75 +489,66 @@ def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = Fa
     recapitulates what elmr's (https://github.com/jefferis/elmr) nblast_fafb 
     does.
 
-    Parameters:
+    Parameters
     ----------
-    neuron :            neuron to blast
+    neuron :        neuron to blast
+                    This can be either:
+                    1. A single skeleton ID
+                    2. PyMaid neuron from e.g. pymaid.pymaid.get_3D_skeleton()
+                    3. RCatmaid neuron object
+    remote_instance :   Catmaid Instance, optional
+                        Only neccessary if only a SKID is provided
+    db :            database, optional
+                    File containing dotproducts to blast against. 
+                    Default = None. This can be either:
+                    1. the name of a file in ``'flycircuit.datadir'``,
+                    2. a path (e.g. ``'.../gmrdps.rds'``), 
+                    3. an R file object (e.g. ``robjects.r("load('.../gmrdps.rds')")``)
+                    4. a URL to load the list from (e.g. ``'http://.../gmrdps.rds'``)
 
-                        This can be either
-                        1. A single skeleton ID
-                        2. PyMaid neuron from e.g. pymaid.pymaid.get_3D_skeleton()
-                        3. RCatmaid neuron object
+                    If None, rmaid.nblast() searches for a 'dpscanon.rds' in 
+                    'flycircuit.datadir'.
+    ncores :        int, optional
+                    Number of cores to use for nblasting. Default = 4
+    reverse :       bool, optional
+                    If True, treats the neuron as NBLAST target rather than 
+                    neurons of database. Makes sense for partial 
+                    reconstructions. Default = False
+    UseAlpha :      bool, optional
+                    Emphasises neurons' straight parts (backbone) over parts 
+                    that have lots of branches. Default = False
+    mirror :        bool, optional
+                    Whether to mirror the neuron or not b/c FlyCircuit neurons 
+                    are on fly's right. Default = True
+    normalised :    bool, optional
+                    Whether to return normalised NBLAST scores. Default = True
+    reference :     {string, R file object}, optional
+                    Default = 'nat.flybrains::FCWB'
 
-    remote_instance :   Catmaid Instance (optional)
-                        only neccessary if only a SKID is provided
-
-    db :                database file containing dotproducts to blast against
-                        (optional, default = None)
-
-                        This can be either:
-                        1. the name of a file in 'flycircuit.datadir',
-                        2. a path (e.g. '.../gmrdps.rds'), 
-                        3. an R file object (robjects.r("load('.../gmrdps.rds')"))
-                        4. a URL to load the list from ('http://.../gmrdps.rds')
-
-                        If None, rmaid.nblast() searches for a 'dpscanon.rds'
-                        in 'flycircuit.datadir'.
-
-    ncores :            integer (default = 4)
-                        number of cores to use for nblasting
-    reverse :           boolean (default = False)
-                        Treats the neuron as NBLAST target rather than neurons
-                        of database. Makes sense for partial reconstructions.
-    UseAlpha :          boolean (default = False)
-                        Emphasises neurons' straight parts (backbone) over
-                        parts that have lots of branches.
-    mirror :            boolean (default = True)
-                        Whether to mirror the neuron or not b/c FlyCircuit
-                        neurons are on fly's right.
-    normalised :        boolean (default = True)
-                        Whether to return normalised NBLAST scores
-    reference :         string or R object
-                        default = 'nat.flybrains::FCWB'
-
-    Returns:
+    Returns
     -------
-    Instance of of nbl_results class that holds nblast results and
-    contains wrappers to plot/extract data. Please use help(nbl_results)
-    to learn more and see example below.
+    nblast_results
+        Instance of of nbl_results class that holds nblast results and
+        contains wrappers to plot/extract data. Please use help(nbl_results)
+        to learn more and see example below.
 
-    Example:
-    -------
-    from pymaid.pymaid import CatmaidInstance
-    from pymaid import rmaid
-
-    #Initialize connection to Catmaid server
-    rm = CatmaidInstance( url, http_user, http_pw, token )
-
-    #Blast a neuron against default (FlyCircuit) database
-    nbl = rmaid.nblast( skid = 16, remote_instance = rm  )
-
-    #See contents of nblast_res object
-    help(nbl)
-
-    #Get results as Pandas Dataframe
-    nbl.res
-
-    #Plot histogram of results
-    nbl.plot.hist(alpha=.5)
-
-    #Sort and plot the first hits
-    nbl.sort('mu_score')
-    nbl.plot(hits = 4)
+    Examples
+    --------
+    >>> from pymaid.pymaid import CatmaidInstance
+    >>> from pymaid import rmaid
+    >>> #Initialize connection to Catmaid server
+    >>> rm = CatmaidInstance( url, http_user, http_pw, token )
+    >>> #Blast a neuron against default (FlyCircuit) database
+    >>> nbl = rmaid.nblast( skid = 16, remote_instance = rm  )
+    >>> #See contents of nblast_res object
+    >>> help(nbl)
+    >>> #Get results as Pandas Dataframe
+    >>> nbl.res
+    >>> #Plot histogram of results
+    >>> nbl.plot.hist(alpha=.5)
+    >>> #Sort and plot the first hits
+    >>> nbl.sort('mu_score')
+    >>> nbl.plot(hits = 4)
     """    
 
     start_time = time.time()
@@ -658,37 +661,35 @@ class nbl_results:
     """ Class that holds nblast results and contains wrappers that allow easy
     plotting.    
 
-    Data stored in class:
-    --------------------
-    self.res :      pandas Dataframe holding top N results
-    self.sc :       original RNblast forward scores 
-    self.scr :      original R Nblast reverse scores (Top N only)
-    self.neuron :   the neuron that was nblasted transformed into reference space
-    self.xdp :      dotproduct of the transformed neuron
-    self.param :    dict holding parameters used for nblasting
-    self.db :       dotproduct database as R object "neuronlistfh"
-    self.date :     time of nblasting
+    Attributes
+    ----------
+    res :       pandas Dataframe 
+                Contains top N results
+    sc :        Robject
+                Contains original RNblast forward scores 
+    scr :       Robject     
+                Original R Nblast reverse scores (Top N only)
+    neuron :    R ``catmaidneuron``
+                The neuron that was nblasted transformed into reference space
+    xdp :       robject
+                Dotproduct of the transformed neuron
+    param :     dict 
+                Contains parameters used for nblasting
+    db :        file robject 
+                Dotproduct database as R object "neuronlistfh"
+    date :      datetime object
+                Time of nblasting    
 
-    Class methods
-    ------------
-    plot() :        plots results. See help(nbl_results.plot) for details.
-    get_dps():      get dotproducts for subset of self.db
-    sort():         sorts results by given column (gene_name, forward_score,
-                    reverse_score, mu_score)
-
-    Example:
-    ------
-    #Blast neuron by skeleton ID
-    nbl = rmaid.nblast( skid, remote_instance = rm )
-
-    #Sort results by mu_score
-    nbl.sort( 'mu_score' )
-
-    #Show table
-    nbl.res
-
-    #3D plot top 5 hits using vispy
-    canvas, view = nbl.plot(hits=5)
+    Examples
+    --------
+    >>> #Blast neuron by skeleton ID
+    >>> nbl = rmaid.nblast( skid, remote_instance = rm )
+    >>> #Sort results by mu_score
+    >>> nbl.sort( 'mu_score' )
+    >>> #Show table
+    >>> nbl.res
+    >>> #3D plot top 5 hits using vispy
+    >>> canvas, view = nbl.plot(hits=5)
     """
 
     def __init__(self, results, sc, scr, neuron, xdp, dps_db, nblast_param ):        
@@ -706,36 +707,37 @@ class nbl_results:
         self.res.reset_index( inplace=True, drop =True )
 
     def plot( self, hits = 5, plot_neuron = True, plot_brain = True, **kwargs ):
-        """ Wrapper to plot nblast hits using pymaid.plot.plot.plot3d()
+        """ Wrapper to plot nblast hits using ``pymaid.plot.plot.plot3d()``
 
-        Parameters:
+        Parameters
         ----------
-        hits :      nblast hits to plot (default = 5). Can be:                     
-                    1. int: e.g. hits = 5 for top 5 hits 
-                    2 .list of ints: e.g. hits = [2,5] to plot hits 2 and 5 
-                    3. string: e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
-                    4. list of strings: 
-                       e.g. ['THMARCM-198F_seg1', npfMARCM-'F000003_seg002'] to
-                       plot multiple neurons by their gene name
+        hits :  {int, list of int, str, list of str}, optional
+                nblast hits to plot (default = 5). Can be:                     
+                1. int: e.g. hits = 5 for top 5 hits 
+                2 .list of ints: e.g. hits = [2,5] to plot hits 2 and 5 
+                3. string: e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
+                4. list of strings: 
+                   e.g. ['THMARCM-198F_seg1', npfMARCM-'F000003_seg002'] to
+                   plot multiple neurons by their gene name
+        plot_neuron :   bool 
+                        If True, the nblast query neuron will be plotted. 
+                        Default = True
+        plot_brain :    bool 
+                        If True, the reference brain will be plotted. 
+                        Default = True
+        **kwargs    
+                        parameters passed to `plot.plot3d`. 
+                        See `help(pymaid.plot.plot.plot3d)` for details.
 
-        plot_neuron :   boolean (default = True)
-                        if True, the nblast query neuron will be plotted
-
-        plot_brain :    boolean (default =True)
-                        if True, the reference brain will be plotted
-
-        kwargs :    parameters passed to plot.plot3d. See help(pymaid.plot.plot.plot3d)
-                    for details.
-
-        Returns:
+        Returns
         -------
-        Depending on the backends used by plot.plot.plot3d():
+        Depending on the backends used by `plot.plot.plot3d()`:
 
-        vispy (default):    canvas, view
-        plotly:             figure
+        vispy (default) : canvas, view
+        plotly : matplotlib figure
 
-        You can specify the backend by using e.g. backend = 'plotly' in **kwargs.
-        See help(pymaid.plot.plot.plot3d) for details.
+        You can specify the backend by using e.g. `backend = 'plotly'` in 
+        **kwargs. See `help(pymaid.plot.plot.plot3d)` for details.
         """
 
         nl = self.get_dps( hits )
@@ -783,17 +785,19 @@ class nbl_results:
         """ Wrapper to retrieve dotproducts from DPS database (neuronlistfh) 
         as neuronslist
 
-        Parameters:
+        Parameters
         ----------
-        entries :   Neurons to extract from DPS database. Can be:
+        entries :   {int, str, list of int, list of str}, optional
+                    Neurons to extract from DPS database. Can be:
                     1. int: e.g. hits = 5 for top 5 hits 
                     2 .list of ints: e.g. hits = [2,5] to plot hits 2 and 5 
-                    3. string: e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
+                    3. string: 
+                       e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
                     4. list of strings: 
-                       e.g. ['THMARCM-198F_seg1', npfMARCM-'F000003_seg002'] to
-                       plot multiple neurons by their gene name
+                       e.g. ['THMARCM-198F_seg1', npfMARCM-'F000003_seg002'] 
+                       to plot multiple neurons by their gene name
 
-        Returns:
+        Returns
         -------
         neuronlist of dotproduct neurons
         """
@@ -810,12 +814,5 @@ class nbl_results:
         else:
             module_logger.error('Unable to intepret entries provided. See help(nbl_results.plot) for details.')
             return None
-
-
-
-
-
-
-
 
 

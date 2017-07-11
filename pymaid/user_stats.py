@@ -1,22 +1,22 @@
-"""
-    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
-    Copyright (C) 2017 Philipp Schlegel
+#    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+#    Copyright (C) 2017 Philipp Schlegel
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along
-"""
 
 from pymaid.pymaid import get_3D_skeleton, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids
+from pymaid import core
 import logging
 import pandas as pd
 
@@ -34,29 +34,28 @@ if not module_logger.handlers:
   module_logger.addHandler(sh)
 
 def get_user_contributions( x , remote_instance ):
-   """
-   Takes a list of skeleton IDs and returns nodes and synapses contributed by each user.
+   """ Takes a list of skeleton IDs and returns nodes and synapses contributed 
+   by each user.
+
+   Notes
+   -----
    This is essentially a wrapper for pymaid.get_contributor_statistics() - if you are 
    also interested in e.g. construction time, review time, etc. you may want to consider
    using pymaid.get_contributor_statistics() instead.
 
-   Parameters:
-   -----------
-   x :                Which neurons to check. Can be either:
+   Parameters
+   ----------
+   x :                  Which neurons to check. Can be either:
                         1. skeleton IDs (int or str)
                         2. neuron name (str, must be exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-   remote_instance :  Catmaid Instance   
+   remote_instance :    Catmaid Instance   
 
-   Returns:
+   Returns
    -------
    pandas DataFrame
-
-      user   nodes   presynapses   postsynapses
-   0
-   1
-   2
+      contains `nodes`, `presynapses`, `postsynapses` by `user`   
    """
 
    skids = eval_skids(x, remote_instance)
@@ -83,37 +82,35 @@ def get_user_contributions( x , remote_instance ):
    return pd.DataFrame( [ [  user_list.ix[ int(u) ].last_name, stats['nodes'][u] , stats['presynapses'][u], stats['postsynapses'][u] ] for u in all_users ] , columns = [ 'user', 'nodes' ,'presynapses', 'postsynapses' ] ).sort_values('nodes', ascending = False).reset_index()
 
 def get_time_invested( x, remote_instance, interval = 1, minimum_actions = 1 ):
-   """
-   Takes a list of skeleton IDs and calculates the time each user has spent working
-   on this set of neurons.
+   """ Takes a list of skeleton IDs and calculates the time each user has 
+   spent working on this set of neurons.
 
-   Parameters:
-   -----------
+   Parameters
+   ----------
    x :                Which neurons to check. Can be either:
-                        1. skeleton IDs (int or str)
-                        2. neuron name (str, must be exact match)
-                        3. annotation: e.g. 'annotation:PN right'
-                        4. CatmaidNeuron or CatmaidNeuronList object
+                      1. skeleton IDs (int or str)
+                      2. neuron name (str, must be exact match)
+                      3. annotation: e.g. 'annotation:PN right'
+                      4. CatmaidNeuron or CatmaidNeuronList object
    remote_instance :  Catmaid Instance
-   interval :         integer (default = 1)
-                      size of the bins in minutes
-   minimum_actions :  integer (default = 1)
-                      minimum number of actions per bin to be counted as active
+   interval :         int, optional          
+                      Size of the bins in minutes. Default = 1
+   minimum_actions :  int, optional
+                      Minimum number of actions per bin to be counted as 
+                      active. Default = 1
 
-   Returns:
+   Returns
    -------
    pandas DataFrame
+      contains `total`, `creation`, `edition`, `review` per `user`   
 
-      user   total   creation   edition   review
-   0
-   1
-   2
+   Notes
+   -----
+   Values represent minutes. Creation/Edition/Review can overlap! This is why 
+   total time spent is < creation + edition + review.
 
-   Values represent minutes. Creation/Edition/Review can overlap! This is why total 
-   time spent is < creation + edition + review.
-
-   Please note that this does currently not take placement of postsynaptic nodes
-   into account!
+   Please note that this does currently not take placement of postsynaptic 
+   nodes into account!
    """
 
    skids =  eval_skids(x, remote_instance )
@@ -123,7 +120,12 @@ def get_time_invested( x, remote_instance, interval = 1, minimum_actions = 1 ):
 
    user_list = get_user_list( remote_instance ).set_index('id')
 
-   skdata = get_3D_skeleton( skids, remote_instance = remote_instance )
+   if not isinstance( x, core.CatmaidNeuron ) and not isinstance( x, core.CatmaidNeuronList ):    
+    skdata = get_3D_skeleton( skids, remote_instance = remote_instance )
+   elif isinstance( x, core.CatmaidNeuron ):    
+    skdata = core.CatmaidNeuronList( skdata )
+   elif isinstance( x, core.CatmaidNeuronList ):    
+    skdata = x
 
    #Extract connector and node IDs
    node_ids = []

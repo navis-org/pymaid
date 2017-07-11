@@ -120,6 +120,8 @@ Check out [/examples/](https://github.com/schlegelp/PyMaid/tree/master/examples)
 
 ### pymaid.core:
 
+Contains definitions for neuron and neuronlist classes.
+
 #### class `CatmaidNeuron`: 
 Representation of a **single** Catmaid neuron. Can be minimally initialized with just a skeleton ID. Data (e.g. nodes, connectors, name, review status, annotation) 
 are retrieved/calculated on-demand the first time they are **explicitly** requested:

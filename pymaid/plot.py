@@ -1,19 +1,20 @@
-"""
-    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
-    Copyright (C) 2017 Philipp Schlegel
+#    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+#    Copyright (C) 2017 Philipp Schlegel
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along
+""" Module contains functions to plot neurons in 2 and 3D.
 """
 
 import matplotlib.pyplot as plt 
@@ -50,82 +51,83 @@ if not module_logger.handlers:
    module_logger.addHandler(sh)
 
 def plot2d( *args, **kwargs ):
-   """ 
-   Retrieves 3D skeletons and generates matplotlib object.  
-   Currently plots only frontal view (x,y axes). 
-   X and y limits have been set to fit the adult EM volume -> adjust if necessary.
+   """ Retrieves 3D skeletons and generates matplotlib object.   
 
-   Parameters:
+   Parameters
    ----------
-   Provide neurons by using either one of the following kwargs
+   Provide either skeleton IDs via ``skids`` or skeleton data via ``skdata``.
 
-   skids :           list or single skid
-   skdata :          skeleton data as retrieved by pymaid.pymaid.get_3D_skeleton()
-   remote_instance : Catmaid Instance - need this too if you are passing only
-                     skids
+   skids :           {str, int, list of str, list of int}
+                     Skeleton IDs for neurons to plot
+   skdata :          {CatmaidNeuron, CatmaidNeuronList} 
+                     Skeleton data as retrieved by 
+                     ``pymaid.pymaid.get_3D_skeleton()``
+   remote_instance : Catmaid Instance, optional 
+                     Need this too if you are passing only skids
+   *args 
+                     See Notes for permissible arguments.
+   **kwargs 
+                     See Notes for permissible keyword arguments.
 
-   Examples:
-
-   1. Plot two neurons and have plot2d download the skeleton data for you:
-
+   Examples
+   --------
+   >>> # Plot two neurons and have plot2d download the skeleton data for you:
    >>> fig, ax = plot.plot2d( skids = [12345, 45567], remote_instance = rm ) 
    >>> matplotlib.pyplot.show()
-
-   2. Manually download a neuron, modify it and plot it:
-
+   >>> # 2. Manually download a neuron, modify it and plot it:
    >>> skdata = pymaid.pymaid.get_3D_skeleton( [12345], rm )
    >>> dist, prox = morpho.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
    >>> fig, ax = plot.plot2d( skdata = dist )
-   >>> matplotlib.pyplot.show()
-
-   Other (optional) arguments:
-   connectors :      boolean (default = True)
-                     Plot connectors (synapses, gap junctions, abutting)
-   connectors_only : boolean (default = False)
-                     Plot only connectors, not the neuron                  
-   zoom :            boolean (default = False)
-                     Zoom in on higher brain centers
-   auto_limits :     boolean (default = True)
-                     by default, limits are being calculated such that they 
-                     fit the neurons plotted. 
-   limits :          dict (default = None)
-                     Manually override limits for plot. Dict needs to define
-                     min and max values for each axis:
-                     { 'x' : [ int, int ], 'y' : [ int, int ] }
-
-                     If auto_limits = False and limits = None, a hard-coded 
-                     fallback is used - this may not suit your needs!
-
-   Neuropils included for FAFB(v13)
-   ---------
-   Neuropil names can be passed either as *args or as **kwargs. Passing them as
-   *args will cause them to be plotted in gray; passing neuropil names as **kwargs 
-   will render them in the provided color.
-   
-   Examples:
-
-   #Plots brain in red, and mushroom body in green:
+   >>> matplotlib.pyplot.show()   
+   >>> 3. #Plots brain in red, and mushroom body in green:
    >>> plot.plot2d(  skids = [ 12346 ], 
    ...               remote_instance = rm, 
    ...               'brain' = (1,0,0), 
-   ...               'MB' =  (0,1,0) )
-      
-   #Plots brain and mushroom body in grey
+   ...               'MB' =  (0,1,0) )      
+   >>> 4. #Plots brain and mushroom body in grey
    >>> plot.plot2d(   skids = [ 12346 ], 
    ...               remote_instance = rm,
    ...               *['brain', 'MB'] )
-   
+
+   Returns
+   --------
+   fig, ax :      matplotlib figure and axis object
+
+   Notes
+   -----  
+   Currently plots only frontal view (x,y axes). X and y limits have been set 
+   to fit the adult EM volume -> adjust if necessary.
+
+   (Optional) *args and **kwargs:
+
+   ``connectors`` (boolean, default = True )
+      Plot connectors (synapses, gap junctions, abutting)
+
+   ``connectors_only`` (boolean, default = False)
+      Plot only connectors, not the neuron                  
+
+   ``zoom`` (boolean, default = False)
+      Zoom in on higher brain centers
+
+   ``auto_limits`` (boolean, default = True)
+      By default, limits are being calculated such that they fit the neurons 
+      plotted. 
+
+   ``limits`` (dict, default = None)
+      Manually override limits for plot. Dict needs to define min and max 
+      values for each axis: ``{ 'x' : [ int, int ], 'y' : [ int, int ] }``
+      If ``auto_limits = False`` and ``limits = None``, a hard-coded fallback is used 
+      - this may not suit your needs!
+      
+   Neuropil names can be passed either as *args or as **kwargs. Passing them as
+   *args will cause them to be plotted in gray; passing neuropil names as **kwargs 
+   will render them in the provided color. See examples.
 
    Currently, the following neuropils are included:
-   brain, MB, LH, AL, SLP, SIP, CRE
+   ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
 
-   If you want additional neuropils or work on a different project: feel free to
-   contact me to find out how to add more.
-
-
-   Returns:
-   --------
-   fig, ax :         matplotlib figure and axe object
+   If you want additional neuropils or work on a different project: feel free 
+   to contact me to find out how to add more.
    """      
 
    #Here, we define 2d outlines brain meshes/neuropils:
@@ -273,7 +275,7 @@ def plot2d( *args, **kwargs ):
    module_logger.debug('Plot limits set to: x= %i -> %i; y = %i -> %i' % ( catmaid_limits['x'][0], catmaid_limits['x'][1], -catmaid_limits['y'][0], -catmaid_limits['y'][1] ) )
 
    if skdata.shape[0] > 1:
-      colormap = random_colors ( len(skdata) , color_space='RGB') 
+      colormap = _random_colors ( len(skdata) , color_space='RGB') 
    else:
       colormap = [ (float(0),float(0),float(0)) ]
 
@@ -342,7 +344,7 @@ def plot2d( *args, **kwargs ):
 
    return fig, ax
 
-def random_colors (color_count, color_space='RGB', color_range = 1):
+def _random_colors (color_count, color_space='RGB', color_range = 1):
    """ Divides colorspace into N evenly distributed colors
    Returns
    -------
@@ -389,7 +391,7 @@ def random_colors (color_count, color_space='RGB', color_range = 1):
 
    return(colormap)
 
-def fibonacci_sphere(samples=1,randomize=True):
+def _fibonacci_sphere(samples=1,randomize=True):
    """ Calculates points on a sphere
    """
    rnd = 1.
@@ -414,77 +416,81 @@ def fibonacci_sphere(samples=1,randomize=True):
    return points
 
 def plot3d( *args, **kwargs ):
-   """ 
-   Retrieves 3D skeletons and generates 3D plot using either 
+   """ Retrieves 3D skeletons and generates 3D plot using either 
    vispy (default, http://vispy.org) or plotly (http://plot.ly)
 
-   Parameters:
+   Parameters
    ----------
    USE EITHER <skids> or <skdata> to specify which neurons you want to plot
 
-   skids :           list
+   skids :           {list of int, list of str}
                      list of CATMAID skeleton ids
-   skdata :          skeleton data as retrieved by pymaid.pymaid.get_3D_skeleton()
-   dotprops :        pandas DataFrame containing neurons as dotprops 
-                     Format:  index    name    points        vect
-                              1        str     DataFrame      DataFrame
-
-                        Format of <points> :    index   x     y     z
-                     
-                        Format of <vect>:       index   x     y     z
-
+   skdata 
+                     skeleton data as retrieved by 
+                     ``pymaid.pymaid.get_3D_skeleton()``
+   dotprops 
+                     | pandas DataFrame containing neurons as dotprops 
+                     | Format:       ``name`` ``points``   ``vect``
+                     |           1    `str`  `DataFrame`  `DataFrame`
+                     |
+                     | Format of ``points`` :    index   x     y     z                     
+                     | Format of ``vect``:       index   x     y     z
    remote_instance : CATMAID remote instance
-                     need to pass this too if you are providing only skids
-                     also necessary if you want to include volumes!
-                     If possible, will try to get remote instance from
-                     neuron object.                     
-
-   backend :         string (default = 'vispy')
-                     Can be 'vispy' or 'plotly': 
-                     Vispy uses OpenGL to generate high-performance 3D plots 
-                     but is less pretty. 
-                     Plotly generates 3D plots in .html which are shareable
-                     but take longer to generate.
-
-   Other (optional arguments):        
-   connectors :      plot synapses and gap junctions (default = False)
-   by_strahler :     will render the neuron by strahler index (default = False)
+                     Need to pass this too if you are providing only skids 
+                     also necessary if you want to include volumes! If 
+                     possible, will try to get remote instance from neuron 
+                     object.                     
+   backend :         {'vispy','plotly'}, optional       
+      | ``vispy`` uses OpenGL to generate high-performance 3D plots but is less pretty. 
+      | ``plotly`` generates 3D plots in .html which are shareable but take longer to generate.
+      | Default = ``vispy``
+   
+   connectors :      bool, optional 
+                     Plot synapses and gap junctions (default = False)
+   by_strahler :     bool, optional
+                     Will render the neuron by strahler index (default=False)
                      Does currently only work when backend = 'plotly'
-   cn_mesh_colors :  plot connectors using mesh colors (default = False)
-   limits :          manually override plot limits
-                     {'x' : [min,max], 'y': [min,max], 'z':[min,max]}
-   auto_limits :     autoscales plot to fit the neurons (default = True)                         
-   downsampling :    set downsampling of neurons before plotting (default = None)
-   volumes :         volumes to plot. Can be:
-                        1. Volume name (str): e.g. "v13.LH_R"
-                        2. List of names: e.g. ['v13.LH_R', 'v13.LH_L']
-                        3. Dict of names+color: e.g. { 'v13.LH_R' : (255,0,0) }
-                        4. Dict of dict: e.g. {'v13.LH_R': { 'color' : (255,0,0 ) } }
-                        5. Dict with verts/faces: 
-                           e.g. {'my_neuropil': { 'verts': [ ], 'faces' : [], 'color': () }}
-                     If no color is provided, default (220,220,220) is used
-   colormap :        { skid : (r,g,b), ... } (default = random colors)
-                     color must be 0-255
-   fig_width and :   use to define figure/window size (default = 1440/960)
-   fig_height
+   cn_mesh_colors :  bool, optional 
+                     Plot connectors using mesh colors (default = False)
+   limits :          dict, optional
+                     Manually override plot limits. 
+                     Format: ``{'x' :[min,max], 'y':[min,max], 'z':[min,max]}``
+   auto_limits :     bool, optional
+                     Autoscales plot to fit the neurons (default = True)                         
+   downsampling :    int, optional   
+                     Set downsampling of neurons before plotting. 
+                     Default = None
+   volumes         
+      | volumes to plot. Can be:
+      | 1. Volume name (str): e.g. ``"v13.LH_R"``
+      | 2. List of names: e.g. ``['v13.LH_R', 'v13.LH_L']``
+      | 3. Dict of names+color: e.g. ``{ 'v13.LH_R' : (255,0,0) }``
+      | 4. Dict of dict: e.g. ``{'v13.LH_R': { 'color' : (255,0,0 ) } }``
+      | 5. Dict with verts/faces: 
+      |   e.g. ``{'my_neuropil': { 'verts': [ ], 'faces' : [], 'color': () }}``
+      |   If no color is provided, default (220,220,220) is used
+   colormap :        dict, optional
+                     ``{ skid : (r,g,b), ... }`` - color must be 0-255. 
+                     Default = random colors                     
+   fig_width, fig_height : int, optional   
+                     Use to define figure/window size (default = 1440/960)      
+   title :           str, optional          
+                     For plotly only! Plot title (default = 'Neuron plot')   
+   fig_autosize :    bool, optional    
+                     For plotly only! Autoscale figure size (default = False) 
+                     Attention: autoscale overrides fig_width and fig_height      
 
-   For plotly only:
-      title :           plot title (default = 'Neuron plot')   
-      fig_autosize :    autoscale figure size (default = False)
-                        Attention: autoscale overrides fig_width and fig_height      
-
-   Returns:
+   Returns
    --------
-   If backend = 'vispy':      
-                  Opens a 3D window and returns
-      canvas :    Vispy canvas object
-      view   :    Vispy view object -> use to manipulate camera, add object, etc.
+   If ``backend = 'vispy'``
+      |Opens a 3D window and returns
+      |canvas : Vispy canvas object
+      |view : Vispy view object -> use to manipulate camera, add object, etc.
 
-   If backend = 'plotly':
-      fig:        dictionary to generate plotly 3d figure
-                  use for example:
-                  plotly.offline.plot(fig, filename='3d_plot.html') 
-                  to generate html file and open it webbrowser 
+   If ``backend = 'plotly'``
+      |fig: dictionary to generate plotly 3d figure
+      | Use for example: ``plotly.offline.plot(fig, filename='3d_plot.html')``
+         to generate html file and open it webbrowser 
    """   
 
    def _plot3d_vispy():
@@ -687,7 +693,7 @@ def plot3d( *args, **kwargs ):
       trace_data = []
 
       #Generate sphere for somas
-      fib_points = fibonacci_sphere( samples = 30 )
+      fib_points = _fibonacci_sphere( samples = 30 )
 
       module_logger.info('Generating traces...')
       for i, neuron in enumerate( skdata.itertuples() ):
@@ -1063,7 +1069,7 @@ def plot3d( *args, **kwargs ):
    colormap = kwargs.get( 'colormap', {} )
 
    if not colormap:
-      cm = random_colors ( skdata.shape[0] + dotprops.shape[0] , color_space='RGB', color_range = 255)      
+      cm = _random_colors ( skdata.shape[0] + dotprops.shape[0] , color_space='RGB', color_range = 255)      
       colormap = {}
       #if ( skdata.shape[0] + dotprops.shape[0] ) > 1:
          
@@ -1126,55 +1132,55 @@ def plot3d( *args, **kwargs ):
       return _plot3d_vispy()
 
 def plot_network( *args, **kwargs ):
-   """ 
-   Uses python-igraph to generate a plot in plotly
+   """ Uses python-igraph and plotly to generate a network plot
 
-   Parameters:
+   Parameters
    ----------
-   USE EITHER <skids>, <adj_mat> or <graph> to specify what to plot
+   USE EITHER <skids>, <adj_mat> or <g> to specify what to plot  
 
    skids :           list
-                     list of CATMAID skeleton ids
+                     List of CATMAID skeleton ids
    adj_mat :         Pandas dataframe
-                     adjacency matrix, e.g. from cluster.create_adjacency_matrix()
+                     Adjacency matrix, e.g. from 
+                     ``cluster.create_adjacency_matrix()``
    g :               igraph object
-                     igraph representation of the network
+                     iGraph representation of the network
    remote_instance : CATMAID remote instance
-                     need to pass this too if you are providing only skids
-
-   Other (optional arguments):           
+                     Need to pass this too if you are providing only skids
+   
    layout :          string (default = 'fr' -> Fruchterman-Reingold)
-                     see http://igraph.org/python/doc/tutorial/tutorial.html for
-                     available layouts
+                     See http://igraph.org/python/doc/tutorial/tutorial.html 
+                     for available layouts
    syn_cutoff :      int (default = False)
-                     if provided, connections will be maxed at this value
+                     If provided, connections will be maxed at this value
    syn_threshold :   int (default = 0)
-                     edges with less connections are ignored
+                     Edges with less connections are ignored
    groups :          dict 
-                     Use to group neurons. Format: { 'Group A' : [skid1, skid2, ..], }
-   colormap :        Set to 'random' (default) to assign random colors to neurons
-                     Use single tuple to assign the same color to all neurons:
-                     ( (0-255,0-255,0-255) ) 
-                     Use dict to assign rgb colors to individual neurons: 
-                     { neuron1 : (0-255,0-255,0-255), .. }
+                     Use to group neurons. Format: 
+                     ``{ 'Group A' : [skid1, skid2, ..], }``
+   colormap :        {str, tuple, dict }
+               | Set to 'random' (default) to assign random colors to neurons
+               | Use single tuple to assign the same color to all neurons:
+               | ( (0-255,0-255,0-255) ) 
+               | Use dict to assign rgb colors to individual neurons: 
+               | { neuron1 : (0-255,0-255,0-255), .. }
    label_nodes :     boolean (default = True)
-                     plot neuron labels
+                     Plot neuron labels
    label_edges :     boolean (default = True)
-                     plot edge labels
+                     Plot edge labels
    node_hover_text : dict
-                     provide custom hover text for neurons:
-                     { neuron1 : 'hover text', .. }
-   node_size :       node sizes
-                     use int to set node size once
-                     use dict to set size for individual nodes
-                     { neuron1 : 20, neuron2 : 5,  .. }
+                     Provide custom hover text for neurons:
+                     ``{ neuron1 : 'hover text', .. }``
+   node_size :       {int, dict}
+                     | Use int to set node size once
+                     | Use dict to set size for individual nodes:
+                     | ``{ neuron1 : 20, neuron2 : 5,  .. }``
 
-   Returns:
-   --------
-   fig:           dictionary to generate plotly figure
-                  use for example:
-                  plotly.offline.plot(fig, filename='plot.html') 
-                  to generate html file and open it webbrowser 
+   Returns
+   -------
+   fig: plotly dict
+      Use for example ``plotly.offline.plot(fig, filename='plot.html')`` to 
+      generate html file and open it webbrowser 
    """
 
    skids = kwargs.get('skids', [] )
@@ -1227,7 +1233,7 @@ def plot_network( *args, **kwargs ):
       #Give grey color to neurons that are not in colormap
       colors.update( { v['label'] : (.5,.5,.5) for i,v in enumerate( g.vs ) if v['label'] not in colormap }  )
    elif colormap == 'random':
-      c = random_colors (len( g.vs ), color_space='RGB', color_range = 255)
+      c = _random_colors (len( g.vs ), color_space='RGB', color_range = 255)
       colors = { v['label'] : c[i] for i,v in enumerate( g.vs ) }
    elif type(colormap) == type(tuple()):
       colors = { v['label'] : colormap for i,v in enumerate( g.vs ) }
@@ -1360,23 +1366,3 @@ def plot_network( *args, **kwargs ):
    module_logger.info('Done! Use e.g. plotly.offline.plot(fig, filename="network_plot.html") to plot.')
 
    return fig   
-
-if __name__ == '__main__':
-   """
-   FOR DEBUGGING/TESTING
-   """
-   module_logger.setLevel(logging.DEBUG)
-
-   import sys
-   sys.path.append('/Users/philipps/OneDrive/Cloudbox/Python')
-   from connect_catmaid import connect_adult_em
-
-   remote_instance = connect_adult_em()
-
-   skdata = pymaid.get_3D_skeleton( [27295] , remote_instance )[0]
-
-   LH, rest = morpho.cut_neuron2 ( skdata , 2816697 )
-
-   fig = plot3d( ['27295-LH','27295-rest'], remote_instance, *['connectors'], skdata = [ LH, rest ], names={ '27295-LH' : '27295-LH' ,'27295-rest': '27295-rest' }, volumes = ['v13.LH_R'] )   
-
-   pyoff.plot(fig, filename='3d_plot_test.html')
