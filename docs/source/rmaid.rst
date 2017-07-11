@@ -1,5 +1,5 @@
-Introduction
-************
+Using R and PyMaid
+******************
 This section will teach you the basics of how to use R in Python.
 
 On a fundamental level, you can use every single R function from within Python. The trick is to manually convert data types when the R interface ``rpy2`` does not. See https://rpy2.readthedocs.io for an introduction to ``rpy2``.
