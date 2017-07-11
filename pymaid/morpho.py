@@ -224,8 +224,8 @@ def longest_neurite( skdata, root_to_soma = False ):
                   If true, neuron will be rerooted to soma. Soma is the node 
                   with >1000 radius. Default = False
 
-   Returns:
-   --------
+   Returns
+   -------
    pandas DataFrame or Catmaid Object
                   Contains only node data of the longest neurite
    """

@@ -12,9 +12,9 @@ At the beginning of each session, you have to initialise a :class:`pymaid.pymaid
 >>> #HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
 ... #http authentification
 >>> remote_instance = CatmaidInstance(   'www.your.catmaid-server.org' , 
-...                                 	'HTTP_USER' , 
-...                                 	'HTTP_PASSWORD', 
-...                                 	'TOKEN' )
+...                                 	 'HTTP_USER' , 
+...                                 	 'HTTP_PASSWORD', 
+...                                 	 'TOKEN' )
 >>> neuron_list = get_3D_skeleton ( ['12345','67890'] , remote_instance )
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
@@ -30,7 +30,8 @@ annotations                                     False
 igraph                                          False
 tags                                             True
 dtype: object
->>> #Note how some entries are ``False``: these are still empty. They will be retrieved/computed on-demand upon first *explicit* request
+>>> #Note how some entries are False? These are still empty. 
+>>> #They will be retrieved/computed on-demand upon first *explicit* request
 
 ``neuron_list`` is an instance of the :class:`pymaid.core.CatmaidNeuronList` class and holds two neurons, both of which are of the :class:`pymaid.core.CatmaidNeuron` class. Check out their documentation for methods and attributes.
 
@@ -123,7 +124,7 @@ All this data is loaded once upon the first explicit request and then stored in 
 >>> n.annotations
 [ 'annotation1', 'annotation2', 'new_annotation' ]
 
-Attributes in :class:`pymaid.core.CatmaidNeuron` work much the same way but instead you will get that data for all neurons that are within that neuron list.
+Attributes in :class:`pymaid.core.CatmaidNeuronList` work much the same way but instead you will get that data for all neurons that are within that neuron list.
 
 >>> nl = CatmaidNeuronList( [ 123456, 456789, 123455 ], remote_instance = rm ) 
 >>> nl.skeleton_id
@@ -141,13 +142,15 @@ Indexing CatmaidNeuronLists
 >>> #Add CatmaidInstance to neurons in neuronlist
 >>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
 >>> nl.set_remote_instance( rm )
->>> Index using node count
+>>> #Index using node count
 >>> subset = nl [ nl.n_nodes > 6000 ]
->>> Index by skeleton ID 
+>>> #Index by skeleton ID 
 >>> subset = nl [ '123456' ]
 >>> #Index by neuron name
 >>> subset = nl [ 'name1' ]
+>>> #Index by list of skeleton IDs
+>>> subset = nl [ [ '12345', '67890' ] ]
 >>> #Concatenate lists
 >>> nl += pymaid.get_3D_skeleton( [ 912345 ], remote_instance = rm )
->>> #Remove item
+>>> #Remove item(s)
 >>> subset = nl - [ 45677 ]
