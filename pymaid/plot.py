@@ -19,9 +19,9 @@
 
 import matplotlib.pyplot as plt 
 import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
+import matplotlib.collections as mcollections
 import random, colorsys, logging
-from matplotlib.patches import Polygon, Circle
-from matplotlib.collections import PatchCollection
 
 import plotly.plotly as py
 import plotly.offline as pyoff
@@ -182,48 +182,48 @@ def plot2d( *args, **kwargs ):
    if 'brain' in args or 'brain' in kwargs:
       c = kwargs.get('brain', (0.9,0.9,0.9) )     
 
-      brain_p = Polygon(brain, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      hole_p = Polygon(hole, closed = True, lw = 0, fill =True, fc = 'white', alpha = 1 )
+      brain_p = mpatches.Polygon(brain, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      hole_p = mpatches.Polygon(hole, closed = True, lw = 0, fill =True, fc = 'white', alpha = 1 )
 
       ax.add_patch( brain_p )
       ax.add_patch( hole_p )
    if 'cre' in args or 'cre' in kwargs:
       c = kwargs.get('cre', (0.8,0.8,0.8) )     
 
-      cre_r_p = Polygon(cre_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      cre_l_p = Polygon(cre_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      cre_r_p = mpatches.Polygon(cre_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      cre_l_p = mpatches.Polygon(cre_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( cre_r_p )
       ax.add_patch( cre_l_p ) 
    if 'sip' in args or 'sip' in kwargs:      
       c = kwargs.get('sip', (0.8,0.8,0.8) )
 
-      sip_r_p = Polygon(sip_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      sip_l_p = Polygon(sip_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      sip_r_p = mpatches.Polygon(sip_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      sip_l_p = mpatches.Polygon(sip_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( sip_r_p )
       ax.add_patch( sip_l_p ) 
    if 'slp' in args or 'slp' in kwargs:
       c = kwargs.get('slp', (0.8,0.8,0.8) )
 
-      slp_r_p = Polygon(slp_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      slp_l_p = Polygon(slp_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      slp_r_p = mpatches.Polygon(slp_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      slp_l_p = mpatches.Polygon(slp_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( slp_r_p )
       ax.add_patch( slp_l_p ) 
    if 'mb' in args or 'mb' in kwargs:
       c = kwargs.get('mb', (0.8,0.8,0.8) )
 
-      mb_r_p = Polygon(mb_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      mb_l_p = Polygon(mb_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      mb_r_p = mpatches.Polygon(mb_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      mb_l_p = mpatches.Polygon(mb_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( mb_r_p )
       ax.add_patch( mb_l_p )     
    if 'lh' in args or 'lh' in kwargs:
       c = kwargs.get('lh', (0.8,0.8,0.8) )
 
-      lh_r_p = Polygon(lh_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      lh_l_p = Polygon(lh_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      lh_r_p = mpatches.Polygon(lh_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      lh_l_p = mpatches.Polygon(lh_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( lh_r_p )
       ax.add_patch( lh_l_p )     
@@ -231,8 +231,8 @@ def plot2d( *args, **kwargs ):
    if 'al' in args or 'al' in kwargs:
       c = kwargs.get('al', (0.8,0.8,0.8) )
 
-      al_r_p = Polygon(al_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
-      al_l_p = Polygon(al_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      al_r_p = mpatches.Polygon(al_r, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
+      al_l_p = mpatches.Polygon(al_l, closed = True, lw = 0, fill =True, fc = c, alpha = 1 )
 
       ax.add_patch( al_r_p )
       ax.add_patch( al_l_p )
@@ -329,7 +329,7 @@ def plot2d( *args, **kwargs ):
             ax.add_line(this_line)  
 
          for n in soma.itertuples():       
-            s = Circle( ( int( n.x ), int( -n.y ) ), radius = n.radius , alpha = .9, fill = True, color = colormap[i], zorder=4, edgecolor='none' )
+            s = mpatches.Circle( ( int( n.x ), int( -n.y ) ), radius = n.radius , alpha = .9, fill = True, color = colormap[i], zorder=4, edgecolor='none' )
             ax.add_patch(s)
 
       if connectors or connectors_only:
@@ -570,7 +570,7 @@ def plot3d( *args, **kwargs ):
                
                pos = this_cn[ [ 'x','y','z' ] ].apply(pd.to_numeric).as_matrix()                  
 
-               if syn_lay['display'] == 'circles':  
+               if syn_lay['display'] == 'mpatches.Circles':  
                   con = scene.visuals.Markers()
 
                   con.set_data( pos = np.array(pos)*scale_factor, face_color = color, edge_color = color, size = 1 )
@@ -818,7 +818,7 @@ def plot3d( *args, **kwargs ):
 
                this_cn = neuron.connectors[ neuron.connectors.relation == j ]
 
-               if syn_lay['display'] == 'circles':          
+               if syn_lay['display'] == 'mpatches.Circles':          
                   trace_data.append( go.Scatter3d(
                                           x = this_cn.x.as_matrix() * -1,
                                           y = this_cn.z.as_matrix() * -1, #y and z are switched
@@ -1027,7 +1027,7 @@ def plot3d( *args, **kwargs ):
                   'name' : 'Gap junctions',
                   'color': (0,255,0)
                   },
-               'display' : 'circles'
+               'display' : 'mpatches.Circles'
                }
    syn_lay.update( syn_lay_new )
 
