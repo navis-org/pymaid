@@ -59,7 +59,7 @@ import re
 import pandas as pd
 import numpy as np
 import datetime
-import tqdm
+from tqdm import tqdm
 
 from pymaid import core, morpho #igraph_catmaid#, morpho 
 
@@ -444,7 +444,7 @@ def _get_urls_threaded( urls , remote_instance, post_data = [] ):
 
     if cur_time > (start + time_out):        
         remote_instance.logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % ( len( [ d for d in data if d != None ] ), len(threads) ) )
-        remote_instance.logger.warning('Consider increasing time to time-out by setting remote_instance.time_out' )  
+        remote_instance.logger.warning('Consider increasing time to time-out via remote_instance.time_out' )  
         for t in threads:
             if t not in threads_closed:
                 remote_instance.logger.warning('Did not close thread for url: ' + urls[ int( t ) ] )
@@ -593,7 +593,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     urls = []    
     for i, skeleton_id in enumerate(to_retrieve):
         #Create URL for retrieving skeleton data from server with history details
-        remote_compact_skeleton_url = remote_instance.get_compact_details_url( project_id , skeleton_id )
+        remote_compact_skeleton_url = remote_instance.get_compact_details_url( skeleton_id )
         #For compact-details, parameters have to passed as GET 
         remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode( { 'with_history': str(get_history).lower() , 
                                                                          'with_tags' : str(tag_flag).lower() , 
@@ -602,7 +602,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
         #'True'/'False' needs to be lower case
         urls.append (  remote_compact_skeleton_url )
 
-    skdata = _get_urls_threaded( urls, remote_instance, time_out = time_out )   
+    skdata = _get_urls_threaded( urls, remote_instance )   
 
     #Retrieve abutting
     if get_abutting: 
@@ -612,10 +612,10 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
         for s in to_retrieve: 
             get_connectors_GET_data = { 'skeleton_ids[0]' : str( s ),
                                         'relation_type' : 'abutting' }                    
-            urls.append ( remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data) )       
+            urls.append ( remote_instance.get_connectors_url( ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data) )       
             print(urls)    
 
-        cn_data = _get_urls_threaded( urls, remote_instance, time_out = time_out )
+        cn_data = _get_urls_threaded( urls, remote_instance )
 
         #Add abutting to other connectors in skdata with type == 2
         for i,cn in enumerate(cn_data):
@@ -1689,7 +1689,7 @@ def has_soma ( skids , remote_instance = None,  ):
 
     skdata = get_3D_skeleton ( skids, remote_instance = remote_instance , 
                             connector_flag = 0, tag_flag = 1, 
-                            get_history = False, time_out = None, 
+                            get_history = False, 
                             )
 
     skdata.set_index('skeleton_id', inplace=True)
@@ -1843,8 +1843,7 @@ def skid_exists( skid, remote_instance = None,  ):
     if 'error' in response:
         return False
     else:
-        return True  
-
+        return True
 
 def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_existing = False,  ):
     """ Wrapper to add or remove tag(s) for a list of treenode(s) or connector(s)
@@ -1892,7 +1891,7 @@ def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_exist
 
     post_data = [ {'tags': ','.join(tags) , 'delete_existing': delete_existing } for n in node_list ]
 
-    d = _get_urls_threaded( add_tags_urls , remote_instance, post_data = post_data, time_out = None )   
+    d = _get_urls_threaded( add_tags_urls , remote_instance, post_data = post_data )   
     
     return d
 
@@ -1944,7 +1943,7 @@ def get_review_details ( skids, remote_instance = None, ):
         #For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         post_data.append ( { 'placeholder' : 0 } )
 
-    rdata = _get_urls_threaded( urls , remote_instance, post_data = post_data, time_out = None )           
+    rdata = _get_urls_threaded( urls , remote_instance, post_data = post_data )           
 
     for neuron in rdata:
         #There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
@@ -2126,7 +2125,7 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
         get_statistics_postdata = [ { 'skids[0]' : s } for s in skids  ]
         remote_get_statistics_url = [ remote_instance.get_contributions_url( ) for s in skids  ]
 
-        stats = _get_urls_threaded( remote_get_statistics_url , remote_instance, post_data = get_statistics_postdata, time_out = None )
+        stats = _get_urls_threaded( remote_get_statistics_url , remote_instance, post_data = get_statistics_postdata )
 
         df = pd.DataFrame( [ [  
                                 s,
