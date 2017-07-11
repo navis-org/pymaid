@@ -6,12 +6,15 @@
 Welcome to pymaid's documentation!
 ==================================
 
+If you are new to PyMaid, check out :doc:`source/intro`
+
 Contents:
 
 .. toctree::
    :maxdepth: 2   
    
    source/intro
+   source/pymaid
 
 Indices and tables
 ==================

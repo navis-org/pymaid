@@ -126,6 +126,10 @@ def init_rcatmaid ( **kwargs ):
     authpassword = kwargs.get( 'authpassword', None )
     authtoken = kwargs.get( 'authtoken', None )
 
+    if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']        
+
     if remote_instance:
         server = remote_instance.server
         authname = remote_instance.authname
@@ -558,6 +562,10 @@ def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = Fa
 
     doParallel = importr('doParallel')
     doParallel.registerDoParallel( cores = ncores )
+
+    if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']      
 
     try:
         flycircuit = importr('flycircuit')

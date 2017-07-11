@@ -33,7 +33,7 @@ if not module_logger.handlers:
   sh.setFormatter(formatter)
   module_logger.addHandler(sh)
 
-def get_user_contributions( x , remote_instance ):
+def get_user_contributions( x , remote_instance = None ):
    """ Takes a list of skeleton IDs and returns nodes and synapses contributed 
    by each user.
 
@@ -57,6 +57,13 @@ def get_user_contributions( x , remote_instance ):
    pandas DataFrame
       contains `nodes`, `presynapses`, `postsynapses` by `user`   
    """
+
+   if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']
+        else:
+            module_logger.error('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
    skids = eval_skids(x, remote_instance)
 

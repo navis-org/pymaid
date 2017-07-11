@@ -43,6 +43,9 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 - [Plotly](http://plot.ly)
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/)
 
+## Documentation:
+PyMaid is now on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
+
 ## Basic examples:
 
 ### Retrieve 3D skeleton data
@@ -117,6 +120,8 @@ print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for
 Check out [/examples/](https://github.com/schlegelp/PyMaid/tree/master/examples) for a growing list of Jupyter notebooks.
 
 ## Modules:
+
+Also check out PyMaid on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 ### pymaid.core:
 

@@ -76,6 +76,8 @@ class CatmaidInstance:
                     The http password.
     authtoken :     string
                     User token - see CATMAID documentation on how to get it.
+    project_id :    int, optional
+                    ID of your project. Default = 1
     logger :        optional
                     provide name for logging.getLogger if you like the CATMAID 
                     instance to log to a specific logger by default (None), a 
@@ -98,12 +100,10 @@ class CatmaidInstance:
     -------
     fetch ( url, post = None )
         retrieves information from CATMAID server
-    get_XXX_url ( pid , sid , X )
+    get_XXX_url ( sid , X )
         <CatmaidInstance> class contains a long list of function that generate 
         URLs to request data from the CATMAID server. 
-        Use dir(<CatmaidInstance>) to get the full list. Most of these 
-        functions require a project id (pid) and a stack id (sid) some require 
-        additional parameters, for example a skeleton id (skid). 
+        Use dir(<CatmaidInstance>) to get the full list. 
 
     Examples
     --------
@@ -114,10 +114,9 @@ class CatmaidInstance:
     ...                                 'password', 
     ...                                 'token' 
     ...                             )
-    >>> project_id = 1
+    >>> 
     >>> skeleton_id = 12345
-    >>> 3d_skeleton_url = myInstance.get_compact_skeleton_url(  project_id , 
-    ...                                                         skeleton_id )
+    >>> 3d_skeleton_url = myInstance.get_compact_skeleton_url( skeleton_id )
     >>> raw_data = myInstance.fetch( 3d_skeleton_url )
     >>> # 2.) Use wrapper to generate CatmaidNeuron objects
     >>> from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
@@ -130,13 +129,14 @@ class CatmaidInstance:
     >>> print(neuron_list)
     """
 
-    def __init__(self, server, authname, authpassword, authtoken, logger = None, debug=False, time_out = None ):
+    def __init__(self, server, authname, authpassword, authtoken, project_id = 1, logger = None, debug=False, time_out = None ):
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
         self.authtoken = authtoken        
         self.opener = urllib.request.build_opener(urllib.request.HTTPRedirectHandler())      
-        self.time_out = time_out      
+        self.time_out = time_out   
+        self.project_id = project_id   
 
         #If pymaid is not run as module, make sure logger has a at least a StreamHandler
         if not logger:
@@ -192,56 +192,56 @@ class CatmaidInstance:
 
         return json.loads(response.read().decode("utf-8"))
     
-    def get_stack_info_url(self, pid, sid):
+    def get_stack_info_url(self, sid):
         """ Use to parse url for retrieving stack infos. """
-        return self.djangourl("/" + str(pid) + "/stack/" + str(sid) + "/info")
+        return self.djangourl("/" + str(self.project_id) + "/stack/" + str(sid) + "/info")
     
-    def get_skeleton_nodes_url(self, pid, skid):
+    def get_skeleton_nodes_url(self, skid):
         """ Use to parse url for retrieving skeleton nodes (no info on parents or synapses, does need post data). """
-        return self.djangourl("/" + str(pid) + "/treenode/table/" + str(skid) + "/content")
+        return self.djangourl("/" + str(self.project_id) + "/treenode/table/" + str(skid) + "/content")
     
-    def get_skeleton_for_3d_viewer_url(self, pid, skid):
+    def get_skeleton_for_3d_viewer_url(self, skid):
         """ ATTENTION: this url doesn't work properly anymore as of 07/07/14
         use compact-skeleton instead
         Used to parse url for retrieving all info the 3D viewer gets (does NOT need post data)
         Format: name, nodes, tags, connectors, reviews
         """
-        return self.djangourl("/" + str(pid) + "/skeleton/" + str(skid) + "/compact-json")
+        return self.djangourl("/" + str(self.project_id) + "/skeleton/" + str(skid) + "/compact-json")
     
-    def get_add_annotations_url(self,pid):
+    def get_add_annotations_url(self):
         """ Use to parse url to add annotations to skeleton IDs. """
-        return self.djangourl("/" + str(pid) + "/annotations/add" )    
+        return self.djangourl("/" + str(self.project_id) + "/annotations/add" )    
     
-    def get_connectivity_url(self, pid):
+    def get_connectivity_url(self):
         """ Use to parse url for retrieving connectivity (does need post data). """
-        return self.djangourl("/" + str(pid) + "/skeletons/connectivity" )
+        return self.djangourl("/" + str(self.project_id) + "/skeletons/connectivity" )
 
-    def get_connectors_url(self, pid):
+    def get_connectors_url(self):
         """ Use to retrieve list of connectors either pre- or postsynaptic a set of neurons - GET request
         Format: { 'links': [ skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ] }
         """    
-        return self.djangourl("/" + str(pid) + "/connectors/" )
+        return self.djangourl("/" + str(self.project_id) + "/connectors/" )
     
-    def get_connector_details_url(self, pid):
+    def get_connector_details_url(self):
         """ Use to parse url for retrieving info connectors (does need post data). """
-        return self.djangourl("/" + str(pid) + "/connector/skeletons" )
+        return self.djangourl("/" + str(self.project_id) + "/connector/skeletons" )
     
-    def get_neuronnames(self, pid):
-        """ Use to parse url for names for a list of skeleton ids (does need post data: pid, skid). """
-        return self.djangourl("/" + str(pid) + "/skeleton/neuronnames" )
+    def get_neuronnames(self):
+        """ Use to parse url for names for a list of skeleton ids (does need post data: self.project_id, skid). """
+        return self.djangourl("/" + str(self.project_id) + "/skeleton/neuronnames" )
     
-    def get_list_skeletons_url(self, pid):
-        """ Use to parse url for names for a list of skeleton ids (does need post data: pid, skid). """
-        return self.djangourl("/" + str(pid) + "/skeletons/")
+    def get_list_skeletons_url(self):
+        """ Use to parse url for names for a list of skeleton ids (does need post data: self.project_id, skid). """
+        return self.djangourl("/" + str(self.project_id) + "/skeletons/")
 
-    def get_completed_connector_links(self, pid):
+    def get_completed_connector_links(self):
         """ Use to parse url for retrieval of completed connector links by given user 
         GET request: 
         Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id, link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id, link2_confidence, creator_id ]
         """
-        return self.djangourl("/" + str(pid) + "/connector/list/")
+        return self.djangourl("/" + str(self.project_id) + "/connector/list/")
 
-    def url_to_coordinates(self, pid, coords , stack_id = 0, tool = 'tracingtool' , active_skeleton_id = None, active_node_id = None ):
+    def url_to_coordinates(self, coords , stack_id = 0, tool = 'tracingtool' , active_skeleton_id = None, active_node_id = None ):
         """ Use to generate URL to a location
 
         Parameters
@@ -250,7 +250,7 @@ class CatmaidInstance:
                     (x, y, z)
 
         """
-        GET_data = {   'pid': pid,
+        GET_data = {   'self.project_id': self.project_id,
                         'xp': coords[0],
                         'yp': coords[1],
                         'zp': coords[2],
@@ -270,118 +270,118 @@ class CatmaidInstance:
         """ Get user list for project. """
         return self.djangourl("/user-list" )
     
-    def get_single_neuronname_url(self, pid, skid):
+    def get_single_neuronname_url(self, skid):
         """ Use to parse url for a SINGLE neuron (will also give you neuronID). """
-        return self.djangourl("/" + str(pid) + "/skeleton/" + str(skid) + "/neuronname" )    
+        return self.djangourl("/" + str(self.project_id) + "/skeleton/" + str(skid) + "/neuronname" )    
     
-    def get_review_status_url(self, pid):
+    def get_review_status_url(self):
         """ Use to get skeletons review status. """
-        return self.djangourl("/" + str(pid) + "/skeletons/review-status" )
+        return self.djangourl("/" + str(self.project_id) + "/skeletons/review-status" )
     
-    def get_neuron_annotations_url(self, pid):
+    def get_neuron_annotations_url(self):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
-        return self.djangourl("/" + str(pid) + "/annotations/table-list" )
+        return self.djangourl("/" + str(self.project_id) + "/annotations/table-list" )
     
-    def get_intersects(self, pid, vol_id, x, y, z):        
+    def get_intersects(self, vol_id, x, y, z):        
         """ Use to test if point intersects with volume. """
-        return self.djangourl("/" + str(pid) + "/volumes/"+str(vol_id)+"/intersect" ) + '?%s' % urllib.parse.urlencode( {'x':x, 'y':y , 'z': z} )
+        return self.djangourl("/" + str(self.project_id) + "/volumes/"+str(vol_id)+"/intersect" ) + '?%s' % urllib.parse.urlencode( {'x':x, 'y':y , 'z': z} )
     
-    def get_volumes(self, pid):
+    def get_volumes(self):
         """ Get list of all volumes in project. """
-        return self.djangourl("/" + str(pid) + "/volumes/")    
+        return self.djangourl("/" + str(self.project_id) + "/volumes/")    
 
     #Get details on a given volume (mesh)
-    def get_volume_details(self, pid, volume_id):
-        return self.djangourl("/" + str(pid) + "/volumes/" + str(volume_id) )
+    def get_volume_details(self, volume_id):
+        return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(volume_id) )
 
-    def get_annotations_for_skid_list(self, pid):
+    def get_annotations_for_skid_list(self):
         """ ATTENTION: This does not seem to work anymore as of 20/10/2015 -> although it still exists in CATMAID code
             use get_annotations_for_skid_list2    
             Use to get annotations for given neuron. DOES need skid as postdata
         """
-        return self.djangourl("/" + str(pid) + "/annotations/skeletons/list" )      
+        return self.djangourl("/" + str(self.project_id) + "/annotations/skeletons/list" )      
 
-    def get_review_details_url(self, pid, skid):
+    def get_review_details_url(self, skid):
         """ Use to retrieve review status for every single node of a skeleton.      
         For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         Returns list of arbors, the nodes the contain and who has been reviewing them at what time  
         """ 
-        return self.djangourl("/" + str(pid) + "/skeletons/" + str(skid) + "/review" )
+        return self.djangourl("/" + str(self.project_id) + "/skeletons/" + str(skid) + "/review" )
     
-    def get_annotations_for_skid_list2(self, pid):
+    def get_annotations_for_skid_list2(self):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
-        return self.djangourl("/" + str(pid) + "/skeleton/annotationlist" )
+        return self.djangourl("/" + str(self.project_id) + "/skeleton/annotationlist" )
 
-    def get_logs_url(self, pid):
+    def get_logs_url(self):
         """ Use to get logs. DOES need skid as postdata. """
-        return self.djangourl("/" + str(pid) + "/logs/list" )
+        return self.djangourl("/" + str(self.project_id) + "/logs/list" )
     
-    def get_annotation_list(self, pid):        
+    def get_annotation_list(self):        
         """ Use to parse url for retrieving list of all annotations (and their IDs!!!). """
-        return self.djangourl("/" + str(pid) + "/annotations/" )
+        return self.djangourl("/" + str(self.project_id) + "/annotations/" )
     
-    def get_contributions_url(self, pid ):
+    def get_contributions_url(self ):
         """ Use to parse url for retrieving contributor statistics for given skeleton (does need post data). """
-        return self.djangourl("/" + str(pid) + "/skeleton/contributor_statistics_multiple" )     
+        return self.djangourl("/" + str(self.project_id) + "/skeleton/contributor_statistics_multiple" )     
     
-    def get_annotated_url(self, pid):
+    def get_annotated_url(self):
         """ Use to parse url for retrieving annotated neurons (NEEDS post data). """        
-        return self.djangourl("/" + str(pid) + "/annotations/query-targets" )
+        return self.djangourl("/" + str(self.project_id) + "/annotations/query-targets" )
 
-    def get_skid_from_tnid( self, pid, tnid):
+    def get_skid_from_tnid( self, tnid):
         """ Use to parse url for retrieving the skeleton id to a single treenode id (does not need postdata) 
         API returns dict: {"count": integer, "skeleton_id": integer}
         """
-        return self.djangourl( "/" + str(pid) + "/skeleton/node/" + str(tnid) + "/node_count" )
+        return self.djangourl( "/" + str(self.project_id) + "/skeleton/node/" + str(tnid) + "/node_count" )
     
-    def get_node_list_url(self, pid):
+    def get_node_list_url(self):
         """ Use to parse url for retrieving list of nodes (NEEDS post data). """
-        return self.djangourl("/" + str(pid) + "/node/list" )  
+        return self.djangourl("/" + str(self.project_id) + "/node/list" )  
     
-    def get_node_info_url(self, pid):
+    def get_node_info_url(self):
         """ Use to parse url for retrieving user info on a single node (needs post data). """
-        return self.djangourl("/" + str(pid) + "/node/user-info" )        
+        return self.djangourl("/" + str(self.project_id) + "/node/user-info" )        
 
-    def treenode_add_tag_url(self, pid, treenode_id):
+    def treenode_add_tag_url(self, treenode_id):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
-        return self.djangourl("/" + str(pid) + "/label/treenode/" + str(treenode_id) + "/update" )
+        return self.djangourl("/" + str(self.project_id) + "/label/treenode/" + str(treenode_id) + "/update" )
 
-    def connector_add_tag_url(self, pid, treenode_id):
+    def connector_add_tag_url(self, treenode_id):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
-        return self.djangourl("/" + str(pid) + "/label/connector/" + str(treenode_id) + "/update" )
+        return self.djangourl("/" + str(self.project_id) + "/label/connector/" + str(treenode_id) + "/update" )
     
-    def get_compact_skeleton_url(self, pid, skid, connector_flag = 1, tag_flag = 1):        
+    def get_compact_skeleton_url(self, skid, connector_flag = 1, tag_flag = 1):        
         """ Use to parse url for retrieving all info the 3D viewer gets (does NOT need post data).
         Returns, in JSON, [[nodes], [connectors], [tags]], with connectors and tags being empty when 0 == with_connectors and 0 == with_tags, respectively.
         Deprecated but kept for backwards compability!
         """
-        return self.djangourl("/" + str(pid) + "/" + str(skid) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-skeleton")    
+        return self.djangourl("/" + str(self.project_id) + "/" + str(skid) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-skeleton")    
 
-    def get_compact_details_url(self, pid, skid):        
+    def get_compact_details_url(self, skid):        
         """ Similar to compact-skeleton but if 'with_history':True is passed as GET request, returned data will include all positions a nodes/connector has ever occupied plus the creation time and last modified.        
         """
-        return self.djangourl("/" + str(pid) + "/skeletons/" + str(skid) + "/compact-detail")
+        return self.djangourl("/" + str(self.project_id) + "/skeletons/" + str(skid) + "/compact-detail")
     
-    def get_compact_arbor_url(self, pid, skid, nodes_flag = 1, connector_flag = 1, tag_flag = 1):        
+    def get_compact_arbor_url(self, skid, nodes_flag = 1, connector_flag = 1, tag_flag = 1):        
         """ The difference between this function and get_compact_skeleton is that the connectors contain the whole chain from the skeleton of interest to the
         partner skeleton: contains [treenode_id, confidence_to_connector, connector_id, confidence_from_connector, connected_treenode_id, connected_skeleton_id, relation1, relation2]
         relation1 = 1 means presynaptic (this neuron is upstream), 0 means postsynaptic (this neuron is downstream)
         """ 
-        return self.djangourl("/" + str(pid) + "/" + str(skid) + "/" + str(nodes_flag) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-arbor")    
+        return self.djangourl("/" + str(self.project_id) + "/" + str(skid) + "/" + str(nodes_flag) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-arbor")    
     
-    def get_edges_url(self, pid):
+    def get_edges_url(self):
         """ Use to parse url for retrieving edges between given skeleton ids (does need postdata).
         Returns list of edges: [source_skid, target_skid, weight]
         """
-        return self.djangourl("/" + str(pid) + "/skeletons/confidence-compartment-subgraph" )
+        return self.djangourl("/" + str(self.project_id) + "/skeletons/confidence-compartment-subgraph" )
     
-    def get_skeletons_from_neuron_id(self, neuron_id, pid):
+    def get_skeletons_from_neuron_id(self, neuron_id):
         """ Use to get all skeletons of a given neuron (neuron_id). """
-        return self.djangourl("/" + str(pid) + "/neuron/" + str(neuron_id) + '/get-all-skeletons' )
+        return self.djangourl("/" + str(self.project_id) + "/neuron/" + str(neuron_id) + '/get-all-skeletons' )
     
-    def get_history_url(self, pid):
+    def get_history_url(self):
         """ Use to get user history. """
-        return self.djangourl("/" + str(pid) + "/stats/user-history" )
+        return self.djangourl("/" + str(self.project_id) + "/stats/user-history" )
   
 
 def _get_urls_threaded( urls , remote_instance, post_data = [] ):
@@ -485,7 +485,7 @@ class _retrieveUrlThreaded(threading.Thread):
             remote_instance.logger.error('Failed to join thread for ' + self.url )
             return None
 
-def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, get_merge_history = False, get_abutting = False, project_id = 1, return_neuron = True, kwargs = {} ):
+def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, get_merge_history = False, get_abutting = False,  return_neuron = True, kwargs = {} ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids
 
     Parameters
@@ -657,13 +657,13 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
 
     if return_neuron:
         if df.shape[0] > 1:
-            return core.CatmaidNeuronList( df, remote_instance = remote_instance, project_id = project_id )
+            return core.CatmaidNeuronList( df, remote_instance = remote_instance,  )
         else:
-            return core.CatmaidNeuron( df.ix[0], remote_instance = remote_instance, project_id = project_id )
+            return core.CatmaidNeuron( df.ix[0], remote_instance = remote_instance,  )
     else:
         return df    
 
-def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1, tag_flag = 1, project_id = 1 ):
+def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1, tag_flag = 1,  ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids.
 
     Notes
@@ -724,7 +724,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
 
     for s in skids:
         #Create URL for retrieving example skeleton from server
-        remote_compact_arbor_url = remote_instance.get_compact_arbor_url( project_id , s, node_flag, connector_flag, tag_flag )
+        remote_compact_arbor_url = remote_instance.get_compact_arbor_url( s, node_flag, connector_flag, tag_flag )
 
         #Retrieve node_data for example skeleton
         arbor_data = remote_instance.fetch( remote_compact_arbor_url )
@@ -748,7 +748,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
                         )
     return df
 
-def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1, project_id = 1, min_size = 2, approximate = False):
+def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1, min_size = 2, approximate = False):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest WITHIN a given Catmaid Volume. Attention: total number of 
     connections returned is not restricted to that volume.
@@ -809,7 +809,7 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
     #First, get list of connectors
     cn_data = get_connectors ( skids, remote_instance = remote_instance, 
                               incoming_synapses = True, outgoing_synapses = True, 
-                              abutting = False, gap_junctions = True, project_id = project_id)
+                              abutting = False, gap_junctions = True, )
 
     remote_instance.logger.info('%i connectors retrieved - now checking for intersection with volume...' % cn_data.shape[0] )
 
@@ -822,14 +822,14 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
     remote_instance.logger.info('%i connectors in volume - retrieving connected neurons...' % cn_in_volume.shape[0] )
 
     #Get details and extract connected skids
-    cn_details = get_connector_details ( cn_in_volume.connector_id.unique().tolist() , remote_instance = remote_instance , project_id = project_id )    
+    cn_details = get_connector_details ( cn_in_volume.connector_id.unique().tolist() , remote_instance = remote_instance ,  )    
     skids_in_volume = list( set( cn_details.presynaptic_to.tolist() + [ n for l in cn_details.postsynaptic_to.tolist() for n in l ] ))
 
     skids_in_volume = [ str(s) for s in skids_in_volume ]
 
     #Get all connectivity
     connectivity = get_partners(skids, remote_instance = remote_instance , 
-                                threshold = threshold, project_id = project_id, 
+                                threshold = threshold,
                                 min_size = min_size)    
 
     #Filter and return connectivity
@@ -839,7 +839,7 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
 
     return filtered_connectivity
 
-def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1, min_size = 2, filt = [], directions = ['incoming','outgoing'] ):
+def get_partners (skids, remote_instance = None , threshold = 1,  min_size = 2, filt = [], directions = ['incoming','outgoing'] ):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest
 
@@ -911,7 +911,7 @@ def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1,
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_connectivity_url = remote_instance.get_connectivity_url( project_id )
+    remote_connectivity_url = remote_instance.get_connectivity_url( )
 
     connectivity_post = {}    
     connectivity_post['boolean_op'] = 'OR'
@@ -979,7 +979,7 @@ def get_partners (skids, remote_instance = None , threshold = 1, project_id = 1,
         
     return df    
 
-def get_names (skids, remote_instance = None, project_id = 1):
+def get_names (skids, remote_instance = None):
     """ Wrapper to retrieve neurons names for a list of skeleton ids
 
     Parameters
@@ -1011,10 +1011,10 @@ def get_names (skids, remote_instance = None, project_id = 1):
 
     skids = list( set(skids) )
 
-    remote_get_names_url = remote_instance.get_neuronnames( project_id )
+    remote_get_names_url = remote_instance.get_neuronnames( )
 
     get_names_postdata = {}
-    get_names_postdata['pid'] = 1
+    get_names_postdata['self.project_id'] = remote_instance.project_id
         
     for i in range(len(skids)):
         key = 'skids[%i]' % i
@@ -1026,7 +1026,7 @@ def get_names (skids, remote_instance = None, project_id = 1):
         
     return(names)
 
-def get_node_user_details(treenode_ids, remote_instance = None, project_id = 1):
+def get_node_user_details(treenode_ids, remote_instance = None, ):
     """ Wrapper to retrieve user info for a list of treenode and/or connectors
 
     Parameters
@@ -1057,7 +1057,7 @@ def get_node_user_details(treenode_ids, remote_instance = None, project_id = 1):
 
     remote_instance.logger.info('Retrieving details for %i nodes...' % len(treenode_ids))
 
-    remote_nodes_details_url = remote_instance.get_node_info_url( project_id )
+    remote_nodes_details_url = remote_instance.get_node_info_url( )
 
     get_node_details_postdata = {
                                 }
@@ -1082,7 +1082,7 @@ def get_node_user_details(treenode_ids, remote_instance = None, project_id = 1):
 
     return df
 
-def get_node_lists ( skids, remote_instance = None, project_id = 1):
+def get_node_lists ( skids, remote_instance = None, ):
     """ Wrapper to retrieve treenode table for a list of skids
 
     Parameters
@@ -1128,7 +1128,7 @@ def get_node_lists ( skids, remote_instance = None, project_id = 1):
     nodes = {}    
     for run ,skid in enumerate(skids):
 
-        remote_nodes_list_url = remote_instance.get_skeleton_nodes_url( project_id , skid )
+        remote_nodes_list_url = remote_instance.get_skeleton_nodes_url( skid )
 
         remote_instance.logger.debug('Retrieving node table of %s [%i of %i]...' % (str(skid),run,len(skids)))        
 
@@ -1214,7 +1214,7 @@ def get_edges (skids, remote_instance = None):
         
     return df
 
-def get_connectors ( skids, remote_instance = None, incoming_synapses = True, outgoing_synapses = True, abutting = False, gap_junctions = False, project_id = 1):
+def get_connectors ( skids, remote_instance = None, incoming_synapses = True, outgoing_synapses = True, abutting = False, gap_junctions = False, ):
     """ Wrapper to retrieve connectors for a set of neurons.    
     
     Parameters
@@ -1235,8 +1235,6 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
                         if True, abutting connectors will be retrieved
     gap_junctions :     boolean (default = False)
                         if True, gap junctions will be retrieved
-    project_id :        int (default = 1)
-                        ID of the CATMAID project
 
     Returns
     ------- 
@@ -1282,22 +1280,22 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
 
         if incoming_synapses is True:
             get_connectors_GET_data['relation_type']='presynaptic_to'
-            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            remote_get_connectors_url = remote_instance.get_connectors_url( ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [ e + ['presynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
 
         if outgoing_synapses is True:
             get_connectors_GET_data['relation_type']='postsynaptic_to'
-            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            remote_get_connectors_url = remote_instance.get_connectors_url( ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [ e + ['postsynaptic_to'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
 
         if abutting is True:
             get_connectors_GET_data['relation_type']='abutting'
-            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            remote_get_connectors_url = remote_instance.get_connectors_url( ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [ e + ['abutting'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]
 
         if gap_junctions is True:
             get_connectors_GET_data['relation_type']='gapjunction_with'
-            remote_get_connectors_url = remote_instance.get_connectors_url( project_id ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+            remote_get_connectors_url = remote_instance.get_connectors_url( ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [ e + ['gap_junction'] for e in remote_instance.fetch( remote_get_connectors_url )['links'] ]              
 
     df = pd.DataFrame(  cn_data,
@@ -1310,7 +1308,7 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
     return df
 
 
-def get_connector_details (connector_ids, remote_instance = None, project_id = 1):
+def get_connector_details (connector_ids, remote_instance = None, ):
     """ Wrapper to retrieve details on sets of connectors 
     
     Parameters
@@ -1341,7 +1339,7 @@ def get_connector_details (connector_ids, remote_instance = None, project_id = 1
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_get_connectors_url = remote_instance.get_connector_details_url( project_id )       
+    remote_get_connectors_url = remote_instance.get_connector_details_url( )       
     
     #Depending on DATA_UPLOAD_MAX_NUMBER_FIELDS of your CATMAID server (default = 1000), we have to cut requests into batches < 1000
     connectors = []
@@ -1364,7 +1362,7 @@ def get_connector_details (connector_ids, remote_instance = None, project_id = 1
 
     return df
 
-def get_review (skids, remote_instance = None, project_id = 1):
+def get_review (skids, remote_instance = None, ):
     """ Wrapper to retrieve review status for a set of neurons
     
     Parameters
@@ -1399,7 +1397,7 @@ def get_review (skids, remote_instance = None, project_id = 1):
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_get_reviews_url = remote_instance.get_review_status_url( project_id )
+    remote_get_reviews_url = remote_instance.get_review_status_url( )
 
     get_review_postdata = {}    
         
@@ -1422,7 +1420,7 @@ def get_review (skids, remote_instance = None, project_id = 1):
         
     return df
 
-def add_annotations ( skids, annotations, remote_instance = None, project_id = 1 ):
+def add_annotations ( skids, annotations, remote_instance = None,  ):
     """ Wrapper to add annotation(s) to a list of neuron(s)
 
     Parameters
@@ -1456,7 +1454,7 @@ def add_annotations ( skids, annotations, remote_instance = None, project_id = 1
     if type(annotations) != type(list()):
         annotations = [annotations]
 
-    add_annotations_url = remote_instance.get_add_annotations_url ( project_id )
+    add_annotations_url = remote_instance.get_add_annotations_url ( )
 
     add_annotations_postdata = {}
 
@@ -1472,7 +1470,7 @@ def add_annotations ( skids, annotations, remote_instance = None, project_id = 1
 
     return 
    
-def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
+def get_neuron_annotation (skid, remote_instance = None,  ):
     """ Wrapper to retrieve annotations of a SINGLE neuron. 
     Contains timestamps and user_id
     
@@ -1512,10 +1510,10 @@ def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
 
     #This works with neuron_id NOT skeleton_id
     #neuron_id can be requested via neuron_names
-    remote_get_neuron_name = remote_instance.get_single_neuronname_url( project_id , skid )
+    remote_get_neuron_name = remote_instance.get_single_neuronname_url(  skid )
     neuronid = remote_instance.fetch( remote_get_neuron_name )['neuronid']
 
-    remote_get_annotations_url = remote_instance.get_neuron_annotations_url( project_id )
+    remote_get_annotations_url = remote_instance.get_neuron_annotations_url( )
 
     get_annotations_postdata = {}            
     get_annotations_postdata['neuron_id'] = int(neuronid)   
@@ -1535,7 +1533,7 @@ def get_neuron_annotation (skid, remote_instance = None, project_id = 1 ):
         
     return df 
 
-def get_annotations_from_list(skids, remote_instance = None, project_id = 1 ):
+def get_annotations_from_list(skids, remote_instance = None,  ):
     """ Wrapper to retrieve annotations for a list of skeleton ids
     If a neuron has no annotations, it will not show up in returned dict!
     Note: this API endpoint does not process more than 250 skids at a time!
@@ -1568,7 +1566,7 @@ def get_annotations_from_list(skids, remote_instance = None, project_id = 1 ):
     if not isinstance(skids,list):
         skids = [skids]
 
-    remote_get_annotations_url = remote_instance.get_annotations_for_skid_list2( project_id )
+    remote_get_annotations_url = remote_instance.get_annotations_for_skid_list2( )
 
     get_annotations_postdata = {'metaannotations':0,'neuronnames':0}  
 
@@ -1594,7 +1592,7 @@ def get_annotations_from_list(skids, remote_instance = None, project_id = 1 ):
         remote_instance.logger.error( 'No annotations retrieved. Make sure that the skeleton IDs exist.' )
         return None
 
-def get_annotation_id( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
+def get_annotation_id( annotations, remote_instance = None,  allow_partial = False ):
     """ Wrapper to retrieve the annotation ID for single or list of annotation(s)
     
     Parameters
@@ -1620,7 +1618,7 @@ def get_annotation_id( annotations, remote_instance = None, project_id = 1, allo
 
     remote_instance.logger.info('Retrieving list of annotations...')
 
-    remote_annotation_list_url = remote_instance.get_annotation_list( project_id )
+    remote_annotation_list_url = remote_instance.get_annotation_list( )
     annotation_list = remote_instance.fetch( remote_annotation_list_url )
          
     annotation_ids = {}
@@ -1657,7 +1655,7 @@ def get_annotation_id( annotations, remote_instance = None, project_id = 1, allo
     return annotation_ids
 
 
-def has_soma ( skids , remote_instance = None, project_id = 1 ):
+def has_soma ( skids , remote_instance = None,  ):
     """ Quick function to check if a neuron/a list of neurons have somas
     Searches for nodes that have a 'soma' tag AND a radius > 500nm
 
@@ -1692,7 +1690,7 @@ def has_soma ( skids , remote_instance = None, project_id = 1 ):
     skdata = get_3D_skeleton ( skids, remote_instance = remote_instance , 
                             connector_flag = 0, tag_flag = 1, 
                             get_history = False, time_out = None, 
-                            project_id = project_id)
+                            )
 
     skdata.set_index('skeleton_id', inplace=True)
 
@@ -1711,7 +1709,7 @@ def has_soma ( skids , remote_instance = None, project_id = 1 ):
     return d
 
 
-def get_skids_by_name(tag, remote_instance = None, allow_partial = True, project_id = 1):
+def get_skids_by_name(tag, remote_instance = None, allow_partial = True, ):
     """ Wrapper to retrieve the all neurons with matching name
     
     Parameters
@@ -1738,7 +1736,7 @@ def get_skids_by_name(tag, remote_instance = None, allow_partial = True, project
             print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    search_url = remote_instance.get_annotated_url( project_id )
+    search_url = remote_instance.get_annotated_url( )
     annotation_post = { 'name': str(tag) , 'rangey_start': 0, 'range_length':500, 'with_annotations':False } 
 
     results = remote_instance.fetch( search_url, annotation_post )     
@@ -1758,7 +1756,7 @@ def get_skids_by_name(tag, remote_instance = None, allow_partial = True, project
 
     return df
 
-def get_skids_by_annotation( annotations, remote_instance = None, project_id = 1, allow_partial = False ):
+def get_skids_by_annotation( annotations, remote_instance = None,  allow_partial = False ):
     """ Wrapper to retrieve the all neurons annotated with given annotation(s)
     
     Parameters
@@ -1782,7 +1780,7 @@ def get_skids_by_annotation( annotations, remote_instance = None, project_id = 1
             return
 
     remote_instance.logger.info('Looking for Annotation(s): ' + str(annotations) )
-    annotation_ids = get_annotation_id(annotations, remote_instance, project_id = 1, allow_partial = allow_partial)
+    annotation_ids = get_annotation_id(annotations, remote_instance,  allow_partial = allow_partial)
 
     if not annotation_ids:
         remote_instance.logger.error('No matching annotation found! Returning None')
@@ -1801,7 +1799,7 @@ def get_skids_by_annotation( annotations, remote_instance = None, project_id = 1
     for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0, 'range_length':500, 'with_annotations':False}
-        remote_annotated_url = remote_instance.get_annotated_url( project_id )
+        remote_annotated_url = remote_instance.get_annotated_url( )
         neuron_list = remote_instance.fetch( remote_annotated_url, annotation_post )
         count = 0    
         for entry in neuron_list['entities']:
@@ -1812,7 +1810,7 @@ def get_skids_by_annotation( annotations, remote_instance = None, project_id = 1
         
     return(annotated_skids)
 
-def skid_exists( skid, remote_instance = None, project_id = 1 ):
+def skid_exists( skid, remote_instance = None,  ):
     """ Quick function to check if skeleton id exists
     
     Parameters
@@ -1839,7 +1837,7 @@ def skid_exists( skid, remote_instance = None, project_id = 1 ):
     if isinstance(skid, list):
         return { n: skid_exists(n) for n in skids }
 
-    remote_get_neuron_name = remote_instance.get_single_neuronname_url( project_id , skid )
+    remote_get_neuron_name = remote_instance.get_single_neuronname_url( skid )
     response = remote_instance.fetch( remote_get_neuron_name )
     
     if 'error' in response:
@@ -1848,7 +1846,7 @@ def skid_exists( skid, remote_instance = None, project_id = 1 ):
         return True  
 
 
-def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_existing = False, project_id = 1 ):
+def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_existing = False,  ):
     """ Wrapper to add or remove tag(s) for a list of treenode(s) or connector(s)
     In order to remove tags, 
 
@@ -1888,9 +1886,9 @@ def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_exist
         tags = [ tags ]
 
     if node_type == 'TREENODE':
-        add_tags_urls = [ remote_instance.treenode_add_tag_url( project_id, n) for n in node_list ]
+        add_tags_urls = [ remote_instance.treenode_add_tag_url( n) for n in node_list ]
     elif node_type == 'CONNECTOR':
-        add_tags_urls = [ remote_instance.connector_add_tag_url( project_id, n) for n in node_list ]
+        add_tags_urls = [ remote_instance.connector_add_tag_url( n) for n in node_list ]
 
     post_data = [ {'tags': ','.join(tags) , 'delete_existing': delete_existing } for n in node_list ]
 
@@ -1899,7 +1897,7 @@ def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_exist
     return d
 
 
-def get_review_details ( skids, remote_instance = None, project_id = 1):
+def get_review_details ( skids, remote_instance = None, ):
     """ Wrapper to retrieve review status (reviewer + timestamp) for each node 
     of a given skeleton -> uses the review API
 
@@ -1942,7 +1940,7 @@ def get_review_details ( skids, remote_instance = None, project_id = 1):
     post_data = []
 
     for s in skids:
-        urls.append ( remote_instance.get_review_details_url( project_id , s ) )
+        urls.append ( remote_instance.get_review_details_url( s ) )
         #For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         post_data.append ( { 'placeholder' : 0 } )
 
@@ -1956,7 +1954,7 @@ def get_review_details ( skids, remote_instance = None, project_id = 1):
 
     return node_list
 
-def get_logs (remote_instance = None, operations = [] , entries = 50 , display_start = 0, project_id = 1, search = ''):
+def get_logs (remote_instance = None, operations = [] , entries = 50 , display_start = 0,  search = ''):
     """ Wrapper to retrieve log (like log widget)
     
     Parameters
@@ -1971,8 +1969,6 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
                         'reroot_skeleton', 'reset_reviews', 'move_skeleton'
     entries :           integer (default = 50)
                         number of entries to retrieve
-    project_id :        integer (default = 1)
-                        Id of your CATMAID project
 
     Returns
     -------
@@ -2039,27 +2035,11 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
                                 'iSortCol_0':2,
                                 'sSortDir_0':'desc',
                                 'iSortingCols':1,
-                                'pid': project_id,
+                                'self.project_id': remote_instance.project_id,
                                 'operation_type': op,
                                 'search_freetext': search}
-        """
-        {
-                                'sEcho': 1,
-                                'iColumns': 7,
-                                'pid' : project_id,
-                                'sSearch': '',
-                                'bRegex':False,
-                                'iDisplayStart' : display_start,                                
-                                'iDisplayLength' : entries,
-                                'operation_type' : op,
-                                'iSortCol_0':2,
-                                'sSortDir_0':'desc',
-                                'iSortingCols':1,                                
-                                'search_freetext' : search
-                                } 
-        """
     
-        remote_get_logs_url = remote_instance.get_logs_url( project_id )
+        remote_get_logs_url = remote_instance.get_logs_url( )
         logs += remote_instance.fetch( remote_get_logs_url, get_logs_postdata )['aaData']
 
     df = pd.DataFrame(  logs,
@@ -2069,7 +2049,7 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
     return df
 
 
-def get_contributor_statistics (skids, remote_instance = None, separate = False, project_id = 1):
+def get_contributor_statistics (skids, remote_instance = None, separate = False, ):
     """ Wrapper to retrieve contributor statistics for given skeleton ids.
     By default, stats are given over all neurons.
     
@@ -2084,8 +2064,6 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
                         or define globally as 'remote_instance'
     separate :          boolean (default =False)
                         if true, stats are given per neuron
-    project_id :        integer (default = 1)
-                        Id of your CATMAID project
 
     Returns
     -------
@@ -2126,7 +2104,7 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
             key = 'skids[%i]' % i
             get_statistics_postdata[key] = skids[i]        
         
-        remote_get_statistics_url = remote_instance.get_contributions_url( project_id )
+        remote_get_statistics_url = remote_instance.get_contributions_url( )
         stats = remote_instance.fetch( remote_get_statistics_url, get_statistics_postdata )
 
         df = pd.DataFrame( [ [  
@@ -2146,7 +2124,7 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
                             )
     else:
         get_statistics_postdata = [ { 'skids[0]' : s } for s in skids  ]
-        remote_get_statistics_url = [ remote_instance.get_contributions_url( project_id ) for s in skids  ]
+        remote_get_statistics_url = [ remote_instance.get_contributions_url( ) for s in skids  ]
 
         stats = _get_urls_threaded( remote_get_statistics_url , remote_instance, post_data = get_statistics_postdata, time_out = None )
 
@@ -2167,7 +2145,7 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
                             )
     return df
 
-def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None, project_id = 1 ):
+def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None,  ):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters 
     (see variables). If no parameters are provided, all existing skeletons are 
     returned!
@@ -2212,13 +2190,13 @@ def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_da
         get_skeleton_list_GET_data['to'] = ''.join( [ str(d) for d in end_date ] )
 
 
-    remote_get_list_url = remote_instance.get_list_skeletons_url( project_id )
+    remote_get_list_url = remote_instance.get_list_skeletons_url( )
     remote_get_list_url += '?%s' % urllib.parse.urlencode(get_skeleton_list_GET_data)    
     skid_list = remote_instance.fetch ( remote_get_list_url)
 
     return skid_list
 
-def get_history( remote_instance = None, project_id = 1, start_date = (datetime.date.today()-datetime.timedelta(days=7)).isoformat() , end_date = datetime.date.today().isoformat(), split = True ):    
+def get_history( remote_instance = None,  start_date = (datetime.date.today()-datetime.timedelta(days=7)).isoformat() , end_date = datetime.date.today().isoformat(), split = True ):    
     """ Wrapper to retrieves CATMAID history 
 
     Notes
@@ -2326,12 +2304,12 @@ def get_history( remote_instance = None, project_id = 1, start_date = (datetime.
 
     data = []    
     for r in tqdm(rounds):
-        get_history_GET_data = {    'pid': project_id ,
+        get_history_GET_data = {    'self.project_id': remote_instance.project_id ,
                                     'start_date': r[0],
                                     'end_date': r[1]
                                         }
 
-        remote_get_history_url = remote_instance.get_history_url( project_id )
+        remote_get_history_url = remote_instance.get_history_url( )
 
         remote_get_history_url += '?%s' % urllib.parse.urlencode(get_history_GET_data)
 
@@ -2368,7 +2346,7 @@ def get_history( remote_instance = None, project_id = 1, start_date = (datetime.
                     )
     return df
 
-def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, project_id = 1, coord_format = 'NM', resolution = ( 4, 4, 50) ):      
+def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance,  coord_format = 'NM', resolution = ( 4, 4, 50) ):      
     """ Get nodes in provided volume. This is the same API enpoint that is 
     called when panning in the browser.
 
@@ -2417,7 +2395,7 @@ def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, proj
     if coord_format == 'NM':
         resolution = (1,1,1)
 
-    remote_nodes_list = remote_instance.get_node_list_url ( project_id )    
+    remote_nodes_list = remote_instance.get_node_list_url ( )    
     
     node_list_postdata = {      
                                 'left':left * resolution[0],
@@ -2448,7 +2426,7 @@ def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, proj
 
     return data
 
-def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, min_size = 1, only_soma = False, project_id = 1 ):
+def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, min_size = 1, only_soma = False,  ):
     """ Retrieves neurons with processes within CATMAID volumes. This function
     uses the BOUNDING BOX around the volume as proxy and queries for neurons
     that enter/exit that bounding box --> will therefore not catch fragments
@@ -2500,7 +2478,7 @@ def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, 
               )
 
         remote_instance.logger.info( 'Retrieving nodes in volume: %s...' % v )
-        temp = get_neurons_in_box ( bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[2][0], bbox[2][1], remote_instance = remote_instance, project_id = project_id )        
+        temp = get_neurons_in_box ( bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[2][0], bbox[2][1], remote_instance = remote_instance,  )        
 
         if not intersect:
             neurons += temp
@@ -2513,12 +2491,12 @@ def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, 
 
     if min_size > 1:
         remote_instance.logger.info( 'Filtering neurons for size...')
-        rev = get_review( list(set(neurons)), remote_instance, project_id )
+        rev = get_review( list(set(neurons)), remote_instance )
         neurons = rev[ rev.total_node_count > min_size ].skeleton_id.tolist()    
 
     if only_soma:
         remote_instance.logger.info( 'Filtering neurons for somas...')
-        soma = has_soma( list(set(neurons)), remote_instance, project_id )
+        soma = has_soma( list(set(neurons)), remote_instance )
         neurons = [ n for n in neurons if soma[n] == True ]
 
     remote_instance.logger.info( 'Done. %i unique neurons found in volume(s): %s' % ( len(set(neurons)), (',').join(volumes) ) )
@@ -2526,7 +2504,7 @@ def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, 
     return list(set(neurons))
 
 
-def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = None, unit = 'NM', project_id = 1, **kwargs ):
+def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = None, unit = 'NM',  **kwargs ):
     """ Retrieves neurons with processes within a defined volume. Because the 
     API returns only a limited number of neurons at a time, the defined volume 
     has to be chopped into smaller pieces for crowded areas - may thus take 
@@ -2574,12 +2552,12 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
         z1 *= z_resolution 
         z2 *= z_resolution 
 
-    def get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion, project_id ):  
+    def get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion ):  
 
         #remote_instance.logger.info( '%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (incursion, left, right, top, bottom, z1, z2) )
         #remote_instance.logger.info( 'Incursion %i' % incursion )
 
-        remote_nodes_list = remote_instance.get_node_list_url ( project_id )        
+        remote_nodes_list = remote_instance.get_node_list_url ( )        
         
         node_list_postdata = {      
                                     'left':left,
@@ -2606,7 +2584,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         top + (bottom-top)/2, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp            
 
             #Front right top
@@ -2616,7 +2594,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         top + (bottom-top)/2, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
 
             #Front left bottom            
@@ -2626,7 +2604,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         bottom, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
 
             #Front right bottom
@@ -2636,7 +2614,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         bottom, 
                                         z1, 
                                         z1 + (z2-z1)/2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
 
             #Back left top
@@ -2646,7 +2624,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         top + (bottom-top)/2, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
             
             #Back right top
@@ -2656,7 +2634,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         top + (bottom-top)/2, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
             
             #Back left bottom            
@@ -2666,7 +2644,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         bottom, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
 
             #Back right bottom
@@ -2676,7 +2654,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
                                         bottom, 
                                         z1 + (z2-z1)/2, 
                                         z2, 
-                                        remote_instance, incursion, project_id )
+                                        remote_instance, incursion )
             node_list += temp
 
         else:
@@ -2688,7 +2666,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
         return node_list, incursion
 
     incursion = 1
-    node_list, incursion = get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion , project_id )
+    node_list, incursion = get_nodes( left, right, top, bottom, z1, z2, remote_instance, incursion  )
 
     #Collapse list into unique skeleton ids
     skeletons = set()
@@ -2744,7 +2722,7 @@ def get_user_list( remote_instance = None ):
 
     return df
 
-def get_volume( volume_name, remote_instance = None, project_id = 1 ):
+def get_volume( volume_name, remote_instance = None,  ):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of 
     vertices and faces.
 
@@ -2774,7 +2752,7 @@ def get_volume( volume_name, remote_instance = None, project_id = 1 ):
     remote_instance.logger.info('Retrieving volume <%s>' % volume_name)
 
     #First, get volume ID
-    get_volumes_url = remote_instance.get_volumes( project_id )
+    get_volumes_url = remote_instance.get_volumes( )
     response =  remote_instance.fetch ( get_volumes_url )      
 
     volume_id  = [ e['id'] for e in response if e['name'] == volume_name ]
@@ -2786,7 +2764,7 @@ def get_volume( volume_name, remote_instance = None, project_id = 1 ):
         volume_id = volume_id[0]
 
     #Now download volume
-    url = remote_instance.get_volume_details( project_id, volume_id )
+    url = remote_instance.get_volume_details( volume_id )
     response = remote_instance.fetch(url)
 
     mesh_string = response['mesh']

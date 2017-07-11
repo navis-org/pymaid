@@ -161,6 +161,9 @@ def plot2d( *args, **kwargs ):
    limits = kwargs.get('limits', None )
    auto_limits = kwargs.get('auto_limits', False )
 
+   if remote_instance is None:        
+     if 'remote_instance' in globals():            
+         remote_instance = globals()['remote_instance'] 
 
    if not skdata and remote_instance and skids:
       skdata = pymaid.get_3D_skeleton ( skids, remote_instance, connector_flag = 1, tag_flag = 0 , get_history = False, time_out = None, get_abutting = True)
@@ -1055,6 +1058,10 @@ def plot3d( *args, **kwargs ):
    if not remote_instance and isinstance(skdata, core.CatmaidNeuronList):
       remote_instance = skdata._remote_instance
 
+   if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']        
+
    if (skdata.empty and dotprops.empty and not skids) or (skids and not remote_instance):
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot3d).')
       return  
@@ -1204,6 +1211,10 @@ def plot_network( *args, **kwargs ):
    fig_width = kwargs.get('fig_width', 1440)
    fig_height = kwargs.get('fig_height', 960)
    fig_autosize = kwargs.get('fig_autosize', False)
+
+   if remote_instance is None:        
+     if 'remote_instance' in globals():            
+         remote_instance = globals()['remote_instance']
 
    if adj_mat.empty and not skids and not g:
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR an adjacency matrix. See help(plot.plot_network).')

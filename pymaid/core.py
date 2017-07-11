@@ -50,8 +50,6 @@ class CatmaidNeuron:
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
                         neuron annotations, review status, etc.
-    project_id :        integer, optional 
-                        Default = 1
     meta_data :         dict, optional
                         any additional data
     copy :              boolean, optional
@@ -112,7 +110,7 @@ class CatmaidNeuron:
     >>> n.get_annotations()
     """
 
-    def __init__(self, x, remote_instance=None, project_id=1, meta_data=None, copy=True):        
+    def __init__(self, x, remote_instance=None, meta_data=None, copy=True):   
         self.logger = logging.getLogger('CatmaidNeuron')
 
         if not self.logger.handlers:
@@ -129,9 +127,12 @@ class CatmaidNeuron:
             else:                
                 raise Exception('Unable to construct CatmaidNeuron from data containing multiple neurons.')
 
+        if remote_instance is None:        
+            if 'remote_instance' in globals():            
+                remote_instance = globals()['remote_instance']     
+
         #These will be overriden if x is a CatmaidNeuron
-        self._remote_instance = remote_instance
-        self._project_id = project_id
+        self._remote_instance = remote_instance        
         self._meta_data = meta_data
         self.date_retrieved = datetime.datetime.now().isoformat()
         self._is_copy = copy
@@ -162,8 +163,7 @@ class CatmaidNeuron:
             self.tags = self.df.tags
 
             if isinstance(x, CatmaidNeuron):
-                self._remote_instance = x._remote_instance
-                self._project_id = x._project_id
+                self._remote_instance = x._remote_instance                
                 self._meta_data = x._meta_data
                 self.date_retrieved = x.date_retrieved
 
@@ -251,7 +251,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
         self.logger.info('Retrieving skeleton data...')
-        skeleton = pymaid.get_3D_skeleton( self.skeleton_id, remote_instance, self._project_id, return_neuron = False, kwargs = kwargs ).ix[0]   
+        skeleton = pymaid.get_3D_skeleton( self.skeleton_id, remote_instance, return_neuron = False, kwargs = kwargs ).ix[0]   
 
         if 'type' not in skeleton.nodes:
             skeleton  = morpho.classify_nodes( skeleton )
@@ -281,7 +281,7 @@ class CatmaidNeuron:
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
-        self.review_status = pymaid.get_review( self.skeleton_id, remote_instance, self._project_id ).ix[0].percent_reviewed
+        self.review_status = pymaid.get_review( self.skeleton_id, remote_instance ).ix[0].percent_reviewed
         return self.review_status    
 
     def get_annotations(self, remote_instance = None ):
@@ -292,7 +292,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.annotations = pymaid.get_annotations_from_list( self.skeleton_id, remote_instance , self._project_id )[ str(self.skeleton_id) ]
+        self.annotations = pymaid.get_annotations_from_list( self.skeleton_id, remote_instance )[ str(self.skeleton_id) ]
         return self.annotations
 
     def plot2d(self, **kwargs):
@@ -325,7 +325,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.neuron_name = pymaid.get_names( self.skeleton_id, remote_instance , self._project_id )[ str(self.skeleton_id) ]
+        self.neuron_name = pymaid.get_names( self.skeleton_id, remote_instance)[ str(self.skeleton_id) ]
         return self.neuron_name
 
     def downsample(self, factor = 5):        
@@ -363,7 +363,33 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
 
         n = pymaid.get_3D_skeleton( self.skeleton_id, remote_instance = remote_instance )
-        self.__init__(n, self._remote_instance, self._project_id, self._meta_data)
+        self.__init__(n, self._remote_instance, self._meta_data)
+
+    def set_remote_instance(self, remote_instance = None, server_url = None, http_user = None, http_pw = None, auth_token = None):
+        """Assign remote_instance to neuron
+
+        Notes
+        -----
+        Provide either existing CatmaidInstance OR your credentials.
+
+        Parameters
+        ----------
+        remote_instance :       pymaid.CatmaidInstance, optional
+        server_url :            str, optional
+        http_user :             str, optional
+        http_pw :               str, optional
+        auth_token :            str, optional
+        """
+        if remote_instance:
+            self._remote_instance = remote_instance
+        elif server_url and auth_token:
+            self._remote_instance = pymaid.CatmaidInstance( server_url,
+                                                            http_user,
+                                                            http_pw,
+                                                            auth_token
+                                                         )
+        else:
+            raise Exception('Provide either CatmaidInstance or credentials.')
 
     def __str__(self):        
         return self.__repr__()
@@ -411,8 +437,6 @@ class CatmaidNeuronList:
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
                         neuron annotations, review status, etc.
-    project_id :        integer, optional 
-                        Default = 1
     meta_data :         dict, optional
                         Any additional data
     copy :              boolean, optional
@@ -450,7 +474,7 @@ class CatmaidNeuronList:
     >>> nl = CatmaidNeuronList( [ 123456, 45677 ] )
     >>> #Add CatmaidInstance to neurons in neuronlist
     >>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
-    >>> nl.assign_remote_instance( rm )
+    >>> nl.set_remote_instance( rm )
     >>> #Retrieve review status from server on-demand
     >>> nl.review_status
     array([ 90, 10 ])
@@ -459,7 +483,7 @@ class CatmaidNeuronList:
     >>> #Get annotations from server
     >>> nl.annotations
     [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
-    >>>Index using node count
+    >>> Index using node count
     >>> subset = nl [ nl.n_nodes > 6000 ]
     >>> Index by skeleton ID 
     >>> subset = nl [ '123456' ]
@@ -470,7 +494,7 @@ class CatmaidNeuronList:
 
     """
 
-    def __init__(self, x, remote_instance=None, project_id=1, copy=True ):
+    def __init__(self, x, remote_instance=None, copy=True ):
         self.logger = logging.getLogger('CatmaidNeuronList')
         if not self.logger.handlers:
             sh = logging.StreamHandler()
@@ -479,6 +503,10 @@ class CatmaidNeuronList:
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             sh.setFormatter(formatter)
             self.logger.addHandler(sh)
+
+        if remote_instance is None:        
+            if 'remote_instance' in globals():            
+                remote_instance = globals()['remote_instance']            
 
         if not isinstance(x, list) and not isinstance( x, pd.DataFrame ) and not isinstance(x, CatmaidNeuronList) and not isinstance(x, np.ndarray):            
             self.neurons = list([ x ])
@@ -492,7 +520,7 @@ class CatmaidNeuronList:
         #Now convert into CatmaidNeurons if necessary
         for i,n in enumerate(self.neurons):            
             if not isinstance(n, CatmaidNeuron) or copy is True:
-                self.neurons[i] = CatmaidNeuron( n, remote_instance = remote_instance, project_id = project_id, copy = copy )
+                self.neurons[i] = CatmaidNeuron( n, remote_instance = remote_instance, copy = copy )
 
         self.ix = _IXIndexer(self.neurons, self.logger)                   
 
@@ -567,7 +595,7 @@ class CatmaidNeuronList:
             if len(set(all_instances)) > 1:
                 self.logger.warning('Neurons are using multiple remote_instances! Returning first entry.')
             elif len(set(all_instances)) == 0:
-                raise Exception('No remote_instance found. Use .assign_remote_instance(rm) to assign one to all neurons.')
+                raise Exception('No remote_instance found. Use .instance(rm) to assign one to all neurons.')
             else:
                 return all_instances[0]
 
@@ -660,10 +688,32 @@ class CatmaidNeuronList:
                 n.date_retrieved = datetime.datetime.now().isoformat()
                 n.get_igraph()
 
-    def assign_remote_instance(self, remote_instance):
-        """Assign remote_instance to all neurons"""
+    def set_remote_instance(self, remote_instance = None, server_url = None, http_user = None, http_pw = None, auth_token = None):
+        """Assign remote_instance to all neurons
+
+        Notes
+        -----
+        Provide either existing CatmaidInstance OR your credentials.
+
+        Parameters
+        ----------
+        remote_instance :       pymaid.CatmaidInstance, optional
+        server_url :            str, optional
+        http_user :             str, optional
+        http_pw :               str, optional
+        auth_token :            str, optional
+        """
+        if not remote_instance and server_url and auth_token:
+            remote_instance = pymaid.CatmaidInstance(       server_url,
+                                                            http_user,
+                                                            http_pw,
+                                                            auth_token
+                                                         )
+        else:
+            raise Exception('Provide either CatmaidInstance or credentials.')
+        
         for n in self.neurons:
-            n._remote_instance = remote_instance
+            n._remote_instance = remote_instance        
 
     def plot3d(self, **kwargs):
         """Plot neuron using pymaid.plot.plot3d()        

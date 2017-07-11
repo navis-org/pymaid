@@ -37,7 +37,7 @@ if not module_logger.handlers:
    sh.setFormatter(formatter)
    module_logger.addHandler(sh)
 
-def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = None, row_groups = {}, col_groups = {}, syn_threshold = 1 ):
+def create_adjacency_matrix( neuronsA, neuronsB, remote_instance = None, syn_cutoff = None, row_groups = {}, col_groups = {}, syn_threshold = 1 ):
    """ Wrapper to generate a matrix for synaptic connections between neuronsA 
    -> neuronsB (unidirectional!)
 
@@ -60,6 +60,13 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance, syn_cutoff = N
    -------
    matrix :          pandas Dataframe
    """
+   if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']
+        else:
+            module_logger.error('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+   
    #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
    try:   
       neuronsA = list( neuronsA.skeleton_id )   
@@ -192,7 +199,7 @@ def group_matrix ( mat, row_groups = {} , col_groups = {}, method = 'AVERAGE' ):
 
    return new_mat
 
-def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix = True, min_nodes = 2, similarity = 'vertex_normalized'):
+def create_connectivity_distance_matrix( neurons, remote_instance = None, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix = True, min_nodes = 2, similarity = 'vertex_normalized'):
    """ Wrapper to calculate connectivity similarity and creates a distance 
    matrix for a set of neurons. Uses Ward's algorithm for clustering.
 
@@ -232,6 +239,13 @@ def create_connectivity_distance_matrix( neurons, remote_instance, upstream=True
    cg :                 Seaborn cluster grid plot 
                         Only if ``plot_matrix = True``
    """
+
+   if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']
+        else:
+            module_logger.error('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
    #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
    try:

@@ -680,7 +680,7 @@ def _cut_neuron( skdata, cut_node ):
 
    return neuron_dist, neuron_prox
 
-def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_skid_filter = [] ):    
+def synapse_root_distances(skdata, remote_instance = None, pre_skid_filter = [], post_skid_filter = [] ):    
    """ Calculates geodesic (along the arbor) distance of synapses to root 
    (i.e. soma)
 
@@ -702,6 +702,13 @@ def synapse_root_distances(skdata, remote_instance, pre_skid_filter = [], post_s
       ``{'connector_id: distance_to_root[nm]'}`` for all postsynaptic sites of 
       this neuron
    """
+
+   if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']
+        else:
+            module_logger.error('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
       df = skdata
@@ -764,7 +771,7 @@ def _calc_dist(v1,v2):
     return math.sqrt(sum(((a-b)**2 for a,b in zip(v1,v2))))
 
 def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = False ):
-   """ Calculates cable length in micro meter (um) of a given neuron     
+    """ Calculates cable length in micro meter (um) of a given neuron     
 
     Parameters
     ----------
@@ -791,12 +798,16 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = 
                 ``nodes.parent_dist`` containing the distances to parent
     """   
 
-   if isinstance(skdata, int) or isinstance(skdata, str):
+    if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']        
+
+    if isinstance(skdata, int) or isinstance(skdata, str):
       skdata = pymaid.get_3D_skeleton( [skdata], remote_instance).ix[0]
 
-   if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
+    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
       df = skdata
-   elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
+    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
       if skdata.shape[0] == 1:
         df = skdata.ix[0]
       elif not return_skdata:
@@ -804,30 +815,30 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = 
       else:
         return core.CatmaidNeuronList( [ calc_cable( skdata.ix[i], return_skdata = return_skdata ) for i in range(skdata.shape[0]) ] )
 
-   #Copy node data too
-   df.nodes = df.nodes.copy()
+    #Copy node data too
+    df.nodes = df.nodes.copy()
 
-   if smoothing > 1:
+    if smoothing > 1:
       df = downsample_neuron( df, smoothing )   
 
-   if df.nodes.index.name != 'treenode_id':
+    if df.nodes.index.name != 'treenode_id':
       df.nodes.set_index( 'treenode_id' , inplace = True )
 
-   #Calculate distance to parent for each node
-   tn_coords = df.nodes[ ['x','y','z' ] ].reset_index()
-   parent_coords = df.nodes.ix[ [ n for n in df.nodes.parent_id.tolist() ] ][ [ 'x','y','z'] ].reset_index()   
+    #Calculate distance to parent for each node
+    tn_coords = df.nodes[ ['x','y','z' ] ].reset_index()
+    parent_coords = df.nodes.ix[ [ n for n in df.nodes.parent_id.tolist() ] ][ [ 'x','y','z'] ].reset_index()   
 
-   #Calculate distances between nodes and their parents
-   w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 ))
+    #Calculate distances between nodes and their parents
+    w = np.sqrt( np.sum(( tn_coords[ ['x','y','z' ] ] - parent_coords[ ['x','y','z' ] ] ) **2, axis=1 ))
 
-   df.nodes.reset_index( inplace = True )
+    df.nodes.reset_index( inplace = True )
 
-   if return_skdata:      
+    if return_skdata:      
       df.nodes['parent_dist'] =  [ v / 1000 for v in list(w) ]
       return df    
 
-   # #Remove nan value (at parent node) and return sum of all distances
-   return np.sum( w[ np.logical_not( np.isnan(w) ) ] ) / 1000
+    # #Remove nan value (at parent node) and return sum of all distances
+    return np.sum( w[ np.logical_not( np.isnan(w) ) ] ) / 1000
 
 def calc_strahler_index( skdata, return_dict = False ):
     """ Calculates Strahler Index -> starts with index of 1 at each leaf, at 
@@ -1007,7 +1018,7 @@ def _walk_to_root( start_node, list_of_parents, visited_nodes ):
 
     return round ( sum( distances_traveled ) ), visited_nodes
 
-def in_volume( points, volume, remote_instance, approximate = False, ignore_axis = [] ):
+def in_volume( points, volume, remote_instance = None, approximate = False, ignore_axis = [] ):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 
@@ -1036,6 +1047,10 @@ def in_volume( points, volume, remote_instance, approximate = False, ignore_axis
     list of bool
                       True if in volume, False if not
     """
+
+    if remote_instance is None:        
+        if 'remote_instance' in globals():            
+            remote_instance = globals()['remote_instance']      
 
     if type(volume) == type(str()):
       volume = pymaid.get_volume ( volume, remote_instance )
