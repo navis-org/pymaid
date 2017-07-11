@@ -2,7 +2,7 @@ from distutils.core import setup
 import re
 
 
-VERSIONFILE="pymaid/_version.py"
+VERSIONFILE="pymaid/__version.py"
 verstrline = open(VERSIONFILE, "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(VSRE, verstrline, re.M)

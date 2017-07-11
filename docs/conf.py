@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 import mock
 MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib', 'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
-                'pylab', 'rpy2', 'plotly','vispy','seaborn']
+                'pylab', 'rpy2', 'plotly','vispy','seaborn','scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull', 'matplotlib.lines']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
