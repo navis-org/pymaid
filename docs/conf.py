@@ -31,7 +31,7 @@ import mock
 MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'igraph' , 'tqdm', 'pandas',  
                 'pylab', 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 
                 'rpy2.robjects.pandas2ri' ,'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs', 
-                 'matplotlib',#'matplotlib.collections',  'matplotlib.pyplot', 'matplotlib.lines', 'maplotlib.patches',
+                 'matplotlib', 'matplotlib.pyplot',#'matplotlib.collections',   'matplotlib.lines', 'maplotlib.patches',
                 'vispy','seaborn','scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull', 
                 'vispy.geometry']
 for mod_name in MOCK_MODULES:
