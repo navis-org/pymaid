@@ -18,9 +18,9 @@
 """
 
 import matplotlib.pyplot as plt 
-#import matplotlib.lines as mlines
-#import matplotlib.patches as mpatches
-#import matplotlib.collections as mcollections
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
+import matplotlib.collections as mcollections
 import random, colorsys, logging
 
 import plotly.plotly as py
