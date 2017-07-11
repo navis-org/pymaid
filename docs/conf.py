@@ -27,9 +27,8 @@ sys.path.insert(0, os.path.abspath('../..'))
 #sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid')
 
 import mock
-MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib', 'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  'cluster', 
-                'pylab', 'math', 'np', 'plt','cluster','spatial','time','logging', 'rpy2', 'ConvexHull', 'http', 'cj','cookiejar','re','datetime',
-                'threading','json','urllib','base64','pd','plotly','vispy','seaborn']
+MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib', 'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
+                'pylab', 'cluster', 'rpy2', 'plotly','vispy','seaborn']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
