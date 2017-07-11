@@ -35,6 +35,7 @@ Quickstart
 Data conversion
 ===============
 :mod:`pymaid.rmaid` provides functions to convert data from Python to R:
+
 1. :func:`pymaid.rmaid.data2py` converts general data from R to Python
 2. :func:`pymaid.rmaid.neuron2py` converts R neuron or neuronlist object to Python :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`, respectively
 3. :func:`pymaid.rmaid.neuron2r` converts :class:`pymaid.core.CatmaidNeuron` or :class:`pymaid.core.CatmaidNeuronList` to R neuron or neuronlist object
