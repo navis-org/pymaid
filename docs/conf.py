@@ -26,11 +26,13 @@ sys.path.insert(0, os.path.abspath('../..'))
 #sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid/pymaid')
 #sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid')
 
+"""
 import mock
 MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib', 'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
-                'pylab', 'cluster', 'rpy2', 'plotly','vispy','seaborn']
+                'pylab', 'rpy2', 'plotly','vispy','seaborn']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
+"""
 
 # -- General configuration ------------------------------------------------
 
@@ -44,7 +46,8 @@ for mod_name in MOCK_MODULES:
 extensions = [
     'sphinx.ext.autodoc',
     #'sphinx.ext.viewcode',
-    'numpydoc'
+    'sphinx.ext.napoleon'
+    #'numpydoc'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
