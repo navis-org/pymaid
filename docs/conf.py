@@ -27,9 +27,11 @@ sys.path.insert(0, os.path.abspath('../..'))
 #sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid')
 
 import mock
-MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib', 'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
-                'pylab', 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 'rpy2.robjects.pandas2ri' ,'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs', 'vispy','seaborn','scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull', 
-                'matplotlib.lines', 'maplotlib.patches', 'matplotlib.collections', 'vispy.geometry']
+MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib','matplotlib.collections',  'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
+                'pylab', 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 
+                'rpy2.robjects.pandas2ri' ,'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs', 
+                'vispy','seaborn','scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull', 
+                'matplotlib.lines', 'maplotlib.patches', 'vispy.geometry']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
