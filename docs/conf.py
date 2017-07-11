@@ -28,11 +28,12 @@ sys.path.insert(0, os.path.abspath('../..'))
 
 #This needs to be removed in order to built locally
 import mock
-MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib','matplotlib.collections',  'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
+MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'igraph' , 'tqdm', 'pandas',  
                 'pylab', 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 
                 'rpy2.robjects.pandas2ri' ,'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs', 
+                 #'matplotlib','matplotlib.collections',  'matplotlib.pyplot', 'matplotlib.lines', 'maplotlib.patches',
                 'vispy','seaborn','scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull', 
-                'matplotlib.lines', 'maplotlib.patches', 'vispy.geometry']
+                'vispy.geometry']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
