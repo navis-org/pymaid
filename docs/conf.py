@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 #sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid/pymaid')
 #sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid')
 
+#This needs to be removed in order to built locally
 import mock
 MOCK_MODULES = ['numpy', 'scipy', 'sklearn', 'matplotlib','matplotlib.collections',  'matplotlib.pyplot', 'igraph' , 'tqdm', 'pandas',  
                 'pylab', 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 
