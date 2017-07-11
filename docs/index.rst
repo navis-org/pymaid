@@ -14,7 +14,9 @@ Contents:
    :maxdepth: 2   
    
    source/intro
+   source/rmaid
    source/pymaid
+
 
 Indices and tables
 ==================

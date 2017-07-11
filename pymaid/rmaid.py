@@ -39,7 +39,7 @@ Examples
 >>> Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
 >>> n_r = rmaid.neuron2r( n.ix[0] )
 >>> #Use nat to prune the neuron
->>> n_pruned = nat.prune_by_strahler( n_r )
+>>> n_pruned = nat.prune_strahler( n_r )
 >>> #Convert back to pymaid object
 >>> n_py = rmaid.neuron2py( n_pruned, rm )
 >>> #Nblast pruned neuron (assumes FlyCircuit database is saved locally)
@@ -182,7 +182,7 @@ def data2py ( data, **kwargs ):
     Returns
     -------
     converted data
-    """   
+    """       
 
     if 'neuronlistfh' in cl(data):
         module_logger.error('On-demand neuronlist found. Conversion cancelled to prevent loading large datasets in memory. Please use rmaid.dotprops2py() and its "subset" parameter.')
@@ -215,7 +215,7 @@ def data2py ( data, **kwargs ):
         return df
     elif cl(data)[0] == 'matrix':
         mat = np.array( data )
-        df = pd.DataFrame(  data = mat )
+        df = pd.DataFrame( data = mat )
         if data.names:
             if data.names[1] != robjects.r('NULL'):
                 df.columns = data.names[1] 
@@ -269,15 +269,15 @@ def neuron2py ( neuron, remote_instance = None ):
     """
 
     if 'rpy2' in str( type(neuron) ):
-        if cl(neuron)[0] == 'neuronlist':             
-            neuron_list = pd.DataFrame( data = [ [ data2py(e) for e in n ] for n in neuron ], columns = neuron.names  )      
+        if cl(neuron)[0] == 'neuronlist':                         
+            neuron_list = pd.DataFrame( data = [ [ data2py(e) for e in n ] for n in neuron ], columns = list(neuron[0].names) )
             #neuron_list.columns =  data.names #[ 'NumPoints', 'StartPoint','BranchPoints','EndPoints','nTrees', 'NumSeqs', 'SegList', 'd', 'skid', 'connectors', 'tags','url', 'headers'  ]
             if 'df' in neuron.slots:
                 neuron_list['name'] = neuron.slots['df'][2]
             else:
                 neuron_list['name'] = ['NA'] * neuron_list.shape[0]                        
         elif cl(neuron)[0] == 'catmaidneuron' or cl(neuron)[0] == 'neuron':             
-            neuron_list = pd.DataFrame( data = [ [ data2py(e) for e in neuron ] ], columns = neuron.names  )       
+            neuron_list = pd.DataFrame( data = [ [ data2py(e) for e in neuron ] ], columns = neuron.names  )                  
             neuron_list['name'] = ['NA']
             #neuron_list.columns = neuron.names  #[ 'NumPoints', 'StartPoint','BranchPoints','EndPoints','nTrees', 'NumSeqs', 'SegList', 'd', 'skid', 'connectors', 'tags','url', 'headers'  ]                         
         neuron = neuron_list
@@ -286,7 +286,7 @@ def neuron2py ( neuron, remote_instance = None ):
     if 'skid' in neuron and remote_instance:
         neuron_names = pymaid.get_names( [ n[0] for n in neuron.skid.tolist() ], remote_instance )    
     elif 'skid' in neuron and not remote_instance:
-        neuron_names = { n[0] : 'NA' for n in neuron.skid.tolist() }
+        neuron_names = None
         module_logger.warning('Please provide a remote instance if you want to add neuron name.')
     else:
         module_logger.warning('Neuron has only nodes (no name, skid, connectors or tags).')
@@ -306,31 +306,28 @@ def neuron2py ( neuron, remote_instance = None ):
             connectors = pd.DataFrame( columns = ['treenode_id','connector_id','relation','x','y','z']   )            
 
         if 'skid' in n:
-            skid = n.skid[0]            
-            name = neuron_names[ n.skid[0] ]
+            skid = n.skid[0]                        
         else:
             skid = 'NA'
-            name = 'NA'
 
-        if 'tags' in n:
-            tags = n.tags
-        else:
-            tags = {} 
-
-        data.append( [   
-                         name,
-                         skid,
+        data.append( [   skid,
                          nodes,
-                         connectors,
-                         tags
+                         connectors                         
                          ]  )
 
     df = pd.DataFrame(      data = data , 
-                            columns = ['neuron_name','skeleton_id','nodes','connectors','tags'],
+                            columns = ['skeleton_id','nodes','connectors'],
                             dtype=object
                             )
+    df['igraph'] = None
 
-    return core.CatmaidNeuronList( df )
+    if 'tags' in n:
+        df['tags'] = neuron.tags.tolist()
+
+    if 'skid' in n and neuron_names != None:
+        df['neuron_name'] = [ neuron_names[str(n)] for n in df.skeleton_id.tolist() ]
+
+    return core.CatmaidNeuronList( df, remote_instance = remote_instance )
 
 def neuron2r ( neuron ):
     """ Converts a PyMaid neuron or list of neurons (DataFrames) to the 
@@ -693,7 +690,7 @@ class nbl_results:
     >>> #Blast neuron by skeleton ID
     >>> nbl = rmaid.nblast( skid, remote_instance = rm )
     >>> #Sort results by mu_score
-    >>> nbl.sort( 'mu_score' )
+    >>> nbl.res.sort( 'mu_score' )
     >>> #Show table
     >>> nbl.res
     >>> #3D plot top 5 hits using vispy

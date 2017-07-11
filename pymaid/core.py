@@ -154,13 +154,14 @@ class CatmaidNeuron:
                     self.df.igraph = self.df.igraph.copy()
 
             self.skeleton_id = self.df.skeleton_id
-            self.neuron_name = self.df.neuron_name
-
-            self.nodes = self.df.nodes                  
-
+            self.nodes = self.df.nodes
             self.connectors = self.df.connectors            
 
-            self.tags = self.df.tags
+            if 'neuron_name' in self.df:
+                self.neuron_name = self.df.neuron_name
+
+            if 'tags' in self.df:
+                self.tags = self.df.tags
 
             if isinstance(x, CatmaidNeuron):
                 self._remote_instance = x._remote_instance                
