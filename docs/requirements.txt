@@ -1,4 +1,2 @@
 ###### Requirements without Version Specifiers ######
 numpydoc
-matplotlib
-numpy
