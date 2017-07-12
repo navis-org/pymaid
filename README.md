@@ -207,15 +207,15 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - `synapse_root_distances()`: similar to `pymaid.igraph_catmaid.calculate_distance_from_root()` but does not use iGraph
 
 ### pymaid.rmaid:
-- `init_rcatmaid()`: initialize connection with Catmaid server in R
-- `data2py()`: wrapper to convert R data to Python 
-- `nblast()`: wrapper to use Nat's NBLAST on Pymaid neurons
-- `neuron2py()`: converts R neuron and neuronlist objects to Pymaid neurons
-- `neuron2r()`: converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
+- [`init_rcatmaid()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.rmaid.init_rcatmaid): initialize connection with Catmaid server in R
+- [`data2py()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.rmaid.data2py): wrapper to convert R data to Python 
+- [`nblast()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.rmaid.nblast): wrapper to use Nat's NBLAST on Pymaid neurons
+- [`neuron2py()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.rmaid.neuron2py): converts R neuron and neuronlist objects to Pymaid neurons
+- [`neuron2r()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.rmaid.neuron2r): converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
 
 ### pymaid.user_stats:
-- `get_time_invested()`: calculate the time users have spent working on a set of neurons
-- `get_user_contributions()`: returns contributions per user for a set of neurons
+- [`get_time_invested()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.user_stats.get_time_invested): calculate the time users have spent working on a set of neurons
+- [`get_user_contributions()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.user_stats.get_user_contributions): returns contributions per user for a set of neurons
 
 ## License:
 This code is under GNU GPL V3
