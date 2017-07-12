@@ -94,7 +94,7 @@ def classify_nodes ( skdata ):
 
    #If more than one neuron
    if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-      for i,n in range(len(skdata)):
+      for i in range( skdata.shape[0] ):
         skdata.ix[i] = classify_nodes( skdata.ix[i] )
    elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):   
      list_of_childs  = generate_list_of_childs( skdata )
@@ -434,10 +434,10 @@ def cut_neuron( skdata, cut_node, g = None ):
    #If cut_node is a tag, rather than a ID, try finding that node
    if type(cut_node) == type( str() ):
       if cut_node not in df.tags:
-        module_logger.error('Error: Found no treenodes with tag %s - please double check!' % str( cut_node ) )
+        module_logger.error('Found no treenodes with tag %s - please double check!' % str( cut_node ) )
         return 
       elif len( df.tags[cut_node] ) > 1:
-        module_logger.error('Error: Found multiple treenodes with tag %s - please double check!' % str( cut_node ) )
+        module_logger.warning('Found multiple treenodes with tag %s - please double check!' % str( cut_node ) )
         return
       else:
         cut_node = df.tags[cut_node][0]
@@ -449,7 +449,7 @@ def cut_neuron( skdata, cut_node, g = None ):
       cut_node_index = g.vs.select( node_id=int(cut_node) )[0].index
    #Should have found only one cut node
    except:
-      module_logger.error('Error: Found no treenodes with ID %s - please double check!' % str( cut_node ) )
+      module_logger.error('Found no treenodes with ID %s - please double check!' % str( cut_node ) )
       return 
 
    #Select the cut node's parent

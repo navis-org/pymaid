@@ -427,7 +427,7 @@ def _get_urls_threaded( urls , remote_instance, post_data = [] ):
     start = cur_time = time.time()
     joined = 0
 
-    with tqdm(total=len(threads)) as pbar:
+    with tqdm(total=len(threads), desc = 'Retrieving neurons') as pbar:
         while cur_time <= (start + time_out) and len( [ d for d in data if d != None ] ) != len(threads):
             for t in threads:
                 if t in threads_closed:
@@ -2302,7 +2302,7 @@ def get_history( remote_instance = None,  start_date = (datetime.date.today()-da
         rounds = [ ( start_date, end_date ) ]
 
     data = []    
-    for r in tqdm(rounds):
+    for r in tqdm(rounds, desc = 'Retrieving history'):
         get_history_GET_data = {    'self.project_id': remote_instance.project_id ,
                                     'start_date': r[0],
                                     'end_date': r[1]

@@ -132,14 +132,15 @@ Representation of a **single** Catmaid neuron. Can be minimally initialized with
 are retrieved/calculated on-demand the first time they are **explicitly** requested:
 
 Primary attributes:
-	- `skeleton_id`: neuron's skeleton ID
-	- `neuron_name`: neuron's name
-	- `nodes`: pandas DataFrame of treenode table
-	- `connectors`: pandas DataFrame of connector table
-	- `tags`: node tags
-	- `annotations`: list of neuron(s) annotations
-	- `cable_length`: cable length(s) in nm
-	- `review_status`: review status of neuron(s)
+
+- `skeleton_id`: neuron's skeleton ID	
+- `neuron_name`: neuron's name
+- `nodes`: pandas DataFrame of treenode table
+- `connectors`: pandas DataFrame of connector table
+- `tags`: node tags
+- `annotations`: list of neuron(s) annotations
+- `cable_length`: cable length(s) in nm
+- `review_status`: review status of neuron(s)
 
 #### class `CatmaidNeuronList`:
 Representation of a **list** of Catmaid neurons. Can be minimally initialized with just a skeleton ID.

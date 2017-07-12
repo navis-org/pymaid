@@ -22,6 +22,7 @@ import pandas as pd
 import numpy as np
 import datetime
 import random
+from tqdm import tqdm
 
 from pymaid import igraph_catmaid, morpho, pymaid, plot   
 
@@ -516,7 +517,11 @@ class CatmaidNeuronList:
         elif isinstance(x, CatmaidNeuronList):
             self.neurons = x.neurons
         else:            
-            self.neurons = list(x) #We have to convert from numpy ndarray to list - do NOT remove list() here
+            self.neurons = list(x) #We have to convert from numpy ndarray to list - do NOT remove list() here                       
+
+            if True in [ x.count(n) > 1 for n in x ]:
+                self.logger.warning('Multiple occurrences of the same neuron(s) were removed.')
+                self.neurons = list(set(self.neurons))
 
         #Now convert into CatmaidNeurons if necessary
         for i,n in enumerate(self.neurons):            
@@ -673,9 +678,9 @@ class CatmaidNeuronList:
         else:
             to_update = self.neurons
 
-        if to_update:
-            skdata = pymaid.get_3D_skeleton( [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_neuron=False ).set_index('skeleton_id')        
-            for n in to_update:
+        if to_update:            
+            skdata = pymaid.get_3D_skeleton( [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_neuron=False ).set_index('skeleton_id')            
+            for n in tqdm(to_update, desc = 'Extracting data'):
                 n.df = skdata.ix[ str( n.skeleton_id ) ]
 
                 if 'type' not in n.df:

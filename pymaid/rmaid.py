@@ -36,7 +36,7 @@ Examples
 >>> n = pymaid.pymaid.get_3D_skeleton( skeleton_id, rm )
 >>> #Initialize R's rcatmaid 
 >>> rcatmaid = rmaid.init_rcatmaid( rm )
->>> Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
+>>> #Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
 >>> n_r = rmaid.neuron2r( n.ix[0] )
 >>> #Use nat to prune the neuron
 >>> n_pruned = nat.prune_strahler( n_r )

@@ -19,7 +19,7 @@ Quickstart
 >>> n = pymaid.pymaid.get_3D_skeleton( skeleton_id, rm )
 >>> #Initialize R's rcatmaid 
 >>> rcatmaid = rmaid.init_rcatmaid( rm )
->>> Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
+>>> #Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
 >>> n_r = rmaid.neuron2r( n.ix[0] )
 >>> #Use nat to prune the neuron
 >>> n_pruned = nat.prune_by_strahler( n_r )
@@ -37,8 +37,8 @@ Data conversion
 :mod:`pymaid.rmaid` provides functions to convert data from Python to R:
 
 1. :func:`pymaid.rmaid.data2py` converts general data from R to Python
-2. :func:`pymaid.rmaid.neuron2py` converts R neuron or neuronlist object to Python :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`, respectively
-3. :func:`pymaid.rmaid.neuron2r` converts :class:`pymaid.core.CatmaidNeuron` or :class:`pymaid.core.CatmaidNeuronList` to R neuron or neuronlist object
+2. :func:`pymaid.rmaid.neuron2py` converts R neuron or neuronlist objects to Python :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`, respectively
+3. :func:`pymaid.rmaid.neuron2r` converts :class:`pymaid.core.CatmaidNeuron` or :class:`pymaid.core.CatmaidNeuronList` to R neuron or neuronlist objects
 4. :func:`pymaid.rmaid.dotprops2py` converts R dotprop objects to pandas DataFrame that can be passed to :func:`pymaid.plot.plot3d`
 
 R catmaid
