@@ -138,31 +138,32 @@ class CatmaidNeuron:
         self.date_retrieved = datetime.datetime.now().isoformat()
         self._is_copy = copy
 
-        if isinstance( x, pd.Series ) or isinstance( x, CatmaidNeuron ):            
-            if 'type' not in x.nodes:
-                x  = morpho.classify_nodes( x )
+        if isinstance( x, pd.Series ) or isinstance( x, CatmaidNeuron ):
+            self.skeleton_id = x.skeleton_id            
+            if 'df' in x.__dict__:
+                if 'type' not in x.nodes:
+                    x  = morpho.classify_nodes( x )
 
-            if copy:               
-                if isinstance(x, CatmaidNeuron):                                        
-                    self.df = x.df.copy()                    
-                else:                                  
-                    self.df = x.copy()
+                if copy:               
+                    if isinstance(x, CatmaidNeuron):                                        
+                        self.df = x.df.copy()                    
+                    else:                                  
+                        self.df = x.copy()
 
-                self.df.nodes = self.df.nodes.copy()
-                self.df.connectors = self.df.connectors.copy()
+                    self.df.nodes = self.df.nodes.copy()
+                    self.df.connectors = self.df.connectors.copy()
 
-                if self.df.igraph != None:
-                    self.df.igraph = self.df.igraph.copy()
+                    if self.df.igraph != None:
+                        self.df.igraph = self.df.igraph.copy()
+            
+                self.nodes = self.df.nodes
+                self.connectors = self.df.connectors            
 
-            self.skeleton_id = self.df.skeleton_id
-            self.nodes = self.df.nodes
-            self.connectors = self.df.connectors            
+                if 'neuron_name' in self.df:
+                    self.neuron_name = self.df.neuron_name
 
-            if 'neuron_name' in self.df:
-                self.neuron_name = self.df.neuron_name
-
-            if 'tags' in self.df:
-                self.tags = self.df.tags
+                if 'tags' in self.df:
+                    self.tags = self.df.tags
 
             if isinstance(x, CatmaidNeuron):
                 self._remote_instance = x._remote_instance                
@@ -497,7 +498,7 @@ class CatmaidNeuronList:
     """
 
     def __init__(self, x, remote_instance=None, copy=True ):
-        self.logger = logging.getLogger('CatmaidNeuronList')
+        self.logger = logging.getLogger('CatmaidNeuronList')        
         if not self.logger.handlers:
             sh = logging.StreamHandler()
             sh.setLevel(logging.DEBUG)
@@ -528,12 +529,13 @@ class CatmaidNeuronList:
             if not isinstance(n, CatmaidNeuron) or copy is True:
                 self.neurons[i] = CatmaidNeuron( n, remote_instance = remote_instance, copy = copy )
 
+        #Add indexer class
         self.ix = _IXIndexer(self.neurons, self.logger)                   
 
     def __str__(self):
         return self.__repr__()
 
-    def __repr__(self):
+    def _summary(self):
         #Prepare data without rquesting it from server
         d = []
         for n in self.neurons:
@@ -550,10 +552,12 @@ class CatmaidNeuronList:
 
             d.append( [ neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes, cable, review_status, annotations != None, igraph != None,tags != None, n._remote_instance != None] )
 
-        self._repr = pd.DataFrame( data = d,
-                                   columns = ['neuron_name','skeleton_id','n_nodes','n_connectors','n_branch_nodes','n_end_nodes','cable_length','review_status','annotations','igraph','tags', 'remote_instance' ]
-                                )        
-        return str( self._repr )
+        return pd.DataFrame(    data = d,
+                                columns = ['neuron_name','skeleton_id','n_nodes','n_connectors','n_branch_nodes','n_end_nodes','cable_length','review_status','annotations','igraph','tags', 'remote_instance' ]
+                              )
+
+    def __repr__(self):                
+        return str( self._summary() )
 
     def __iter__(self):
         self.iter = 0
@@ -578,7 +582,8 @@ class CatmaidNeuronList:
             return np.array ( [ n.n_connectors for n in self.neurons ] )
         elif key == 'cable_length':
             return np.array ( [ n.cable_length for n in self.neurons ] )
-        elif key == 'neuron_name':
+        elif key == 'neuron_name':            
+            self.get_names(skip_existing=True)
             return np.array ( [ n.neuron_name for n in self.neurons ] )
         elif key == 'skeleton_id':
             return np.array ( [ n.skeleton_id for n in self.neurons ] )
@@ -606,13 +611,10 @@ class CatmaidNeuronList:
                 return all_instances[0]
 
         elif key == 'igraph':
+            self.get_skeletons(skip_existing = True)
             return np.array ( [ n.igraph for n in self.neurons ] )
         elif key == 'review_status':
-            to_retrieve = [ n.skeleton_id for n in self.neurons if 'review_status' not in n.__dict__ ]
-            if to_retrieve:
-                re = pymaid.get_review( to_retrieve, remote_instance = self._remote_instance ).set_index('skeleton_id')
-                for n in [ n for n in self.neurons if 'review_status' not in n.__dict__ ]:
-                    n.review_status = re.ix[ str( n.skeleton_id ) ].percent_reviewed
+            self.get_review(skip_existing = True)
             return np.array ( [ n.review_status for n in self.neurons ] )
         elif key == 'annotations':
             to_retrieve = [ n.skeleton_id for n in self.neurons if 'annotations' not in n.__dict__ ]
@@ -647,6 +649,14 @@ class CatmaidNeuronList:
         else:
             return CatmaidNeuronList( subset )    
 
+    def sum(self):
+        """Returns sum numeric and boolean values over all neurons"""
+        return self._summary().sum(numeric_only=True)
+
+    def mean(self):
+        """Returns sum numeric and boolean values over all neurons"""
+        return self._summary().mean(numeric_only=True)
+
     def sample(self, N=1):
         """Use to return random subset of neurons"""
         indices = list( range( len(self.neurons) ) )
@@ -663,6 +673,29 @@ class CatmaidNeuronList:
         """
         for n in self.neurons:
             n.downsample( downsampling = factor )
+
+    def get_review(self, skip_existing = False):
+        """ Use to get/update review status"""
+        to_retrieve = [ n.skeleton_id for n in self.neurons if 'review_status' not in n.__dict__ ]
+        if to_retrieve:
+            re = pymaid.get_review( to_retrieve, remote_instance = self._remote_instance ).set_index('skeleton_id')
+            for n in [ n for n in self.neurons if 'review_status' not in n.__dict__ ]:
+                n.review_status = re.ix[ str( n.skeleton_id ) ].percent_reviewed
+
+    def get_names(self, skip_existing = False):
+        """ Use to get/update neuron names"""
+        if skip_existing:
+            to_update = [ n.skeleton_id for n in self.neurons if 'neuron_name' not in n.__dict__ ]
+        else:
+            to_update = self.skeleton_id.tolist()
+
+        if to_update:
+            names = pymaid.get_names( self.skeleton_id, remote_instance=self._remote_instance )
+            for n in self.neurons:
+                try:
+                    n.neuron_name = names[ str(n.skeleton_id) ]
+                except:
+                    pass
 
     def get_skeletons(self, skip_existing = False):
         """Helper function to fill in/update skeleton data of neurons. 

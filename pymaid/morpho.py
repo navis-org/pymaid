@@ -814,6 +814,8 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = 
         return sum( [ calc_cable( skdata.ix[i] ) for i in range(skdata.shape[0]) ] )
       else:
         return core.CatmaidNeuronList( [ calc_cable( skdata.ix[i], return_skdata = return_skdata ) for i in range(skdata.shape[0]) ] )
+    else:
+      raise Exception('Unable to interpret data of type' , type(skdata))
 
     #Copy node data too
     df.nodes = df.nodes.copy()
