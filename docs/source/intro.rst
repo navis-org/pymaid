@@ -72,6 +72,7 @@ All functions that explicitly require you to pass a ``skids`` parameter (e.g. :f
 4. CatmaidNeuron or CatmaidNeuronList object
 
 Some examples:
+
 >>> from pymaid import pymaid
 >>> rm = pymaid.CatmaidInstance(   'www.your.catmaid-server.org' , 
 ...                               	'HTTP_USER' , 
