@@ -84,7 +84,7 @@ Nblasting
 >>> #Blast a neuron against default (FlyCircuit) database
 >>> nbl = rmaid.nblast( skid = 16, remote_instance = rm  )
 
-:func:`pymaid.rmaid.nblast` returns nblast results as :class:`pymaid.rmaid.nbl_results` 
+:func:`pymaid.rmaid.nblast` returns nblast results as instance of the :class:`pymaid.rmaid.nbl_results` class.
 
 >>> #See contents of nblast_res object
 >>> help(nbl)

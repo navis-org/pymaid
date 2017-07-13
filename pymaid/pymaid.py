@@ -1141,7 +1141,8 @@ def get_node_lists ( skids, remote_instance = None, ):
                 node_list = remote_instance.fetch( remote_nodes_list_url )
                 remote_instance.logger.warning('Success on second attempt!')
             except:
-                remote_instance.logger.error('Unable to retrieve node table')        
+                remote_instance.logger.error('Unable to retrieve node table')
+                raise Exception('Unable to retrieve node table')
 
         #Format of node_list: node_id, parent_node_id, confidence, x, y, z, radius, creator, last_edition_timestamp
         tag_dict = { n[0] : [] for n in node_list[0] }
@@ -1504,7 +1505,7 @@ def get_neuron_annotation (skid, remote_instance = None,  ):
     if isinstance(skids,list):
         if len(skid) != 1:
             remote_instance.logger.error('Please provide a SINGLE skeleton ID.')
-            raise ValueError
+            raise ValueError('Please provide a SINGLE skeleton ID.')
         else:            
             skid = skid[0]
 
@@ -1590,7 +1591,7 @@ def get_annotations_from_list(skids, remote_instance = None,  ):
         return(annotation_list) 
     except:
         remote_instance.logger.error( 'No annotations retrieved. Make sure that the skeleton IDs exist.' )
-        return None
+        raise Exception( 'No annotations retrieved. Make sure that the skeleton IDs exist.' )
 
 def get_annotation_id( annotations, remote_instance = None,  allow_partial = False ):
     """ Wrapper to retrieve the annotation ID for single or list of annotation(s)
@@ -1784,8 +1785,7 @@ def get_skids_by_annotation( annotations, remote_instance = None,  allow_partial
 
     if not annotation_ids:
         remote_instance.logger.error('No matching annotation found! Returning None')
-        raise StandardError
-        return []
+        raise Exception('No matching annotation found!')        
 
     if allow_partial is True:
         remote_instance.logger.debug('Found id(s): %s (partial matches included)' % len(annotation_ids) )  
@@ -1810,12 +1810,16 @@ def get_skids_by_annotation( annotations, remote_instance = None,  allow_partial
         
     return(annotated_skids)
 
-def skid_exists( skid, remote_instance = None,  ):
+def skid_exists( skids, remote_instance = None,  ):
     """ Quick function to check if skeleton id exists
     
     Parameters
     ----------
-    skid :              single or list of skeleton id
+    skids :             Catmaid Neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance; either pass directly to function 
                         or define globally as 'remote_instance'
 
@@ -1834,10 +1838,10 @@ def skid_exists( skid, remote_instance = None,  ):
 
     skids = eval_skids ( skids , remote_instance = remote_instance )
 
-    if isinstance(skid, list):
+    if isinstance(skids, list):
         return { n: skid_exists(n) for n in skids }
 
-    remote_get_neuron_name = remote_instance.get_single_neuronname_url( skid )
+    remote_get_neuron_name = remote_instance.get_single_neuronname_url( skids )
     response = remote_instance.fetch( remote_get_neuron_name )
     
     if 'error' in response:
@@ -2758,7 +2762,7 @@ def get_volume( volume_name, remote_instance = None,  ):
 
     if not volume_id:
         remote_instance.logger.error('Did not find a matching volume for name %s' % volume_name)
-        return
+        raise Exception('Did not find a matching volume for name %s' % volume_name)
     else:
         volume_id = volume_id[0]
 
@@ -2798,8 +2802,8 @@ def get_volume( volume_name, remote_instance = None,  ):
         vertices = [ ( float( v[i] ), float( v[i+1] ), float( v[i+2] ) ) for i in range( 0,  len(v) - 2 , 3 ) ]
 
     else:
-        remote_instance.logger.error("Unknown volume type: %s" % mesh_type)        
-        return
+        remote_instance.logger.error("Unknown volume type: %s" % mesh_type)
+        raise Exception("Unknown volume type: %s" % mesh_type)
 
     #For some reason, in this format vertices occur multiple times - we have to collapse that to get a clean mesh
     final_faces = []
@@ -2875,4 +2879,4 @@ def eval_skids ( x, remote_instance = None ):
         return list( x.skeleton_id )
     else:
         remote_instance.logger.error('Unable to extract skids from type %s' % str(type( x )))
-        raise TypeError
+        raise TypeError('Unable to extract skids from type %s' % str(type( x )))

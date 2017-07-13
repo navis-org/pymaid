@@ -107,7 +107,7 @@ class CatmaidNeuron:
     >>> # Get annotations from server
     >>> n.annotations
     [ 'annotation1', 'annotation2' ]
-    >>> Force update of annotations
+    >>> #Force update of annotations
     >>> n.get_annotations()
     """
 
@@ -306,7 +306,9 @@ class CatmaidNeuron:
         **kwargs         
                 Will be passed to plot.plot2d() 
                 See help(plot.plot3d) for a list of keywords                        
-        """         
+        """
+        if 'nodes' not in self.__dict__:
+            self.get_skeleton()         
         return plot.plot2d( skdata = self, **kwargs )
 
     def plot3d(self, **kwargs):
@@ -318,6 +320,8 @@ class CatmaidNeuron:
                 Will be passed to plot.plot3d() 
                 See help(plot.plot3d) for a list of keywords                        
         """         
+        if 'nodes' not in self.__dict__:
+            self.get_skeleton()
         return plot.plot3d( skdata = CatmaidNeuronList(self), **kwargs )
 
     def get_name(self, remote_instance = None):
@@ -488,7 +492,7 @@ class CatmaidNeuronList:
     [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
     >>> Index using node count
     >>> subset = nl [ nl.n_nodes > 6000 ]
-    >>> Index by skeleton ID 
+    >>> #Index by skeleton ID 
     >>> subset = nl [ '123456' ]
     >>> #Index by neuron name
     >>> subset = nl [ 'name1' ]
@@ -654,7 +658,7 @@ class CatmaidNeuronList:
         return self._summary().sum(numeric_only=True)
 
     def mean(self):
-        """Returns sum numeric and boolean values over all neurons"""
+        """Returns mean numeric and boolean values over all neurons"""
         return self._summary().mean(numeric_only=True)
 
     def sample(self, N=1):
@@ -741,14 +745,14 @@ class CatmaidNeuronList:
         http_user :             str, optional
         http_pw :               str, optional
         auth_token :            str, optional
-        """
+        """        
         if not remote_instance and server_url and auth_token:
             remote_instance = pymaid.CatmaidInstance(       server_url,
                                                             http_user,
                                                             http_pw,
                                                             auth_token
                                                          )
-        else:
+        elif not remote_instance:
             raise Exception('Provide either CatmaidInstance or credentials.')
         
         for n in self.neurons:
@@ -762,7 +766,8 @@ class CatmaidNeuronList:
         **kwargs
                 will be passed to plot.plot3d() 
                 see help(plot.plot3d) for a list of keywords                        
-        """         
+        """
+        self.get_skeletons(skip_existing=True)         
         return plot.plot3d( skdata = self, **kwargs )
 
     def plot2d(self, **kwargs):
@@ -774,6 +779,7 @@ class CatmaidNeuronList:
                 will be passed to plot.plot2d() 
                 see help(plot.plot3d) for a list of keywords                        
         """         
+        self.get_skeletons(skip_existing=True)
         return plot.plot2d( skdata = self, **kwargs )
 
     def __missing__(self, key):
