@@ -51,6 +51,7 @@ from scipy import cluster, spatial
 import logging
 import pandas as pd
 import time
+from pymaid import core, pymaid
 
 #Set up logging
 module_logger = logging.getLogger(__name__)
@@ -64,7 +65,57 @@ if not module_logger.handlers:
    sh.setFormatter(formatter)
    module_logger.addHandler(sh)
 
-from pymaid import core
+def igraph_from_neurons( x, remote_instance = None, threshold = 1 ):
+   """ Generates igraph network object for a set of neurons
+
+   Parameters
+   ----------
+   x :                 Catmaid Neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+   remote_instance :   CATMAID instance; either pass directly to function or 
+                       define globally as 'remote_instance'
+   threshold :         int
+                       Connections weaker than this will be excluded 
+
+   Returns
+   ------- 
+   iGraph representation of the network 
+   """
+
+   if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return
+
+   module_logger.info('Generating graph from skeleton data...')
+
+   skids = pymaid.eval_skids ( x , remote_instance = remote_instance )
+   indices = { s: skids.index(s) for s in skids }
+
+   try:
+      neuron_names = x.neuron_names.tolist()
+   except:
+      names = pymaid.get_names( skids, remote_instance = remote_instance )
+      neuron_names = [ names[ str(n) ] for n in skids ]
+
+   edges = pymaid.get_edges (skids, remote_instance = None )
+   edges_by_index = [ [ indices[e.source_skid], indices[e.target_skid] ] for e in edges[ edges.weight >= threshold ].itertuples() ]    
+
+   #Generate graph and assign custom properties
+   g = Graph( directed = True )
+   g.add_vertices( len(skids) )
+   g.add_edges( edges_by_index )
+
+   g.vs['node_id'] = skids
+   g.vs['neuron_name'] = neuron_names   
+   g.es['weight'] = edges.weight.tolist()
+
+   return g
 
 def igraph_from_adj_mat( adj_matrix, **kwargs ):
    """ Takes an adjacency matrix and turns it into an iGraph object

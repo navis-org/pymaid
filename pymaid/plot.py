@@ -14,7 +14,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" Module contains functions to plot neurons in 2 and 3D.
+""" Module contains functions to plot neurons in 2D and 3D.
 """
 
 import matplotlib.pyplot as plt 

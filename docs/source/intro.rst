@@ -11,12 +11,12 @@ At the beginning of each session, you have to initialise a :class:`pymaid.pymaid
 >>> from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
 >>> #HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
 ... #http authentification
->>> rm = CatmaidInstance(   'www.your.catmaid-server.org' , 
-...   	                   	'HTTP_USER' , 
-...                         'HTTP_PASSWORD', 
-...                         'TOKEN' )
+>>> rm = CatmaidInstance(    'www.your.catmaid-server.org' , 
+...                          'HTTP_USER' , 
+...                          'HTTP_PASSWORD', 
+...                          'TOKEN' )
 >>> neuron_list = get_3D_skeleton ( ['12345','67890'] , remote_instance = rm )
->>> #to access individual neurons, use neuron_list like a normal list object
+>>> #To access individual neurons, use neuron_list like a normal list object
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
 neuron_name                PN glomerulus DA1 27296 BH
@@ -74,10 +74,10 @@ All functions that explicitly require you to pass a ``skids`` parameter (e.g. :f
 Some examples:
 
 >>> from pymaid import pymaid
->>> rm = pymaid.CatmaidInstance(   'www.your.catmaid-server.org' , 
-...                               	'HTTP_USER' , 
-...                                 'HTTP_PASSWORD', 
-...                                 'TOKEN' )
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
+...                              'HTTP_USER' , 
+...                              'HTTP_PASSWORD', 
+...                              'TOKEN' )
 >>> #Create neuron list from annotation
 >>> neuron_list = pymaid.get_3D_skeleton( 'annotation:glomerulus DA1', remote_instance = rm )
 >>> #Get partners of these neurons
@@ -111,9 +111,9 @@ The project ID is part of the CatmaidInstance and defaults to 1. You can change 
 
 >>> from pymaid import pymaid, core
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
-...   	        		         'HTTP_USER' , 
-...                     	     'HTTP_PASSWORD', 
-...                         	 'TOKEN' )
+...                              'HTTP_USER' , 
+...                              'HTTP_PASSWORD', 
+...                              'TOKEN' )
 >>> #Initialise with a CatmaidInstance
 >>> nl = core.CatmaidNeuronList( [12345,67890], remote_instance = rm )
 >>> #Initialise without and add later
@@ -121,8 +121,8 @@ The project ID is part of the CatmaidInstance and defaults to 1. You can change 
 >>> nl.set_remote_instance(rm)
 >>> #Alternatively
 >>> nl.set_remote_instance( server_url = 'www.your.catmaid-server.org', 
-...   	        		    http_user = 'HTTP_USER', 
-...                     	http_pw = 'HTTP_PASSWORD', 
+...                         http_user = 'HTTP_USER', 
+...                         http_pw = 'HTTP_PASSWORD', 
 ...                         auth_token = 'TOKEN' )
 
 CatmaidNeuron and CatmaidNeuronList objects

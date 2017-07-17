@@ -661,7 +661,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
         else:
             return core.CatmaidNeuron( df.ix[0], remote_instance = remote_instance,  )
     else:
-        return df    
+        return df
 
 def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1, tag_flag = 1,  ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids.
@@ -1198,7 +1198,7 @@ def get_edges (skids, remote_instance = None):
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_get_edges_url = remote_instance.get_edges_url( 1 )
+    remote_get_edges_url = remote_instance.get_edges_url()
 
     get_edges_postdata = {}
     get_edges_postdata['confidence_threshold'] = '0'
@@ -2050,7 +2050,6 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
                         )
 
     return df
-
 
 def get_contributor_statistics (skids, remote_instance = None, separate = False, ):
     """ Wrapper to retrieve contributor statistics for given skeleton ids.

@@ -13,7 +13,8 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" This module contains definitions for neuron classes
+""" This module contains neuron and neuronlist classes returned and accepted 
+by many low-level functions within pymaid.
 """
 
 import datetime
@@ -138,18 +139,15 @@ class CatmaidNeuron:
         self.date_retrieved = datetime.datetime.now().isoformat()
         self._is_copy = copy
 
-        if isinstance( x, pd.Series ) or isinstance( x, CatmaidNeuron ):
-            self.skeleton_id = x.skeleton_id            
+        if isinstance( x, CatmaidNeuron ):            
+            self.skeleton_id = x.skeleton_id
             if 'df' in x.__dict__:
+
                 if 'type' not in x.nodes:
                     x  = morpho.classify_nodes( x )
 
-                if copy:               
-                    if isinstance(x, CatmaidNeuron):                                        
-                        self.df = x.df.copy()                    
-                    else:                                  
-                        self.df = x.copy()
-
+                if copy:
+                    self.df = x.df.copy()
                     self.df.nodes = self.df.nodes.copy()
                     self.df.connectors = self.df.connectors.copy()
 
@@ -165,15 +163,39 @@ class CatmaidNeuron:
                 if 'tags' in self.df:
                     self.tags = self.df.tags
 
-            if isinstance(x, CatmaidNeuron):
-                self._remote_instance = x._remote_instance                
-                self._meta_data = x._meta_data
-                self.date_retrieved = x.date_retrieved
+            
+            self._remote_instance = x._remote_instance                
+            self._meta_data = x._meta_data
+            self.date_retrieved = x.date_retrieved
 
-                if 'igraph' in x.__dict__:                    
-                    self.igraph = x.igraph
-                    if copy:
-                        self.igraph = self.igraph.copy()                
+            if 'igraph' in x.__dict__:                    
+                self.igraph = x.igraph
+                if copy:
+                    self.igraph = self.igraph.copy()   
+        
+        elif isinstance( x, pd.Series ):
+            self.skeleton_id = x.skeleton_id
+
+            if 'type' not in x.nodes:
+                x  = morpho.classify_nodes( x )
+
+            if copy:                                              
+                self.df = x.copy()
+                self.df.nodes = self.df.nodes.copy()
+                self.df.connectors = self.df.connectors.copy()
+
+                if self.df.igraph != None:
+                    self.df.igraph = self.df.igraph.copy()
+        
+            self.nodes = self.df.nodes
+            self.connectors = self.df.connectors            
+
+            if 'neuron_name' in self.df:
+                self.neuron_name = self.df.neuron_name
+
+            if 'tags' in self.df:
+                self.tags = self.df.tags
+
         else:
             try: 
                 int( x ) #Check if this is a skeleton ID
@@ -529,7 +551,7 @@ class CatmaidNeuronList:
                 self.neurons = list(set(self.neurons))
 
         #Now convert into CatmaidNeurons if necessary
-        for i,n in enumerate(self.neurons):            
+        for i,n in enumerate(self.neurons):                       
             if not isinstance(n, CatmaidNeuron) or copy is True:
                 self.neurons[i] = CatmaidNeuron( n, remote_instance = remote_instance, copy = copy )
 

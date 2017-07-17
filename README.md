@@ -181,7 +181,8 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 ### pymaid.igraph_catmaid:
 - [`calculate_distance_from_root()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.calculate_distance_from_root): calculates geodesic (along-the-arbor) distances for nodes to root node
 - [`cluster_nodes_w_synapses()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.cluster_nodes_w_synapses): uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
-- [`igraph_from_adj_matrix()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_adj_matrix): generates iGraph representation of network
+- [`igraph_from_adj_matrix()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_adj_matrix): generates iGraph representation from adjacency matrix
+- [`igraph_from_neurons()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_neurons): generates iGraph representation from set of neurons
 - [`igraph_from_skeleton()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_skeleton): generates iGraph representation of neuron morphology
 
 ### pymaid.plot:

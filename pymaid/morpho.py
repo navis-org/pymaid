@@ -14,6 +14,9 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
+
+""" This module contains functions to analyse and manipulate neuron morphology.
+""" 
    
 import math
 import time

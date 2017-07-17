@@ -1,21 +1,26 @@
-pymaid package
+pymaid contents
 ==============
-
-Submodules
-----------
-
-pymaid.cluster module
----------------------
-
-.. automodule:: pymaid.cluster
-    :members:
-    :undoc-members:
-    :show-inheritance:
 
 pymaid.core module
 ------------------
 
 .. automodule:: pymaid.core
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+pymaid.pymaid module
+--------------------
+
+.. automodule:: pymaid.pymaid
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+pymaid.cluster module
+---------------------
+
+.. automodule:: pymaid.cluster
     :members:
     :undoc-members:
     :show-inheritance:
@@ -44,14 +49,6 @@ pymaid.plot module
     :undoc-members:
     :show-inheritance:
 
-pymaid.pymaid module
---------------------
-
-.. automodule:: pymaid.pymaid
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 pymaid.rmaid module
 -------------------
 
@@ -64,15 +61,6 @@ pymaid.user_stats module
 ------------------------
 
 .. automodule:: pymaid.user_stats
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-Module contents
----------------
-
-.. automodule:: pymaid
     :members:
     :undoc-members:
     :show-inheritance:

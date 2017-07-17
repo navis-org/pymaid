@@ -14,6 +14,43 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
+""" This module contains functions to retrieve user statistics for sets of 
+neurons.
+
+Examples
+--------
+>>> from pymaid import pymaid, user_stats
+>>> myInstance = CatmaidInstance(   'www.your.catmaid-server.org' , 
+...                                 'HTTP_USER' , 
+...                                 'HTTP_PASSWORD', 
+...                                 'TOKEN' )
+>>> skeleton_ids = pymaid.get_skids_by_annotation('Hugin')
+>>> cont = user_stats.get_user_contributions( skeleton_ids, 
+...                                           remote_instance = myInstance)
+>>> cont
+             user  nodes  presynapses  postsynapses
+0        Schlegel  47221          470          1408
+1            Tran   1645            7             4
+2           Lacin   1300            1            20
+3              Li   1244            5            45
+...
+>>> #Get the time that each user has invested
+>>> time_inv = user_stats.get_time_invested(  skeleton_ids,
+...                                           remote_instance = myInstance )
+>>> time_inv
+index           user  total  creation  edition  review
+0       0       Schlegel   4649      3224     2151    1204
+1       1           Tran    174       125       59       0
+2       4             Li    150       114       65       0
+3       3          Lacin    133       119       30       0
+...
+>>> #Plot contributions as pie chart
+>>> import plotly
+>>> fig = { "data" : [ { "values" : time_inv.total.tolist(), 
+...         "labels" : time_inv.user.tolist(), 
+...         "type" : "pie" } ] } 
+>>> plotly.offline.plot(fig) 
+"""
 
 from pymaid.pymaid import get_3D_skeleton, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids
 from pymaid import core
@@ -39,9 +76,9 @@ def get_user_contributions( x , remote_instance = None ):
 
    Notes
    -----
-   This is essentially a wrapper for pymaid.get_contributor_statistics() - if you are 
-   also interested in e.g. construction time, review time, etc. you may want to consider
-   using pymaid.get_contributor_statistics() instead.
+   This is essentially a wrapper for pymaid.get_contributor_statistics() - if 
+   you are also interested in e.g. construction time, review time, etc. you 
+   may want to consider using pymaid.get_contributor_statistics() instead.
 
    Parameters
    ----------
@@ -86,7 +123,7 @@ def get_user_contributions( x , remote_instance = None ):
    for u in cont.post_contributors:
       stats[ 'postsynapses' ][ u ] = cont.post_contributors[u]
 
-   return pd.DataFrame( [ [  user_list.ix[ int(u) ].last_name, stats['nodes'][u] , stats['presynapses'][u], stats['postsynapses'][u] ] for u in all_users ] , columns = [ 'user', 'nodes' ,'presynapses', 'postsynapses' ] ).sort_values('nodes', ascending = False).reset_index()
+   return pd.DataFrame( [ [  user_list.ix[ int(u) ].last_name, stats['nodes'][u] , stats['presynapses'][u], stats['postsynapses'][u] ] for u in all_users ] , columns = [ 'user', 'nodes' ,'presynapses', 'postsynapses' ] ).sort_values('nodes', ascending = False).reset_index(drop=True)
 
 def get_time_invested( x, remote_instance, interval = 1, minimum_actions = 1 ):
    """ Takes a list of skeleton IDs and calculates the time each user has 

@@ -66,7 +66,7 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance = None, syn_cut
         else:
             module_logger.error('Please either pass a CATMAID instance or define globally as "remote_instance" ')
             raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
-   
+
    #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
    try:   
       neuronsA = list( neuronsA.skeleton_id )   
@@ -315,7 +315,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance = None, upstre
       for i, neuronA in enumerate(neurons):  
          print('%s (%i of %i)' % ( str( neuronA), i, len(neurons) ), end = ', ')         
          for neuronB in neurons:          
-            matching_indices = _calc_matching_index ( neuronA, neuronB, this_cn, vertex_score = vertex_score, nA_cn = cn_subsets[neuronA], nB_cn = cn_subsets[neuronB] )                
+            matching_indices = _calc_connectivity_matching_index ( neuronA, neuronB, this_cn, vertex_score = vertex_score, nA_cn = cn_subsets[neuronA], nB_cn = cn_subsets[neuronB] )                
             matching_scores[d][neuronA][neuronB] = matching_indices[similarity]
 
    #Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
@@ -363,7 +363,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance = None, upstre
    return dist_matrix
 
 
-def _calc_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1, **kwargs ): 
+def _calc_connectivity_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1, **kwargs ): 
    """ Calculates and returns various matching indices between two neurons.
 
    Parameters
