@@ -38,11 +38,11 @@ Examples
 >>> time_inv = user_stats.get_time_invested(  skeleton_ids,
 ...                                           remote_instance = myInstance )
 >>> time_inv
-index           user  total  creation  edition  review
-0       0       Schlegel   4649      3224     2151    1204
-1       1           Tran    174       125       59       0
-2       4             Li    150       114       65       0
-3       3          Lacin    133       119       30       0
+            user  total  creation  edition  review
+0       Schlegel   4649      3224     2151    1204
+1           Tran    174       125       59       0
+2             Li    150       114       65       0
+3          Lacin    133       119       30       0
 ...
 >>> #Plot contributions as pie chart
 >>> import plotly
@@ -216,4 +216,4 @@ def get_time_invested( x, remote_instance, interval = 1, minimum_actions = 1 ):
 
    module_logger.info('Done! Use e.g. plotly to generate a plot: \n stats = get_time_invested( skids, remote_instance ) \n fig = { "data" : [ { "values" : stats.total.tolist(), "labels" : stats.user.tolist(), "type" : "pie" } ] } \n plotly.offline.plot(fig) ')
  
-   return pd.DataFrame( [ [  user_list.ix[ u ].last_name, stats['total'][u] , stats['creation'][u], stats['edition'][u], stats['review'][u] ] for u in all_timestamps.user.unique() ] , columns = [ 'user', 'total' ,'creation', 'edition', 'review' ] ).sort_values('total', ascending = False).reset_index()
+   return pd.DataFrame( [ [  user_list.ix[ u ].last_name, stats['total'][u] , stats['creation'][u], stats['edition'][u], stats['review'][u] ] for u in all_timestamps.user.unique() ] , columns = [ 'user', 'total' ,'creation', 'edition', 'review' ] ).sort_values('total', ascending = False).reset_index(drop=True)

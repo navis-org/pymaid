@@ -433,8 +433,8 @@ def plot3d( *args, **kwargs ):
                      ``pymaid.pymaid.get_3D_skeleton()``
    dotprops 
                      | pandas DataFrame containing neurons as dotprops 
-                     | Format:       ``name`` ``points``   ``vect``
-                     |           1    `str`  `DataFrame`  `DataFrame`
+                     | Format:       ``name`` ``points``     ``vect``
+                     |               ``str``  ``DataFrame``  ``DataFrame``
                      |
                      | Format of ``points`` :    index   x     y     z                     
                      | Format of ``vect``:       index   x     y     z
@@ -475,7 +475,7 @@ def plot3d( *args, **kwargs ):
    colormap :        dict, optional
                      ``{ skid : (r,g,b), ... }`` - color must be 0-255. 
                      Default = random colors                     
-   fig_width, fig_height : int, optional   
+   fig_width,fig_height : int, optional   
                      Use to define figure/window size (default = 1440/960)      
    title :           str, optional          
                      For plotly only! Plot title (default = 'Neuron plot')   
