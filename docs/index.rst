@@ -15,6 +15,7 @@ Contents:
    
    source/intro
    source/rmaid
+   source/plotting
    source/pymaid
 
 

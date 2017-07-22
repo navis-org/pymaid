@@ -447,7 +447,7 @@ def neuron2r ( neuron ):
     else:
         module_logger.error('Unknown DataFrame format: %s' % str( type( neuron ) ) )
 
-def dotprops2py( dp, subset = None ):
+def dotprops2py( dp, subset=None ):
     """ Converts dotprops into pandas DataFrame.
 
     Parameters
@@ -484,7 +484,7 @@ def dotprops2py( dp, subset = None ):
     return df
 
 
-def nblast ( neuron, remote_instance = None, db = None, ncores = 4, reverse = False, normalised=True, UseAlpha = False, mirror = True, reference = 'nat.flybrains::FCWB' ) :
+def nblast ( neuron, remote_instance=None, db=None, ncores=4, reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB' ) :
     """ Wrapper to use R's nblast (https://github.com/jefferis/nat). Provide 
     neuron to nblast either as skeleton ID or neuron object. This essentially 
     recapitulates what elmr's (https://github.com/jefferis/elmr) nblast_fafb 

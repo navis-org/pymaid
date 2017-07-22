@@ -328,7 +328,7 @@ def reroot_neuron( skdata, new_root, g = None, inplace = False ):
       elif instance(df, pd.Series):
         if df.igraph != None:
           #Generate iGraph -> order/indices of vertices are the same as in skdata
-          g = igraph_catmaid.igraph_from_skeleton(df)
+          g = igraph_catmaid.neuron2graph(df)
           df.igraph = g
         else:
           g = df.igraph
@@ -378,13 +378,13 @@ def reroot_neuron( skdata, new_root, g = None, inplace = False ):
    df.nodes.reset_index( inplace=True ) #Reset index
 
    #Recalculate graph
-   df.igraph = igraph_catmaid.igraph_from_skeleton(df)
+   df.igraph = igraph_catmaid.neuron2graph(df)
    
    module_logger.info('Info: %s #%s successfully rerooted (%s s)' % ( df.neuron_name, df.skeleton_id, round(time.time()-start_time,1) ) )
 
    return df
 
-def cut_neuron( skdata, cut_node, g = None ):
+def cut_neuron( skdata, cut_node, g=None ):
    """ Uses igraph to Cut the neuron at given point and returns two new neurons.
 
    Parameters
@@ -402,7 +402,7 @@ def cut_neuron( skdata, cut_node, g = None ):
    Examples
    --------
    >>> #Example for multiple cuts 
-   >>> from pymaid.igraph_catmaid import igraph_catmaid.igraph_from_skeleton
+   >>> from pymaid.igraph_catmaid import igraph_catmaid.neuron2graph
    >>> from pymaid.morpho import cut_neuron2
    >>> from pymaid.pymaid import pymaid.get_3D_skeleton, CatmaidInstance
    >>> remote_instance = CatmaidInstance( url, http_user, http_pw, token )
@@ -430,7 +430,7 @@ def cut_neuron( skdata, cut_node, g = None ):
 
    if g is None:
       #Generate iGraph -> order/indices of vertices are the same as in skdata
-      g = igraph_catmaid.igraph_from_skeleton(df)     
+      g = igraph_catmaid.neuron2graph(df)     
    else:
       g = g.copy()    
 
@@ -683,7 +683,7 @@ def _cut_neuron( skdata, cut_node ):
 
    return neuron_dist, neuron_prox
 
-def synapse_root_distances(skdata, remote_instance = None, pre_skid_filter = [], post_skid_filter = [] ):    
+def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], post_skid_filter=[] ):    
    """ Calculates geodesic (along the arbor) distance of synapses to root 
    (i.e. soma)
 
@@ -773,7 +773,7 @@ def synapse_root_distances(skdata, remote_instance = None, pre_skid_filter = [],
 def _calc_dist(v1,v2):        
     return math.sqrt(sum(((a-b)**2 for a,b in zip(v1,v2))))
 
-def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = False ):
+def calc_cable( skdata, smoothing=1, remote_instance=None, return_skdata=False ):
     """ Calculates cable length in micro meter (um) of a given neuron     
 
     Parameters
@@ -845,7 +845,7 @@ def calc_cable( skdata , smoothing = 1, remote_instance = None, return_skdata = 
     # #Remove nan value (at parent node) and return sum of all distances
     return np.sum( w[ np.logical_not( np.isnan(w) ) ] ) / 1000
 
-def calc_strahler_index( skdata, return_dict = False ):
+def calc_strahler_index( skdata, return_dict=False ):
     """ Calculates Strahler Index -> starts with index of 1 at each leaf, at 
     forks with varying incoming strahler index, the highest index
     is continued, at forks with the same incoming strahler index, highest 
@@ -1023,7 +1023,7 @@ def _walk_to_root( start_node, list_of_parents, visited_nodes ):
 
     return round ( sum( distances_traveled ) ), visited_nodes
 
-def in_volume( points, volume, remote_instance = None, approximate = False, ignore_axis = [] ):
+def in_volume( points, volume, remote_instance=None, approximate=False, ignore_axis=[] ):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 

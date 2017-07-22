@@ -95,7 +95,7 @@ nl.plot3d()
 ### Cluster synapses based on distance along the arbor using iGraph
 ```python
 from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
-from pymaid.igraph_catmaid import, cluster_nodes_w_synapses
+from pymaid.igraph_catmaid import cluster_nodes_w_synapses
 
 #Initiate Catmaid instance
 remote_instance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
@@ -181,9 +181,9 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 ### pymaid.igraph_catmaid:
 - [`calculate_distance_from_root()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.calculate_distance_from_root): calculates geodesic (along-the-arbor) distances for nodes to root node
 - [`cluster_nodes_w_synapses()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.cluster_nodes_w_synapses): uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
-- [`igraph_from_adj_matrix()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_adj_matrix): generates iGraph representation from adjacency matrix
-- [`igraph_from_neurons()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_neurons): generates iGraph representation from set of neurons
-- [`igraph_from_skeleton()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.igraph_from_skeleton): generates iGraph representation of neuron morphology
+- [`matrix2graph()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.matrix2graph): generates iGraph representation from adjacency matrix
+- [`network2graph()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.network2graph): generates iGraph representation from set of neurons
+- [`neuron2graph()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.igraph_catmaid.neuron2graph): generates iGraph representation of neuron morphology
 
 ### pymaid.plot:
 - [`plot2d()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.plot.plot2d): generates 2D plots of neurons

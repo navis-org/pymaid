@@ -468,7 +468,7 @@ def plot3d( *args, **kwargs ):
       | 1. Volume name (str): e.g. ``"v13.LH_R"``
       | 2. List of names: e.g. ``['v13.LH_R', 'v13.LH_L']``
       | 3. Dict of names+color: e.g. ``{ 'v13.LH_R' : (255,0,0) }``
-      | 4. Dict of dict: e.g. ``{'v13.LH_R': { 'color' : (255,0,0 ) } }``
+      | 4. Dict of dict: e.g. ``{'v13.LH_R': { 'color' : (255,0,0  } }``
       | 5. Dict with verts/faces: 
       |   e.g. ``{'my_neuropil': { 'verts': [ ], 'faces' : [], 'color': () }}``
       |   If no color is provided, default (220,220,220) is used
@@ -903,7 +903,7 @@ def plot3d( *args, **kwargs ):
                              ) 
                           )
 
-      module_logger.info('Traced done.')
+      module_logger.info('Tracing done.')
 
       #Now add neuropils:      
       for v in volumes_data:
@@ -1107,7 +1107,7 @@ def plot3d( *args, **kwargs ):
       if 'color' in volumes[v]:
          c = volumes[v]['color']
       else:
-         c = (220,220,220)      
+         c = (220,220,220)
 
       if verts:
          volumes_data[v] = { 'verts' : verts, 'faces' : faces, 'color' : (220,220,220) }   
@@ -1145,8 +1145,11 @@ def plot_network( *args, **kwargs ):
    ----------
    USE EITHER <skids>, <adj_mat> or <g> to specify what to plot  
 
-   skids :           list
-                     List of CATMAID skeleton ids
+   neurons :         neurons as single or list of either:
+                     1. skeleton IDs (int or str)
+                     2. neuron name (str, exact match)
+                     3. annotation: e.g. 'annotation:PN right'
+                     4. CatmaidNeuron or CatmaidNeuronList object
    adj_mat :         Pandas dataframe
                      Adjacency matrix, e.g. from 
                      ``cluster.create_adjacency_matrix()``
@@ -1190,7 +1193,7 @@ def plot_network( *args, **kwargs ):
       generate html file and open it webbrowser 
    """
 
-   skids = kwargs.get('skids', [] )
+   neurons = kwargs.get('neurons', None )
    adj_mat = kwargs.get('adj_mat', pd.DataFrame() )
    g = kwargs.get('g', None )
    remote_instance = kwargs.get('remote_instance', [] )
@@ -1213,24 +1216,29 @@ def plot_network( *args, **kwargs ):
    fig_autosize = kwargs.get('fig_autosize', False)
 
    if remote_instance is None:        
-     if 'remote_instance' in globals():            
+      if isinstance(neurons, core.CatmaidNeuronList) or isinstance(neurons, core.CatmaidNeuron):         
+         remote_instance = neurons._remote_instance   
+      elif 'remote_instance' in globals():            
          remote_instance = globals()['remote_instance']
+
+   if not isinstance(neurons,type(None)):
+      skids = pymaid.eval_skids ( neurons , remote_instance=remote_instance )
 
    if adj_mat.empty and not skids and not g:
       module_logger.error('You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR an adjacency matrix. See help(plot.plot_network).')
       return
-   elif adj_mat.empty and not g:
+   elif adj_mat.empty and not g:      
       adj_mat = clustmaid.create_adjacency_matrix( skids, 
                                                    skids, 
                                                    remote_instance,
-                                                   syn_cutoff = syn_cutoff,
-                                                   syn_threshold = syn_threshold,
-                                                   row_groups = groups, #This is where the magic happens
-                                                   col_groups = groups #This is where the magic happens
+                                                   syn_cutoff=syn_cutoff,
+                                                   syn_threshold=syn_threshold,
+                                                   row_groups=groups, #This is where the magic happens
+                                                   col_groups=groups #This is where the magic happens
                                                    )
    if not g:
       #Generate igraph object and apply layout
-      g = igraph_catmaid.igraph_from_adj_mat( adj_mat, syn_threshold = syn_threshold, syn_cutoff = syn_cutoff )
+      g = igraph_catmaid.matrix2graph( adj_mat, syn_threshold = syn_threshold, syn_cutoff = syn_cutoff )
 
    try:
       layout = g.layout( layout, weights = g.es['weight'] )

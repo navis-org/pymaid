@@ -61,7 +61,7 @@ import numpy as np
 import datetime
 from tqdm import tqdm
 
-from pymaid import core, morpho #igraph_catmaid#, morpho 
+from pymaid import core, morpho
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -129,7 +129,7 @@ class CatmaidInstance:
     >>> print(neuron_list)
     """
 
-    def __init__(self, server, authname, authpassword, authtoken, project_id = 1, logger = None, debug=False, time_out = None ):
+    def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger=None, debug=False, time_out=None ):
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
@@ -384,7 +384,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/stats/user-history" )
   
 
-def _get_urls_threaded( urls , remote_instance, post_data = [] ):
+def _get_urls_threaded( urls , remote_instance, post_data=[] ):
     """ Wrapper to retrieve a list of urls using threads
 
     Parameters
@@ -485,7 +485,7 @@ class _retrieveUrlThreaded(threading.Thread):
             remote_instance.logger.error('Failed to join thread for ' + self.url )
             return None
 
-def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_flag = 1, get_history = False, get_merge_history = False, get_abutting = False,  return_neuron = True, kwargs = {} ):
+def get_3D_skeleton ( skids, remote_instance=None, connector_flag=1, tag_flag=1, get_history=False, get_merge_history=False, get_abutting=False, return_neuron=True, kwargs={} ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids
 
     Parameters
@@ -663,7 +663,7 @@ def get_3D_skeleton ( skids, remote_instance = None , connector_flag = 1, tag_fl
     else:
         return df
 
-def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1, tag_flag = 1,  ):
+def get_arbor ( skids, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1 ):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids.
 
     Notes
@@ -748,7 +748,7 @@ def get_arbor ( skids, remote_instance = None, node_flag = 1, connector_flag = 1
                         )
     return df
 
-def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1, min_size = 2, approximate = False):
+def get_partners_in_volume( skids, volume, remote_instance=None , threshold=1, min_size=2, approximate=False ):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest WITHIN a given Catmaid Volume. Attention: total number of 
     connections returned is not restricted to that volume.
@@ -807,9 +807,9 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
         skids = [skids]
 
     #First, get list of connectors
-    cn_data = get_connectors ( skids, remote_instance = remote_instance, 
-                              incoming_synapses = True, outgoing_synapses = True, 
-                              abutting = False, gap_junctions = True, )
+    cn_data = get_connectors ( skids, remote_instance=remote_instance, 
+                              incoming_synapses=True, outgoing_synapses=True, 
+                              abutting=False, gap_junctions=True, )
 
     remote_instance.logger.info('%i connectors retrieved - now checking for intersection with volume...' % cn_data.shape[0] )
 
@@ -828,9 +828,9 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
     skids_in_volume = [ str(s) for s in skids_in_volume ]
 
     #Get all connectivity
-    connectivity = get_partners(skids, remote_instance = remote_instance , 
-                                threshold = threshold,
-                                min_size = min_size)    
+    connectivity = get_partners(skids, remote_instance=remote_instance , 
+                                threshold=threshold,
+                                min_size=min_size)    
 
     #Filter and return connectivity
     filtered_connectivity = connectivity[ connectivity.skeleton_id.isin( skids_in_volume ) ].copy().reset_index()
@@ -839,7 +839,7 @@ def get_partners_in_volume(skids, volume, remote_instance = None , threshold = 1
 
     return filtered_connectivity
 
-def get_partners (skids, remote_instance = None , threshold = 1,  min_size = 2, filt = [], directions = ['incoming','outgoing'] ):
+def get_partners (skids, remote_instance=None , threshold=1,  min_size=2, filt=[], directions=['incoming','outgoing'] ):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest
 
@@ -923,11 +923,13 @@ def get_partners (skids, remote_instance = None , threshold = 1,  min_size = 2, 
 
     remote_instance.logger.info('Fetching connectivity')   
     connectivity_data = remote_instance.fetch( remote_connectivity_url , connectivity_post )
+    #Delete directions that we don't want
+    connectivity_data.update(  { d : [] for d in connectivity_data if d not in directions } )
 
     #As of 08/2015, # of synapses is returned as list of nodes with 0-5 confidence: {'skid': [0,1,2,3,4,5]}
     #This is being collapsed into a single value before returning it:    
     
-    for d in directions:
+    for d in connectivity_data:
         pop = set()
         for entry in connectivity_data[ d ]:
             if sum( [ sum(connectivity_data[ d ][entry]['skids'][n]) for n in connectivity_data[ d ][entry]['skids'] ] ) >= threshold:
@@ -941,11 +943,11 @@ def get_partners (skids, remote_instance = None , threshold = 1,  min_size = 2, 
                     pop.add(entry)
 
         for n in pop:
-            connectivity_data[ d ].pop(n)
+            connectivity_data[ d ].pop(n)    
+       
+    names = get_names( [ n for d in connectivity_data for n in connectivity_data[d] ] + skids, remote_instance )    
 
     remote_instance.logger.info('Done. Found %i up- %i downstream neurons' % ( len(connectivity_data['incoming']) , len(connectivity_data['outgoing']) ) )
-
-    names = get_names( list(connectivity_data['incoming']) + list(connectivity_data['outgoing']) + skids, remote_instance )    
 
     df = pd.DataFrame( columns = ['neuron_name','skeleton_id','num_nodes','relation'] + [ str(s) for s in skids ] )
 
@@ -966,12 +968,14 @@ def get_partners (skids, remote_instance = None , threshold = 1,  min_size = 2, 
                         ], 
                         columns = ['neuron_name','skeleton_id','num_nodes','relation'] + [ str(s) for s in skids ],
                         dtype=object
-                        )          
+                        )
 
         df = pd.concat( [df , df_temp], axis = 0)
 
     if filt:
-        f = [ True in [ f in name for f in filt ] for name in df.neuron_name.tolist() ]
+        if not isinstance(filt, list):
+            filt = [ filt ]        
+        f = [ True in [ f in name for f in filt ] for name in df.neuron_name.tolist() ]        
         df = df [ f ]
 
     #Reindex concatenated dataframe
@@ -979,7 +983,7 @@ def get_partners (skids, remote_instance = None , threshold = 1,  min_size = 2, 
         
     return df    
 
-def get_names (skids, remote_instance = None):
+def get_names ( skids, remote_instance=None ):
     """ Wrapper to retrieve neurons names for a list of skeleton ids
 
     Parameters
@@ -1026,7 +1030,7 @@ def get_names (skids, remote_instance = None):
         
     return(names)
 
-def get_node_user_details(treenode_ids, remote_instance = None, ):
+def get_node_user_details ( treenode_ids, remote_instance=None ):
     """ Wrapper to retrieve user info for a list of treenode and/or connectors
 
     Parameters
@@ -1082,7 +1086,7 @@ def get_node_user_details(treenode_ids, remote_instance = None, ):
 
     return df
 
-def get_node_lists ( skids, remote_instance = None, ):
+def get_node_lists ( skids, remote_instance=None ):
     """ Wrapper to retrieve treenode table for a list of skids
 
     Parameters
@@ -1163,7 +1167,7 @@ def get_node_lists ( skids, remote_instance = None, ):
 
     return nodes
 
-def get_edges (skids, remote_instance = None):
+def get_edges (skids, remote_instance=None ):
     """ Wrapper to retrieve edges (synaptic connections) between sets of neurons
     
     Parameters
@@ -1215,7 +1219,7 @@ def get_edges (skids, remote_instance = None):
         
     return df
 
-def get_connectors ( skids, remote_instance = None, incoming_synapses = True, outgoing_synapses = True, abutting = False, gap_junctions = False, ):
+def get_connectors ( skids, remote_instance=None, incoming_synapses=True, outgoing_synapses=True, abutting=False, gap_junctions=False ):
     """ Wrapper to retrieve connectors for a set of neurons.    
     
     Parameters
@@ -1309,7 +1313,7 @@ def get_connectors ( skids, remote_instance = None, incoming_synapses = True, ou
     return df
 
 
-def get_connector_details (connector_ids, remote_instance = None, ):
+def get_connector_details ( connector_ids, remote_instance=None ):
     """ Wrapper to retrieve details on sets of connectors 
     
     Parameters
@@ -1363,7 +1367,7 @@ def get_connector_details (connector_ids, remote_instance = None, ):
 
     return df
 
-def get_review (skids, remote_instance = None, ):
+def get_review ( skids, remote_instance=None ):
     """ Wrapper to retrieve review status for a set of neurons
     
     Parameters
@@ -1421,7 +1425,7 @@ def get_review (skids, remote_instance = None, ):
         
     return df
 
-def add_annotations ( skids, annotations, remote_instance = None,  ):
+def add_annotations ( skids, annotations, remote_instance=None ):
     """ Wrapper to add annotation(s) to a list of neuron(s)
 
     Parameters
@@ -1471,7 +1475,7 @@ def add_annotations ( skids, annotations, remote_instance = None,  ):
 
     return 
    
-def get_neuron_annotation (skid, remote_instance = None,  ):
+def get_neuron_annotation ( skid, remote_instance=None ):
     """ Wrapper to retrieve annotations of a SINGLE neuron. 
     Contains timestamps and user_id
     
@@ -1534,7 +1538,7 @@ def get_neuron_annotation (skid, remote_instance = None,  ):
         
     return df 
 
-def get_annotations_from_list(skids, remote_instance = None,  ):
+def get_annotations_from_list ( skids, remote_instance=None ):
     """ Wrapper to retrieve annotations for a list of skeleton ids
     If a neuron has no annotations, it will not show up in returned dict!
     Note: this API endpoint does not process more than 250 skids at a time!
@@ -1593,7 +1597,7 @@ def get_annotations_from_list(skids, remote_instance = None,  ):
         remote_instance.logger.error( 'No annotations retrieved. Make sure that the skeleton IDs exist.' )
         raise Exception( 'No annotations retrieved. Make sure that the skeleton IDs exist.' )
 
-def get_annotation_id( annotations, remote_instance = None,  allow_partial = False ):
+def get_annotation_id ( annotations, remote_instance=None,  allow_partial=False ):
     """ Wrapper to retrieve the annotation ID for single or list of annotation(s)
     
     Parameters
@@ -1656,7 +1660,7 @@ def get_annotation_id( annotations, remote_instance = None,  allow_partial = Fal
     return annotation_ids
 
 
-def has_soma ( skids , remote_instance = None,  ):
+def has_soma ( skids , remote_instance=None ):
     """ Quick function to check if a neuron/a list of neurons have somas
     Searches for nodes that have a 'soma' tag AND a radius > 500nm
 
@@ -1710,7 +1714,7 @@ def has_soma ( skids , remote_instance = None,  ):
     return d
 
 
-def get_skids_by_name(tag, remote_instance = None, allow_partial = True, ):
+def get_skids_by_name ( tag, remote_instance=None, allow_partial=True ):
     """ Wrapper to retrieve the all neurons with matching name
     
     Parameters
@@ -1757,7 +1761,7 @@ def get_skids_by_name(tag, remote_instance = None, allow_partial = True, ):
 
     return df
 
-def get_skids_by_annotation( annotations, remote_instance = None,  allow_partial = False ):
+def get_skids_by_annotation( annotations, remote_instance=None, allow_partial=False ):
     """ Wrapper to retrieve the all neurons annotated with given annotation(s)
     
     Parameters
@@ -1810,7 +1814,7 @@ def get_skids_by_annotation( annotations, remote_instance = None,  allow_partial
         
     return(annotated_skids)
 
-def skid_exists( skids, remote_instance = None,  ):
+def skid_exists ( skids, remote_instance=None ):
     """ Quick function to check if skeleton id exists
     
     Parameters
@@ -1849,7 +1853,7 @@ def skid_exists( skids, remote_instance = None,  ):
     else:
         return True
 
-def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_existing = False,  ):
+def edit_tags ( node_list, tags, node_type, remote_instance=None, delete_existing=False ):
     """ Wrapper to add or remove tag(s) for a list of treenode(s) or connector(s)
     In order to remove tags, 
 
@@ -1900,7 +1904,7 @@ def edit_tags ( node_list, tags, node_type, remote_instance = None, delete_exist
     return d
 
 
-def get_review_details ( skids, remote_instance = None, ):
+def get_review_details ( skids, remote_instance=None ):
     """ Wrapper to retrieve review status (reviewer + timestamp) for each node 
     of a given skeleton -> uses the review API
 
@@ -1957,7 +1961,7 @@ def get_review_details ( skids, remote_instance = None, ):
 
     return node_list
 
-def get_logs (remote_instance = None, operations = [] , entries = 50 , display_start = 0,  search = ''):
+def get_logs ( remote_instance=None, operations=[], entries=50, display_start=0, search=''):
     """ Wrapper to retrieve log (like log widget)
     
     Parameters
@@ -2051,7 +2055,7 @@ def get_logs (remote_instance = None, operations = [] , entries = 50 , display_s
 
     return df
 
-def get_contributor_statistics (skids, remote_instance = None, separate = False, ):
+def get_contributor_statistics ( skids, remote_instance=None, separate=False ):
     """ Wrapper to retrieve contributor statistics for given skeleton ids.
     By default, stats are given over all neurons.
     
@@ -2147,7 +2151,7 @@ def get_contributor_statistics (skids, remote_instance = None, separate = False,
                             )
     return df
 
-def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by = None,  ):
+def get_skeleton_list( remote_instance=None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by=None ):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters 
     (see variables). If no parameters are provided, all existing skeletons are 
     returned!
@@ -2198,7 +2202,7 @@ def get_skeleton_list( remote_instance = None, user=None, node_count=1, start_da
 
     return skid_list
 
-def get_history( remote_instance = None,  start_date = (datetime.date.today()-datetime.timedelta(days=7)).isoformat() , end_date = datetime.date.today().isoformat(), split = True ):    
+def get_history ( remote_instance=None, start_date=(datetime.date.today()-datetime.timedelta(days=7)).isoformat(), end_date=datetime.date.today().isoformat(), split=True ):    
     """ Wrapper to retrieves CATMAID history 
 
     Notes
@@ -2348,7 +2352,7 @@ def get_history( remote_instance = None,  start_date = (datetime.date.today()-da
                     )
     return df
 
-def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance,  coord_format = 'NM', resolution = ( 4, 4, 50) ):      
+def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, coord_format='NM', resolution=(4,4,50) ):      
     """ Get nodes in provided volume. This is the same API enpoint that is 
     called when panning in the browser.
 
@@ -2428,7 +2432,7 @@ def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance,  coo
 
     return data
 
-def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, min_size = 1, only_soma = False,  ):
+def get_neurons_in_volume ( volumes, remote_instance=None, intersect=False, min_size=1, only_soma=False ):
     """ Retrieves neurons with processes within CATMAID volumes. This function
     uses the BOUNDING BOX around the volume as proxy and queries for neurons
     that enter/exit that bounding box --> will therefore not catch fragments
@@ -2506,7 +2510,7 @@ def get_neurons_in_volume ( volumes, remote_instance = None, intersect = False, 
     return list(set(neurons))
 
 
-def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = None, unit = 'NM',  **kwargs ):
+def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance=None, unit = 'NM',  **kwargs ):
     """ Retrieves neurons with processes within a defined volume. Because the 
     API returns only a limited number of neurons at a time, the defined volume 
     has to be chopped into smaller pieces for crowded areas - may thus take 
@@ -2679,7 +2683,7 @@ def get_neurons_in_box ( left, right, top, bottom, z1, z2, remote_instance = Non
 
     return list(skeletons)
 
-def get_user_list( remote_instance = None ):
+def get_user_list( remote_instance=None ):
     """ Get list of users for given CATMAID server (not project specific)
 
     Parameters
@@ -2724,7 +2728,7 @@ def get_user_list( remote_instance = None ):
 
     return df
 
-def get_volume( volume_name, remote_instance = None,  ):
+def get_volume( volume_name, remote_instance=None ):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of 
     vertices and faces.
 
@@ -2824,19 +2828,21 @@ def get_volume( volume_name, remote_instance = None,  ):
 
     return final_vertices, final_faces
 
-def eval_skids ( x, remote_instance = None ):
+def eval_skids ( x, remote_instance=None ):
     """ Wrapper to evaluate parameters passed as skeleton IDs. Will turn
     annotations and neuron names into skeleton IDs.
 
     Parameters
     ----------
-    x :             {int, str, list of either}
+    x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
                     1. int or list of ints will be assumed to be skeleton IDs
                     2. string or list of strings:
                         - if convertible to int, will be interpreted as skids
                         - elif start with 'annotation:' will be assumed to be 
                           annotations
                         - else, will be assumed to be neuron names
+                    3. For CatmaidNeuron/List or pandas DataFrames will try
+                       to extract skeleton_id parameter
 
     Returns
     -------
@@ -2873,9 +2879,13 @@ def eval_skids ( x, remote_instance = None ):
                 skids.append(temp)
         return skids
     elif isinstance(x, core.CatmaidNeuron):
-        return x.skeleton_id
+        return [ x.skeleton_id ]
     elif isinstance(x, core.CatmaidNeuronList):
         return list( x.skeleton_id )
+    elif isinstance(x, pd.DataFrame):
+        return x.skeleton_id.tolist()
+    elif isinstance(x, pd.Series):
+        return [ x.skeleton_id ]
     else:
         remote_instance.logger.error('Unable to extract skids from type %s' % str(type( x )))
         raise TypeError('Unable to extract skids from type %s' % str(type( x )))

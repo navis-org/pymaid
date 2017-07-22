@@ -20,7 +20,7 @@ efficiently calculate distances and cluster synapses.
 Examples
 --------
 >>> from pymaid import CatmaidInstance, get_3D_skeleton
->>> from catmaid_igraph import igraph_from_skeleton, cluster_nodes_w_synapses
+>>> from catmaid_igraph import neuron2graph, cluster_nodes_w_synapses
 >>> remote_instance = CatmaidInstance(    'www.your.catmaid-server.org', 
 ...                                       'user', 
 ...                                       'password', 
@@ -65,7 +65,7 @@ if not module_logger.handlers:
    sh.setFormatter(formatter)
    module_logger.addHandler(sh)
 
-def igraph_from_neurons( x, remote_instance = None, threshold = 1 ):
+def network2graph( x, remote_instance=None, threshold=1 ):
    """ Generates igraph network object for a set of neurons
 
    Parameters
@@ -117,7 +117,7 @@ def igraph_from_neurons( x, remote_instance = None, threshold = 1 ):
 
    return g
 
-def igraph_from_adj_mat( adj_matrix, **kwargs ):
+def matrix2graph( adj_matrix, **kwargs ):
    """ Takes an adjacency matrix and turns it into an iGraph object
 
    Parameters
@@ -143,8 +143,8 @@ def igraph_from_adj_mat( adj_matrix, **kwargs ):
    ...                                             HTTP_PW, 
    ...                                             TOKEN )
    >>> neurons = pymaid.get_skids_by_annotation( 'right_pns' ,remote_instance)
-   >>> mat = cluster.create_adjacency_matrix(neurons,neurons,remote_instance)
-   >>> g = igraph_catmaid.igraph_from_adj_mat ( mat )
+   >>> mat = cluster.matrix2graph(neurons,neurons,remote_instance)
+   >>> g = igraph_catmaid.matrix2graph ( mat )
    >>> #Use fruchterman-Reingold algorithm
    >>> layout = g.layout('fr')
    >>> gplot( g, layout = layout )
@@ -191,7 +191,7 @@ def igraph_from_adj_mat( adj_matrix, **kwargs ):
 
    return g
 
-def igraph_from_skeleton( skdata, append = True ):
+def neuron2graph( skdata, append=True ):
    """ Takes CATMAID single skeleton data and turns it into an iGraph object
    
    Parameters
@@ -209,7 +209,7 @@ def igraph_from_skeleton( skdata, append = True ):
 
    """
    if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):            
-      return [ igraph_from_skeleton( skdata.ix[i] ) for i in range( skdata.shape[0] ) ]
+      return [ neuron2graph( skdata.ix[i] ) for i in range( skdata.shape[0] ) ]
    elif isinstance(skdata, pd.Series) or isinstance( skdata, core.CatmaidNeuron ):
       df = skdata
 
@@ -254,7 +254,7 @@ def igraph_from_skeleton( skdata, append = True ):
 
    return g
 
-def dist_from_root( data , synapses_only = False ):
+def dist_from_root( data, synapses_only=False ):
    """ Get distance to root in nano meter (nm) for all treenodes 
 
    Parameters
@@ -284,7 +284,7 @@ def dist_from_root( data , synapses_only = False ):
    elif isinstance(data, pd.Series) or isinstance(data, core.CatmaidNeuron):
       g = data.igraph
       if g == None:
-         g = igraph_from_skeleton( data )      
+         g = neuron2graph( data )      
    else:
       raise Exception('Unexpected data type: %s' % str(type(data)))
 
@@ -312,10 +312,10 @@ def dist_from_root( data , synapses_only = False ):
       return distances_to_root
    else:
       data.nodes['dist_to_root'] = [ distances_to_root[ n ] for n in data.nodes.treenode_id.tolist() ]  
-      data.igraph = igraph_from_skeleton ( data )      
+      data.igraph = neuron2graph ( data )      
       return data
 
-def cluster_nodes_w_synapses(data, plot_graph = True):
+def cluster_nodes_w_synapses(data, plot_graph=True):
    """ Cluster nodes of an iGraph object based on distance
 
    Parameters
@@ -341,7 +341,7 @@ def cluster_nodes_w_synapses(data, plot_graph = True):
    elif isinstance(data, pd.Series) or isinstance(data, core.CatmaidNeuron):
       g = data.igraph
       if g == None:
-         g = igraph_from_skeleton( data )      
+         g = neuron2graph( data )      
    else:
       raise Exception('Unexpected data type: %s' % str(type(data)))
 

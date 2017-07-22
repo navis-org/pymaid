@@ -46,8 +46,7 @@ class CatmaidNeuron:
     x :             data to construct neuron from
                     1. skeleton ID or
                     2. pandas DataFrame or Series from pymaid.get_3D_skeleton() or
-                    3. CatmaidNeuron (will create a deep copy)
-
+                    3. another CatmaidNeuron (will create a deep copy)
                     This will override other, redundant attributes
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
@@ -257,9 +256,9 @@ class CatmaidNeuron:
 
     def copy(self):
         """Create a copy of the neuron"""
-        return CatmaidNeuron( self, copy = True )
+        return CatmaidNeuron( self, copy=True )
 
-    def get_skeleton(self, remote_instance = None, **kwargs ):
+    def get_skeleton(self, remote_instance=None, **kwargs ):
         """Get skeleton data for neuron using pymaid.get_3D_skeleton() 
 
         Parameters
@@ -270,6 +269,11 @@ class CatmaidNeuron:
                     n.get_skeleton( with_history = True )
                     or to get abutting connectors:
                     n.get_skeleton( get_abutting = True )
+
+        See Also
+        --------
+        :func:`pymaid.pymaid.get_3D_skeleton` 
+                    Function called to get skeleton information
         """
         if not remote_instance and not self._remote_instance:
             raise Exception('Get_skeleton - Unable to connect to server without remote_instance. See help(core.CatmaidNeuron) to learn how to assign.')            
@@ -295,11 +299,11 @@ class CatmaidNeuron:
         """Calculate igraph representation of neuron """
         level = igraph_catmaid.module_logger.level
         igraph_catmaid.module_logger.setLevel('WARNING')
-        self.igraph = igraph_catmaid.igraph_from_skeleton( self.df )
+        self.igraph = igraph_catmaid.neuron2graph( self.df )
         igraph_catmaid.module_logger.setLevel(level)
         return self.igraph
 
-    def get_review(self, remote_instance = None ):
+    def get_review(self, remote_instance=None ):
         """Get review status for neuron"""
         if not remote_instance and not self._remote_instance:
             self.logger.error('Get_review: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
@@ -309,7 +313,7 @@ class CatmaidNeuron:
         self.review_status = pymaid.get_review( self.skeleton_id, remote_instance ).ix[0].percent_reviewed
         return self.review_status    
 
-    def get_annotations(self, remote_instance = None ):
+    def get_annotations(self, remote_instance=None ):
         """Retrieve annotations for neuron"""
         if not remote_instance and not self._remote_instance:
             self.logger.error('Get_annotations: Need CatmaidInstance to retrieve annotations. Use neuron.get_annotations( remote_instance = CatmaidInstance )')
@@ -346,7 +350,7 @@ class CatmaidNeuron:
             self.get_skeleton()
         return plot.plot3d( skdata = CatmaidNeuronList(self), **kwargs )
 
-    def get_name(self, remote_instance = None):
+    def get_name(self, remote_instance=None):
         """Retrieve name of neuron"""
         if not remote_instance and not self._remote_instance:
             self.logger.error('Get_name: Need CatmaidInstance to retrieve annotations. Use neuron.get_annotations( remote_instance = CatmaidInstance )')
@@ -379,7 +383,7 @@ class CatmaidNeuron:
         morpho.reroot_neuron( self, new_root, inplace=True)
         self.get_igraph()
 
-    def update(self, remote_instance = None ):
+    def update(self, remote_instance=None ):
         """Reload neuron from server. 
 
         Notes
@@ -394,7 +398,7 @@ class CatmaidNeuron:
         n = pymaid.get_3D_skeleton( self.skeleton_id, remote_instance = remote_instance )
         self.__init__(n, self._remote_instance, self._meta_data)
 
-    def set_remote_instance(self, remote_instance = None, server_url = None, http_user = None, http_pw = None, auth_token = None):
+    def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to neuron
 
         Notes
@@ -615,16 +619,16 @@ class CatmaidNeuronList:
             return np.array ( [ n.skeleton_id for n in self.neurons ] )
 
         elif key == 'nodes':  
-            self.get_skeletons(skip_existing = True)
+            self.get_skeletons(skip_existing=True)
             return pd.DataFrame ( [ n.nodes for n in self.neurons ] )
         elif key == 'connectors':
-            self.get_skeletons(skip_existing = True)
+            self.get_skeletons(skip_existing=True)
             return pd.DataFrame ( [ n.connectors for n in self.neurons ] )
         elif key == 'tags':
-            self.get_skeletons(skip_existing = True)
+            self.get_skeletons(skip_existing=True)
             return np.array ( [ n.tags for n in self.neurons ] )
         elif key == 'df':
-            self.get_skeletons(skip_existing = True)
+            self.get_skeletons(skip_existing=True)
             return pd.DataFrame ( [ n.df for n in self.neurons ] )
 
         elif key == '_remote_instance':
@@ -637,10 +641,10 @@ class CatmaidNeuronList:
                 return all_instances[0]
 
         elif key == 'igraph':
-            self.get_skeletons(skip_existing = True)
+            self.get_skeletons(skip_existing=True)
             return np.array ( [ n.igraph for n in self.neurons ] )
         elif key == 'review_status':
-            self.get_review(skip_existing = True)
+            self.get_review(skip_existing=True)
             return np.array ( [ n.review_status for n in self.neurons ] )
         elif key == 'annotations':
             to_retrieve = [ n.skeleton_id for n in self.neurons if 'annotations' not in n.__dict__ ]
@@ -689,7 +693,7 @@ class CatmaidNeuronList:
         random.shuffle(indices)
         return [ n for i,n in enumerate( self.neurons ) if i in indices[:N] ]
 
-    def downsample(self, factor = 5):
+    def downsample(self, factor=5):
         """Downsamples all neurons by factor X
         
         Parameters
@@ -700,7 +704,7 @@ class CatmaidNeuronList:
         for n in self.neurons:
             n.downsample( downsampling = factor )
 
-    def get_review(self, skip_existing = False):
+    def get_review(self, skip_existing=False):
         """ Use to get/update review status"""
         to_retrieve = [ n.skeleton_id for n in self.neurons if 'review_status' not in n.__dict__ ]
         if to_retrieve:
@@ -708,7 +712,7 @@ class CatmaidNeuronList:
             for n in [ n for n in self.neurons if 'review_status' not in n.__dict__ ]:
                 n.review_status = re.ix[ str( n.skeleton_id ) ].percent_reviewed
 
-    def get_names(self, skip_existing = False):
+    def get_names(self, skip_existing=False):
         """ Use to get/update neuron names"""
         if skip_existing:
             to_update = [ n.skeleton_id for n in self.neurons if 'neuron_name' not in n.__dict__ ]
@@ -723,7 +727,7 @@ class CatmaidNeuronList:
                 except:
                     pass
 
-    def get_skeletons(self, skip_existing = False):
+    def get_skeletons(self, skip_existing=False):
         """Helper function to fill in/update skeleton data of neurons. 
 
         Notes
@@ -753,7 +757,7 @@ class CatmaidNeuronList:
                 n.date_retrieved = datetime.datetime.now().isoformat()
                 n.get_igraph()
 
-    def set_remote_instance(self, remote_instance = None, server_url = None, http_user = None, http_pw = None, auth_token = None):
+    def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to all neurons
 
         Notes
@@ -843,7 +847,7 @@ class CatmaidNeuronList:
 
     def copy(self):
         """Return copy of this CatmaidNeuronList """
-        return CatmaidNeuronList( self, copy = True )
+        return CatmaidNeuronList( self, copy=True )
 
 
 class _IXIndexer():
@@ -853,7 +857,7 @@ class _IXIndexer():
     it would on DataFrames.
     """
 
-    def __init__(self, obj, logger = None):
+    def __init__(self, obj, logger=None):
         self.obj = obj
         self.logger = logger
 

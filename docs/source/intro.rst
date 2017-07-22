@@ -2,7 +2,7 @@
 
 Introduction
 ************
-This section will teach you the basics of how to use PyMaid. If you are impatient, check out the *Quickstart Guide* but I recommend having a look at the *Basics* too.
+This section will teach you the basics of how to use PyMaid. If you are impatient check out the *Quickstart Guide* but I recommend having a look at the *Basics* too.
 
 Quickstart Guide
 ================
@@ -64,7 +64,7 @@ Some functions already return partially completed neurons (e.g. :func:`pymaid.py
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token' )
 >>> neuron = pymaid.pymaid.get_3D_skeleton( 123456, remote_instance = rm )
 
-All functions that explicitly require you to pass a ``skids`` parameter (e.g. :func:`pymaid.pymaid.get_3D_skeleton`) accept:
+All functions that explicitly require you to pass a ``skids`` parameter (e.g. :func:`pymaid.pymaid.get_3D_skeleton`) accept either:
 
 1. skeleton IDs (int or str)
 2. neuron name (str, exact match)
@@ -150,7 +150,10 @@ CatmaidNeuron - INFO - Retrieving skeleton data...
     treenode_id  parent_id  creator_id  x  y  z radius confidence
 0   ...
 
-You might have noticed that nodes are stored as pandas.DataFrame. That allows some fancy indexing and processing.
+You might have noticed that nodes are stored as pandas.DataFrame. That allows some fancy indexing and processing!
+
+>>> # Get all nodes with radius larger than -1
+>>> n.nodes[ n.nodes.radius > 1 ]
 
 Other data, such as annotations are stored as simple lists.
 

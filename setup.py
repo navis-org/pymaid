@@ -47,6 +47,9 @@ setup(
         "pandas>=0.18.1",
         "rpy2>=2.8.5",
         "vispy>=0.4.0",
-        "tqdm>=4.14.0"
+        "tqdm>=4.14.0",
+        "pyqt5",
+        "pyglet"
+
     ],
 )

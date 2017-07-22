@@ -70,7 +70,7 @@ if not module_logger.handlers:
   sh.setFormatter(formatter)
   module_logger.addHandler(sh)
 
-def get_user_contributions( x , remote_instance = None ):
+def get_user_contributions( x , remote_instance=None ):
    """ Takes a list of skeleton IDs and returns nodes and synapses contributed 
    by each user.
 
@@ -125,7 +125,7 @@ def get_user_contributions( x , remote_instance = None ):
 
    return pd.DataFrame( [ [  user_list.ix[ int(u) ].last_name, stats['nodes'][u] , stats['presynapses'][u], stats['postsynapses'][u] ] for u in all_users ] , columns = [ 'user', 'nodes' ,'presynapses', 'postsynapses' ] ).sort_values('nodes', ascending = False).reset_index(drop=True)
 
-def get_time_invested( x, remote_instance, interval = 1, minimum_actions = 1 ):
+def get_time_invested( x, remote_instance, interval=1, minimum_actions=1 ):
    """ Takes a list of skeleton IDs and calculates the time each user has 
    spent working on this set of neurons.
 

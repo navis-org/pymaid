@@ -37,14 +37,22 @@ if not module_logger.handlers:
    sh.setFormatter(formatter)
    module_logger.addHandler(sh)
 
-def create_adjacency_matrix( neuronsA, neuronsB, remote_instance = None, syn_cutoff = None, row_groups = {}, col_groups = {}, syn_threshold = 1 ):
+def create_adjacency_matrix( n_a, n_b, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None ):
    """ Wrapper to generate a matrix for synaptic connections between neuronsA 
    -> neuronsB (unidirectional!)
 
    Parameters
    ----------
-   neuronsA :        list of skeleton IDs
-   neuronsB :        list of skeleton IDs
+   n_a :             Source neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+   n_b :             Target neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
    remote_instance : CATMAID instance
    syn_cutoff :      int, optional
                      If set, will cut off synapses above given value. 
@@ -65,14 +73,10 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance = None, syn_cut
             remote_instance = globals()['remote_instance']
         else:
             module_logger.error('Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')   
 
-   #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
-   try:   
-      neuronsA = list( neuronsA.skeleton_id )   
-      neuronsB = list( neuronsB.skeleton_id )
-   except:
-      pass
+   neuronsA = pymaid.eval_skids ( n_a , remote_instance = remote_instance )
+   neuronsB = pymaid.eval_skids ( n_b , remote_instance = remote_instance )
 
    #Make sure neurons are strings, not integers
    neurons = list( set( [str(n) for n in list(set(neuronsA + neuronsB))] ) )
@@ -141,7 +145,7 @@ def create_adjacency_matrix( neuronsA, neuronsB, remote_instance = None, syn_cut
 
    return matrix
 
-def group_matrix ( mat, row_groups = {} , col_groups = {}, method = 'AVERAGE' ):
+def group_matrix ( mat, row_groups={} , col_groups={}, method='AVERAGE' ):
    """ Takes a matrix or a pandas Dataframe and groups values by keys provided.  
 
    Parameters
@@ -199,13 +203,17 @@ def group_matrix ( mat, row_groups = {} , col_groups = {}, method = 'AVERAGE' ):
 
    return new_mat
 
-def create_connectivity_distance_matrix( neurons, remote_instance = None, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix = True, min_nodes = 2, similarity = 'vertex_normalized'):
+def create_connectivity_distance_matrix( x, remote_instance=None, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix=True, min_nodes=2, similarity='vertex_normalized'):
    """ Wrapper to calculate connectivity similarity and creates a distance 
    matrix for a set of neurons. Uses Ward's algorithm for clustering.
 
    Parameters
    ----------
-   neurons :            list of skeleton IDs
+   x :                  neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
    remote_instance :    CATMAID instance
    upstream :           bool, optional
                         If True, upstream partners will be considered. 
@@ -248,10 +256,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance = None, upstre
             raise Exception('Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
    #Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
-   try:
-      neurons = list( neurons.skeleton_id )
-   except:
-      pass
+   neurons = pymaid.eval_skids ( x , remote_instance = remote_instance )
 
    #Make sure neurons are strings, not integers
    neurons = [ str(n) for n in list(set(neurons)) ]
@@ -363,7 +368,7 @@ def create_connectivity_distance_matrix( neurons, remote_instance = None, upstre
    return dist_matrix
 
 
-def _calc_connectivity_matching_index( neuronA, neuronB, connectivity, syn_threshold = 1, min_nodes = 1, **kwargs ): 
+def _calc_connectivity_matching_index( neuronA, neuronB, connectivity, syn_threshold=1, min_nodes=1, **kwargs ): 
    """ Calculates and returns various matching indices between two neurons.
 
    Parameters
@@ -496,7 +501,7 @@ def _calc_connectivity_matching_index( neuronA, neuronB, connectivity, syn_thres
 
    return similarity_indices
 
-def synapse_distance_matrix(synapse_data, labels = None, plot_matrix = True, method = 'ward'):
+def synapse_distance_matrix(synapse_data, labels=None, plot_matrix=True, method='ward'):
    """ Takes a list of CATMAID synapses, calculates EUCLEDIAN distance matrix 
    and clusters them (WARD algorithm)
 
