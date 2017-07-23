@@ -1,8 +1,11 @@
 pymaid
 ==================
-
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 
+## Documentation
+PyMaid is now on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
+
+## Contents
 Pymaid has been tested with CATMAID latest release version 2017.04.20 - if you are working with older versions, you may experience incompatibilities.
 
 `pymaid.core` contains definition for CatmaidNeuron and CatmaidNeuronList classes.
@@ -42,9 +45,6 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 - [vispy](http://vispy.org/) 
 - [Plotly](http://plot.ly)
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/)
-
-## Documentation:
-PyMaid is now on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 ## Basic examples:
 
@@ -179,11 +179,11 @@ Use e.g. `help(get_edges)` to learn more about their function, parameters and us
 - [`skid_exists()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.skid_exists): checks if a skeleton ID exists
 
 ### pymaid.igraph_catmaid:
-- [`calculate_distance_from_root()`](http://pymaid.readthedocs.io/en/latest/source/igraph_catmaid.html#pymaid.igraph_catmaid.calculate_distance_from_root): calculates geodesic (along-the-arbor) distances for nodes to root node
-- [`cluster_nodes_w_synapses()`](http://pymaid.readthedocs.io/en/latest/source/igraph_catmaid.html#pymaid.igraph_catmaid.cluster_nodes_w_synapses): uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
-- [`matrix2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph_catmaid.html#pymaid.igraph_catmaid.matrix2graph): generates iGraph representation from adjacency matrix
-- [`network2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph_catmaid.html#pymaid.igraph_catmaid.network2graph): generates iGraph representation from set of neurons
-- [`neuron2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph_catmaid.html#pymaid.igraph_catmaid.neuron2graph): generates iGraph representation of neuron morphology
+- [`calculate_distance_from_root()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.calculate_distance_from_root): calculates geodesic (along-the-arbor) distances for nodes to root node
+- [`cluster_nodes_w_synapses()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.cluster_nodes_w_synapses): uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
+- [`matrix2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.matrix2graph): generates iGraph representation from adjacency matrix
+- [`network2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.network2graph): generates iGraph representation from set of neurons
+- [`neuron2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.neuron2graph): generates iGraph representation of neuron morphology
 
 ### pymaid.plot:
 - [`plot2d()`](http://pymaid.readthedocs.io/en/latest/source/plot.html#pymaid.plot.plot2d): generates 2D plots of neurons

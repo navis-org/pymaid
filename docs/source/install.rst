@@ -5,7 +5,7 @@ PyMaid requires Python 3.3 or higher. It heavily depends on other
 scientific packages (e.g. `scipy`). If you do not already
 have a Python environment configured on your computer, please see the
 instructions for installing the full `scientific Python stack
-<https://scipy.org/install.html>`_. This will 
+<https://scipy.org/install.html>`_. 
 
 .. note::
    If you are on Windows and want to install optional packages (e.g., `scipy`),
@@ -28,6 +28,15 @@ the current version from github using
 
    pip install git+git://github.com/schlegelp/pymaid@master
 
+See `here <https://pip.pypa.io/en/stable/installing/>`_ how to get PIP.
+
+Depending on your default Python version you may have to specify that you want
+PyMaid to be installed for Python 3:
+
+::
+
+   pip3 install git+git://github.com/schlegelp/pymaid@master
+
 Installing from source
 ----------------------
 
@@ -43,7 +52,7 @@ Requirements
 ------------
 
 PyMaid heavily relies on scientific Python packages to do its job. 
-On Linux and MacOs these packages will be installed automatically
+On Linux and MacOS these packages will be installed automatically
 but on Windows you may have to tinker around to get them to work.
 Your best bet is to use a scientific Python distribution such
 as `Anaconda <https://www.continuum.io/downloads>`_ which has
@@ -65,7 +74,7 @@ Provides advanced dataframes and indexing.
 Vispy
 *****
 Used to visualise neurons in 3D. This requires you to have *one* of 
-the supported `backends<http://vispy.org/installation.html#backend-requirements>`_ 
+the supported `backends <http://vispy.org/installation.html#backend-requirements>`_ 
 installed. During automatic installation PyMaid will try installing the QT5 
 backend to fullfil this requirement.
 

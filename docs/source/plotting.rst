@@ -4,10 +4,10 @@ Plotting
 
 Pymaid contains functions for 2 and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plot` module and represent wrappers for matplotlib (www.matplotlib.org) for 2D, vispy (www.vispy.org) and plotly (http://plot.ly) for 3D.
 
-Quickstart
-==========
+Plotting Neurons
+================
 
-Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`) as well as nblast results (:class:`pymaid.rmaid.nbl_res`) have built-in modules that call :func:`pymaid.plot.plot3d` or :funct:`pymaid.plot.plot2d`.
+Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`) as well as nblast results (:class:`pymaid.rmaid.nbl_results`) have built-in modules that call :func:`pymaid.plot.plot3d` or :func:`pymaid.plot.plot2d`.
 
 >>> from pymaid import core, pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
@@ -29,8 +29,8 @@ By default, calling :func:`pymaid.plot.plot3d` uses the vispy backend and does n
 >>> from plotly import offline as poff
 >>> poff.plot( fig )
 
-Volumes
-=======
+Adding Volumes
+**************
 
 :func:`pymaid.plot.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
 
@@ -54,8 +54,8 @@ You can also pass your own custom volumes as dictionarys:
 ...            ) )
 >>> nl.plot3d( volumes = cust_vol )
 
-Networks
-========
+Plotting Networks
+=================
 
 :func:`pymaid.plot.plot_network` is a wrapper to plot networks using plotly. It's rather slow for large-ish graphs though
 
