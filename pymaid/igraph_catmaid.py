@@ -123,7 +123,7 @@ def matrix2graph( adj_matrix, **kwargs ):
    Parameters
    ----------
    adj_matrix :      Pandas dataframe 
-                     Adjacency matrix - e.g. from pymaid.cluster   
+                     Adjacency matrix - e.g. from :func:`pymaid.cluster.create_adjacency_matrix`   
    syn_threshold :   int, optional     
                      Edges with less connections will be ignored
    syn_cutoff :      int, optional

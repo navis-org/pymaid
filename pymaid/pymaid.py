@@ -792,6 +792,11 @@ def get_partners_in_volume( skids, volume, remote_instance=None , threshold=1, m
     postsynaptic
     (2) the number of connections between two partners is not restricted to the
     volume
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_neurons_in_volume`
+                            Get neurons within given volume
     """
 
     if remote_instance is None:
@@ -889,6 +894,14 @@ def get_partners (skids, remote_instance=None , threshold=1,  min_size=2, filt=[
     >>> #Combine above conditions (watch parentheses!)
     >>> subset3 = cn[ (cn.relation=='upstream') & 
     ... (cn[example_skids].sum(axis=1) > 5) ]
+
+    See Also
+    --------
+    :func:`pymaid.cluster.create_adjacency_matrix`
+                        Use if you need an adjacency matrix instead of a 
+                        table
+    :func:`pymaid.pymaid.get_partners_in_volume`
+                        Use if you only want partners within a given volume
     """
 
     def _constructor_helper(entry,skid):
@@ -1386,7 +1399,13 @@ def get_review ( skids, remote_instance=None ):
     |   skeleton_id neuron_name  total_node_count nodes_reviewed percent_reviewed
     | 0    
     | 1
-    | 2   
+    | 2
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_review_details`
+                        Gives you review status for individual nodes of a 
+                        given neuron   
 
     """
 
@@ -1494,6 +1513,11 @@ def get_neuron_annotation ( skid, remote_instance=None ):
     | 1
     | ..
     | .
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_annotations_from_list`
+                        Gives you annotations for a list of neurons
     
     """
 
@@ -1556,7 +1580,13 @@ def get_annotations_from_list ( skids, remote_instance=None ):
     Returns
     -------
     dict 
-    ``{ skeleton_id : [annnotation, annotation ], ... }``
+    ``{ skeleton_id : [ annnotation, annotation ], ... }``
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_neuron_annotation`
+                        Gives you more detailed information for annotations
+                        of a SINGLE neuron (includes timestamp and user)
     """    
 
     if remote_instance is None:
@@ -2203,7 +2233,7 @@ def get_skeleton_list( remote_instance=None, user=None, node_count=1, start_date
     return skid_list
 
 def get_history ( remote_instance=None, start_date=(datetime.date.today()-datetime.timedelta(days=7)).isoformat(), end_date=datetime.date.today().isoformat(), split=True ):    
-    """ Wrapper to retrieves CATMAID history 
+    """ Wrapper to retrieves CATMAID project history
 
     Notes
     -----
@@ -2434,13 +2464,13 @@ def get_nodes_in_volume( left, right, top, bottom, z1, z2, remote_instance, coor
 
 def get_neurons_in_volume ( volumes, remote_instance=None, intersect=False, min_size=1, only_soma=False ):
     """ Retrieves neurons with processes within CATMAID volumes. This function
-    uses the BOUNDING BOX around the volume as proxy and queries for neurons
-    that enter/exit that bounding box --> will therefore not catch fragments
-    of neurons that reside entirely within the volume! If you need ALL neurons
-    within a given volume, consider using pymaid.get_neurons_in_box()
+    uses the *BOUNDING BOX* around the volume as proxy and queries for neurons
+    that are within that volume.
 
-    Warning ahead: depending on the number of nodes in that volume, this 
-    can take quite a while!
+    Warning  
+    -------
+    Depending on the number of nodes in that volume, this can take quite a 
+    while!
 
     Parameters
     ----------
@@ -2460,6 +2490,12 @@ def get_neurons_in_volume ( volumes, remote_instance=None, intersect=False, min_
     --------
     list                  
     ``[ skeleton_id, skeleton_id, ... ]``
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_partners_in_volume`
+                            Get only partners that make connections within a
+                            given volume
     """  
 
     if remote_instance is None:
@@ -2484,7 +2520,7 @@ def get_neurons_in_volume ( volumes, remote_instance=None, intersect=False, min_
               )
 
         remote_instance.logger.info( 'Retrieving nodes in volume: %s...' % v )
-        temp = get_neurons_in_box ( bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[2][0], bbox[2][1], remote_instance = remote_instance,  )        
+        temp = get_neurons_in_box ( bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[2][0], bbox[2][1], remote_instance = remote_instance )        
 
         if not intersect:
             neurons += temp

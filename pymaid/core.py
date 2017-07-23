@@ -331,7 +331,12 @@ class CatmaidNeuron:
         ----------     
         **kwargs         
                 Will be passed to plot.plot2d() 
-                See help(plot.plot3d) for a list of keywords                        
+                See help(plot.plot3d) for a list of keywords  
+
+        See Also
+        --------
+        :func:`pymaid.plot.plot2d` 
+                    Function called to generate 2d plot
         """
         if 'nodes' not in self.__dict__:
             self.get_skeleton()         
@@ -344,7 +349,12 @@ class CatmaidNeuron:
         ----------      
         **kwargs
                 Will be passed to plot.plot3d() 
-                See help(plot.plot3d) for a list of keywords                        
+                See help(plot.plot3d) for a list of keywords      
+
+        See Also
+        --------
+        :func:`pymaid.plot.plot3d` 
+                    Function called to generate 3d plot                  
         """         
         if 'nodes' not in self.__dict__:
             self.get_skeleton()
@@ -791,7 +801,12 @@ class CatmaidNeuronList:
         ---------
         **kwargs
                 will be passed to plot.plot3d() 
-                see help(plot.plot3d) for a list of keywords                        
+                see help(plot.plot3d) for a list of keywords      
+
+        See Also
+        --------
+        :func:`pymaid.plot.plot3d` 
+                    Function called to generate 3d plot                  
         """
         self.get_skeletons(skip_existing=True)         
         return plot.plot3d( skdata = self, **kwargs )
@@ -803,7 +818,12 @@ class CatmaidNeuronList:
         ---------
         **kwargs        
                 will be passed to plot.plot2d() 
-                see help(plot.plot3d) for a list of keywords                        
+                see help(plot.plot3d) for a list of keywords  
+
+        See Also
+        --------
+        :func:`pymaid.plot.plot2d` 
+                    Function called to generate 2d plot                      
         """         
         self.get_skeletons(skip_existing=True)
         return plot.plot2d( skdata = self, **kwargs )

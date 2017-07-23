@@ -14,9 +14,16 @@ Contents:
    :maxdepth: 2   
    
    source/intro
-   source/rmaid
+   source/plotting
+   source/rmaid_doc
    source/plotting
    source/pymaid
+   source/core
+   source/cluster
+   source/igraph
+   source/morpho
+   source/plot
+   source/user_stats
 
 
 Indices and tables

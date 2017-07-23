@@ -90,7 +90,7 @@ def classify_nodes ( skdata ):
    Returns
    -------
    skdata             
-              Added columns 'type' and 'has_synapse'.
+              Added columns 'type' and 'has_connectors'.
    """
 
    module_logger.debug('Looking for end, branch and root points...')
@@ -116,9 +116,9 @@ def classify_nodes ( skdata ):
      new_column = [ classes[n] for n in skdata.nodes.treenode_id.tolist() ]
      skdata.nodes['type'] = new_column
 
-     nodes_w_synapses = skdata.connectors.treenode_id.tolist()     
-     new_column = [ n in nodes_w_synapses for n in skdata.nodes.treenode_id.tolist() ]
-     skdata.nodes['has_synapses'] = new_column
+     nodes_w_connectors = skdata.connectors.treenode_id.tolist()     
+     new_column = [ n in nodes_w_connectors for n in skdata.nodes.treenode_id.tolist() ]
+     skdata.nodes['has_connectors'] = new_column
    else:
       module_logger.error('Unknown neuron type: %s' % str( type(skdata) ) )
 
