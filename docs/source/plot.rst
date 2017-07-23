@@ -1,5 +1,5 @@
-pymaid.plot module
-------------------
+The plot module
+---------------
 
 .. automodule:: pymaid.plot
     :members:

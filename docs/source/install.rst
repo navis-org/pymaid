@@ -1,0 +1,103 @@
+Install
+=======
+
+PyMaid requires Python 3.3 or higher. It heavily depends on other
+scientific packages (e.g. `scipy`). If you do not already
+have a Python environment configured on your computer, please see the
+instructions for installing the full `scientific Python stack
+<https://scipy.org/install.html>`_. This will 
+
+.. note::
+   If you are on Windows and want to install optional packages (e.g., `scipy`),
+   then you will need to install a Python distribution such as
+   `Anaconda <https://www.continuum.io/downloads>`_,
+   `Enthought Canopy <https://www.enthought.com/products/canopy/>`_,
+   `Python(x,y) <http://python-xy.github.io/>`_,
+   `WinPython <https://winpython.github.io/>`_, or
+   `Pyzo <http://www.pyzo.org/>`_.
+   If you use one of these Python distribution, please refer to their online
+   documentation.
+
+Quick install
+-------------
+
+PyMaid is *not yet* listed in the Python Packaging Index but you can install
+the current version from github using
+
+::
+
+   pip install git+git://github.com/schlegelp/pymaid@master
+
+Installing from source
+----------------------
+
+1. Download the source (tar.gz file) from
+ https://github.com/schlegelp/PyMaid/tree/master/dist
+
+2. Unpack and change directory to the source directory
+ (it should have the files README.txt and setup.py).
+
+3. Run :samp:`python setup.py install` to build and install
+
+Requirements 
+------------
+
+PyMaid heavily relies on scientific Python packages to do its job. 
+On Linux and MacOs these packages will be installed automatically
+but on Windows you may have to tinker around to get them to work.
+Your best bet is to use a scientific Python distribution such
+as `Anaconda <https://www.continuum.io/downloads>`_ which has
+most of these preinstalled. 
+
+
+NumPy
+*****
+Provides matrix representation of graphs and is used in some graph algorithms for high-performance matrix computations.
+
+  - Download: http://scipy.org/Download
+
+Pandas
+******
+Provides advanced dataframes and indexing.
+
+	- Download: http://pandas.pydata.org/getpandas.html
+
+Vispy
+*****
+Used to visualise neurons in 3D. This requires you to have *one* of 
+the supported `backends<http://vispy.org/installation.html#backend-requirements>`_ 
+installed. During automatic installation PyMaid will try installing the QT5 
+backend to fullfil this requirement.
+
+  - Download: http://vispy.org/installation.html
+
+Plotly
+******
+Used to visualise neurons in 2D. Alternative to Vispy based on WebGL.
+
+  - Download: https://plot.ly/python/getting-started/
+
+iGraph
+******
+Provides fast analysis of graphs (networks and neurons)
+
+  - Download: http://igraph.org/python/#downloads
+
+SciPy
+*****
+Provides sparse matrix representation of graphs and many numerical scientific tools.
+
+  - Download: http://scipy.org/Download
+
+Matplotlib
+**********
+Provides flexible drawing of graphs.
+
+  - Download: http://matplotlib.sourceforge.net/
+
+Rpy2
+****
+Provides interface with R. This allows you to use e.g. R packages from https://github.com/jefferis and https://github.com/alexanderbates 
+
+  - Download: https://rpy2.readthedocs.io/en/version_2.8.x/overview.html#installation
+

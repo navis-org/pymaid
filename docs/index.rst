@@ -1,20 +1,14 @@
-.. pymaid documentation master file, created by
-   sphinx-quickstart on Sun Jul  9 22:17:00 2017.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+PyMaid documentation
+====================
 
-Welcome to pymaid's documentation!
-==================================
-
-If you are new to PyMaid, check out :doc:`source/intro`
-
-Contents:
+:Release: |version|
+:Date: |today|
 
 .. toctree::
    :maxdepth: 2   
    
-   source/intro
-   source/plotting
+   source/install
+   source/intro   
    source/rmaid_doc
    source/plotting
    source/pymaid
@@ -24,6 +18,7 @@ Contents:
    source/morpho
    source/plot
    source/user_stats
+   source/rmaid
 
 
 Indices and tables

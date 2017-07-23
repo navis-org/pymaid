@@ -1,5 +1,5 @@
-pymaid.cluster module
----------------------
+The cluster module
+------------------
 
 .. automodule:: pymaid.cluster
     :members:

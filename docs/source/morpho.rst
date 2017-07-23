@@ -1,5 +1,5 @@
-pymaid.morpho module
---------------------
+The morpho module
+-----------------
 
 .. automodule:: pymaid.morpho
     :members:

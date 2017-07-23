@@ -1,5 +1,5 @@
-pymaid.pymaid module
---------------------
+The pymaid module
+-----------------
 
 .. automodule:: pymaid.pymaid
     :members:

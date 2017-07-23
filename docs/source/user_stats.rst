@@ -1,5 +1,5 @@
-pymaid.user_stats module
-------------------------
+user_stats module
+-----------------
 
 .. automodule:: pymaid.user_stats
     :members:

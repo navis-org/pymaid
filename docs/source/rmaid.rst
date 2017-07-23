@@ -1,5 +1,5 @@
-pymaid.rmaid module
--------------------
+The rmaid module
+----------------
 
 .. automodule:: pymaid.rmaid
     :members:

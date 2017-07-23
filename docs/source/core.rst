@@ -1,5 +1,5 @@
-pymaid.core module
-------------------
+The core module
+---------------
 
 .. automodule:: pymaid.core
     :members:

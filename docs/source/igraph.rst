@@ -1,5 +1,5 @@
-pymaid.igraph_catmaid module
-----------------------------
+The igraph_catmaid module
+-------------------------
 
 .. automodule:: pymaid.igraph_catmaid
     :members:
