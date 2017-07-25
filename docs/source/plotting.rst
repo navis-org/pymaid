@@ -1,7 +1,7 @@
 Plotting
 ********
 
-Pymaid contains functions for 2 and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plot` module and represent wrappers for matplotlib (www.matplotlib.org) for 2D, vispy (www.vispy.org) and plotly (http://plot.ly) for 3D.
+Pymaid contains functions for 2 and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plot` module and represent wrappers for `matplotlib <http://www.matplotlib.org>`_ for 2D, `vispy <http://www.vispy.org>`_ and `plotly <http://plot.ly>`_ for 3D.
 
 Plotting Neurons
 ================

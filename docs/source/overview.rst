@@ -77,7 +77,7 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 
 - :func:`pymaid.plot.plot2d`: generates 2D plots of neurons
 - :func:`pymaid.plot.plot3d`: uses either `Vispy <http://vispy.org>`_ or `Plotly <http://plot.ly>`_ to generate 3D plots of neurons
-- :func:`pymaid.plot.plot_network`: uses iGraph and [Plotly](http://plot.ly) to generate network plots
+- :func:`pymaid.plot.plot_network`: uses iGraph and `Plotly <http://plot.ly>`_ to generate network plots
 
 :mod:`pymaid.cluster`:
 ----------------------
@@ -100,7 +100,7 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.morpho.reroot_neuron`: reroot neuron to a specific node
 - :func:`pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.calculate_distance_from_root` but does not use iGraph
 
-:mod:pymaid.rmaid:
+:mod:`pymaid.rmaid`:
 ------------------
 
 - :func:`pymaid.rmaid.init_rcatmaid`: initialize connection with Catmaid server in R
@@ -109,7 +109,7 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.rmaid.neuron2py`: converts R neuron and neuronlist objects to Pymaid neurons
 - :func:`pymaid.rmaid.neuron2r`: converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
 
-:mod:pymaid.user_stats:
+:mod:`pymaid.user_stats`:
 -----------------------
 
 - :func:`pymaid.user_stats.get_time_invested`: calculate the time users have spent working on a set of neurons
