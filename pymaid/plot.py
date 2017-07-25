@@ -27,8 +27,11 @@ import plotly.plotly as py
 import plotly.offline as pyoff
 import plotly.graph_objs as go
 
+import vispy
 from vispy import scene
 from vispy.geometry import create_sphere
+
+vispy.use(app='PyQt5')
 
 import pandas as pd
 import numpy as np
@@ -82,8 +85,8 @@ def plot2d( *args, **kwargs ):
    >>> 3. #Plots brain in red, and mushroom body in green:
    >>> plot.plot2d(  skids = [ 12346 ], 
    ...               remote_instance = rm, 
-   ...               'brain' = (1,0,0), 
-   ...               'MB' =  (0,1,0) )      
+   ...               brain = (.8,.8,.8), 
+   ...               MB = (.3,1,.3) )      
    >>> 4. #Plots brain and mushroom body in grey
    >>> plot.plot2d(   skids = [ 12346 ], 
    ...               remote_instance = rm,
@@ -268,7 +271,7 @@ def plot2d( *args, **kwargs ):
                   #'y': [510000, 150000]
                   'x': [200000, 1000000],
                   'y': [ 730000, -70000]
-               } 
+               }
    
    ax.set_ylim( ( -catmaid_limits['y'][0], -catmaid_limits['y'][1] ) )
    ax.set_xlim( ( catmaid_limits['x'][0], catmaid_limits['x'][1] ) )
@@ -290,33 +293,16 @@ def plot2d( *args, **kwargs ):
       if 'type' not in neuron.nodes:         
          neuron = morpho.classify_nodes( neuron )
 
-      b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
-      end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
-      soma = neuron.nodes[ neuron.nodes.radius > 1 ]      
-
-      if neuron.nodes.index.name != 'treenode_id':
-         neuron.nodes.set_index('treenode_id', inplace = True )   
+      soma = neuron.nodes[ neuron.nodes.radius > 1 ]
 
       if not connectors_only:
-         module_logger.debug('Finding slabs... (%i branch points)' % len(b_points) )
-         for k, node in enumerate(b_points + end_points):               
-            if neuron.nodes.ix[node].parent_id == None:
-               continue
-                      
-            this_line = [ node ]
-            while True: #neuron.nodes.ix[ this_line[-1] ].parent_id not in b_points
-               this_line.append( neuron.nodes.ix[ this_line[-1] ].parent_id )               
+         #Now make traces   
+         try:
+            neuron.slabs
+         except:                        
+            neuron.slabs = morpho._generate_slabs( neuron )
 
-               if neuron.nodes.ix[ this_line[-1] ].parent_id is None:
-                  module_logger.debug('Ended slab %i at root after %i nodes' % ( k , len(this_line) ) )
-                  break
-
-               if neuron.nodes.ix[ this_line[-1] ].parent_id in b_points:
-                  module_logger.debug('Ended slab %i at branch point after %i nodes' % ( k , len(this_line) ) )
-                  this_line.append( neuron.nodes.ix[ this_line[-1] ].parent_id ) 
-                  break
-
-            lines.append( neuron.nodes.ix[ this_line ][ ['x','y','z'] ].as_matrix().tolist() )                    
+         lines = _slabs_to_coords( neuron, neuron.slabs, invert = False )         
          
          module_logger.debug('Creating %i lines' % len(lines) )
          module_logger.debug( [ len(l) for l in lines ]  )
@@ -346,6 +332,34 @@ def plot2d( *args, **kwargs ):
    module_logger.info('Done. Use matplotlib.pyplot.show() to show plot.')   
 
    return fig, ax
+
+def _slabs_to_coords( x, slabs, invert = False ):
+   """Turns lists of treenode_ids into coordinates
+
+   Parameters
+   ----------
+   x :         {pandas DataFrame, CatmaidNeuron}
+               Must contain the nodes
+   slabs :     list of treeenode IDs
+   invert :    boolean, optional
+               If True, coordinates will be inverted               
+   
+   Returns
+   -------
+   coords :    list of tuples 
+               [ (x,y,z), (x,y,z ) ]
+   """
+
+   coords = []
+   nodes = x.nodes.set_index('treenode_id')
+
+   for l in slabs:
+      if not invert:
+         coords.append( nodes.ix[ l ][[ 'x','y','z' ]].as_matrix().tolist() )
+      else:
+         coords.append( (nodes.ix[ l ][[ 'x','y','z' ]] * -1).as_matrix().tolist() )
+
+   return coords
 
 def _random_colors (color_count, color_space='RGB', color_range = 1):
    """ Divides colorspace into N evenly distributed colors
@@ -535,7 +549,7 @@ def plot3d( *args, **kwargs ):
             parent_coords = np.delete( parent_coords, root_ix, axis = 0)
 
             #Turn coordinates into segments
-            segments = [ item for sublist in zip(tn_coords,parent_coords) for item in sublist ]                         
+            segments = [ item for sublist in zip(tn_coords,parent_coords) for item in sublist ]
 
             #Create line plot from segments. Note that we divide coords by a scale factor
             t = scene.visuals.Line(  pos = np.array(segments) * scale_factor,                            
@@ -713,60 +727,41 @@ def plot3d( *args, **kwargs ):
            if 'type' not in neuron.nodes:
               neuron = morpho.classify_nodes( neuron )              
 
-           b_points = neuron.nodes[ neuron.nodes.type == 'branch' ].treenode_id.tolist()
-           end_points = neuron.nodes[ neuron.nodes.type == 'end' ].treenode_id.tolist()
-           root = neuron.nodes[ neuron.nodes.type == 'root' ].treenode_id.tolist()
            soma = neuron.nodes[ neuron.nodes.radius > 1 ]
 
-           #Set dataframe indices to treenode IDs - will facilitate distributing nodes
-           if neuron.nodes.index.name != 'treenode_id':      
-              neuron.nodes.set_index('treenode_id', inplace = True)      
-
-           module_logger.debug('Generating slabs for %i branch/end nodes' % len( b_points + end_points ) )
-
-           slabs = []     
-           #Now walk from each branch and leaf node to the next
-           for n in b_points + end_points:
-              this_slab = [ n, neuron.nodes.ix[ n ].parent_id ]        
-              while this_slab[-1] not in b_points+end_points+root:
-                 try:     
-                    this_slab += [ neuron.nodes.ix[ this_slab[-1] ].parent_id ]
-                 except:              
-                    break #will fail if root node (cause no parent)
-
-              try:
-                 this_slab.remove(None)
-              except:
-                 pass
-
-              slabs.append( this_slab )                
-
            module_logger.debug('Generating traces...')
+
            #Now make traces   
-           x_coords = []
-           y_coords = []   
-           z_coords = []
-           c = []
-           for k,s in enumerate(slabs):
-               if by_strahler:                  
-                  this_c = 'rgba(%i,%i,%i,%f)' % (   colormap[str( skid )][0],
+           try:
+              neuron.slabs 
+           except:
+              neuron.slabs = morpho._generate_slabs( neuron )
+
+           coords = _slabs_to_coords( neuron, neuron.slabs, invert = True )
+
+           #We have to add (None,None,None) to the end of each slab to make that line discontinuous there
+           coords = [ t + [ [None] * 3 ] for t in coords ]          
+
+           x_coords = [ co[0] for l in coords for co in l ]
+           y_coords = [ co[1] for l in coords for co in l ]
+           z_coords = [ co[2] for l in coords for co in l ]
+           c = []                      
+           
+           if by_strahler: 
+               for k,s in enumerate(slabs):                 
+                  this_c = 'rgba(%i,%i,%i,%f)' % ( colormap[str( skid )][0],
                                                colormap[str( skid )][1],
                                                colormap[str( skid )][2], 
                                                s_index[ s[0] ] / max( s_index.values() 
                                             ) ) 
                   #Slabs are separated by a <None> coordinate -> this is why we need one more color entry
                   c += [ this_c ] * ( len( s ) + 1 )
-
-               x_coords += (-neuron.nodes.ix[ s ].x).tolist() + [None]
-               y_coords += (-neuron.nodes.ix[ s ].y).tolist() + [None]
-               z_coords += (-neuron.nodes.ix[ s ].z).tolist() + [None] 
-
-           if not by_strahler:
+           else:
                try:
                   c = 'rgb%s' % str( colormap[ str( skid ) ] ) 
                except:
                   c = 'rgb(10,10,10)'
-
+           
            trace_data.append( go.Scatter3d(    x = x_coords,
                                                y = z_coords, #y and z are switched
                                                z = y_coords,

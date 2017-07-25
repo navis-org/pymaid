@@ -4,6 +4,11 @@ This section will teach you the basics of how to use R in Python.
 
 On a fundamental level, you can use every single R function from within Python. The trick is to manually convert data types when the R interface ``rpy2`` does not. See https://rpy2.readthedocs.io for an introduction to ``rpy2``.
 
+.. note::
+   The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
+   As `rpy2` installation fails if no R is installed, it is not a default 
+   dependency and has to be installed manually *after* R has been set up.
+
 Quickstart
 ==========
 >>> from pymaid import pymaid

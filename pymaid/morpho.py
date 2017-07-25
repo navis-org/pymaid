@@ -124,6 +124,66 @@ def classify_nodes ( skdata ):
 
    return skdata
 
+def _generate_slabs ( x, append=True ):
+   """ Generate slabs of a given neuron.
+
+   Parameters
+   ----------
+   x :         {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+               May contain multiple neurons
+   append :    bool, optional 
+               If true slabs will be appended to neuron
+
+   Returns
+   -------
+   slabs :     list of lists containing treenode ids 
+   """
+
+   if isinstance( x, pd.DataFrame) or isinstance( x, core.CatmaidNeuronList):
+      return [ _generate_slabs( x.ix[i], append = append) for i in range(x.shape[0]) ]   
+   elif isinstance( x, pd.Series): 
+      if x.igraph == None:         
+         x.igraph = igraph_catmaid.neuron2graph(x)
+   elif isinstance( x, core.CatmaidNeuron):
+      pass           
+   else:
+      module_logger.error('Unexpected datatype: %s' % str( type( skdata )))
+      raise ValueError
+
+   #Make a copy of the graph -> we will delete edges later on
+   g = x.igraph.copy() 
+
+   if 'type' not in x.nodes:
+      x = classify_nodes( x )
+
+   branch_points = x.nodes[ x.nodes.type == 'branch' ].treenode_id.tolist()
+   root_node = x.nodes[ x.nodes.type == 'root' ].treenode_id.tolist()   
+
+   #Now remove edges which have a branch point or the root node as target
+   node_indices = [ i for i in range(len(g.vs)) if g.vs[i]['node_id'] in branch_points + root_node ]
+   edges_to_delete = [ i for i in range( len(g.es) ) if g.es[i].target in node_indices ]
+   g.delete_edges( edges_to_delete )
+
+   #Now chop graph into disconnected components
+   components = [ g.subgraph(sg) for sg in g.components( mode='WEAK' ) ]
+
+   #Problem here: components appear ordered by treenode_id. We have to generate subgraphs, sort them   
+   #and turn vertex IDs into treenode ids. Attention: order changed when we created the subgraphs!
+   slabs = [ [ sg.vs[i]['node_id'] for i in sg.topological_sorting() ] for sg in components ]   
+
+   #Delete root node slab -> otherwise this will be its own slab
+   slabs = [ l for l in slabs if l != root_node ]
+
+   #Now add the parent to the last node of each slab (which should be a branch point or the node)
+   list_of_parents = { n.treenode_id : n.parent_id for n in x.nodes.itertuples() }
+   for s in slabs:
+      s.append( list_of_parents[s[-1]] )
+
+   if append:
+      x.slabs = slabs
+
+   return slabs
+
 def downsample_neuron ( skdata, resampling_factor, inplace=False):
    """ Downsamples neuron(s) by a given factor. Preserves root, leafs, 
    branchpoints and synapse nodes

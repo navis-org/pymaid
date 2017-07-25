@@ -1,13 +1,13 @@
 pymaid
-==================
+======
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
+Tested with CATMAID latest release version 2017.05.17 - if you are working with older versions you may experience incompatibilities due to 
+API changes.
 
 ## Documentation
-PyMaid is now on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
+PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 ## Contents
-Pymaid has been tested with CATMAID latest release version 2017.04.20 - if you are working with older versions, you may experience incompatibilities.
-
 `pymaid.core` contains definition for CatmaidNeuron and CatmaidNeuronList classes.
 
 `pymaid.pymaid` is the low-level library to connect to CATMAID servers and fetch data. 
@@ -20,9 +20,9 @@ Pymaid has been tested with CATMAID latest release version 2017.04.20 - if you a
 
 `pymaid.cluster` contains wrappers to cluster neurons
 
-`pymaid.rmaid` provides an interface with R libraries ([nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) ) using [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/)
-
 `pymaid.user_stats` contains functions for user stats and contributions
+
+`pymaid.rmaid` provides an interface with R libraries ([nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) ) using [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/). *Attention*: rpy2 is not installed as dependency as it requires R to be installed. In order to use this module you must setup R and install rpy2 manually.
 
 ## Installation
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
@@ -31,6 +31,10 @@ First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in term
 `pip install git+git://github.com/schlegelp/pymaid@master`  
 
 This command should also work to update the package.
+
+If your default distribution is Python 2, you have to explicitly tell [PIP](https://pip.pypa.io/en/stable/installing/) to install for Python 3:
+
+`pip3 install git+git://github.com/schlegelp/pymaid@master`  
 
 **Attention**: on Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install automatically. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)).
 
@@ -42,11 +46,11 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 - [SciPy](http://www.scipy.org)
 - [Numpy](http://www.scipy.org) 
 - [Matplotlib](http://www.matplotlib.org)
-- [vispy](http://vispy.org/) 
-- [Plotly](http://plot.ly)
-- [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/)
+- [vispy](http://vispy.org/) - this also requires one of the supported backend. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
+- [Plotly](http://plot.ly) 
+- [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - *Attention*: rpy2 is not automatically installed as dependency as it requires R to be installed. In order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
 
-## Basic examples:
+## Quickstart:
 
 ### Retrieve 3D skeleton data
 ```python
@@ -118,105 +122,6 @@ print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for
 
 ## Additional examples:
 Check out [/examples/](https://github.com/schlegelp/PyMaid/tree/master/examples) for a growing list of Jupyter notebooks.
-
-## Modules:
-
-Also check out PyMaid on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
-
-### pymaid.core:
-
-Contains definitions for neuron and neuronlist classes.
-
-#### [class `CatmaidNeuron`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.core.CatmaidNeuronList): 
-Representation of a **single** Catmaid neuron. Can be minimally initialized with just a skeleton ID. Data (e.g. nodes, connectors, name, review status, annotation) 
-are retrieved/calculated on-demand the first time they are **explicitly** requested:
-
-Primary attributes:
-
-- `skeleton_id`: neuron's skeleton ID	
-- `neuron_name`: neuron's name
-- `nodes`: pandas DataFrame of treenode table
-- `connectors`: pandas DataFrame of connector table
-- `tags`: node tags
-- `annotations`: list of neuron(s) annotations
-- `cable_length`: cable length(s) in nm
-- `review_status`: review status of neuron(s)
-
-#### [class `CatmaidNeuronList`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.core.CatmaidNeuronList):
-Representation of a **list** of Catmaid neurons. Can be minimally initialized with just a skeleton ID.
-Has the same attributes as `CatmaidNeuron` objects. Additionally it allows indexing similar to 
-pandas DataFrames (see examples).
-
-### pymaid.pymaid:
-Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
-Use e.g. `help(get_edges)` to learn more about their function, parameters and usage.
-
-- [`add_annotations()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.add_annotations): use to add annotation(s) to neuron(s)
-- [`edit_tags()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.edit_tags): edit (add/remove) tags of treenodes or connectors
-- [`get_3D_skeleton()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_3D_skeleton): get neurons' skeleton(s) - i.e. what the 3D viewer in CATMAID shows
-- [`get_arbor()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_arbor): similar to get_3D_skeleton but more detailed information on connectors
-- [`get_annotations_from_list()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_annotations_from_list): get annotations of a set of neurons (annotation only)
-- [`get_connectors()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_connectors): get connectors (synapses, abutting and/or gap junctions) for set of neurons
-- [`get_connector_details()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_connector_details): get details for connector (i.e. all neurons connected to it)
-- [`get_contributor_statistics()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_contributor_statistics): get contributors (nodes, synapses, etc) for a set of neurons
-- [`get_edges()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_edges): get edges (connections) between sets of neurons
-- [`get_history()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_history): retrieve project history similar to the project statistics widget
-- [`get_logs()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_logs): get what the log widged shows (merges, splits, etc.)
-- [`get_names()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_names): retrieve names of a set of skeleton IDs
-- [`get_neuron_annotation()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_neuron_annotation): get annotations of a **single** neuron (includes user and timestamp)
-- [`get_neurons_in_volume()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_neurons_in_volume): get neurons in a defined box volume
-- [`get_node_lists()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_node_lists): retrieve list of nodes within given volume
-- [`get_node_user_details()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_node_user_details): get details (creator, edition time, etc.) for individual nodes
-- [`get_partners()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_partners): retrieve connected partners for a list of neurons
-- [`get_partners_in_volume()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_partners_in_volume): retrieve connected partners for a list of neurons within a given Catmaid volume
-- [`get_review()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_review): get review status for set of neurons
-- [`get_review_details()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_review_details): get review status (reviewer + timestamp) for each individual node
-- [`get_skids_by_annotation()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.calc_caget_skids_by_annotationble): get skeleton IDs that are annotated with a given annotation
-- [`get_skids_by_name()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_skids_by_name): get skeleton IDs of neurons with given names
-- [`get_skeleton_list()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_skeleton_list): retrieve neurons that fit certain criteria (e.g. user, size, dates)
-- [`get_user_list()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_user_list): get list of users in the project
-- [`get_volume()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.get_volume): get volume (verts + faces) of CATMAID volumes
-- [`skid_exists()`](http://pymaid.readthedocs.io/en/latest/source/pymaid.html#pymaid.pymaid.skid_exists): checks if a skeleton ID exists
-
-### pymaid.igraph_catmaid:
-- [`calculate_distance_from_root()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.calculate_distance_from_root): calculates geodesic (along-the-arbor) distances for nodes to root node
-- [`cluster_nodes_w_synapses()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.cluster_nodes_w_synapses): uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
-- [`matrix2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.matrix2graph): generates iGraph representation from adjacency matrix
-- [`network2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.network2graph): generates iGraph representation from set of neurons
-- [`neuron2graph()`](http://pymaid.readthedocs.io/en/latest/source/igraph.html#pymaid.igraph_catmaid.neuron2graph): generates iGraph representation of neuron morphology
-
-### pymaid.plot:
-- [`plot2d()`](http://pymaid.readthedocs.io/en/latest/source/plot.html#pymaid.plot.plot2d): generates 2D plots of neurons
-- [`plot3d()`](http://pymaid.readthedocs.io/en/latest/source/plot.html#pymaid.plot.plot3d): uses either [Vispy](http://vispy.org) or [Plotly](http://plot.ly) to generate 3D plots of neurons
-- [`plot_network()`](http://pymaid.readthedocs.io/en/latest/source/plot.html#pymaid.plot.plot_network): uses iGraph and [Plotly](http://plot.ly) to generate network plots
-
-### pymaid.cluster:
-- [`create_adjacency_matrix()`](http://pymaid.readthedocs.io/en/latest/source/cluster.html#pymaid.cluster.create_adjacency_matrix): create a Pandas dataframe containing the adjacency matrix for two sets of neurons
-- [`create_connectivity_distance_matrix()`](http://pymaid.readthedocs.io/en/latest/source/cluster.html#pymaid.cluster.create_connectivity_distance_matrix): returns distance matrix based on connectivity similarity (Jarrell et al., 2012)
-- [`group_matrix()`](http://pymaid.readthedocs.io/en/latest/source/cluster.html#pymaid.cluster.group_matrix): groups matrix by columns or rows - use to e.g. collapse connectivity matrix into groups of neurons
-- [`synapse_distance_matrix()`](http://pymaid.readthedocs.io/en/latest/source/cluster.html#pymaid.cluster.synapse_distance_matrix): cluster synapses based on eucledian distance
-
-### pymaid.morpho:
-- [`calc_cable()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.calc_cable): calculate cable length of given neuron
-- [`calc_strahler_index()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.calc_strahler_index): calculate strahler index for each node
-- [`classify_nodes()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.classify_nodes): adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
-- [`cut_neuron()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.cut_neuron): cut neuron at a node or node tag
-- [`downsample_neuron()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.downsample_neuron): takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
-- [`in_volume()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.in_volume): test if points are within given CATMAID volume
-- [`longest_neurite()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.longest_neurite): prunes neuron to its longest neurite
-- [`reroot_neuron()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.reroot_neuron): reroot neuron to a specific node
-- [`synapse_root_distances()`](http://pymaid.readthedocs.io/en/latest/source/morpho.html#pymaid.morpho.synapse_root_distances): similar to `pymaid.igraph_catmaid.calculate_distance_from_root()` but does not use iGraph
-
-### pymaid.rmaid:
-- [`init_rcatmaid()`](http://pymaid.readthedocs.io/en/latest/source/rmaid.html#pymaid.rmaid.init_rcatmaid): initialize connection with Catmaid server in R
-- [`data2py()`](http://pymaid.readthedocs.io/en/latest/source/rmaid.html#pymaid.rmaid.data2py): wrapper to convert R data to Python 
-- [`nblast()`](http://pymaid.readthedocs.io/en/latest/source/rmaid.html#pymaid.rmaid.nblast): wrapper to use Nat's NBLAST on Pymaid neurons
-- [`neuron2py()`](http://pymaid.readthedocs.io/en/latest/source/rmaid.html#pymaid.rmaid.neuron2py): converts R neuron and neuronlist objects to Pymaid neurons
-- [`neuron2r()`](http://pymaid.readthedocs.io/en/latest/source/rmaid.html#pymaid.rmaid.neuron2r): converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
-
-### pymaid.user_stats:
-- [`get_time_invested()`](http://pymaid.readthedocs.io/en/latest/source/user_stats.html#pymaid.user_stats.get_time_invested): calculate the time users have spent working on a set of neurons
-- [`get_user_contributions()`](http://pymaid.readthedocs.io/en/latest/source/user_stats.html#pymaid.user_stats.get_user_contributions): returns contributions per user for a set of neurons
 
 ## License:
 This code is under GNU GPL V3

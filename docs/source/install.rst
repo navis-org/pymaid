@@ -37,6 +37,11 @@ PyMaid to be installed for Python 3:
 
    pip3 install git+git://github.com/schlegelp/pymaid@master
 
+.. note::
+   The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
+   As `rpy2` installation fails if no R is installed, it is not a default 
+   dependency and has to be installed manually *after* R has been set up.
+
 Installing from source
 ----------------------
 
@@ -106,7 +111,7 @@ Provides flexible drawing of graphs.
 
 Rpy2
 ****
-Provides interface with R. This allows you to use e.g. R packages from https://github.com/jefferis and https://github.com/alexanderbates 
+Provides interface with R. This allows you to use e.g. R packages from https://github.com/jefferis and https://github.com/alexanderbates. Note that this package is not installed automatically as it would fail if R is not already installed on the system. You have to install Rpy2 manually!
 
   - Download: https://rpy2.readthedocs.io/en/version_2.8.x/overview.html#installation
 

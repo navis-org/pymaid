@@ -62,23 +62,6 @@ from colorsys import hsv_to_rgb
 
 from pymaid import core, pymaid, plot
 
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
-
-cl = robjects.r('class')
-names = robjects.r('names')
-
-try:
-    nat = importr('nat')
-    r_nblast = importr('nat.nblast')
-    nat_templatebrains = importr('nat.templatebrains')
-    nat_flybrains = importr('nat.flybrains')
-    flycircuit = importr('flycircuit') #even if not used, these packages are important!
-    elmr = importr('elmr') #even if not used, these packages are important!
-except:
-    module_logger.error('R library "nat" not found!')    
-
 #Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
@@ -91,6 +74,25 @@ if not module_logger.handlers:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
+try:
+    import rpy2.robjects as robjects
+    from rpy2.robjects.packages import importr
+    from rpy2.robjects import pandas2ri
+
+    cl = robjects.r('class')
+    names = robjects.r('names')
+except:
+    module_logger.error('Package rpy2 not found. Please install!')
+
+try:
+    nat = importr('nat')
+    r_nblast = importr('nat.nblast')
+    nat_templatebrains = importr('nat.templatebrains')
+    nat_flybrains = importr('nat.flybrains')
+    flycircuit = importr('flycircuit') #even if not used, these packages are important!
+    elmr = importr('elmr') #even if not used, these packages are important!
+except:
+    module_logger.error('R library "nat" not found! Please install from within R.')    
 
 def init_rcatmaid ( **kwargs ):
     """ This function initializes the R catmaid package from Jefferis 

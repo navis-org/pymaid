@@ -44,12 +44,10 @@ setup(
         "numpy>=1.12.1",
         "matplotlib>=2.0.0",
         "plotly>=2.0.6",
-        "pandas>=0.18.1",
-        "rpy2>=2.8.5",
+        "pandas>=0.18.1",        
         "vispy>=0.4.0",
         "tqdm>=4.14.0",
-        "pyqt5",
-        "pyglet"
-
+        "pyqt5"
+        #"rpy2>=2.8.5", #This throws an error when no R is installed on the system 
     ],
 )

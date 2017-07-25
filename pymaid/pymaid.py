@@ -2181,7 +2181,7 @@ def get_contributor_statistics ( skids, remote_instance=None, separate=False ):
                             )
     return df
 
-def get_skeleton_list( remote_instance=None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by=None ):
+def get_neuron_list( remote_instance=None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by=None ):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters 
     (see variables). If no parameters are provided, all existing skeletons are 
     returned!

@@ -1,4 +1,3 @@
-
 Plotting
 ********
 
@@ -9,13 +8,40 @@ Plotting Neurons
 
 Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`) as well as nblast results (:class:`pymaid.rmaid.nbl_results`) have built-in modules that call :func:`pymaid.plot.plot3d` or :func:`pymaid.plot.plot2d`.
 
+2D Plotting:
+------------
+
+>>> from pymaid import core, pymaid
+>>> import matplib.pyplot as plt
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
+...                              'HTTP_USER' , 
+...                              'HTTP_PASSWORD', 
+...                              'TOKEN' )
+>>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
+>>> #Plot using standard parameters
+>>> fig, ax = nl.plot2d()
+2017-07-25 14:56:08,701 - pymaid.plot - INFO - Done. Use matplotlib.pyplot.show() to show plot.
+>>> plt.show()
+
+Adding volumes:
++++++++++++++++
+
+:func:`pymaid.plot.plot2d` has some built-in outlines for the **adult Drosophila** brain project: ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
+
+>>> fig, ax = nl.plot2d( brain = (.8,.8,.8), 
+...                      MB = (.3,.9,.3) )
+>>> plt.show()
+
+3D Plotting:
+------------
+
 >>> from pymaid import core, pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
->>> # Plot using standard parameters
+>>> #Plot using standard parameters
 >>> nl.plot3d()
 
 By default, calling :func:`pymaid.plot.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
@@ -29,8 +55,14 @@ By default, calling :func:`pymaid.plot.plot3d` uses the vispy backend and does n
 >>> from plotly import offline as poff
 >>> poff.plot( fig )
 
-Adding Volumes
-**************
+.. note::
+   Vispy itself uses either one of these backends: 
+   Qt, GLFW,SDL2, Wx, or Pyglet. By default, pymaid
+   installs and sets PyQt5 as vispy's backend. If
+   you need to change that use e.g. ``vispy.use(app='PyQt4')``
+
+Adding volumes:
++++++++++++++++
 
 :func:`pymaid.plot.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
 

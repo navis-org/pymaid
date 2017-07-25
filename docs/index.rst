@@ -9,6 +9,7 @@ PyMaid documentation
    
    source/install
    source/intro   
+   source/overview
    source/rmaid_doc
    source/plotting
    source/pymaid

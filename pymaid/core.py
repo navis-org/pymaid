@@ -85,6 +85,7 @@ class CatmaidNeuron:
                         Number of end nodes
     cable_length :      float
                         Cable length in micrometers [um]    
+    slabs :             list of treenode IDs
 
     Examples
     --------    
@@ -217,6 +218,9 @@ class CatmaidNeuron:
         elif key == 'connectors':
             self.get_skeleton()
             return self.connectors
+        elif key == 'slabs':
+            self.get_slabs()
+            return self.slabs
         elif key == 'df':
             self.get_skeleton()
             return self.df
@@ -289,10 +293,18 @@ class CatmaidNeuron:
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
         self.tags = skeleton.tags
-        self.neuron_name = skeleton.neuron_name        
-        self.get_igraph()
-
+        self.neuron_name = skeleton.neuron_name
         self.date_retrieved = datetime.datetime.now().isoformat()
+
+        #Delete outdated attributes
+        try:
+            delattr(self,"igraph")
+        except:
+            pass                
+        try:
+            delattr(self,"slabs")
+        except:
+            pass
         return
 
     def get_igraph( self ):
@@ -302,6 +314,11 @@ class CatmaidNeuron:
         self.igraph = igraph_catmaid.neuron2graph( self.df )
         igraph_catmaid.module_logger.setLevel(level)
         return self.igraph
+
+    def get_slabs( self ):
+        """Generate slabs from neuron"""        
+        self.slabs = morpho._generate_slabs( self.df )
+        return self.slabs
 
     def get_review(self, remote_instance=None ):
         """Get review status for neuron"""
@@ -380,7 +397,16 @@ class CatmaidNeuron:
                     Factor by which to downsample the neurons. Default = 5
         """
         morpho.downsample_neuron ( self, factor, inplace=True)
-        self.get_igraph()
+
+        #Delete outdated attributes
+        try:
+            delattr(self,"igraph")
+        except:
+            pass                
+        try:
+            delattr(self,"slabs")
+        except:
+            pass
 
     def reroot(self, new_root):        
         """Downsample the neuron by given factor 
@@ -495,7 +521,7 @@ class CatmaidNeuronList:
     neuron_name :       list of str
                         Neurons' names
     nodes :             list of pandas DataFrame
-                        Neurons' complete treenode tables
+                        Neurons' complete treenode tables    
     connectors :        list of pandas DataFrame
                         Neurons' complete connector tables
     tags :              list of dict
@@ -510,6 +536,7 @@ class CatmaidNeuronList:
                         Number of end nodes for each neuron
     cable_length :      list of float
                         Cable length in micrometers [um]
+    slabs :             list of treenode IDs
 
     Examples
     --------
@@ -549,7 +576,7 @@ class CatmaidNeuronList:
 
         if remote_instance is None:        
             if 'remote_instance' in globals():            
-                remote_instance = globals()['remote_instance']            
+                remote_instance = globals()['remote_instance']
 
         if not isinstance(x, list) and not isinstance( x, pd.DataFrame ) and not isinstance(x, CatmaidNeuronList) and not isinstance(x, np.ndarray):            
             self.neurons = list([ x ])
@@ -557,7 +584,7 @@ class CatmaidNeuronList:
             self.neurons = [ x.ix[i] for i in range( x.shape[0] ) ]
         elif isinstance(x, CatmaidNeuronList):
             self.neurons = x.neurons
-        else:            
+        else:
             self.neurons = list(x) #We have to convert from numpy ndarray to list - do NOT remove list() here                       
 
             if True in [ x.count(n) > 1 for n in x ]:
@@ -627,6 +654,8 @@ class CatmaidNeuronList:
             return np.array ( [ n.neuron_name for n in self.neurons ] )
         elif key == 'skeleton_id':
             return np.array ( [ n.skeleton_id for n in self.neurons ] )
+        elif key == 'slabs':
+            return np.array ( [ n.slabs for n in self.neurons ] )
 
         elif key == 'nodes':  
             self.get_skeletons(skip_existing=True)
@@ -646,7 +675,7 @@ class CatmaidNeuronList:
             if len(set(all_instances)) > 1:
                 self.logger.warning('Neurons are using multiple remote_instances! Returning first entry.')
             elif len(set(all_instances)) == 0:
-                raise Exception('No remote_instance found. Use .instance(rm) to assign one to all neurons.')
+                raise Exception('No remote_instance found. Use .set_remote_instance() to assign one to all neurons.')
             else:
                 return all_instances[0]
 
@@ -713,6 +742,15 @@ class CatmaidNeuronList:
         """
         for n in self.neurons:
             n.downsample( downsampling = factor )
+            #Delete outdated attributes (igraph is updated automatically)            
+            try:
+                delattr(self,"slabs")
+            except:
+                pass
+            try:
+                delattr(self,"igraph")
+            except:
+                pass
 
     def get_review(self, skip_existing=False):
         """ Use to get/update review status"""
@@ -762,10 +800,18 @@ class CatmaidNeuronList:
                 n.nodes = skdata.ix[ str( n.skeleton_id ) ].nodes
                 n.connectors = skdata.ix[ str( n.skeleton_id ) ].connectors
                 n.tags = skdata.ix[ str( n.skeleton_id ) ].tags
-                n.neuron_name = skdata.ix[ str( n.skeleton_id ) ].neuron_name
-                n.neuron_name = skdata.ix[ str( n.skeleton_id ) ].neuron_name
+                n.neuron_name = skdata.ix[ str( n.skeleton_id ) ].neuron_name                
                 n.date_retrieved = datetime.datetime.now().isoformat()
-                n.get_igraph()
+                
+                #Delete outdated attributes
+                try:
+                    delattr(n,"igraph")
+                except:
+                    pass                
+                try:
+                    delattr(n,"slabs")
+                except:
+                    pass
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to all neurons
