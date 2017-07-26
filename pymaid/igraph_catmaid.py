@@ -255,7 +255,7 @@ def neuron2graph( skdata, append=True ):
    return g
 
 def dist_from_root( data, synapses_only=False ):
-   """ Get distance to root in nano meter (nm) for all treenodes 
+   """ Get geodesic distance to root in nano meter (nm) for all treenodes 
 
    Parameters
    ----------

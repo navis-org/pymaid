@@ -51,7 +51,7 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.pymaid.get_neuron_annotation`: get annotations of a **single** neuron (includes user and timestamp)
 - :func:`pymaid.pymaid.get_neurons_in_volume`: get neurons in a defined box volume
 - :func:`pymaid.pymaid.get_neuron_list`: retrieve neurons that fit certain criteria (e.g. user, size, dates)
-- :func:`pymaid.pymaid.get_node_lists`: retrieve list of nodes within given volume
+- :func:`pymaid.pymaid.get_treenode_table`: retrieve list of nodes within given volume
 - :func:`pymaid.pymaid.get_node_user_details`: get details (creator, edition time, etc.) for individual nodes
 - :func:`pymaid.pymaid.get_partners`: retrieve connected partners for a list of neurons
 - :func:`pymaid.pymaid.get_partners_in_volume`: retrieve connected partners for a list of neurons within a given Catmaid volume
@@ -66,8 +66,8 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 :mod:`pymaid.igraph_catmaid`:
 -----------------------------
 
-- :func:`pymaid.igraph_catmaid.calculate_distance_from_root`: calculates geodesic (along-the-arbor) distances for nodes to root node
 - :func:`pymaid.igraph_catmaid.cluster_nodes_w_synapses`: uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
+- :func:`pymaid.igraph_catmaid.dist_from_root`: calculates geodesic (along-the-arbor) distances for nodes to root node
 - :func:`pymaid.igraph_catmaid.matrix2graph`: generates iGraph representation from adjacency matrix
 - :func:`pymaid.igraph_catmaid.network2graph`: generates iGraph representation from set of neurons
 - :func:`pymaid.igraph_catmaid.neuron2graph`: generates iGraph representation of neuron morphology
@@ -98,7 +98,7 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.morpho.in_volume`: test if points are within given CATMAID volume
 - :func:`pymaid.morpho.longest_neurite`: prunes neuron to its longest neurite
 - :func:`pymaid.morpho.reroot_neuron`: reroot neuron to a specific node
-- :func:`pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.calculate_distance_from_root` but does not use iGraph
+- :func:`pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.dist_from_root` but does not use iGraph
 
 :mod:`pymaid.rmaid`:
 ------------------

@@ -250,7 +250,7 @@ class CatmaidInstance:
                     (x, y, z)
 
         """
-        GET_data = {   'self.project_id': self.project_id,
+        GET_data = {   'pid': self.project_id,
                         'xp': coords[0],
                         'yp': coords[1],
                         'zp': coords[2],
@@ -1099,12 +1099,12 @@ def get_node_user_details ( treenode_ids, remote_instance=None ):
 
     return df
 
-def get_node_lists ( skids, remote_instance=None ):
+def get_treenode_table( skids, remote_instance=None ):
     """ Wrapper to retrieve treenode table for a list of skids
 
     Parameters
     ----------
-    skids :             Catmaid Neurons as single or list of either:
+    skids :             Catmaid Neuron(s) as single or list of either:
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
@@ -1114,14 +1114,11 @@ def get_node_lists ( skids, remote_instance=None ):
 
     Returns
     ------- 
-    dict      
-    | { skid1 : Pandas dataframe =
-    |   node_id parent_id confidence x y z radius creator last_edition reviewers tag
-    | 0  123     124      5        ...    
-    | 1  124     125      5        ..
-    | 2  125     126      5        . 
-    | ...
-    | }
+    pandas DataFrame
+    |   skeleton_id treenode_id parent_id confidence x y z radius creator last_edition reviewers tag
+    | 0  123          123     124      5        ...    
+    | 1  123          124     125      5        ..
+    | 2  123          125     126      5        . 
     """    
 
     if remote_instance is None:
@@ -1136,49 +1133,39 @@ def get_node_lists ( skids, remote_instance=None ):
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_instance.logger.info('Retrieving %i node table(s)...' % len(skids))   
+    remote_instance.logger.info('Retrieving %i treenode table(s)...' % len(skids) )   
 
     user_list = get_user_list(remote_instance)
 
     user_dict = user_list.set_index('id').T.to_dict()
 
-    nodes = {}    
-    for run ,skid in enumerate(skids):
+    #Generate URLs to retrieve
+    urls = []    
+    for i, skeleton_id in enumerate(list(set(skids))):
+        remote_nodes_list_url = remote_instance.get_skeleton_nodes_url( skeleton_id )        
+        urls.append (  remote_nodes_list_url )
 
-        remote_nodes_list_url = remote_instance.get_skeleton_nodes_url( skid )
+    node_list = _get_urls_threaded( urls, remote_instance )
 
-        remote_instance.logger.debug('Retrieving node table of %s [%i of %i]...' % (str(skid),run,len(skids)))        
+    #Format of node_list: treenode_id, parent_node_id, confidence, x, y, z, radius, creator, last_edited
+    tag_dict = { n[0] : [] for nl in node_list for n in nl[0] }
+    [ tag_dict[ n[0] ].append( n[1] ) for nl in node_list for n in nl[2] ]
 
-        try:
-            node_list = remote_instance.fetch( remote_nodes_list_url )
-        except:
-            remote_instance.logger.warning('Time out while retrieving node table - retrying...')
-            time.sleep(.5)
-            try:
-                node_list = remote_instance.fetch( remote_nodes_list_url )
-                remote_instance.logger.warning('Success on second attempt!')
-            except:
-                remote_instance.logger.error('Unable to retrieve node table')
-                raise Exception('Unable to retrieve node table')
+    reviewer_dict = { n[0] : [] for nl in node_list for n in nl[0] }
+    [ reviewer_dict[ n[0] ].append( user_list[ user_list.id == n[1] ]['login'].values[0] ) for nl in node_list for n in nl[1] ]
 
-        #Format of node_list: node_id, parent_node_id, confidence, x, y, z, radius, creator, last_edition_timestamp
-        tag_dict = { n[0] : [] for n in node_list[0] }
-        [ tag_dict[ n[0] ].append( n[1] ) for n in node_list[2] ]
+    tn_table = pd.DataFrame( [ [ skids[i] ] + n + [ reviewer_dict[ n[0] ], tag_dict[ n[0] ] ] for nl in node_list for n in nl[0] ] ,
+                                columns = [ 'skeleton_id', 'treenode_id', 'parent_node_id', 'confidence', 'x', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags' ],
+                                dtype=object
+                                )
 
-        reviewer_dict = { n[0] : [] for n in node_list[0] }
-        [ reviewer_dict[ n[0] ].append( user_list[ user_list.id == n[1] ]['login'].values[0] ) for n in node_list[1] ]
+    #Replace creator_id with their login
+    tn_table['creator'] = [ user_dict[u]['login'] for u in tn_table['creator'] ]
 
-        nodes[skid] = pd.DataFrame( [ n + [ reviewer_dict[n[0]], tag_dict[n[0]] ] for n in node_list[0] ] ,
-                                    columns = [ 'node_id', 'parent_node_id', 'confidence', 'x', 'y', 'z', 'radius', 'creator', 'last_edition_timestamp', 'reviewers', 'tags' ],
-                                    dtype=object
-                                    )
+    #Replace timestamp with datetime object
+    tn_table['last_edited'] = [ datetime.datetime.fromtimestamp( int(t) ) for t in tn_table['last_edited'] ] 
 
-        #Replace creator_id with their login
-        nodes[skid]['creator'] = [ user_dict[u]['login'] for u in nodes[skid]['creator'] ]
-
-        remote_instance.logger.debug('Done')         
-
-    return nodes
+    return tn_table
 
 def get_edges (skids, remote_instance=None ):
     """ Wrapper to retrieve edges (synaptic connections) between sets of neurons
@@ -2913,7 +2900,7 @@ def eval_skids ( x, remote_instance=None ):
                 skids += temp
             else:
                 skids.append(temp)
-        return skids
+        return list(set(skids))
     elif isinstance(x, core.CatmaidNeuron):
         return [ x.skeleton_id ]
     elif isinstance(x, core.CatmaidNeuronList):

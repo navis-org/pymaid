@@ -1118,10 +1118,9 @@ def in_volume( points, volume, remote_instance=None, approximate=False, ignore_a
             remote_instance = globals()['remote_instance']      
 
     if type(volume) == type(str()):
-      volume = pymaid.get_volume ( volume, remote_instance )
-      verts = np.array( volume[0] )
-    else:
-      verts = np.array( volume )
+      volume = pymaid.get_volume ( volume, remote_instance )    
+   
+    verts = np.array( volume[0] )
 
     if not approximate:
       intact_hull = ConvexHull(verts)
