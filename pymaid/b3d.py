@@ -69,18 +69,15 @@ class handler:
 
     Notes
     -----
-    The handler adds neurons and keeps track of them in the scene. If you
-    request a list of objects via its attributes (e.g. handler.neurons) or
-    via :func:`pymaid.b3d.handler.select`, a :class:`pymaid.b3d.object_list`
+
+    1. The handler adds neurons and keeps track of them in the scene.
+    2. If you request a list of objects via its attributes (e.g. `handler.neurons`) 
+    or via :func:`pymaid.b3d.handler.select`, a :class:`pymaid.b3d.object_list`
     is returned. This class lets you change basic parameters of your selected
-    neurons.
+    neurons.    
 
     Attributes
     ----------
-    All these attributes return an `object_list` class which you can use
-    to manipulate the selection. See :class:`pymaid.b3d.object_list` for a
-    list of modules.
-
     neurons :       returns list containing all neurons
     connectors :    returns list containing all connectors
     soma :          returns list containing all somata
@@ -400,17 +397,17 @@ class object_list:
 
     Notes
     -----
-    Object_lists should normally be constructed via the handler 
-    (see :class:`pymaid.b3d.handler`)! List works with object NAMES to prevent 
-    Blender from crashing when trying to access neurons that do not exist
-    anymore. This also means that changing names manually will compromise a 
-    object list. 
+    
+    1. Object_lists should normally be constructed via the handler 
+    (see :class:`pymaid.b3d.handler`)! 
+    2. List works with object NAMES to prevent Blender from crashing when 
+    trying to access neurons that do not exist anymore. This also means that 
+    changing names manually will compromise a object list. 
+    3. Accessing a neuron list's attributes (see below) return another 
+    `object_list` class which you can use to manipulate the new subselection. 
 
     Attributes
     ----------
-    All these attributes return another `object_list` class which you can use
-    to manipulate the subselection. 
-
     neurons :       returns list containing just neurons
     connectors :    returns list containing all connectors
     soma :          returns list containing all somata
