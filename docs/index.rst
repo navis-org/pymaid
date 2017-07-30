@@ -12,6 +12,7 @@ PyMaid documentation
    source/overview
    source/rmaid_doc
    source/plotting
+   source/blender
    source/pymaid
    source/core
    source/cluster
@@ -20,6 +21,7 @@ PyMaid documentation
    source/plot
    source/user_stats
    source/rmaid
+   source/b3d
 
 
 Indices and tables

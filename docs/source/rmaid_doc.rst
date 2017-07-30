@@ -8,6 +8,7 @@ On a fundamental level, you can use every single R function from within Python. 
    The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
    As `rpy2` installation fails if no R is installed, it is not a default 
    dependency and has to be installed manually *after* R has been set up.
+   Also: the latest R version supported by `rpy2` appears to be 3.3.3 (Jul/2017).
 
 Quickstart
 ==========

@@ -22,6 +22,8 @@ PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 `pymaid.user_stats` contains functions for user stats and contributions
 
+`pymaid.b3d` interface with [Blender 3D](https://www.blender.org). This can only be used from within Blender. See [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") on how to setup PyMaid for Blender.
+
 `pymaid.rmaid` provides an interface with R libraries ([nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) ) using [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/). *Attention*: rpy2 is not installed as dependency as it requires R to be installed. In order to use this module you must setup R and install rpy2 manually.
 
 ## Installation

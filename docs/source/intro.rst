@@ -125,6 +125,7 @@ The project ID is part of the CatmaidInstance and defaults to 1. You can change 
 ...                         http_pw = 'HTTP_PASSWORD', 
 ...                         auth_token = 'TOKEN' )
 
+
 CatmaidNeuron and CatmaidNeuronList objects
 -------------------------------------------
 
