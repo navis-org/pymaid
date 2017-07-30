@@ -46,7 +46,6 @@ Examples
 import math
 import pylab
 import numpy as np
-import matplotlib.pyplot as plt
 from igraph import *
 from scipy import cluster, spatial
 import logging

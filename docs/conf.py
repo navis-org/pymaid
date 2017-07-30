@@ -32,7 +32,9 @@ MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'pylab', 'bpy',
                 #'numpy', 'scipy', ,'scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull', 
                 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 
                 'rpy2.robjects.pandas2ri' ,'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs', 
-                 'matplotlib', 'matplotlib.pyplot', 'plt', #'matplotlib.collections',   'matplotlib.lines', 'maplotlib.patches',
+                'matplotlib', 'matplotlib.pyplot', 'plt', 
+                'matplotlib.collections',   'matplotlib.lines', 'maplotlib.patches', 
+                'mlines','mpatches','mcolletctions',
                 'vispy','seaborn','vispy.geometry']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
