@@ -27,7 +27,6 @@ from tqdm import tqdm
 
 from pymaid import igraph_catmaid, morpho, pymaid, plot
 
-
 class CatmaidNeuron:
     """ 
     Catmaid neuron object holding neuron data: nodes, connectors, name, etc.
@@ -84,11 +83,15 @@ class CatmaidNeuron:
                         Number of branch nodes
     n_end_nodes :       int
                         Number of end nodes
+    n_open_ends :       int
+                        Number of open end nodes. Leaf nodes that are not 
+                        tagged with either: 'ends', 'not a branch', 
+                        'uncertain end', 'soma' or 'uncertain continuation'
     cable_length :      float
                         Cable length in micrometers [um]    
     slabs :             list of treenode IDs
     soma :              treenode_id of soma
-                        Returns None if no soma
+                        Returns None if no soma or 'NA' if data not available
 
     Examples
     --------    
@@ -149,7 +152,7 @@ class CatmaidNeuron:
             if 'df' in x.__dict__:
 
                 if 'type' not in x.nodes:
-                    x = morpho.classify_nodes(x)
+                    morpho.classify_nodes(x)
 
                 if copy:
                     self.df = x.df.copy()
@@ -181,7 +184,7 @@ class CatmaidNeuron:
             self.skeleton_id = x.skeleton_id
 
             if 'type' not in x.nodes:
-                x = morpho.classify_nodes(x)
+                morpho.classify_nodes(x)
 
             if copy:
                 self.df = x.copy()
@@ -235,9 +238,11 @@ class CatmaidNeuron:
             self.get_skeleton()
             return self.tags
         elif key == 'n_open_ends':
-            if 'ends' not in self.tags:
-                self.tags['ends'] = []
-            return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in self.tags['ends']])
+            if 'nodes' in self.__dict__:
+                closed = self.tags.get('ends',[]) + self.tags.get('uncertain end',[]) + self.tags.get('uncertain continuation',[]) + self.tags.get('not a branch',[]) + self.tags.get('soma',[])
+                return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed ])
+            else:
+                return 'NA'
         elif key == 'n_branch_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'branch'].shape[0]
@@ -259,7 +264,10 @@ class CatmaidNeuron:
             else:
                 return 'NA'
         elif key == 'cable_length':
-            return morpho.calc_cable(self)
+            if 'nodes' in self.__dict__:
+                return morpho.calc_cable(self)
+            else:
+                return 'NA'
         else:
             raise AttributeError('Attribute %s not found' % key)
 
@@ -300,7 +308,7 @@ class CatmaidNeuron:
             self.skeleton_id, remote_instance, return_neuron=False, kwargs=kwargs).ix[0]
 
         if 'type' not in skeleton.nodes:
-            skeleton = morpho.classify_nodes(skeleton)
+            morpho.classify_nodes(skeleton)
 
         self.df = skeleton
         self.nodes = skeleton.nodes
@@ -310,6 +318,11 @@ class CatmaidNeuron:
         self.date_retrieved = datetime.datetime.now().isoformat()
 
         # Delete outdated attributes
+        self._clear_temp_attr()
+        return
+
+    def _clear_temp_attr(self):
+        """Clear temporary attributes"""
         try:
             delattr(self, "igraph")
         except:
@@ -318,7 +331,6 @@ class CatmaidNeuron:
             delattr(self, "slabs")
         except:
             pass
-        return
 
     def get_igraph(self):
         """Calculate igraph representation of neuron """
@@ -405,7 +417,13 @@ class CatmaidNeuron:
         See Also
         --------
         :func:`pymaid.plot.plot3d` 
-                    Function called to generate 3d plot                  
+                    Function called to generate 3d plot   
+
+        Examples
+        --------
+        >>> nl = pymaid.get_3D_skeleton('annotation:uPN right')
+        >>> #Plot with connectors
+        >>> nl.plot3d( connectors=True )               
         """
         if 'nodes' not in self.__dict__:
             self.get_skeleton()
@@ -443,14 +461,7 @@ class CatmaidNeuron:
         self.df.nodes = self.nodes
 
         # Delete outdated attributes
-        try:
-            delattr(self, "igraph")
-        except:
-            pass
-        try:
-            delattr(self, "slabs")
-        except:
-            pass
+        self._clear_temp_attr()
 
     def reroot(self, new_root):
         """Downsample the neuron by given factor 
@@ -461,9 +472,61 @@ class CatmaidNeuron:
                     Either treenode ID or node tag
         """
         morpho.reroot_neuron(self, new_root, inplace=True)
-        self.get_igraph()
+        
+        #Clear temporary attributes
+        self._clear_temp_attr()
 
-    def update(self, remote_instance=None):
+    def prune_distal_to(self, node):
+        """Cut off nodes distal to given node. 
+
+        Parameters
+        ----------
+        node :      {treenode_id, node tag}
+                    Provide either a treenode ID or a (unique) tag
+        """
+        dist, prox = morpho.cut_neuron( self, node )
+        self.__init__(prox, self._remote_instance, self._meta_data )
+
+        #Clear temporary attributes
+        self._clear_temp_attr()
+
+    def prune_proximal_to(self, node):
+        """Remove nodes proximal to given node. Reroots neuron to cut node.
+
+        Parameters
+        ----------
+        node :      {treenode_id, node tag}
+                    Provide either a treenode ID or a (unique) tag
+        """
+        dist, prox = morpho.cut_neuron( self, node )
+        self.__init__(dist, self._remote_instance, self._meta_data )
+
+        #Clear temporary attributes
+        self._clear_temp_attr()
+
+    def prune_by_strahler(self, to_prune=range(1,2) ):
+        """ Prune neuron based on strahler order. Will reroot neuron to
+        soma if possible.
+
+        Notes
+        -----
+        Calls :func:`pymaid.morpho.prune_by_strahler`
+
+        Parameters
+        ----------
+        to_prune :      {int, list, range}, optional
+                        Strahler indices to prune. 
+                        1. ``to_prune = 1`` removes all leaf branches
+                        2. ``to_prune = [1,2]`` removes indices 1 and 2
+                        3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
+                        4. ``to_prune = -1`` removes everything but the highest index 
+        """
+        morpho.prune_by_strahler( self, to_prune=to_prune, inplace=True, reroot_soma=True )
+
+        #Clear temporary attributes
+        self._clear_temp_attr()
+
+    def reload(self, remote_instance=None):
         """Reload neuron from server. 
 
         Notes
@@ -478,7 +541,10 @@ class CatmaidNeuron:
 
         n = pymaid.get_3D_skeleton(
             self.skeleton_id, remote_instance=remote_instance)
-        self.__init__(n, self._remote_instance, self._meta_data)
+        self.__init__(n, self._remote_instance, self._meta_data)        
+
+        #Clear temporary attributes
+        self._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to neuron
@@ -510,23 +576,46 @@ class CatmaidNeuron:
         return self.__repr__()
 
     def __repr__(self):
+        return str(self.summary())
+
+    def summary(self):
+        """ Get summary over all neurons in this NeuronList
+
+        Parameters
+        ----------
+        n :     int, optional
+                Get only first N entries
+
+        Returns
+        -------
+        pandas Series                
+        """
+
         # Look up these values without requesting them
         neuron_name = self.__dict__.get('neuron_name', 'NA')
-        igraph = self.__dict__.get('igraph', None)
-        tags = self.__dict__.get('tags', None)
+        igraph = self.__dict__.get('igraph', 'NA')
+        tags = self.__dict__.get('tags', 'NA')
         review_status = self.__dict__.get('review_status', 'NA')
-        annotations = self.__dict__.get('annotations', None)
-        if self.n_nodes == 'NA':
-            cable = 'NA'
+        annotations = self.__dict__.get('annotations', 'NA')
+
+        if 'nodes' in self.__dict__:
+            soma_temp = self.soma
         else:
-            cable = self.cable_length
+            soma_temp = 'NA'
 
-        self._repr = pd.Series([type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, cable, review_status, self.soma != None, annotations != None, igraph != None, tags != None, self._remote_instance != None],
-                               index=['type', 'neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes',
-                                      'n_end_nodes', 'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'tags', 'remote_instance']
+        if tags != 'NA':
+            tags = True
+
+        if igraph != 'NA':
+            igraph = True
+
+        if annotations != 'NA':
+            annotations = True
+
+        return pd.Series([type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, self.n_open_ends, self.cable_length, review_status, soma_temp, annotations, igraph, tags, self._remote_instance != None],
+                               index=['type', 'neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes',
+                                      'n_open_ends', 'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'tags', 'remote_instance']
                                )
-        return str(self._repr)
-
 
 class CatmaidNeuronList:
     """ Catmaid neuron list. It is designed to work in many ways much like a 
@@ -581,6 +670,10 @@ class CatmaidNeuronList:
                         Number of branch nodes  for each neuron
     n_end_nodes :       list of int
                         Number of end nodes for each neuron
+    n_open_ends :       int
+                        Number of open end nodes. Leaf nodes that are not 
+                        tagged with either: 'ends', 'not a branch', 
+                        'uncertain end', 'soma' or 'uncertain continuation'
     cable_length :      list of float
                         Cable length in micrometers [um]
     slabs :             list of treenode IDs
@@ -607,6 +700,8 @@ class CatmaidNeuronList:
     >>> subset = nl [ '123456' ]
     >>> #Index by neuron name
     >>> subset = nl [ 'name1' ]
+    >>> #Index using annotation
+    >>> subset = nl ['annotation:uPN right']
     >>> #Concatenate lists
     >>> nl += pymaid.get_3D_skeleton( [ 912345 ], remote_instance = rm )
 
@@ -655,31 +750,50 @@ class CatmaidNeuronList:
     def __str__(self):
         return self.__repr__()
 
-    def _summary(self, n=None):
-        # Prepare data without rquesting it from server
+    def summary(self, n=None):
+        """ Get summary over all neurons in this NeuronList
+
+        Parameters
+        ----------
+        n :     int, optional
+                Get only first N entries
+
+        Returns
+        -------
+        pandas DataFrame                
+        """
         d = []
         for n in self.neurons[:None]:
             neuron_name = n.__dict__.get('neuron_name', 'NA')
-            igraph = n.__dict__.get('igraph', None)
-            tags = n.__dict__.get('tags', None)
+            igraph = n.__dict__.get('igraph', 'NA')
+            tags = n.__dict__.get('tags', 'NA')
             review_status = n.__dict__.get('review_status', 'NA')
-            annotations = n.__dict__.get('annotations', None)
+            annotations = n.__dict__.get('annotations', 'NA')
 
-            if n.n_nodes == 'NA':
-                cable = 'NA'
+            if tags != 'NA':
+                tags = True
+
+            if igraph != 'NA':
+                igraph = True
+
+            if annotations != 'NA':
+                annotations = True
+
+            if 'nodes' in n.__dict__:
+                soma_temp = n.soma != None
             else:
-                cable = n.cable_length
+                soma_temp = 'NA'
 
-            d.append([neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes,
-                      cable, review_status, n.soma != None, annotations != None, igraph != None, tags != None, n._remote_instance != None])
+            d.append([neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes, n.n_open_ends,
+                      n.cable_length, review_status, soma_temp, annotations, igraph, tags, n._remote_instance != None])
 
         return pd.DataFrame(data=d,
-                            columns=['neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes',
-                                     'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'tags', 'remote_instance']
+                            columns=['neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes', 'open_ends',
+                                     'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'node_tags', 'remote_instance']
                             )
 
     def __repr__(self):
-        return str(self._summary())
+        return str(self.summary())
 
     def __iter__(self):
         self.iter = 0
@@ -770,8 +884,12 @@ class CatmaidNeuronList:
 
     def __getitem__(self, key):
         if isinstance(key, str):
-            subset = [
-                n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
+            if key.startswith('annotation:'):
+                skids = pymaid.eval_skids(key, remote_instance = self._remote_instance)
+                subset = self[skids]
+            else:
+                subset = [
+                    n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
         elif isinstance(key, list):
             if True in [isinstance(k, str) for k in key]:
                 subset = [n for i, n in enumerate(self.neurons) if True in [
@@ -790,11 +908,11 @@ class CatmaidNeuronList:
 
     def sum(self):
         """Returns sum numeric and boolean values over all neurons"""
-        return self._summary().sum(numeric_only=True)
+        return self.summary().sum(numeric_only=True)
 
     def mean(self):
         """Returns mean numeric and boolean values over all neurons"""
-        return self._summary().mean(numeric_only=True)
+        return self.summary().mean(numeric_only=True)
 
     def sample(self, N=1):
         """Use to return random subset of neurons"""
@@ -815,19 +933,69 @@ class CatmaidNeuronList:
             nl_copy.downsample(factor=factor)
             return nl_copy
 
-        for n in self.neurons:
+        _set_loggers('ERROR')
+        for n in tqdm(self.neurons, desc='Downsampling'):        
             n.downsample(factor=factor)
-            # Make sure to also update neuron.df
-            n.df.nodes = n.nodes
-            # Delete outdated attributes (igraph is updated automatically)
+        _set_loggers('INFO')
+
+    def prune_distal_to(self, tag):
+        """Cut off nodes distal to given node. 
+
+        Parameters
+        ----------
+        node :      node tag
+                    A (unique) tag at which to cut the neurons
+
+        """
+        _set_loggers('ERROR')
+        for n in tqdm(self.neurons, desc='Pruning'):
             try:
-                delattr(n, "slabs")
+                n.prune_distal_to(tag)
             except:
                 pass
+        _set_loggers('INFO')
+
+    def prune_proximal_to(self, tag):
+        """Remove nodes proximal to given node. Reroots neurons to cut node.
+
+        Parameters
+        ----------
+        node :      node tag
+                    A (unique) tag at which to cut the neurons
+
+        """         
+
+        _set_loggers('ERROR')
+        for n in tqdm(self.neurons, desc='Pruning'):
             try:
-                delattr(n, "igraph")
+                n.prune_proximal_to(tag)        
             except:
                 pass
+        _set_loggers('INFO')
+
+    def prune_by_strahler(self, to_prune=range(1,2) ):
+        """ Prune neurons based on strahler order. Will reroot neurons to
+        soma if possible.
+
+        Notes
+        -----
+        Calls :func:`pymaid.morpho.prune_by_strahler`
+
+        Parameters
+        ----------
+        to_prune :      {int, list, range}, optional
+                        Strahler indices to prune. 
+                        1. ``to_prune = 1`` removes all leaf branches
+                        2. ``to_prune = [1,2]`` removes indices 1 and 2
+                        3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
+                        4. ``to_prune = -1`` removes everything but the highest index 
+        
+        """
+
+        _set_loggers('ERROR')
+        for n in tqdm(self.neurons, desc='Pruning'):
+            n.prune_by_strahler( to_prune=to_prune )
+        _set_loggers('INFO')
 
     def get_review(self, skip_existing=False):
         """ Use to get/update review status"""
@@ -856,6 +1024,11 @@ class CatmaidNeuronList:
                 except:
                     pass
 
+    def reload(self):
+        """ Update neuron skeletons.
+        """
+        self.get_skeletons(skip_existing=False)
+
     def get_skeletons(self, skip_existing=False):
         """Helper function to fill in/update skeleton data of neurons. 
 
@@ -877,7 +1050,7 @@ class CatmaidNeuronList:
                 n.df = skdata.ix[str(n.skeleton_id)]
 
                 if 'type' not in n.df:
-                    n.df = morpho.classify_nodes(n.df)
+                    morpho.classify_nodes(n.df)
 
                 n.nodes = skdata.ix[str(n.skeleton_id)].nodes
                 n.connectors = skdata.ix[str(n.skeleton_id)].connectors
@@ -886,14 +1059,7 @@ class CatmaidNeuronList:
                 n.date_retrieved = datetime.datetime.now().isoformat()
 
                 # Delete outdated attributes
-                try:
-                    delattr(n, "igraph")
-                except:
-                    pass
-                try:
-                    delattr(n, "slabs")
-                except:
-                    pass
+                n._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to all neurons
@@ -1000,8 +1166,13 @@ class CatmaidNeuronList:
 
     def head(self, n=5):
         """Return summary for top N neurons"""
-        return str(self._summary(n=n))
+        return str(self.summary(n=n))
 
+def _set_loggers(level='ERROR'):
+    """Helper function to set levels for all associated module loggers """    
+    morpho.module_logger.setLevel(level)    
+    igraph_catmaid.module_logger.setLevel(level)
+    plot.module_logger.setLevel(level)
 
 class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow

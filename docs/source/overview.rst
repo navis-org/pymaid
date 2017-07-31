@@ -23,6 +23,9 @@ Primary attributes:
 - ``annotations``: list of neuron(s) annotations
 - ``cable_length``: cable length(s) in nm
 - ``review_status``: review status of neuron(s)
+- ``soma``: returns treenode ID of soma (if applicable)
+- ``slabs``: returns slabs (linear segments)
+- ``igraph``: iGraph representation of the neuron
 
 :class:`pymaid.core.CatmaidNeuronList`
 
@@ -97,6 +100,7 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.morpho.downsample_neuron`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - :func:`pymaid.morpho.in_volume`: test if points are within given CATMAID volume
 - :func:`pymaid.morpho.longest_neurite`: prunes neuron to its longest neurite
+- :func:`pymaid.morpho.prune_by_strahler`: prunes the neuron by strahler index
 - :func:`pymaid.morpho.reroot_neuron`: reroot neuron to a specific node
 - :func:`pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.dist_from_root` but does not use iGraph
 
@@ -105,7 +109,8 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 
 - :func:`pymaid.rmaid.init_rcatmaid`: initialize connection with Catmaid server in R
 - :func:`pymaid.rmaid.data2py`: wrapper to convert R data to Python 
-- :func:`pymaid.rmaid.nblast`: wrapper to use Nat's NBLAST on Pymaid neurons
+- :func:`pymaid.rmaid.nblast`: wrapper to nblast a set neurons against external database
+- :func:`pymaid.rmaid.nblast_allby_all`: wrapper to nblast a set of neurons against each other
 - :func:`pymaid.rmaid.neuron2py`: converts R neuron and neuronlist objects to Pymaid neurons
 - :func:`pymaid.rmaid.neuron2r`: converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
 

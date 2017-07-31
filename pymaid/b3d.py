@@ -81,7 +81,7 @@ class handler:
     neurons :       returns list containing all neurons
     connectors :    returns list containing all connectors
     soma :          returns list containing all somata
-    selected :      returns list containing selected objects
+    selected :      returns list containing selected Catmaid objects
     presynapses :   returns list containing all presynapses
     postsynapses :  returns list containing all postsynapses
     gapjunctions :  returns list containing all gap junctions
@@ -104,9 +104,7 @@ class handler:
     >>> handler.clear()
     >>> # Add only soma
     >>> handler.add( nl, neurites=False, connectors=False )
-    """
-
-    # Default colors of connectors are defined here
+    """    
     cn_dict = {
         0: dict(name='presynapses',
                 color=(1, 0, 0)),
@@ -116,7 +114,7 @@ class handler:
                 color=(0, 1, 0)),
         3: dict(name='abutting',
                 color=(1, 0, 1))
-    }
+    } #: defines default colours/names for different connector types
 
     def __init__(self, conversion=1 / 10000):
         self.conversion = conversion
@@ -133,7 +131,7 @@ class handler:
         elif key == 'soma' or key == 'somas':
             return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'SOMA'])
         elif key == 'selected':
-            return object_list([ob.name for ob in bpy.context.selected_objects])
+            return object_list([ob.name for ob in bpy.context.selected_objects if 'catmaid_object' in ob])
         elif key == 'presynapses':
             return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'CONNECTORS' and ob['cn_type'] == 0])
         elif key == 'postsynapses':
@@ -205,6 +203,7 @@ class handler:
         ob.location = (0, 0, 0)
         ob.show_name = True
         ob['type'] = 'NEURON'
+        ob['catmaid_object'] = True
         ob['skeleton_id'] = x.skeleton_id
         cu.dimensions = '3D'
         cu.fill_mode = 'FULL'
@@ -218,12 +217,16 @@ class handler:
             coords *= self.conversion
             coords = coords.tolist()
 
+            ids = x.nodes.treenode_id.tolist()
+
             # Add points
             newSpline.points.add(len(coords) - 1)
 
             # Move points
             for i, p in enumerate(coords):
                 newSpline.points[i].co = (p[0], p[2], -p[1], 0)
+                #Hijack weight property to store treenode ID
+                newSpline.points[i].weight = int(ids[i])
 
         ob.active_material = mat
 
@@ -242,6 +245,7 @@ class handler:
         bpy.ops.object.shade_smooth()
         bpy.context.active_object.name = 'Soma of ' + x.neuron_name
         bpy.context.active_object['type'] = 'SOMA'
+        bpy.context.active_object['catmaid_object'] = True
         bpy.context.active_object['skeleton_id'] = x.skeleton_id
 
         bpy.context.scene.objects.active.active_material = mat
@@ -268,6 +272,7 @@ class handler:
             cu = bpy.data.curves.new(ob_name + ' mesh', 'CURVE')
             ob = bpy.data.objects.new(ob_name, cu)
             ob['type'] = 'CONNECTORS'
+            ob['catmaid_object'] = True
             ob['cn_type'] = i
             ob['skeleton_id'] = x.skeleton_id
             bpy.context.scene.objects.link(ob)
@@ -397,7 +402,7 @@ class object_list:
 
     Notes
     -----
-    
+
     1. Object_lists should normally be constructed via the handler 
     (see :class:`pymaid.b3d.handler`)! 
     2. List works with object NAMES to prevent Blender from crashing when 
@@ -414,7 +419,8 @@ class object_list:
     presynapses :   returns list containing all presynapses
     postsynapses :  returns list containing all postsynapses
     gapjunctions :  returns list containing all gap junctions
-    abutting :      returns list containing all abutting connectors    
+    abutting :      returns list containing all abutting connectors  
+    skeleton_id :   returns list of skeleton IDs  
 
     Examples
     --------
@@ -439,11 +445,11 @@ class object_list:
         self.handler = handler
 
     def __getattr__(self, key):
-        if key == 'neurons' or key == 'neuron' or key == 'neurites':
+        if key in ['neurons','neuron','neurites']:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'NEURON'])
-        elif key == 'connectors' or key == 'connector':
+        elif key in ['connectors', 'connector']:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS'])
-        elif key == 'soma' or key == 'somas':
+        elif key in ['soma','somas']:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'SOMA'])
         elif key == 'presynapses':
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS' and bpy.data.objects[n]['cn_type'] == 0])
@@ -453,6 +459,8 @@ class object_list:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS' and bpy.data.objects[n]['cn_type'] == 2])
         elif key == 'abutting':
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS' and bpy.data.objects[n]['cn_type'] == 3])
+        elif key in ['skeleton_id','skeleton_ids','skeletonid','skeletonids','skid','skids']:
+            return [ bpy.data.objects[n]['skeleton_id'] for n in self.object_names if n in bpy.data.objects ]
         else:
             raise AttributeError('Unknown attribute ' + key)
 

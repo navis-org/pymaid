@@ -12,6 +12,7 @@ PyMaid documentation
    source/overview
    source/rmaid_doc
    source/plotting
+   source/morpho_doc
    source/blender
    source/pymaid
    source/core

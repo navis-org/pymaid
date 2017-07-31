@@ -80,27 +80,34 @@ def generate_list_of_childs(skdata):
     return list_of_childs
 
 
-def classify_nodes(skdata):
+def classify_nodes(skdata, inplace=True):
     """ Takes list of nodes and classifies them as end nodes, branches, slabs
     and root
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
-               May contain multiple neurons
+    skdata :    {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+                May contain multiple neurons    
+    inplace :   bool, optional 
+                If false, nodes will be classified on a copy which is then 
+                returned
 
     Returns
     -------
-    skdata             
+    skdata (if inplace=False)            
                Added columns 'type' and 'has_connectors'.
+
     """
 
     module_logger.debug('Looking for end, branch and root points...')
 
+    if not inplace:
+        skdata = skdata.copy()
+
     # If more than one neuron
     if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         for i in range(skdata.shape[0]):
-            skdata.ix[i] = classify_nodes(skdata.ix[i])
+            skdata.ix[i] = classify_nodes(skdata.ix[i], inplace=inplace)
     elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         list_of_childs = generate_list_of_childs(skdata)
         list_of_parent = {
@@ -128,7 +135,8 @@ def classify_nodes(skdata):
     else:
         module_logger.error('Unknown neuron type: %s' % str(type(skdata)))
 
-    return skdata
+    if not inplace:
+        return skdata
 
 def _generate_slabs(x, append=True):
     """ Generate slabs of a given neuron.
@@ -160,7 +168,7 @@ def _generate_slabs(x, append=True):
     g = x.igraph.copy()
 
     if 'type' not in x.nodes:
-        x = classify_nodes(x)
+        classify_nodes(x)
 
     branch_points = x.nodes[x.nodes.type == 'branch'].treenode_id.tolist()
     root_node = x.nodes[x.nodes.type == 'root'].treenode_id.tolist()
@@ -246,7 +254,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False):
         n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
 
     if 'type' not in df.nodes:
-        df = classify_nodes(df)
+        classify_nodes(df)
 
     fix_points = df.nodes[(df.nodes.type != 'slab') | (
         df.nodes.has_connectors is True)].treenode_id.values
@@ -374,7 +382,6 @@ def longest_neurite(skdata, root_to_soma=False):
 
     return df
 
-
 def reroot_neuron(skdata, new_root, g=None, inplace=False):
     """ Uses igraph to reroot the neuron at given point. 
 
@@ -425,8 +432,11 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
             new_root = df.tags[new_root][0]
 
     if df.nodes.set_index('treenode_id').ix[new_root].parent_id == None:
-        module_logger.error('Error: New root is old root!')
-        return df
+        module_logger.warning('New root is old root - skipping')
+        if not inplace:
+            return df
+        else:
+            return
 
     if not g:
         if isinstance(df, core.CatmaidNeuron):
@@ -461,7 +471,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
         return
 
     if 'type' not in df.nodes:
-        df = classify_nodes(df)
+        classify_nodes(df)
 
     leaf_nodes = df.nodes[df.nodes.type == 'end'].treenode_id.tolist()
     leaf_indices = [v.index for v in g.vs if v['node_id'] in leaf_nodes]
@@ -491,8 +501,11 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     df.nodes.parent_id = df.nodes.parent_id.values.astype(
         object)  # then back to object so that we can add a 'None'
     # Set parent_id to None (previously 0 as placeholder)
-    df.nodes.loc[new_root, 'parent_id'] = None
+    df.nodes.loc[new_root, 'parent_id'] = None    
     df.nodes.reset_index(inplace=True)  # Reset index
+
+    #Recalculate node types
+    classify_nodes(df)
 
     # Recalculate graph
     df.igraph = igraph_catmaid.neuron2graph(df)
@@ -500,8 +513,10 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     module_logger.info('Info: %s #%s successfully rerooted (%s s)' % (
         df.neuron_name, df.skeleton_id, round(time.time() - start_time, 1)))
 
-    return df
-
+    if not inplace:
+        return df
+    else:
+        return
 
 def cut_neuron(skdata, cut_node, g=None):
     """ Uses igraph to Cut the neuron at given point and returns two new neurons.
@@ -725,7 +740,7 @@ def _cut_neuron(skdata, cut_node):
         n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
 
     if 'type' not in df.nodes:
-        df = classify_nodes(df)
+        classify_nodes(df)
 
     # If cut_node is a tag, rather than a ID, try finding that node
     if type(cut_node) == type(str()):
@@ -1054,7 +1069,7 @@ def calc_strahler_index(skdata, return_dict=False):
 
     # Find branch, root and end nodes
     if 'type' not in df.nodes:
-        df = classify_nodes(df)
+        classify_nodes(df)
 
     end_nodes = df.nodes[df.nodes.type == 'end'].treenode_id.tolist()
     branch_nodes = df.nodes[df.nodes.type == 'branch'].treenode_id.tolist()
@@ -1156,6 +1171,68 @@ def calc_strahler_index(skdata, return_dict=False):
 
     return df
 
+def prune_by_strahler( x, to_prune=range(1,2), reroot_soma=True, inplace=False, force_strahler_update= False ):
+    """ Prune neuron based on strahler order
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron or CatmaidNeuronList
+    to_prune :      {int, list, range}, optional
+                    Strahler indices to prune. 
+                    1. ``to_prune = 1`` removes all leaf branches
+                    2. ``to_prune = [1,2]`` removes indices 1 and 2
+                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
+                    4. ``to_prune = -1`` removes everything but the highest index       
+    reroot_soma :   bool, optional
+                    If True, neuron will be rerooted to its soma
+    inplace :       bool, optional
+                    If False, pruning is performed on copy of original neuron.    
+
+    Returns
+    -------
+    pruned neuron
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        neuron = x
+    elif isinstance(x, core.CatmaidNeuronList):        
+        temp = [ prune_by_strahler(n, to_prune = to_prune, inplace=inplace ) for n in x ]
+        if not inplace:
+            return core.CatmaidNeuronList( temp, x._remote_instance )
+        else:
+            return
+
+    #Make a copy if necessary before making any changes
+    if not inplace:
+        neuron = neuron.copy()
+
+    if reroot_soma and neuron.soma:
+       neuron.reroot( neuron.soma )
+
+    if 'strahler_index' not in neuron.nodes or force_strahler_update:
+        calc_strahler_index(neuron)        
+
+    #Prepare indices
+    if isinstance(to_prune,int) and to_prune < 0:
+        to_prune =  range( 1, neuron.nodes.strahler_index.max() + ( to_prune + 1) )
+    elif isinstance(to_prune,int):
+        to_prune = [ to_prune ]
+    elif isinstance(to_prune,range):
+        to_prune = list( to_prune )    
+
+    neuron.nodes = neuron.nodes[ ~neuron.nodes.strahler_index.isin(to_prune) ].reset_index(drop=True)
+    neuron.connectors = neuron.connectors[ neuron.connectors.treenode_id.isin( neuron.nodes.treenode_id ) ].reset_index(drop=True)
+
+    neuron.df.nodes = neuron.nodes
+    neuron.df.connectors = neuron.connectors   
+
+    #Remove temporary attributes
+    neuron._clear_temp_attr()
+
+    if not inplace:
+        return neuron
+    else:
+        return
 
 def _walk_to_root(start_node, list_of_parents, visited_nodes):
     """ Helper function for synapse_root_distances(): 

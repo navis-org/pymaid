@@ -22,7 +22,7 @@ Quick install
 -------------
 
 PyMaid is *not yet* listed in the Python Packaging Index but you can install
-the current version from github using
+the current version from `Github <https://github.com/schlegelp/PyMaid>`_ using:
 
 ::
 

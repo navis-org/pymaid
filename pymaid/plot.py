@@ -57,6 +57,26 @@ if not module_logger.handlers:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
+def clear3d():
+    """ Clear 3D viewer
+    """
+    try:
+        canvas = globals()['canvas']
+        canvas.central_widget.remove_widget( canvas.central_widget.children[0] )
+        canvas.update()
+    except:
+        pass
+
+def close3d():
+    """ Close existing 3D (wipes memory)
+    """
+    try:
+        canvas = globals()['canvas']    
+        canvas.close()
+        globals().pop('canvas')
+        del canvas    
+    except:
+        pass
 
 def plot2d(*args, **kwargs):
     """ Retrieves 3D skeletons and generates matplotlib object.   
@@ -335,7 +355,7 @@ def plot2d(*args, **kwargs):
         lines = []
 
         if 'type' not in neuron.nodes:
-            neuron = morpho.classify_nodes(neuron)
+            morpho.classify_nodes(neuron)
 
         soma = neuron.nodes[neuron.nodes.radius > 1]
 
@@ -536,6 +556,10 @@ def plot3d(*args, **kwargs):
     downsampling :    int, optional   
                       Set downsampling of neurons before plotting. 
                       Default = None
+    clear3d :         bool, optional
+                      If True, canvas is cleared before plotting (only for 
+                      vispy). Default = False
+
     volumes         
        | volumes to plot. Can be:
        | 1. Volume name (str): e.g. ``"v13.LH_R"``
@@ -579,11 +603,44 @@ def plot3d(*args, **kwargs):
         # Should keep it between -1000 and +1000
         max_dim = max([math.fabs(n)
                        for n in [max_x, min_x, max_y, min_y, max_z, min_z]])
-        scale_factor = 1000 / max_dim
+        scale_factor = 1000 / max_dim   
 
-        canvas = scene.SceneCanvas(keys='interactive', size=(
-            fig_width, fig_height), bgcolor='white')
-        view = canvas.central_widget.add_view()
+        if kwargs.get('clear3d',False):
+            clear3d()
+
+        #If does not exists yet, initialise a canvas object and make global
+        if 'canvas' not in globals():
+            global canvas
+            canvas = scene.SceneCanvas(keys='interactive', size=(
+                        fig_width, fig_height), bgcolor='white')
+            view = canvas.central_widget.add_view()
+
+            # Add camera
+            view.camera = scene.TurntableCamera()
+
+            #Set camera range            
+            view.camera.set_range((min_x * scale_factor, max_x * scale_factor),
+                                  (min_y * scale_factor, max_y * scale_factor),
+                                  (min_z * scale_factor, max_z * scale_factor)
+                                  )
+        else:
+            canvas = globals()['canvas']
+
+            #Check if we already have a view, if not (e.g. if plot.clear3d() has been used) add new
+            if canvas.central_widget.children:
+                view = canvas.central_widget.children[0]            
+            else:
+                view = canvas.central_widget.add_view()
+
+                # Add camera
+                view.camera = scene.TurntableCamera()
+
+                # Set camera range                
+                view.camera.set_range((min_x * scale_factor, max_x * scale_factor),
+                                      (min_y * scale_factor, max_y * scale_factor),
+                                      (min_z * scale_factor, max_z * scale_factor)
+                                      )
+
 
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
@@ -732,21 +789,13 @@ def plot3d(*args, **kwargs):
         #ax = scene.visuals.XYZAxis( )
         # view.add(ax)
 
-        # Add camera
-        view.camera = scene.TurntableCamera()
-
-        # Set camera range
-        #view.camera.set_range((min_x * scale_factor, max_x *scale_factor), (0, 100), (0, 100))
-        view.camera.set_range((min_x * scale_factor, max_x * scale_factor),
-                              (min_y * scale_factor, max_y * scale_factor),
-                              (min_z * scale_factor, max_z * scale_factor)
-                              )
+        
 
         # And finally: show canvas
         canvas.show()
 
         module_logger.info(
-            'Plot3d() has returned: canvas, view. Use view to change camera and add more object.')
+            'Use plot.clear3d() to clear canvas and plot.close3d() to close canvas.')
 
         return canvas, view
 
@@ -812,7 +861,7 @@ def plot3d(*args, **kwargs):
 
                 # First, we have to generate slabs from the neurons
                 if 'type' not in neuron.nodes:
-                    neuron = morpho.classify_nodes(neuron)
+                    morpho.classify_nodes(neuron)
 
                 soma = neuron.nodes[neuron.nodes.radius > 1]
 

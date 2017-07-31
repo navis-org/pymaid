@@ -75,15 +75,13 @@ if not module_logger.handlers:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-try:
-    import rpy2.robjects as robjects
-    from rpy2.robjects.packages import importr
-    from rpy2.robjects import pandas2ri
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+from rpy2.robjects import pandas2ri
 
-    cl = robjects.r('class')
-    names = robjects.r('names')
-except:
-    module_logger.error('Package rpy2 not found. Please install!')
+cl = robjects.r('class')
+names = robjects.r('names')
+
 
 try:
     nat = importr('nat')
@@ -363,7 +361,7 @@ def neuron2py(neuron, remote_instance=None):
     return core.CatmaidNeuronList(df, remote_instance=remote_instance)
 
 
-def neuron2r(neuron):
+def neuron2r(neuron, convert_to_um=False):
     """ Converts a PyMaid neuron or list of neurons (DataFrames) to the 
     corresponding neuron/neuronlist object in R.
 
@@ -378,7 +376,9 @@ def neuron2r(neuron):
 
     Parameters
     ----------
-    neuron : {CatmaidNeuron, CatmaidNeuronList, pandas DataFrame}
+    neuron :        {CatmaidNeuron, CatmaidNeuronList, pandas DataFrame}
+    convert_to_um : bool, optional
+                    If True, coordinates are divided by 1000
 
     Returns
     -------
@@ -402,7 +402,7 @@ def neuron2r(neuron):
 
         nlist = {}
         for i in range(neuron.shape[0]):
-            nlist[neuron.ix[i].skeleton_id] = neuron2r(neuron.ix[i])
+            nlist[neuron.ix[i].skeleton_id] = neuron2r(neuron.ix[i], convert_to_um=convert_to_um)
 
         nlist = robjects.ListVector(nlist)
         nlist.rownames = neuron.skeleton_id.tolist()
@@ -420,6 +420,11 @@ def neuron2r(neuron):
 
     elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
         n = neuron
+
+        if convert_to_um:
+            n.nodes[['x','y','z']] /= 1000
+            n.connectors[['x','y','z']] /= 1000
+
         # First convert into format that rcatmaid expects as server response
 
         # Prepare list of parents -> root node's parent "None" has to be
@@ -589,7 +594,8 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
             module_logger.warning(
                 'You have to provide more than a single neuron.')
             raise ValueError('You have to provide more than a single neuron.')
-        rn = neuron2r(x)
+
+        rn = neuron2r(x, convert_to_um = True)
     elif isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
         module_logger.warning(
                 'You have to provide more than a single neuron.')
@@ -600,7 +606,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
         x = pymaid.get_3D_skeleton(x, remote_instance)
-        rn = neuron2r(x)
+        rn = neuron2r(x, convert_to_um = True)
     else:
         module_logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
@@ -612,8 +618,8 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     rn_t = nat_templatebrains.xform_brain(
         rn, sample="FAFB13", reference=reference)
 
-    # Make dotprops
-    xdp = nat.dotprops(rn_t)
+    # Make dotprops and resample
+    xdp = nat.dotprops(rn_t, k=5, resample=1)
 
     # Calculate scores
     scores = r_nblast.nblast(
@@ -629,12 +635,13 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
         # Perform z-score normalization
         matrix = (matrix - matrix.mean()) / matrix.std()
 
+    module_logger.info('Done! Use results.plot_mpl() and matplotlib.pyplot.show() to plot dendrogram.')
+
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
         name_dict = x._summary().set_index('skeleton_id')['neuron_name'].to_dict()
         return cluster.clust_results( matrix, labels = [ name_dict[n] for n in matrix.columns ]  )
     else:
         return cluster.clust_results( matrix )
-
 
 def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
     """ Wrapper to use R's nblast (https://github.com/jefferis/nat). Provide 
@@ -749,15 +756,15 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
         if neuron.shape[0] > 1:
             module_logger.warning(
                 'You provided more than a single neuron. Blasting only against the first: %s' % neuron.ix[0].neuron_name)
-        rn = neuron2r(neuron.ix[0])
+        rn = neuron2r(neuron.ix[0], convert_to_um = True)
     elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
-        rn = neuron2r(neuron)
+        rn = neuron2r(neuron, convert_to_um = True)
     elif isinstance(neuron, str) or isinstance(neuron, int):
         if not remote_instance:
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        rn = neuron2r(pymaid.get_3D_skeleton(neuron, remote_instance).ix[0])
+        rn = neuron2r(pymaid.get_3D_skeleton(neuron, remote_instance).ix[0], convert_to_um = True)
     else:
         module_logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')

@@ -18,7 +18,7 @@ Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.Catm
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
->>> #Plot using standard parameters
+>>> # Plot using standard parameters
 >>> fig, ax = nl.plot2d()
 2017-07-25 14:56:08,701 - pymaid.plot - INFO - Done. Use matplotlib.pyplot.show() to show plot.
 >>> plt.show()
@@ -35,14 +35,26 @@ Adding volumes:
 3D Plotting:
 ------------
 
->>> from pymaid import core, pymaid
+>>> from pymaid import core, pymaid, plot
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
->>> #Plot using standard parameters
+>>> # Plot using standard parameters
 >>> nl.plot3d()
+
+The canvas persistent and survives simply closing the window. Calling :func:`pymaid.plot.plot3d` again will add objects to the canvas and open it again.
+
+>>> # Add another set of neurons
+>>> nl2 = core.CatmaidNeuronList([987675,543210], remote_instance = rm)
+>>> nl2.plot3d()
+>>> # To clear canvas either pass parameter when plotting
+>>> nl2.plot3d(clear3d=True)
+>>> # ... or call explicitly
+>>> plot.clear3d()
+>>> # To wipe canvas from memory
+>>> plot.close3d()
 
 By default, calling :func:`pymaid.plot.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
 
@@ -72,9 +84,9 @@ Adding volumes:
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
->>> #Plot volumes without specifying color
+>>> # Plot volumes without specifying color
 >>> nl.plot3d( volumes = ['v13.LH_R', 'v13_LH_L'] )
->>> #Provide colors
+>>> # Provide colors
 >>> nl.plot3d( volumes = {'v13.LH_R':(255,0,0), 'v13_LH_L':(0,255,0)} )
 
 You can also pass your own custom volumes as dictionarys:
