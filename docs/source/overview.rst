@@ -81,6 +81,8 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.plot.plot2d`: generates 2D plots of neurons
 - :func:`pymaid.plot.plot3d`: uses either `Vispy <http://vispy.org>`_ or `Plotly <http://plot.ly>`_ to generate 3D plots of neurons
 - :func:`pymaid.plot.plot_network`: uses iGraph and `Plotly <http://plot.ly>`_ to generate network plots
+- :func:`pymaid.plot.clear3d`: clear 3D canvas
+- :func:`pymaid.plot.close3d`: close 3D canvas and wipe from memory
 
 :mod:`pymaid.cluster`:
 ----------------------

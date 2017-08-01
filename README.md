@@ -102,6 +102,7 @@ nl.plot3d()
 ```python
 from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
 from pymaid.igraph_catmaid import cluster_nodes_w_synapses
+from scipy import cluster
 
 #Initiate Catmaid instance
 remote_instance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )

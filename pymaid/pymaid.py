@@ -1532,7 +1532,6 @@ def get_review(skids, remote_instance=None):
 
     return df
 
-
 def add_annotations(skids, annotations, remote_instance=None):
     """ Wrapper to add annotation(s) to a list of neuron(s)
 
@@ -2395,10 +2394,12 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     remote_instance :   CATMAID instance; either pass directly to function 
                         or define globally as 'remote_instance'
     user :              single user_id    
-    start_date/ :       dates can be:
-    end_date                - datetime.date
+    start_date :        dates can be:
+                            - datetime.date
                             - datetime.datetime
-                            - string ( YYYY-MM-DD format, e.g. '2016-03-09' )    
+                            - string ( YYYY-MM-DD format, e.g. '2016-03-09' )
+                            - tuple ( YYYY, MMM, DD )    
+    end_date :          see start_date for options
     split :             boolean
                         If True, history will be requested in bouts of 6 months
                         Useful if you want to look at a very big time window 
@@ -2461,15 +2462,20 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    if type(start_date) == type(datetime.date.today()):
+    if isinstance(start_date, datetime.date):
         start_date = start_date.isoformat()
-    elif type(start_date) == type(datetime.datetime.now()):
+    elif isinstance(start_date, datetime.datetime):
         start_date = start_date.isoformat()[:10]
+    elif isinstance(start_date, tuple):
+        start_date = datetime.date(start_date[0],start_date[1],start_date[2]).isoformat()
 
-    if type(end_date) == type(datetime.date.today()):
+    if isinstance(end_date, datetime.date):
         end_date = end_date.isoformat()
-    elif type(end_date) == type(datetime.datetime.now()):
+    elif isinstance(end_date, datetime.datetime):
         end_date = end_date.isoformat()[:10]
+    elif isinstance(end_date, tuple):
+        end_date = datetime.date(end_date[0],end_date[1],end_date[2]).isoformat()
+
 
     rounds = []
     if split:
@@ -2534,7 +2540,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
                      index=[user_list.ix[u].login for u in stats[
                          'stats_table'].keys()],
                      columns=[datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']]),
-        user_list.reset_index()
+        user_list.reset_index(drop=True)
     ],
         index=['cable', 'connector_links', 'reviewed', 'user_details']
     )

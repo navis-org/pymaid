@@ -638,7 +638,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     module_logger.info('Done! Use results.plot_mpl() and matplotlib.pyplot.show() to plot dendrogram.')
 
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
-        name_dict = x._summary().set_index('skeleton_id')['neuron_name'].to_dict()
+        name_dict = x.summary().set_index('skeleton_id')['neuron_name'].to_dict()
         return cluster.clust_results( matrix, labels = [ name_dict[n] for n in matrix.columns ]  )
     else:
         return cluster.clust_results( matrix )

@@ -58,7 +58,7 @@ if not module_logger.handlers:
     module_logger.addHandler(sh)
 
 def clear3d():
-    """ Clear 3D viewer
+    """ Clear 3D canvas
     """
     try:
         canvas = globals()['canvas']
@@ -68,7 +68,7 @@ def clear3d():
         pass
 
 def close3d():
-    """ Close existing 3D (wipes memory)
+    """ Close existing 3D canvas (wipes memory)
     """
     try:
         canvas = globals()['canvas']    
