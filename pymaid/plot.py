@@ -57,26 +57,29 @@ if not module_logger.handlers:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
+
 def clear3d():
     """ Clear 3D canvas
     """
     try:
         canvas = globals()['canvas']
-        canvas.central_widget.remove_widget( canvas.central_widget.children[0] )
+        canvas.central_widget.remove_widget(canvas.central_widget.children[0])
         canvas.update()
     except:
         pass
+
 
 def close3d():
     """ Close existing 3D canvas (wipes memory)
     """
     try:
-        canvas = globals()['canvas']    
+        canvas = globals()['canvas']
         canvas.close()
         globals().pop('canvas')
-        del canvas    
+        del canvas
     except:
         pass
+
 
 def plot2d(*args, **kwargs):
     """ Retrieves 3D skeletons and generates matplotlib object.   
@@ -603,22 +606,22 @@ def plot3d(*args, **kwargs):
         # Should keep it between -1000 and +1000
         max_dim = max([math.fabs(n)
                        for n in [max_x, min_x, max_y, min_y, max_z, min_z]])
-        scale_factor = 1000 / max_dim   
+        scale_factor = 1000 / max_dim
 
-        if kwargs.get('clear3d',False):
+        if kwargs.get('clear3d', False):
             clear3d()
 
-        #If does not exists yet, initialise a canvas object and make global
+        # If does not exists yet, initialise a canvas object and make global
         if 'canvas' not in globals():
             global canvas
             canvas = scene.SceneCanvas(keys='interactive', size=(
-                        fig_width, fig_height), bgcolor='white')
+                fig_width, fig_height), bgcolor='white')
             view = canvas.central_widget.add_view()
 
             # Add camera
             view.camera = scene.TurntableCamera()
 
-            #Set camera range            
+            # Set camera range
             view.camera.set_range((min_x * scale_factor, max_x * scale_factor),
                                   (min_y * scale_factor, max_y * scale_factor),
                                   (min_z * scale_factor, max_z * scale_factor)
@@ -626,21 +629,21 @@ def plot3d(*args, **kwargs):
         else:
             canvas = globals()['canvas']
 
-            #Check if we already have a view, if not (e.g. if plot.clear3d() has been used) add new
+            # Check if we already have a view, if not (e.g. if plot.clear3d()
+            # has been used) add new
             if canvas.central_widget.children:
-                view = canvas.central_widget.children[0]            
+                view = canvas.central_widget.children[0]
             else:
                 view = canvas.central_widget.add_view()
 
                 # Add camera
                 view.camera = scene.TurntableCamera()
 
-                # Set camera range                
+                # Set camera range
                 view.camera.set_range((min_x * scale_factor, max_x * scale_factor),
                                       (min_y * scale_factor, max_y * scale_factor),
                                       (min_z * scale_factor, max_z * scale_factor)
                                       )
-
 
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
@@ -788,8 +791,6 @@ def plot3d(*args, **kwargs):
         # Add a 3D axis to keep us oriented
         #ax = scene.visuals.XYZAxis( )
         # view.add(ax)
-
-        
 
         # And finally: show canvas
         canvas.show()
@@ -1256,7 +1257,9 @@ def plot3d(*args, **kwargs):
                     'Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ... >')
                 return
             else:
-                verts, faces = pymaid.get_volume(v, remote_instance)
+                vol = pymaid.get_volume(v, remote_instance)
+                verts = vol['vertices']
+                faces = vol['faces']
         else:
             verts = volumes[v]['verts']
             faces = volumes[v]['faces']

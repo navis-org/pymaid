@@ -913,7 +913,8 @@ def get_partners(skids, remote_instance=None, threshold=1,  min_size=2, filt=[],
     min_size :          minimum node count of partner
                         (optinal, default = 2 -> hide single-node partners!)
     filt :              list of strings (optional, default = [])
-                        filters for neuron names (partial matches sufficient)
+                        filters partners for neuron names (must be exact) or
+                        skeleton_ids
     directions :        list of strings - default = ['incoming', 'outgoing']
                         use to restrict to either up- or downstream partners
 
@@ -1045,14 +1046,13 @@ def get_partners(skids, remote_instance=None, threshold=1,  min_size=2, filt=[],
     if filt:
         if not isinstance(filt, list):
             filt = [filt]
-        f = [True in [f in name for f in filt]
-             for name in df.neuron_name.tolist()]
-        df = df[f]
 
-    # Reindex concatenated dataframe
-    df.index = range(df.shape[0])
+        filt = [ str(s) for s in f ]
 
-    return df
+        df = df[  df.skeleton_id.isin(filt) | df.neuron_name.isin(filt) ]
+
+    # Return reindexed concatenated dataframe
+    return df.reset_index(drop=True)
 
 
 def get_names(skids, remote_instance=None):
@@ -1532,6 +1532,7 @@ def get_review(skids, remote_instance=None):
 
     return df
 
+
 def add_annotations(skids, annotations, remote_instance=None):
     """ Wrapper to add annotation(s) to a list of neuron(s)
 
@@ -1951,7 +1952,8 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
             list(annotation_ids.keys())[0], 1 - len(annotation_ids)))
 
     annotated_skids = []
-    remote_instance.logger.debug('Retrieving skids for annotationed neurons...')
+    remote_instance.logger.debug(
+        'Retrieving skids for annotationed neurons...')
     for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
@@ -2467,15 +2469,16 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     elif isinstance(start_date, datetime.datetime):
         start_date = start_date.isoformat()[:10]
     elif isinstance(start_date, tuple):
-        start_date = datetime.date(start_date[0],start_date[1],start_date[2]).isoformat()
+        start_date = datetime.date(start_date[0], start_date[
+                                   1], start_date[2]).isoformat()
 
     if isinstance(end_date, datetime.date):
         end_date = end_date.isoformat()
     elif isinstance(end_date, datetime.datetime):
         end_date = end_date.isoformat()[:10]
     elif isinstance(end_date, tuple):
-        end_date = datetime.date(end_date[0],end_date[1],end_date[2]).isoformat()
-
+        end_date = datetime.date(end_date[0], end_date[
+                                 1], end_date[2]).isoformat()
 
     rounds = []
     if split:
@@ -2684,7 +2687,7 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
 
     for v in volumes:
         volume = get_volume(v, remote_instance)
-        verts = np.array(volume[0])
+        verts = volume['vertices']
 
         bbox = ((int(min([v[0] for v in verts])), int(max([v[0] for v in verts]))),
                 (int(min([v[1] for v in verts])),
@@ -2984,6 +2987,9 @@ def get_volume(volume_name, remote_instance=None):
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
+    if not isinstance(volume_name, str):
+        raise TypeError('Volume name must be string')
+
     remote_instance.logger.info('Retrieving volume <%s>' % volume_name)
 
     # First, get volume ID
@@ -3064,7 +3070,7 @@ def get_volume(volume_name, remote_instance=None):
     remote_instance.logger.info(
         '# of faces after clean-up: %i' % len(final_faces))
 
-    return final_vertices, final_faces
+    return dict( vertices = final_vertices, faces = final_faces)
 
 
 def eval_skids(x, remote_instance=None):

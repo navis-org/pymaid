@@ -27,6 +27,7 @@ from tqdm import tqdm
 
 from pymaid import igraph_catmaid, morpho, pymaid, plot
 
+
 class CatmaidNeuron:
     """ 
     Catmaid neuron object holding neuron data: nodes, connectors, name, etc.
@@ -239,8 +240,9 @@ class CatmaidNeuron:
             return self.tags
         elif key == 'n_open_ends':
             if 'nodes' in self.__dict__:
-                closed = self.tags.get('ends',[]) + self.tags.get('uncertain end',[]) + self.tags.get('uncertain continuation',[]) + self.tags.get('not a branch',[]) + self.tags.get('soma',[])
-                return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed ])
+                closed = self.tags.get('ends', []) + self.tags.get('uncertain end', []) + self.tags.get(
+                    'uncertain continuation', []) + self.tags.get('not a branch', []) + self.tags.get('soma', [])
+                return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed])
             else:
                 return 'NA'
         elif key == 'n_branch_nodes':
@@ -472,8 +474,8 @@ class CatmaidNeuron:
                     Either treenode ID or node tag
         """
         morpho.reroot_neuron(self, new_root, inplace=True)
-        
-        #Clear temporary attributes
+
+        # Clear temporary attributes
         self._clear_temp_attr()
 
     def prune_distal_to(self, node):
@@ -484,10 +486,10 @@ class CatmaidNeuron:
         node :      {treenode_id, node tag}
                     Provide either a treenode ID or a (unique) tag
         """
-        dist, prox = morpho.cut_neuron( self, node )
-        self.__init__(prox, self._remote_instance, self._meta_data )
+        dist, prox = morpho.cut_neuron(self, node)
+        self.__init__(prox, self._remote_instance, self._meta_data)
 
-        #Clear temporary attributes
+        # Clear temporary attributes
         self._clear_temp_attr()
 
     def prune_proximal_to(self, node):
@@ -498,13 +500,13 @@ class CatmaidNeuron:
         node :      {treenode_id, node tag}
                     Provide either a treenode ID or a (unique) tag
         """
-        dist, prox = morpho.cut_neuron( self, node )
-        self.__init__(dist, self._remote_instance, self._meta_data )
+        dist, prox = morpho.cut_neuron(self, node)
+        self.__init__(dist, self._remote_instance, self._meta_data)
 
-        #Clear temporary attributes
+        # Clear temporary attributes
         self._clear_temp_attr()
 
-    def prune_by_strahler(self, to_prune=range(1,2) ):
+    def prune_by_strahler(self, to_prune=range(1, 2)):
         """ Prune neuron based on strahler order. Will reroot neuron to
         soma if possible.
 
@@ -521,9 +523,10 @@ class CatmaidNeuron:
                         3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
                         4. ``to_prune = -1`` removes everything but the highest index 
         """
-        morpho.prune_by_strahler( self, to_prune=to_prune, inplace=True, reroot_soma=True )
+        morpho.prune_by_strahler(
+            self, to_prune=to_prune, inplace=True, reroot_soma=True)
 
-        #Clear temporary attributes
+        # Clear temporary attributes
         self._clear_temp_attr()
 
     def reload(self, remote_instance=None):
@@ -541,9 +544,9 @@ class CatmaidNeuron:
 
         n = pymaid.get_3D_skeleton(
             self.skeleton_id, remote_instance=remote_instance)
-        self.__init__(n, self._remote_instance, self._meta_data)        
+        self.__init__(n, self._remote_instance, self._meta_data)
 
-        #Clear temporary attributes
+        # Clear temporary attributes
         self._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
@@ -613,9 +616,10 @@ class CatmaidNeuron:
             annotations = True
 
         return pd.Series([type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, self.n_open_ends, self.cable_length, review_status, soma_temp, annotations, igraph, tags, self._remote_instance != None],
-                               index=['type', 'neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes',
-                                      'n_open_ends', 'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'tags', 'remote_instance']
-                               )
+                         index=['type', 'neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes',
+                                'n_open_ends', 'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'tags', 'remote_instance']
+                         )
+
 
 class CatmaidNeuronList:
     """ Catmaid neuron list. It is designed to work in many ways much like a 
@@ -760,7 +764,8 @@ class CatmaidNeuronList:
 
         Returns
         -------
-        pandas DataFrame                
+        pandas DataFrame  
+
         """
         d = []
         for n in self.neurons[:None]:
@@ -885,7 +890,8 @@ class CatmaidNeuronList:
     def __getitem__(self, key):
         if isinstance(key, str):
             if key.startswith('annotation:'):
-                skids = pymaid.eval_skids(key, remote_instance = self._remote_instance)
+                skids = pymaid.eval_skids(
+                    key, remote_instance=self._remote_instance)
                 subset = self[skids]
             else:
                 subset = [
@@ -927,6 +933,7 @@ class CatmaidNeuronList:
         ----------
         factor :    int, optional
                     Factor by which to downsample the neurons. Default = 5
+
         """
         if not inplace:
             nl_copy = self.copy()
@@ -934,7 +941,7 @@ class CatmaidNeuronList:
             return nl_copy
 
         _set_loggers('ERROR')
-        for n in tqdm(self.neurons, desc='Downsampling'):        
+        for n in tqdm(self.neurons, desc='Downsampling'):
             n.downsample(factor=factor)
         _set_loggers('INFO')
 
@@ -963,17 +970,17 @@ class CatmaidNeuronList:
         node :      node tag
                     A (unique) tag at which to cut the neurons
 
-        """         
+        """
 
         _set_loggers('ERROR')
         for n in tqdm(self.neurons, desc='Pruning'):
             try:
-                n.prune_proximal_to(tag)        
+                n.prune_proximal_to(tag)
             except:
                 pass
         _set_loggers('INFO')
 
-    def prune_by_strahler(self, to_prune=range(1,2) ):
+    def prune_by_strahler(self, to_prune=range(1, 2)):
         """ Prune neurons based on strahler order. Will reroot neurons to
         soma if possible.
 
@@ -989,12 +996,12 @@ class CatmaidNeuronList:
                         2. ``to_prune = [1,2]`` removes indices 1 and 2
                         3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
                         4. ``to_prune = -1`` removes everything but the highest index 
-        
+
         """
 
         _set_loggers('ERROR')
         for n in tqdm(self.neurons, desc='Pruning'):
-            n.prune_by_strahler( to_prune=to_prune )
+            n.prune_by_strahler(to_prune=to_prune)
         _set_loggers('INFO')
 
     def get_review(self, skip_existing=False):
@@ -1168,11 +1175,13 @@ class CatmaidNeuronList:
         """Return summary for top N neurons"""
         return str(self.summary(n=n))
 
+
 def _set_loggers(level='ERROR'):
-    """Helper function to set levels for all associated module loggers """    
-    morpho.module_logger.setLevel(level)    
+    """Helper function to set levels for all associated module loggers """
+    morpho.module_logger.setLevel(level)
     igraph_catmaid.module_logger.setLevel(level)
     plot.module_logger.setLevel(level)
+
 
 class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow

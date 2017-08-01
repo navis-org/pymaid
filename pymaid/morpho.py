@@ -24,6 +24,7 @@ import logging
 import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
+from pyoctree import pyoctree
 
 from pymaid import pymaid, igraph_catmaid, core
 
@@ -137,6 +138,7 @@ def classify_nodes(skdata, inplace=True):
 
     if not inplace:
         return skdata
+
 
 def _generate_slabs(x, append=True):
     """ Generate slabs of a given neuron.
@@ -291,29 +293,27 @@ def downsample_neuron(skdata, resampling_factor, inplace=False):
     new_nodes = df.nodes[
         [n.treenode_id in new_parents for n in df.nodes.itertuples()]]
     new_nodes.parent_id = [new_parents[n.treenode_id]
-                           for n in new_nodes.itertuples()]    
+                           for n in new_nodes.itertuples()]
 
-    
-    #We have to temporarily set parent of root node from 1 to an integer
-    root_index = new_nodes[ new_nodes.parent_id.isnull() ].index[0]
-    new_nodes.loc[ root_index, 'parent_id' ] = 0
+    # We have to temporarily set parent of root node from 1 to an integer
+    root_index = new_nodes[new_nodes.parent_id.isnull()].index[0]
+    new_nodes.loc[root_index, 'parent_id'] = 0
 
     new_nodes.parent_id = new_nodes.parent_id.values.astype(
         int)  # first convert everything to int
     new_nodes.parent_id = new_nodes.parent_id.values.astype(
-        object)  # then back to object so that we can add a 'None'    
+        object)  # then back to object so that we can add a 'None'
 
-    #Reassign parent_id None to root node
-    new_nodes.loc[ root_index, 'parent_id' ] = None
-    
+    # Reassign parent_id None to root node
+    new_nodes.loc[root_index, 'parent_id'] = None
 
     module_logger.info('Nodes before/after: %i/%i ' %
                        (len(df.nodes), len(new_nodes)))
 
-    df.nodes = new_nodes    
+    df.nodes = new_nodes
 
-    #This is essential -> otherwise e.g. igraph_catmaid.neuron2graph will fail
-    df.nodes.reset_index(inplace=True,drop=True)
+    # This is essential -> otherwise e.g. igraph_catmaid.neuron2graph will fail
+    df.nodes.reset_index(inplace=True, drop=True)
 
     if not inplace:
         return df
@@ -381,6 +381,7 @@ def longest_neurite(skdata, root_to_soma=False):
         tn_to_preverse)].reset_index(drop=True)
 
     return df
+
 
 def reroot_neuron(skdata, new_root, g=None, inplace=False):
     """ Uses igraph to reroot the neuron at given point. 
@@ -501,10 +502,10 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     df.nodes.parent_id = df.nodes.parent_id.values.astype(
         object)  # then back to object so that we can add a 'None'
     # Set parent_id to None (previously 0 as placeholder)
-    df.nodes.loc[new_root, 'parent_id'] = None    
+    df.nodes.loc[new_root, 'parent_id'] = None
     df.nodes.reset_index(inplace=True)  # Reset index
 
-    #Recalculate node types
+    # Recalculate node types
     classify_nodes(df)
 
     # Recalculate graph
@@ -517,6 +518,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
         return df
     else:
         return
+
 
 def cut_neuron(skdata, cut_node, g=None):
     """ Uses igraph to Cut the neuron at given point and returns two new neurons.
@@ -565,7 +567,8 @@ def cut_neuron(skdata, cut_node, g=None):
         g = df.igraph
 
     if g is None:
-        # Generate iGraph -> order/indices of vertices are the same as in skdata
+        # Generate iGraph -> order/indices of vertices are the same as in
+        # skdata
         g = igraph_catmaid.neuron2graph(df)
     else:
         g = g.copy()
@@ -575,12 +578,14 @@ def cut_neuron(skdata, cut_node, g=None):
         if cut_node not in df.tags:
             module_logger.error(
                 'Found no treenodes with tag %s - please double check!' % str(cut_node))
-            raise ValueError('Found no treenodes with tag %s - please double check!' % str(cut_node))
+            raise ValueError(
+                'Found no treenodes with tag %s - please double check!' % str(cut_node))
 
         elif len(df.tags[cut_node]) > 1:
             module_logger.warning(
                 'Found multiple treenodes with tag %s - please double check!' % str(cut_node))
-            raise ValueError('Found multiple treenodes with tag %s - please double check!' % str(cut_node))
+            raise ValueError(
+                'Found multiple treenodes with tag %s - please double check!' % str(cut_node))
         else:
             cut_node = df.tags[cut_node][0]
 
@@ -593,7 +598,8 @@ def cut_neuron(skdata, cut_node, g=None):
     except:
         module_logger.error(
             'No treenode with ID %s in graph - please double check!' % str(cut_node))
-        raise ValueError('No treenode with ID %s in graph - please double check!' % str(cut_node))
+        raise ValueError(
+            'No treenode with ID %s in graph - please double check!' % str(cut_node))
 
     # Select the cut node's parent
     try:
@@ -1171,7 +1177,8 @@ def calc_strahler_index(skdata, return_dict=False):
 
     return df
 
-def prune_by_strahler( x, to_prune=range(1,2), reroot_soma=True, inplace=False, force_strahler_update= False ):
+
+def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, force_strahler_update=False):
     """ Prune neuron based on strahler order
 
     Parameters
@@ -1195,44 +1202,48 @@ def prune_by_strahler( x, to_prune=range(1,2), reroot_soma=True, inplace=False, 
 
     if isinstance(x, core.CatmaidNeuron):
         neuron = x
-    elif isinstance(x, core.CatmaidNeuronList):        
-        temp = [ prune_by_strahler(n, to_prune = to_prune, inplace=inplace ) for n in x ]
+    elif isinstance(x, core.CatmaidNeuronList):
+        temp = [prune_by_strahler(
+            n, to_prune=to_prune, inplace=inplace) for n in x]
         if not inplace:
-            return core.CatmaidNeuronList( temp, x._remote_instance )
+            return core.CatmaidNeuronList(temp, x._remote_instance)
         else:
             return
 
-    #Make a copy if necessary before making any changes
+    # Make a copy if necessary before making any changes
     if not inplace:
         neuron = neuron.copy()
 
     if reroot_soma and neuron.soma:
-       neuron.reroot( neuron.soma )
+        neuron.reroot(neuron.soma)
 
     if 'strahler_index' not in neuron.nodes or force_strahler_update:
-        calc_strahler_index(neuron)        
+        calc_strahler_index(neuron)
 
-    #Prepare indices
-    if isinstance(to_prune,int) and to_prune < 0:
-        to_prune =  range( 1, neuron.nodes.strahler_index.max() + ( to_prune + 1) )
-    elif isinstance(to_prune,int):
-        to_prune = [ to_prune ]
-    elif isinstance(to_prune,range):
-        to_prune = list( to_prune )    
+    # Prepare indices
+    if isinstance(to_prune, int) and to_prune < 0:
+        to_prune = range(1, neuron.nodes.strahler_index.max() + (to_prune + 1))
+    elif isinstance(to_prune, int):
+        to_prune = [to_prune]
+    elif isinstance(to_prune, range):
+        to_prune = list(to_prune)
 
-    neuron.nodes = neuron.nodes[ ~neuron.nodes.strahler_index.isin(to_prune) ].reset_index(drop=True)
-    neuron.connectors = neuron.connectors[ neuron.connectors.treenode_id.isin( neuron.nodes.treenode_id ) ].reset_index(drop=True)
+    neuron.nodes = neuron.nodes[
+        ~neuron.nodes.strahler_index.isin(to_prune)].reset_index(drop=True)
+    neuron.connectors = neuron.connectors[neuron.connectors.treenode_id.isin(
+        neuron.nodes.treenode_id)].reset_index(drop=True)
 
     neuron.df.nodes = neuron.nodes
-    neuron.df.connectors = neuron.connectors   
+    neuron.df.connectors = neuron.connectors
 
-    #Remove temporary attributes
+    # Remove temporary attributes
     neuron._clear_temp_attr()
 
     if not inplace:
         return neuron
     else:
         return
+
 
 def _walk_to_root(start_node, list_of_parents, visited_nodes):
     """ Helper function for synapse_root_distances(): 
@@ -1278,8 +1289,65 @@ def _walk_to_root(start_node, list_of_parents, visited_nodes):
     return round(sum(distances_traveled)), visited_nodes
 
 
-def in_volume(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
-    """ Uses scipy to test if points are within a given CATMAID volume.
+def in_volume(points, volume, remote_instance=None):
+    """ Uses pyoctree to test if points are within a given CATMAID volume.
+    A ray is shot in random direction and checked for intersection with the
+    volume. Odd number of intersections mean point is inside the volume
+
+    Parameters
+    ----------
+    points :          {list of tuples, pandas DataFrame}
+                      Coordinates:  
+                      1. List/np array -  ``[ ( x, y , z ), [ ... ] ]``
+                      2. DataFrame - needs to have 'x','y','z' columns                      
+    volume :          {str, volume dict} 
+                      Name of the CATMAID volume to test OR dict with 
+                      {'vertices':[],'faces':[]} as returned by e.g. 
+                      :func:`pymaid.pymaid.get_volume()`
+    remote_instance : CATMAID instance, optional
+                      Pass if volume is a volume name
+
+    Returns
+    -------
+    list of bool
+                      True if in volume, False if not
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+
+    if isinstance(volume, str):
+        volume = pymaid.get_volume(volume, remote_instance)
+
+    # Create octree
+    tree = pyoctree.PyOctree(np.array(volume['vertices'], dtype=float),
+                             np.array(volume['faces'], dtype=np.int32)
+                             )
+
+    # Generate rays for points
+    mx = np.array(volume['vertices']).max(axis=0)
+    mn = np.array(volume['vertices']).min(axis=0)
+
+    if isinstance(points, pd.DataFrame):
+        points = points[['x', 'y', 'z']].as_matrix()
+
+    # Rays are along z axis
+    rayPointList = np.array(
+        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+
+    # Unfortunately rays are bidirectional -> we have to filter intersections
+    # by those that occur "above" the point
+    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
+                         2] >= points[k][2]])for k, ray in enumerate(rayPointList)]
+
+    # Count odd intersection
+    return [i % 2 != 0 for i in intersections]
+
+
+def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
+    """ DEPCREATED!
+    Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 
 
@@ -1315,13 +1383,13 @@ def in_volume(points, volume, remote_instance=None, approximate=False, ignore_ax
     if type(volume) == type(str()):
         volume = pymaid.get_volume(volume, remote_instance)
 
-    verts = np.array(volume[0])
+    verts = volume['vertices']
 
     if not approximate:
         intact_hull = ConvexHull(verts)
         intact_verts = list(intact_hull.vertices)
 
-        if type(points) == type(list()):
+        if isinstance(points, list):
             points = pd.DataFrame(points)
 
         return [list(ConvexHull(np.append(verts, list([p]), axis=0)).vertices) == intact_verts for p in points.itertuples(index=False)]

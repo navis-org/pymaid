@@ -47,7 +47,8 @@ setup(
         "pandas>=0.18.1",        
         "vispy>=0.4.0",
         "tqdm>=4.14.0",
-        "pyqt5"
+        "pyqt5",
+        "pyoctree>=0.2.2"
         #"rpy2>=2.8.5", #This throws an error when no R is installed on the system 
     ],
 )

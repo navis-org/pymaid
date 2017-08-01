@@ -402,7 +402,8 @@ def neuron2r(neuron, convert_to_um=False):
 
         nlist = {}
         for i in range(neuron.shape[0]):
-            nlist[neuron.ix[i].skeleton_id] = neuron2r(neuron.ix[i], convert_to_um=convert_to_um)
+            nlist[neuron.ix[i].skeleton_id] = neuron2r(
+                neuron.ix[i], convert_to_um=convert_to_um)
 
         nlist = robjects.ListVector(nlist)
         nlist.rownames = neuron.skeleton_id.tolist()
@@ -422,8 +423,9 @@ def neuron2r(neuron, convert_to_um=False):
         n = neuron
 
         if convert_to_um:
-            n.nodes[['x','y','z']] /= 1000
-            n.connectors[['x','y','z']] /= 1000
+            n = n.copy()
+            n.nodes[['x', 'y', 'z']] /= 1000
+            n.connectors[['x', 'y', 'z']] /= 1000
 
         # First convert into format that rcatmaid expects as server response
 
@@ -443,12 +445,13 @@ def neuron2r(neuron, convert_to_um=False):
                                   })
 
         if n.nodes[n.nodes.radius > 500].shape[0] == 1:
-            soma_id = n.nodes[n.nodes.radius > 500].treenode_id.tolist()[0]
+            soma_id = int(
+                n.nodes[n.nodes.radius > 500].treenode_id.tolist()[0])
         else:
             soma_id = robjects.r('NULL')
 
         # Generate nat neuron
-        n_r = nat.as_neuron(swc, origin=int(soma_id), skid=n.skeleton_id)
+        n_r = nat.as_neuron(swc, origin=soma_id, skid=n.skeleton_id)
 
         # Convert back to python dict so that we can add additional data
         n_py = {n_r.names[i]: n_r[i] for i in range(len(n_r))}
@@ -595,10 +598,10 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
                 'You have to provide more than a single neuron.')
             raise ValueError('You have to provide more than a single neuron.')
 
-        rn = neuron2r(x, convert_to_um = True)
+        rn = neuron2r(x, convert_to_um=True)
     elif isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
         module_logger.warning(
-                'You have to provide more than a single neuron.')
+            'You have to provide more than a single neuron.')
         raise ValueError('You have to provide more than a single neuron.')
     elif isinstance(x, list):
         if not remote_instance:
@@ -606,20 +609,15 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
         x = pymaid.get_3D_skeleton(x, remote_instance)
-        rn = neuron2r(x, convert_to_um = True)
+        rn = neuron2r(x, convert_to_um=True)
     else:
         module_logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
         raise ValueError(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
 
-    # Bring into reference space (otherwise scores will be crazy)
-    reference = robjects.r('nat.flybrains::FCWB')
-    rn_t = nat_templatebrains.xform_brain(
-        rn, sample="FAFB13", reference=reference)
-
     # Make dotprops and resample
-    xdp = nat.dotprops(rn_t, k=5, resample=1)
+    xdp = nat.dotprops(rn, k=5, resample=1)
 
     # Calculate scores
     scores = r_nblast.nblast(
@@ -635,13 +633,19 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
         # Perform z-score normalization
         matrix = (matrix - matrix.mean()) / matrix.std()
 
-    module_logger.info('Done! Use results.plot_mpl() and matplotlib.pyplot.show() to plot dendrogram.')
+    module_logger.info(
+        'Done! Use results.plot_mpl() and matplotlib.pyplot.show() to plot dendrogram.')
 
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
-        name_dict = x.summary().set_index('skeleton_id')['neuron_name'].to_dict()
-        return cluster.clust_results( matrix, labels = [ name_dict[n] for n in matrix.columns ]  )
+        name_dict = x.summary().set_index('skeleton_id')[
+            'neuron_name'].to_dict()
+        res = cluster.clust_results(
+            matrix, labels=[name_dict[n] for n in matrix.columns])
+        res.neurons = x
+        return res
     else:
-        return cluster.clust_results( matrix )
+        return cluster.clust_results(matrix)
+
 
 def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
     """ Wrapper to use R's nblast (https://github.com/jefferis/nat). Provide 
@@ -756,15 +760,16 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
         if neuron.shape[0] > 1:
             module_logger.warning(
                 'You provided more than a single neuron. Blasting only against the first: %s' % neuron.ix[0].neuron_name)
-        rn = neuron2r(neuron.ix[0], convert_to_um = True)
+        rn = neuron2r(neuron.ix[0], convert_to_um=True)
     elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
-        rn = neuron2r(neuron, convert_to_um = True)
+        rn = neuron2r(neuron, convert_to_um=True)
     elif isinstance(neuron, str) or isinstance(neuron, int):
         if not remote_instance:
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        rn = neuron2r(pymaid.get_3D_skeleton(neuron, remote_instance).ix[0], convert_to_um = True)
+        rn = neuron2r(pymaid.get_3D_skeleton(
+            neuron, remote_instance).ix[0], convert_to_um=True)
     else:
         module_logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
@@ -943,7 +948,8 @@ class nbl_results:
             faces = faces.tolist()
             # [ [i,i+1,i+2] for i in range( int( len(verts)/3 ) ) ]
 
-            volumes = {self.param['reference'][8][0]: {'verts': verts, 'faces': faces}}
+            volumes = {self.param['reference'][8][0]
+                : {'verts': verts, 'faces': faces}}
         else:
             volumes = []
 
