@@ -548,33 +548,41 @@ def get_3D_skeleton(skids, remote_instance=None, connector_flag=1, tag_flag=1, g
                         if True:   a CatmaidNeuron for single neurons or a
                                    CatmaidNeuronList for multiple neurons 
                                    is returned
-                        if False:  a pandas DataFrame is returned.
+                        if False:  a pandas.DataFrame is returned.
     kwargs :            Above boolean parameters can also be passed as dict
                         this is utilized in CatmaidNeuron objects
                         will override explicitly set parameters!
 
     Returns
     -------
-    Either:    
-        a)  CatmaidNeuron (for single neuron)
-        b)  CatmaidNeuronList (list of neurons)
-        c)  Pandas dataframe (if return_neuron == False):
+    :class:`pymaid.core.CatmaidNeuron`
+                        For single neurons        
+    :class:`pymaid.core.CatmaidNeuronList`
+                        For a list of neurons
+    pandas.DataFrame
+                        If return_neuron is False
 
-    These objects contain for each neuron:
+    Notes
+    -----    
+    The returned object contain for each neuron::
+
         neuron_name :           string
         skeleton_id :           string
-        nodes / connectors :    Pandas dataframes containing treenode/connector 
+        nodes / connectors :    pandas.DataFrames containing treenode/connector 
                                 ID, coordinates, parent nodes, etc.
         tags :                  dict containing the treenode tags: 
                                 { 'tag' : [ treenode_id, treenode_id, ... ] }        
 
     Dataframe column titles for nodes and connectors should be self explanatory 
-    with one exception:
+    with one exception::
 
-    connectors['relation'] :    0 = presynapse
-                                1 = postsynapse
-                                2 = gap junction
-                                3 = abutting connector
+        ``connectors['relation']`` ::    
+                {
+                    0 = presynapse
+                    1 = postsynapse
+                    2 = gap junction
+                    3 = abutting connector
+                }
     """
 
     if remote_instance is None:
@@ -725,24 +733,23 @@ def get_arbor(skids, remote_instance=None, node_flag=1, connector_flag=1, tag_fl
 
     Returns
     -------
-    Pandas DataFrame (df)
+    pandas.DataFrame
+        Contains the following data::
 
-    Notes
-    -----
-    Returned DataFrame looks like this:
+        >>> df
+        ...  neuron_name   skeleton_id   nodes      connectors   tags
+        ... 0  str             str      node_df      conn_df     dict 
+        
+        
+        - nodes and connectors are pandas.DataFrames themselves
+        - tags is a dict: ``{ 'tag' : [ treenode_id, treenode_id, ... ] }``
 
-    >>> df
-    ...  neuron_name   skeleton_id   nodes      connectors   tags
-    ... 0  str             str      node_df      conn_df     dict 
-    
-    
-    - nodes and connectors are Pandas dataframes themselves
-    - tags is a dict: { 'tag' : [ treenode_id, treenode_id, ... ] }
+        Dataframe column titles should be self explanatory with these exception:
 
-    Dataframe column titles should be self explanatory with these exception:
-    - conn_df['relation_1'] describes treenode_1 to/from connector
-    - conn_df['relation_2'] describes treenode_2 to/from connector
-    - 'relations' can be: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction)
+        - conn_df['relation_1'] describes treenode_1 to/from connector
+        - conn_df['relation_2'] describes treenode_2 to/from connector
+        - 'relations' can be: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction)
+
     """
 
     if remote_instance is None:
@@ -818,23 +825,20 @@ def get_partners_in_volume(skids, volume, remote_instance=None, threshold=1, min
 
     Returns
     ------- 
-    Pandas dataframe (df)
+    pandas.DataFrame
+        Returned DataFrame looks like this::
 
-    Notes
-    -----
-    Returned DataFrame looks like this:    
+        >>> df
+        ...  neuron_name  skeleton_id  num_nodes   relation     skid1  skid2 ...
+        ... 1  name1         skid1    node_count1  upstream     n_syn  n_syn ...
+        ... 2  name2         skid2    node_count2  downstream   n_syn  n_syn ...   
+        ... 3  name3         skid3    node_count3  gapjunction  n_syn  n_syn ...        
 
-    >>> df
-    ...  neuron_name  skeleton_id  num_nodes   relation     skid1  skid2 ...
-    ... 1  name1         skid1    node_count1  upstream      n_syn  n_syn ...
-    ... 2  name2         skid2    node_count2  downstream    n_syn  n_syn ...   
-    ... 3  name3         skid3    node_count3  gapjunction   n_syn  n_syn ...        
-
-    - Relation can be: upstream (incoming), downstream (outgoing) of the neurons
-    of interest or gap junction
-    - partners can show up multiple times if they are e.g. pre- AND postsynaptic
-    - the number of connections between two partners is not restricted to the
-    volume
+        - Relation can be: upstream (incoming), downstream (outgoing) of the neurons
+        of interest or gap junction
+        - partners can show up multiple times if they are e.g. pre- AND postsynaptic
+        - the number of connections between two partners is not restricted to the
+        volume
 
     See Also
     --------
@@ -923,18 +927,22 @@ def get_partners(skids, remote_instance=None, threshold=1,  min_size=2, filt=[],
 
     Returns
     ------- 
-    Pandas dataframe (df): 
-    |    neuron_name  skeleton_id   num_nodes   relation     skid1  skid2 ....
-    | 0   name1         skid1      node_count1  upstream     n_syn  n_syn ...
-    | 1   name2         skid2      node_count2  downstream   n_syn  n_syn ..   
-    | 2   name3         skid3      node_count3  gapjunction  n_syn  n_syn .
-    | ...    
+    pandas.DataFrame
+        Returned DataFrame looks like this::
 
-    Relation can be: upstream (incoming), downstream (outgoing) of the neurons
+        >>> df
+        ...   neuron_name  skeleton_id    num_nodes    relation    skid1  skid2 ....
+        ... 0   name1         skid1      node_count1  upstream     n_syn  n_syn ...
+        ... 1   name2         skid2      node_count2  downstream   n_syn  n_syn ..   
+        ... 2   name3         skid3      node_count3  gapjunction  n_syn  n_syn .            
+        ... ...
+
+    Relation can be:: upstream (incoming), downstream (outgoing) of the neurons
     of interest or gap junction
 
-    NOTE: partners can show up multiple times if they are e.g. pre- AND 
-    postsynaptic
+    Notes
+    -----
+    Partners can show up multiple times if they are e.g. pre- AND postsynaptic!
 
     Examples
     --------
@@ -1073,7 +1081,8 @@ def get_names(skids, remote_instance=None):
 
     Returns
     ------- 
-    dict :           ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
+    dict            
+                        ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
     """
 
     if remote_instance is None:
@@ -1121,9 +1130,12 @@ def get_node_user_details(treenode_ids, remote_instance=None):
 
     Returns
     ------- 
-    Pandas dataframe
-        contains `treenode_id`, `creation_time`, `user`, `edition_time`, 
-        `editor`, `reviewers`, `review_times`
+    pandas.DataFrame
+        Returned DataFrame looks like this::
+
+        >>> df
+        ... treenode_id creation_time`, `user`, `edition_time`, 
+        ...`editor`, `reviewers`, `review_times`
 
     """
 
@@ -1187,7 +1199,7 @@ def get_treenode_table(skids, remote_instance=None):
 
     Returns
     ------- 
-    pandas DataFrame
+    pandas.DataFrame
     |   skeleton_id treenode_id parent_id confidence x y z radius creator last_edition reviewers tag
     | 0  123          123     124      5        ...    
     | 1  123          124     125      5        ..
@@ -1263,7 +1275,7 @@ def get_edges(skids, remote_instance=None):
 
     Returns
     -------
-    Pandas dataframe 
+    pandas.DataFrame 
     |    source_skid     target_skid     weight 
     | 1     
     | 2     
@@ -1326,16 +1338,17 @@ def get_connectors(skids, remote_instance=None, incoming_synapses=True, outgoing
 
     Returns
     ------- 
-    | Pandas dataframe (df)     
-    |   skeleton_id  connector_id  x  y  z  confidence  creator_id  \
-    | 0
-    | 1
-    | ...
-    |
-    |  treenode_id  creation_time  edition_time type
-    | 0
-    | 1
-    | ...
+    pandas.DataFrame
+        Each row represents a connector::
+
+        >>> df
+        ... skeleton_id  connector_id  x  y  z  confidence  creator_id  \
+        ... 0
+        ... 1
+        ...        
+        ... treenode_id  creation_time  edition_time type
+        ... 0
+        ... 1        
 
     Notes
     -----
@@ -1420,22 +1433,19 @@ def get_connector_details(connector_ids, remote_instance=None):
 
     Returns
     ------- 
-    Pandas DataFrame
+    pandas.DataFrame
+        Each row represents a connector
 
-    Notes
-    -----
-    Returned DataFrame looks like this:
-
-    >>> df    
-    ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node \
-    ... 0
-    ... 1
-    ... 2
-    ...
-    ... postsynaptic_to_node
-    ... 0
-    ... 1
-    ... 2    
+        >>> df    
+        ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node \
+        ... 0
+        ... 1
+        ... 2
+        ...
+        ... postsynaptic_to_node
+        ... 0
+        ... 1
+        ... 2    
     """
 
     if remote_instance is None:
@@ -1489,23 +1499,20 @@ def get_review(skids, remote_instance=None):
 
     Returns
     ------- 
-    Pandas DataFrame
+    pandas.DataFrame
+        Each row represents a neuron
 
-    Notes
-    -----
-    Returned DataFrame looks like this:
-
-    >>> df
-    ...   skeleton_id neuron_name total_node_count nodes_reviewed percent_reviewed
-    ... 0    
-    ... 1
-    ... 2
+        >>> df
+        ...   skeleton_id neuron_name total_node_count nodes_reviewed percent_reviewed
+        ... 0    
+        ... 1
+        ... 2
 
     See Also
     --------
     :func:`pymaid.pymaid.get_review_details`
-                        Gives you review status for individual nodes of a 
-                        given neuron   
+        Gives you review status for individual nodes of a 
+        given neuron   
 
     """
 
@@ -1614,16 +1621,13 @@ def get_neuron_annotation(skid, remote_instance=None):
 
     Returns
     ------- 
-    Pandas DataFrame
+    pandas.DataFrame
+        Each row represents a single annotation
 
-    Notes
-    -----
-    Returned DataFrame looks like this:
-
-    >>> df
-    ...    annotation  time_annotated  unknown  user_id  annotation_id  user
-    ... 0
-    ... 1    
+        >>> df
+        ...    annotation  time_annotated  unknown  user_id  annotation_id  user
+        ... 0
+        ... 1    
 
     See Also
     --------
@@ -1696,8 +1700,8 @@ def get_annotations_from_list(skids, remote_instance=None):
 
     Returns
     -------
-    dict :
-    ``{ skeleton_id : [ annnotation, annotation ], ... }``
+    dict 
+                        ``{ skeleton_id : [ annnotation, annotation ], ... }``
 
     See Also
     --------
@@ -1763,7 +1767,7 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
 
     Returns
     -------
-    dict :
+    dict 
                         ``{ 'annotation_name' : 'annotation_id', ....}``
     """
 
@@ -1837,7 +1841,7 @@ def has_soma(skids, remote_instance=None):
 
     Returns
     -------
-    dict :
+    dict 
                         ``{ 'skid' : True, 'skid1' : False }``
     """
 
@@ -1888,17 +1892,14 @@ def get_skids_by_name(tag, remote_instance=None, allow_partial=True):
 
     Returns
     -------
-    pandas DataFrame
+    pandas.DataFrame
+        Each row represents a neuron        
 
-    Notes
-    -----
-    Returned DataFrame looks like this:
-    
-    >>> df
-    ...   name   skeleton_id
-    ... 0
-    ... 1
-    ... 2
+        >>> df
+        ...   name   skeleton_id
+        ... 0
+        ... 1
+        ... 2
 
     """
 
@@ -2109,19 +2110,16 @@ def get_review_details(skids, remote_instance=None):
 
     Returns
     -------
-    list :
-                        list of reviewed nodes 
+    list
+        list of reviewed nodes 
 
-    Notes
-    -----
-    Returned list looks like this:
-    >>> print(l)
-    ... [   node_id, 
-    ...   [ 
-    ...   [ reviewer1, timestamp],
-    ...   [ reviewer2, timestamp] 
-    ...   ] 
-    ... ]
+        >>> print(l)
+        ... [   node_id, 
+        ...   [ 
+        ...   [ reviewer1, timestamp],
+        ...   [ reviewer2, timestamp] 
+        ...   ] 
+        ... ]
 
     """
 
@@ -2178,16 +2176,13 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
 
     Returns
     -------
-    Pandas DataFrame   
+    pandas.DataFrame   
+        Each row represents a single operation
 
-    Notes
-    -----
-    Returned DataFrame looks like this: 
-
-    >>> df
-    ...  user   operation   timestamp   x  y  z  explanation 
-    ... 0
-    ... 1
+        >>> df
+        ...   user   operation   timestamp   x  y  z  explanation 
+        ... 0
+        ... 1
     
     """
 
@@ -2282,21 +2277,25 @@ def get_contributor_statistics(skids, remote_instance=None, separate=False):
 
     Returns
     -------
-    Pandas dataframe
-    |    skeleton_id node_contributors multiuser_review_minutes  ..      
-    | 1
-    | 2
-    | 3
-    |
-    | ..  post_contributors construction_minutes  min_review_minutes  .. 
-    | 1
-    | 2
-    | 3
-    |
-    | ..  n_postsynapses  n_presynapses pre_contributors  n_nodes
-    | 1
-    | 2
-    | 3
+    pandas.DataFrame
+        Returned DataFrame looks like this::
+
+        >>> df
+        ...    skeleton_id node_contributors multiuser_review_minutes  ..      
+        ... 1
+        ... 2
+        ... 3
+        ...
+        ...   post_contributors construction_minutes  min_review_minutes  .. 
+        ... 1
+        ... 2
+        ... 3
+        ...
+        ...   n_postsynapses  n_presynapses pre_contributors  n_nodes
+        ... 1
+        ... 2
+        ... 3
+
     """
     if remote_instance is None:
         if 'remote_instance' in globals():
@@ -2388,7 +2387,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     Returns
     -------
     list              
-    ``[ skid, skid, skid, ... ]``
+                        ``[ skid, skid, skid, ... ]``
     """
 
     if remote_instance is None:
@@ -2446,8 +2445,8 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
 
     Returns
     -------
-    pandas Series:
-
+    pandas.Series
+                        The Series has the following entries::
     cable :             DataFrame containing cable created in nm. 
                         Rows = users, columns = dates
     connector_links :   DataFrame containing connector links created. 
@@ -2611,24 +2610,28 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance, coord
     Returns
     -------
     dict
-    contains the following entries
+        contains the following entries::
 
-    'treenodes' : pandas DataFrame
-    |  id parent_id x y z confidence radius skeleton_id edition_time user_id
-    | 0
-    | 1
-    | 2
+        ``treenodes`` : pandas.DataFrame::
 
-    'connectors' : pandas DataFrame
-    |  id x y z confidence edition_time user_id partners
-    | 0
-    | 1
-    | 2
+        >>> df
+        ...   id parent_id x y z confidence radius skeleton_id edition_time user_id
+        ... 0
+        ... 1
+        ... 2
+        
+        ``connectors`` : pandas.DataFrame::
+        
+        >>> df
+        ...    id x y z confidence edition_time user_id partners
+        ... 0
+        ... 1
+        ... 2
 
-    'labels' : ``{ treenode_id : [ labels ] }``
+        ``labels`` : ``{ treenode_id : [ labels ] }``
 
-    'node_limit_reached' : boolean 
-    If true, we have reached the node limit
+        ``node_limit_reached`` : boolean; if True, node limit was exceeded
+                
 
     """
 
@@ -2700,7 +2703,7 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
     Returns
     --------
     list                  
-    ``[ skeleton_id, skeleton_id, ... ]``
+                            ``[ skeleton_id, skeleton_id, ... ]``
 
     See Also
     --------
@@ -2790,7 +2793,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
     Returns
     --------
     list
-    ``[ skeleton_id, skeleton_id, ... ]``
+                            ``[ skeleton_id, skeleton_id, ... ]``
     """
 
     if remote_instance is None:
@@ -2959,11 +2962,13 @@ def get_user_list(remote_instance=None):
 
     Returns
     ------
-    Pandas dataframe        
-    |    id   login   full_name   first_name   last_name   color
-    | 0
-    | 1
-    | ..
+    pandas.DataFrame        
+        Each row represents a user
+
+        >>> print(user_list)
+        ...  id   login   full_name   first_name   last_name   color
+        ... 0
+        ... 1
 
     Notes
     -----
@@ -3009,10 +3014,15 @@ def get_volume(volume_name, remote_instance=None):
 
     Returns
     -------
-    vertices :          list of tuples
-                        [ (x,y,z), (x,y,z), .... ]
-    faces :             list of tuples
-                        [ ( vertex_index, vertex_index, vertex_incex ), ... ]
+    dict 
+        contains vertices and faces::
+
+        {        
+        vertices :          list of tuples
+                            ``[ (x,y,z), (x,y,z), .... ]``
+        faces :             list of tuples
+                            ``[ ( vertex_ix, vertex_ix, vertex_ix ), ... ]``
+        }
 
     """
 
@@ -3123,13 +3133,13 @@ def eval_skids(x, remote_instance=None):
                         - elif start with 'annotation:' will be assumed to be 
                           annotations
                         - else, will be assumed to be neuron names
-                    3. For CatmaidNeuron/List or pandas DataFrames will try
+                    3. For CatmaidNeuron/List or pandas.DataFrames will try
                        to extract skeleton_id parameter
 
     Returns
     -------
     list 
-    contains skeleton IDs
+                    contains skeleton IDs
     """
 
     if remote_instance is None:
