@@ -38,7 +38,7 @@ If your default distribution is Python 2, you have to explicitly tell [PIP](http
 
 `pip3 install git+git://github.com/schlegelp/pymaid@master`  
 
-**Attention**: on Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install automatically. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)).
+**Attention**: on Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install automatically. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)). Also: one of the dependencies, `pyoctree`, requires `numpy` to already be on the system to install properly. If pip fails with `ImportError: No module named 'numpy'`, you have to manually install numpy using `pip install numpy` and then retry installing pymaid.
 
 #### External libraries used:
 Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install all external dependencies. You may run into problems on Windows though. In that case, you need to install dependencies manually, here is a list of dependencies (check out `install_requires` in [setup.py](https://raw.githubusercontent.com/schlegelp/PyMaid/master/setup.py) for version info):
@@ -51,6 +51,7 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 - [vispy](http://vispy.org/) - this also requires one of the supported backend. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
 - [Plotly](http://plot.ly) 
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - *Attention*: rpy2 is not automatically installed as dependency as it requires R to be installed. In order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
+- ['pyoctree'](https://pypi.python.org/pypi/pyoctree/)
 
 ## Quickstart:
 

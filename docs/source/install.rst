@@ -37,8 +37,13 @@ PyMaid to be installed for Python 3:
 
    pip3 install git+git://github.com/schlegelp/pymaid@master
 
--- important::
-     
+.. important::
+   One of the dependencies ``pyoctree`` requires ``numpy`` to be installed. If 
+   pip fails with ``ImportError: No module named 'numpy'``, manually install numpy:
+   
+   >>> pip install numpy
+
+   Then retry installing PyMaid via pip.
 
 .. note::
    The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
