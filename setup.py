@@ -48,7 +48,7 @@ setup(
     install_requires=[
         "python-igraph>=0.7.1",
         "scipy>=0.18.1",
-        "pyoctree>=0.2.2"
+        "pyoctree>=0.2.2",
         "numpy>=1.12.1",
         "matplotlib>=2.0.0",
         "plotly>=2.0.6",
