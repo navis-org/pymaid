@@ -730,6 +730,7 @@ def get_arbor(skids, remote_instance=None, node_flag=1, connector_flag=1, tag_fl
     Notes
     -----
     Returned DataFrame looks like this:
+
     >>> df
     ...  neuron_name   skeleton_id   nodes      connectors   tags
     ... 0  str             str      node_df      conn_df     dict 
@@ -822,6 +823,7 @@ def get_partners_in_volume(skids, volume, remote_instance=None, threshold=1, min
     Notes
     -----
     Returned DataFrame looks like this:    
+
     >>> df
     ...  neuron_name  skeleton_id  num_nodes   relation     skid1  skid2 ...
     ... 1  name1         skid1    node_count1  upstream      n_syn  n_syn ...
@@ -1423,6 +1425,7 @@ def get_connector_details(connector_ids, remote_instance=None):
     Notes
     -----
     Returned DataFrame looks like this:
+
     >>> df    
     ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node \
     ... 0
@@ -1491,6 +1494,7 @@ def get_review(skids, remote_instance=None):
     Notes
     -----
     Returned DataFrame looks like this:
+
     >>> df
     ...   skeleton_id neuron_name total_node_count nodes_reviewed percent_reviewed
     ... 0    
@@ -1610,12 +1614,16 @@ def get_neuron_annotation(skid, remote_instance=None):
 
     Returns
     ------- 
-    | Pandas dataframe
-    |    annotation  time_annotated  unknown  user_id  annotation_id  user
-    | 0
-    | 1
-    | ..
-    | .
+    Pandas DataFrame
+
+    Notes
+    -----
+    Returned DataFrame looks like this:
+
+    >>> df
+    ...    annotation  time_annotated  unknown  user_id  annotation_id  user
+    ... 0
+    ... 1    
 
     See Also
     --------
@@ -1755,8 +1763,8 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
 
     Returns
     -------
-    dict
-    ``{ 'annotation_name' : 'annotation_id', ....}``
+    dict :
+                        ``{ 'annotation_name' : 'annotation_id', ....}``
     """
 
     if remote_instance is None:
@@ -1829,8 +1837,8 @@ def has_soma(skids, remote_instance=None):
 
     Returns
     -------
-    dict
-    ``{ 'skid' : True, 'skid1' : False }``
+    dict :
+                        ``{ 'skid' : True, 'skid1' : False }``
     """
 
     if remote_instance is None:
@@ -1880,11 +1888,17 @@ def get_skids_by_name(tag, remote_instance=None, allow_partial=True):
 
     Returns
     -------
-    | Pandas dataframe
-    |    name   skeleton_id
-    | 0
-    | 1
-    | 2
+    pandas DataFrame
+
+    Notes
+    -----
+    Returned DataFrame looks like this:
+    
+    >>> df
+    ...   name   skeleton_id
+    ... 0
+    ... 1
+    ... 2
 
     """
 
@@ -1930,8 +1944,8 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
     Returns
     -------
-    list 
-    `` [skid1, skid2, skid3 ]``
+    list :
+                            ``[skid1, skid2, skid3 ]``
     """
 
     if remote_instance is None:
@@ -1998,8 +2012,8 @@ def skid_exists(skids, remote_instance=None):
 
     Returns
     -------
-    bool
-    True if skeleton exists, False if not
+    bool :
+                        True if skeleton exists, False if not
     """
 
     if remote_instance is None:
@@ -2046,8 +2060,8 @@ def edit_tags(node_list, tags, node_type, remote_instance=None, delete_existing=
 
     Returns
     ------- 
-    string
-    Confirmation from Catmaid server
+    string :
+                        Confirmation from Catmaid server
     """
 
     if remote_instance is None:
@@ -2095,14 +2109,20 @@ def get_review_details(skids, remote_instance=None):
 
     Returns
     -------
-    list
-    list of reviewed nodes 
-    | [   node_id, 
-    |    [ 
-    |    [reviewer1, timestamp],
-    |    [ reviewer2, timestamp] 
-    |    ] 
-    | ]
+    list :
+                        list of reviewed nodes 
+
+    Notes
+    -----
+    Returned list looks like this:
+    >>> print(l)
+    ... [   node_id, 
+    ...   [ 
+    ...   [ reviewer1, timestamp],
+    ...   [ reviewer2, timestamp] 
+    ...   ] 
+    ... ]
+
     """
 
     if remote_instance is None:
@@ -2158,11 +2178,17 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
 
     Returns
     -------
-    Pandas DataFrame    
-    |    user   operation   timestamp   x  y  z  explanation 
-    | 0
-    | 1
-    | ...      
+    Pandas DataFrame   
+
+    Notes
+    -----
+    Returned DataFrame looks like this: 
+
+    >>> df
+    ...  user   operation   timestamp   x  y  z  explanation 
+    ... 0
+    ... 1
+    
     """
 
     if remote_instance is None:
