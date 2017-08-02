@@ -49,9 +49,9 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 - [Numpy](http://www.scipy.org) 
 - [Matplotlib](http://www.matplotlib.org)
 - [vispy](http://vispy.org/) - this also requires one of the supported backend. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
-- [Plotly](http://plot.ly) 
+- [Plotly](http://plot.ly)
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - *Attention*: rpy2 is not automatically installed as dependency as it requires R to be installed. In order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
-- ['pyoctree'](https://pypi.python.org/pypi/pyoctree/)
+- [pyoctree](https://pypi.python.org/pypi/pyoctree/)
 
 ## Quickstart:
 
