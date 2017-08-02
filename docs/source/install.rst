@@ -37,6 +37,9 @@ PyMaid to be installed for Python 3:
 
    pip3 install git+git://github.com/schlegelp/pymaid@master
 
+-- important::
+     
+
 .. note::
    The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
    As `rpy2` installation fails if no R is installed, it is not a default 
