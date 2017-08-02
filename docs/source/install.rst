@@ -39,15 +39,13 @@ PyMaid to be installed for Python 3:
 
 .. important::
    One of the dependencies ``pyoctree`` requires ``numpy`` to be installed. If 
-   pip fails with ``ImportError: No module named 'numpy'``, manually install numpy:
-   
-   >>> pip install numpy
-
-   Then retry installing PyMaid via pip.
+   pip fails with ``ImportError: No module named 'numpy'`` you have to manually 
+   install numpy first by running ``pip install numpy``. Then retry installing 
+   PyMaid via pip.
 
 .. note::
    The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
-   As `rpy2` installation fails if no R is installed, it is not a default 
+   As ``rpy2`` installation fails if no R is installed, it is not a default 
    dependency and has to be installed manually *after* R has been set up.
 
 Installing from source
@@ -116,6 +114,13 @@ Matplotlib
 Provides flexible drawing of graphs.
 
   - Download: http://matplotlib.sourceforge.net/
+
+PyOctree
+********
+Generates octrees from meshes to compute ray casting. Used to check if objects are within volume.
+
+  - PyPi: https://pypi.python.org/pypi/pyoctree/
+  - Github: https://github.com/mhogg/pyoctree
 
 Rpy2
 ****

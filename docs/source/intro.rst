@@ -123,7 +123,7 @@ The project ID is part of the CatmaidInstance and defaults to 1. You can change 
 >>> nl.set_remote_instance( server_url = 'www.your.catmaid-server.org', 
 ...                         http_user = 'HTTP_USER', 
 ...                         http_pw = 'HTTP_PASSWORD', 
-...                         auth_token = 'TOKEN' )
+...                         auth_token = 'TOKEN' ) 
 
 
 CatmaidNeuron and CatmaidNeuronList objects
