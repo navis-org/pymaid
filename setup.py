@@ -43,7 +43,7 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
 
-    setup_requires=[ 'numpy>=1.12.1' ], #pyoctree's install requires numpy to install but didn't specify that, so we have to do that for it
+    #setup_requires=[ 'numpy>=1.12.1' ], #pyoctree's install requires numpy to install but didn't specify that, so we have to do that for it
 
     install_requires=[
         "python-igraph>=0.7.1",
