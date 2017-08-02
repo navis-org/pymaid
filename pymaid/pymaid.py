@@ -101,7 +101,7 @@ class CatmaidInstance:
     -------
     fetch ( url, post = None )
         retrieves information from CATMAID server
-    get_XXX_url ( sid , X )
+    _get_XXX_url ( sid , X )
         <CatmaidInstance> class contains a long list of function that generate 
         URLs to request data from the CATMAID server. 
         Use dir(<CatmaidInstance>) to get the full list. 
@@ -200,15 +200,15 @@ class CatmaidInstance:
 
         return json.loads(response.read().decode("utf-8"))
 
-    def get_stack_info_url(self, sid):
+    def _get_stack_info_url(self, sid):
         """ Use to parse url for retrieving stack infos. """
         return self.djangourl("/" + str(self.project_id) + "/stack/" + str(sid) + "/info")
 
-    def get_skeleton_nodes_url(self, skid):
+    def _get_skeleton_nodes_url(self, skid):
         """ Use to parse url for retrieving skeleton nodes (no info on parents or synapses, does need post data). """
         return self.djangourl("/" + str(self.project_id) + "/treenode/table/" + str(skid) + "/content")
 
-    def get_skeleton_for_3d_viewer_url(self, skid):
+    def _get_skeleton_for_3d_viewer_url(self, skid):
         """ ATTENTION: this url doesn't work properly anymore as of 07/07/14
         use compact-skeleton instead
         Used to parse url for retrieving all info the 3D viewer gets (does NOT need post data)
@@ -216,40 +216,40 @@ class CatmaidInstance:
         """
         return self.djangourl("/" + str(self.project_id) + "/skeleton/" + str(skid) + "/compact-json")
 
-    def get_add_annotations_url(self):
+    def _get_add_annotations_url(self):
         """ Use to parse url to add annotations to skeleton IDs. """
         return self.djangourl("/" + str(self.project_id) + "/annotations/add")
 
-    def get_connectivity_url(self):
+    def _get_connectivity_url(self):
         """ Use to parse url for retrieving connectivity (does need post data). """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/connectivity")
 
-    def get_connectors_url(self):
+    def _get_connectors_url(self):
         """ Use to retrieve list of connectors either pre- or postsynaptic a set of neurons - GET request
         Format: { 'links': [ skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ] }
         """
         return self.djangourl("/" + str(self.project_id) + "/connectors/")
 
-    def get_connector_details_url(self):
+    def _get_connector_details_url(self):
         """ Use to parse url for retrieving info connectors (does need post data). """
         return self.djangourl("/" + str(self.project_id) + "/connector/skeletons")
 
-    def get_neuronnames(self):
+    def _get_neuronnames(self):
         """ Use to parse url for names for a list of skeleton ids (does need post data: self.project_id, skid). """
         return self.djangourl("/" + str(self.project_id) + "/skeleton/neuronnames")
 
-    def get_list_skeletons_url(self):
+    def _get_list_skeletons_url(self):
         """ Use to parse url for names for a list of skeleton ids (does need post data: self.project_id, skid). """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/")
 
-    def get_completed_connector_links(self):
+    def _get_completed_connector_links(self):
         """ Use to parse url for retrieval of completed connector links by given user 
         GET request: 
         Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id, link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id, link2_confidence, creator_id ]
         """
         return self.djangourl("/" + str(self.project_id) + "/connector/list/")
 
-    def url_to_coordinates(self, coords, stack_id=0, tool='tracingtool', active_skeleton_id=None, active_node_id=None):
+    def _url_to_coordinates(self, coords, stack_id=0, tool='tracingtool', active_skeleton_id=None, active_node_id=None):
         """ Use to generate URL to a location
 
         Parameters
@@ -274,120 +274,120 @@ class CatmaidInstance:
 
         return(self.djangourl('?%s' % urllib.parse.urlencode(GET_data)))
 
-    def get_user_list_url(self):
+    def _get_user_list_url(self):
         """ Get user list for project. """
         return self.djangourl("/user-list")
 
-    def get_single_neuronname_url(self, skid):
+    def _get_single_neuronname_url(self, skid):
         """ Use to parse url for a SINGLE neuron (will also give you neuronID). """
         return self.djangourl("/" + str(self.project_id) + "/skeleton/" + str(skid) + "/neuronname")
 
-    def get_review_status_url(self):
+    def _get_review_status_url(self):
         """ Use to get skeletons review status. """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/review-status")
 
-    def get_neuron_annotations_url(self):
+    def _get_neuron_annotations_url(self):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
         return self.djangourl("/" + str(self.project_id) + "/annotations/table-list")
 
-    def get_intersects(self, vol_id, x, y, z):
+    def _get_intersects(self, vol_id, x, y, z):
         """ Use to test if point intersects with volume. """
         return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(vol_id) + "/intersect") + '?%s' % urllib.parse.urlencode({'x': x, 'y': y, 'z': z})
 
-    def get_volumes(self):
+    def _get_volumes(self):
         """ Get list of all volumes in project. """
         return self.djangourl("/" + str(self.project_id) + "/volumes/")
 
     # Get details on a given volume (mesh)
-    def get_volume_details(self, volume_id):
+    def _get_volume_details(self, volume_id):
         return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(volume_id))
 
-    def get_annotations_for_skid_list(self):
+    def _get_annotations_for_skid_list(self):
         """ ATTENTION: This does not seem to work anymore as of 20/10/2015 -> although it still exists in CATMAID code
             use get_annotations_for_skid_list2    
             Use to get annotations for given neuron. DOES need skid as postdata
         """
         return self.djangourl("/" + str(self.project_id) + "/annotations/skeletons/list")
 
-    def get_review_details_url(self, skid):
+    def _get_review_details_url(self, skid):
         """ Use to retrieve review status for every single node of a skeleton.      
         For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         Returns list of arbors, the nodes the contain and who has been reviewing them at what time  
         """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/" + str(skid) + "/review")
 
-    def get_annotations_for_skid_list2(self):
+    def _get_annotations_for_skid_list2(self):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
         return self.djangourl("/" + str(self.project_id) + "/skeleton/annotationlist")
 
-    def get_logs_url(self):
+    def _get_logs_url(self):
         """ Use to get logs. DOES need skid as postdata. """
         return self.djangourl("/" + str(self.project_id) + "/logs/list")
 
-    def get_annotation_list(self):
+    def _get_annotation_list(self):
         """ Use to parse url for retrieving list of all annotations (and their IDs!!!). """
         return self.djangourl("/" + str(self.project_id) + "/annotations/")
 
-    def get_contributions_url(self):
+    def _get_contributions_url(self):
         """ Use to parse url for retrieving contributor statistics for given skeleton (does need post data). """
         return self.djangourl("/" + str(self.project_id) + "/skeleton/contributor_statistics_multiple")
 
-    def get_annotated_url(self):
+    def _get_annotated_url(self):
         """ Use to parse url for retrieving annotated neurons (NEEDS post data). """
         return self.djangourl("/" + str(self.project_id) + "/annotations/query-targets")
 
-    def get_skid_from_tnid(self, tnid):
+    def _get_skid_from_tnid(self, tnid):
         """ Use to parse url for retrieving the skeleton id to a single treenode id (does not need postdata) 
         API returns dict: {"count": integer, "skeleton_id": integer}
         """
         return self.djangourl("/" + str(self.project_id) + "/skeleton/node/" + str(tnid) + "/node_count")
 
-    def get_node_list_url(self):
+    def _get_node_list_url(self):
         """ Use to parse url for retrieving list of nodes (NEEDS post data). """
         return self.djangourl("/" + str(self.project_id) + "/node/list")
 
-    def get_node_info_url(self):
+    def _get_node_info_url(self):
         """ Use to parse url for retrieving user info on a single node (needs post data). """
         return self.djangourl("/" + str(self.project_id) + "/node/user-info")
 
-    def treenode_add_tag_url(self, treenode_id):
+    def _treenode_add_tag_url(self, treenode_id):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
         return self.djangourl("/" + str(self.project_id) + "/label/treenode/" + str(treenode_id) + "/update")
 
-    def connector_add_tag_url(self, treenode_id):
+    def _connector_add_tag_url(self, treenode_id):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
         return self.djangourl("/" + str(self.project_id) + "/label/connector/" + str(treenode_id) + "/update")
 
-    def get_compact_skeleton_url(self, skid, connector_flag=1, tag_flag=1):
+    def _get_compact_skeleton_url(self, skid, connector_flag=1, tag_flag=1):
         """ Use to parse url for retrieving all info the 3D viewer gets (does NOT need post data).
         Returns, in JSON, [[nodes], [connectors], [tags]], with connectors and tags being empty when 0 == with_connectors and 0 == with_tags, respectively.
         Deprecated but kept for backwards compability!
         """
         return self.djangourl("/" + str(self.project_id) + "/" + str(skid) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-skeleton")
 
-    def get_compact_details_url(self, skid):
+    def _get_compact_details_url(self, skid):
         """ Similar to compact-skeleton but if 'with_history':True is passed as GET request, returned data will include all positions a nodes/connector has ever occupied plus the creation time and last modified.        
         """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/" + str(skid) + "/compact-detail")
 
-    def get_compact_arbor_url(self, skid, nodes_flag=1, connector_flag=1, tag_flag=1):
+    def _get_compact_arbor_url(self, skid, nodes_flag=1, connector_flag=1, tag_flag=1):
         """ The difference between this function and get_compact_skeleton is that the connectors contain the whole chain from the skeleton of interest to the
         partner skeleton: contains [treenode_id, confidence_to_connector, connector_id, confidence_from_connector, connected_treenode_id, connected_skeleton_id, relation1, relation2]
         relation1 = 1 means presynaptic (this neuron is upstream), 0 means postsynaptic (this neuron is downstream)
         """
         return self.djangourl("/" + str(self.project_id) + "/" + str(skid) + "/" + str(nodes_flag) + "/" + str(connector_flag) + "/" + str(tag_flag) + "/compact-arbor")
 
-    def get_edges_url(self):
+    def _get_edges_url(self):
         """ Use to parse url for retrieving edges between given skeleton ids (does need postdata).
         Returns list of edges: [source_skid, target_skid, weight]
         """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/confidence-compartment-subgraph")
 
-    def get_skeletons_from_neuron_id(self, neuron_id):
+    def _get_skeletons_from_neuron_id(self, neuron_id):
         """ Use to get all skeletons of a given neuron (neuron_id). """
         return self.djangourl("/" + str(self.project_id) + "/neuron/" + str(neuron_id) + '/get-all-skeletons')
 
-    def get_history_url(self):
+    def _get_history_url(self):
         """ Use to get user history. """
         return self.djangourl("/" + str(self.project_id) + "/stats/user-history")
 
@@ -616,7 +616,7 @@ def get_3D_skeleton(skids, remote_instance=None, connector_flag=1, tag_flag=1, g
     for i, skeleton_id in enumerate(to_retrieve):
         # Create URL for retrieving skeleton data from server with history
         # details
-        remote_compact_skeleton_url = remote_instance.get_compact_details_url(
+        remote_compact_skeleton_url = remote_instance._get_compact_details_url(
             skeleton_id)
         # For compact-details, parameters have to passed as GET
         remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode({'with_history': str(get_history).lower(),
@@ -637,7 +637,7 @@ def get_3D_skeleton(skids, remote_instance=None, connector_flag=1, tag_flag=1, g
         for s in to_retrieve:
             get_connectors_GET_data = {'skeleton_ids[0]': str(s),
                                        'relation_type': 'abutting'}
-            urls.append(remote_instance.get_connectors_url() + '?%s' %
+            urls.append(remote_instance._get_connectors_url() + '?%s' %
                         urllib.parse.urlencode(get_connectors_GET_data))
             print(urls)
 
@@ -725,22 +725,23 @@ def get_arbor(skids, remote_instance=None, node_flag=1, connector_flag=1, tag_fl
 
     Returns
     -------
-    Pandas dataframe (df): 
-    |    neuron_name   skeleton_id   nodes   connectors  tags
-    | 0   name1           skid1      node_df   conn_df    dict 
-    | 1   name2           skid2      node_df   conn_df    dict
-    | 2   name3           skid3      node_df   conn_df    dict
-    | ...
+    Pandas DataFrame (df)
 
-    neuron_name and skeleton_id are strings
-    nodes and connectors are Pandas dataframes themselves
-    tags is a dict: { 'tag' : [ treenode_id, treenode_id, ... ] }
+    Notes
+    -----
+    Returned DataFrame looks like this:
+    >>> df
+    ...  neuron_name   skeleton_id   nodes      connectors   tags
+    ... 0  str             str      node_df      conn_df     dict 
+    
+    
+    - nodes and connectors are Pandas dataframes themselves
+    - tags is a dict: { 'tag' : [ treenode_id, treenode_id, ... ] }
 
     Dataframe column titles should be self explanatory with these exception:
-    conn_df['relation_1'] describes treenode_1 to/from connector
-    conn_df['relation_2'] describes treenode_2 to/from connector
-
-    relations can be: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction)
+    - conn_df['relation_1'] describes treenode_1 to/from connector
+    - conn_df['relation_2'] describes treenode_2 to/from connector
+    - 'relations' can be: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction)
     """
 
     if remote_instance is None:
@@ -758,9 +759,9 @@ def get_arbor(skids, remote_instance=None, node_flag=1, connector_flag=1, tag_fl
 
     skdata = []
 
-    for s in skids:
+    for s in tqdm(skids, desc='Retrieving arbors'):    
         # Create URL for retrieving example skeleton from server
-        remote_compact_arbor_url = remote_instance.get_compact_arbor_url(
+        remote_compact_arbor_url = remote_instance._get_compact_arbor_url(
             s, node_flag, connector_flag, tag_flag)
 
         # Retrieve node_data for example skeleton
@@ -816,21 +817,21 @@ def get_partners_in_volume(skids, volume, remote_instance=None, threshold=1, min
 
     Returns
     ------- 
-    Pandas dataframe (df): 
-    |    neuron_name  skeleton_id  num_nodes   relation     skid1  skid2 ...
-    | 0   name1         skid1    node_count1  upstream      n_syn  n_syn ...
-    | 1   name2         skid2    node_count2  downstream    n_syn  n_syn ...   
-    | 2   name3         skid3    node_count3  gapjunction   n_syn  n_syn ...
-    |...    
-
-    Relation can be: upstream (incoming), downstream (outgoing) of the neurons
-    of interest or gap junction
+    Pandas dataframe (df)
 
     Notes
     -----
-    (1) partners can show up multiple times if they are e.g. pre- AND 
-    postsynaptic
-    (2) the number of connections between two partners is not restricted to the
+    Returned DataFrame looks like this:    
+    >>> df
+    ...  neuron_name  skeleton_id  num_nodes   relation     skid1  skid2 ...
+    ... 1  name1         skid1    node_count1  upstream      n_syn  n_syn ...
+    ... 2  name2         skid2    node_count2  downstream    n_syn  n_syn ...   
+    ... 3  name3         skid3    node_count3  gapjunction   n_syn  n_syn ...        
+
+    - Relation can be: upstream (incoming), downstream (outgoing) of the neurons
+    of interest or gap junction
+    - partners can show up multiple times if they are e.g. pre- AND postsynaptic
+    - the number of connections between two partners is not restricted to the
     volume
 
     See Also
@@ -975,7 +976,7 @@ def get_partners(skids, remote_instance=None, threshold=1,  min_size=2, filt=[],
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_connectivity_url = remote_instance.get_connectivity_url()
+    remote_connectivity_url = remote_instance._get_connectivity_url()
 
     connectivity_post = {}
     connectivity_post['boolean_op'] = 'OR'
@@ -1088,7 +1089,7 @@ def get_names(skids, remote_instance=None):
 
     skids = list(set(skids))
 
-    remote_get_names_url = remote_instance.get_neuronnames()
+    remote_get_names_url = remote_instance._get_neuronnames()
 
     get_names_postdata = {}
     get_names_postdata['self.project_id'] = remote_instance.project_id
@@ -1138,7 +1139,7 @@ def get_node_user_details(treenode_ids, remote_instance=None):
     remote_instance.logger.info(
         'Retrieving details for %i nodes...' % len(treenode_ids))
 
-    remote_nodes_details_url = remote_instance.get_node_info_url()
+    remote_nodes_details_url = remote_instance._get_node_info_url()
 
     get_node_details_postdata = {
     }
@@ -1214,7 +1215,7 @@ def get_treenode_table(skids, remote_instance=None):
     # Generate URLs to retrieve
     urls = []
     for i, skeleton_id in enumerate(list(set(skids))):
-        remote_nodes_list_url = remote_instance.get_skeleton_nodes_url(
+        remote_nodes_list_url = remote_instance._get_skeleton_nodes_url(
             skeleton_id)
         urls.append(remote_nodes_list_url)
 
@@ -1281,7 +1282,7 @@ def get_edges(skids, remote_instance=None):
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_get_edges_url = remote_instance.get_edges_url()
+    remote_get_edges_url = remote_instance._get_edges_url()
 
     get_edges_postdata = {}
     get_edges_postdata['confidence_threshold'] = '0'
@@ -1367,28 +1368,28 @@ def get_connectors(skids, remote_instance=None, incoming_synapses=True, outgoing
 
         if incoming_synapses is True:
             get_connectors_GET_data['relation_type'] = 'presynaptic_to'
-            remote_get_connectors_url = remote_instance.get_connectors_url(
+            remote_get_connectors_url = remote_instance._get_connectors_url(
             ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [e + ['presynaptic_to']
                         for e in remote_instance.fetch(remote_get_connectors_url)['links']]
 
         if outgoing_synapses is True:
             get_connectors_GET_data['relation_type'] = 'postsynaptic_to'
-            remote_get_connectors_url = remote_instance.get_connectors_url(
+            remote_get_connectors_url = remote_instance._get_connectors_url(
             ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [e + ['postsynaptic_to']
                         for e in remote_instance.fetch(remote_get_connectors_url)['links']]
 
         if abutting is True:
             get_connectors_GET_data['relation_type'] = 'abutting'
-            remote_get_connectors_url = remote_instance.get_connectors_url(
+            remote_get_connectors_url = remote_instance._get_connectors_url(
             ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [e + ['abutting']
                         for e in remote_instance.fetch(remote_get_connectors_url)['links']]
 
         if gap_junctions is True:
             get_connectors_GET_data['relation_type'] = 'gapjunction_with'
-            remote_get_connectors_url = remote_instance.get_connectors_url(
+            remote_get_connectors_url = remote_instance._get_connectors_url(
             ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
             cn_data += [e + ['gap_junction']
                         for e in remote_instance.fetch(remote_get_connectors_url)['links']]
@@ -1417,16 +1418,21 @@ def get_connector_details(connector_ids, remote_instance=None):
 
     Returns
     ------- 
-    | Pandas dataframe
-    |  connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node \
-    | 0
-    | 1
-    | 2
-    |
-    |  postsynaptic_to_node
-    | 0
-    | 1
-    | 2    
+    Pandas DataFrame
+
+    Notes
+    -----
+    Returned DataFrame looks like this:
+    >>> df    
+    ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node \
+    ... 0
+    ... 1
+    ... 2
+    ...
+    ... postsynaptic_to_node
+    ... 0
+    ... 1
+    ... 2    
     """
 
     if remote_instance is None:
@@ -1437,7 +1443,7 @@ def get_connector_details(connector_ids, remote_instance=None):
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_get_connectors_url = remote_instance.get_connector_details_url()
+    remote_get_connectors_url = remote_instance._get_connector_details_url()
 
     # Depending on DATA_UPLOAD_MAX_NUMBER_FIELDS of your CATMAID server
     # (default = 1000), we have to cut requests into batches < 1000
@@ -1480,11 +1486,16 @@ def get_review(skids, remote_instance=None):
 
     Returns
     ------- 
-    | Pandas dataframe
-    |   skeleton_id neuron_name  total_node_count nodes_reviewed percent_reviewed
-    | 0    
-    | 1
-    | 2
+    Pandas DataFrame
+
+    Notes
+    -----
+    Returned DataFrame looks like this:
+    >>> df
+    ...   skeleton_id neuron_name total_node_count nodes_reviewed percent_reviewed
+    ... 0    
+    ... 1
+    ... 2
 
     See Also
     --------
@@ -1507,7 +1518,7 @@ def get_review(skids, remote_instance=None):
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_get_reviews_url = remote_instance.get_review_status_url()
+    remote_get_reviews_url = remote_instance._get_review_status_url()
 
     get_review_postdata = {}
 
@@ -1568,7 +1579,7 @@ def add_annotations(skids, annotations, remote_instance=None):
     if type(annotations) != type(list()):
         annotations = [annotations]
 
-    add_annotations_url = remote_instance.get_add_annotations_url()
+    add_annotations_url = remote_instance._get_add_annotations_url()
 
     add_annotations_postdata = {}
 
@@ -1633,10 +1644,10 @@ def get_neuron_annotation(skid, remote_instance=None):
 
     # This works with neuron_id NOT skeleton_id
     # neuron_id can be requested via neuron_names
-    remote_get_neuron_name = remote_instance.get_single_neuronname_url(skid)
+    remote_get_neuron_name = remote_instance._get_single_neuronname_url(skid)
     neuronid = remote_instance.fetch(remote_get_neuron_name)['neuronid']
 
-    remote_get_annotations_url = remote_instance.get_neuron_annotations_url()
+    remote_get_annotations_url = remote_instance._get_neuron_annotations_url()
 
     get_annotations_postdata = {}
     get_annotations_postdata['neuron_id'] = int(neuronid)
@@ -1677,7 +1688,7 @@ def get_annotations_from_list(skids, remote_instance=None):
 
     Returns
     -------
-    dict 
+    dict :
     ``{ skeleton_id : [ annnotation, annotation ], ... }``
 
     See Also
@@ -1700,7 +1711,7 @@ def get_annotations_from_list(skids, remote_instance=None):
     if not isinstance(skids, list):
         skids = [skids]
 
-    remote_get_annotations_url = remote_instance.get_annotations_for_skid_list2()
+    remote_get_annotations_url = remote_instance._get_annotations_for_skid_list2()
 
     get_annotations_postdata = {'metaannotations': 0, 'neuronnames': 0}
 
@@ -1758,7 +1769,7 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
 
     remote_instance.logger.debug('Retrieving list of annotations...')
 
-    remote_annotation_list_url = remote_instance.get_annotation_list()
+    remote_annotation_list_url = remote_instance._get_annotation_list()
     annotation_list = remote_instance.fetch(remote_annotation_list_url)
 
     annotation_ids = {}
@@ -1885,7 +1896,7 @@ def get_skids_by_name(tag, remote_instance=None, allow_partial=True):
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    search_url = remote_instance.get_annotated_url()
+    search_url = remote_instance._get_annotated_url()
     annotation_post = {'name': str(
         tag), 'rangey_start': 0, 'range_length': 500, 'with_annotations': False}
 
@@ -1958,7 +1969,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                            'range_length': 500, 'with_annotations': False}
-        remote_annotated_url = remote_instance.get_annotated_url()
+        remote_annotated_url = remote_instance._get_annotated_url()
         neuron_list = remote_instance.fetch(
             remote_annotated_url, annotation_post)
         count = 0
@@ -2004,7 +2015,7 @@ def skid_exists(skids, remote_instance=None):
     if isinstance(skids, list):
         return {n: skid_exists(n) for n in skids}
 
-    remote_get_neuron_name = remote_instance.get_single_neuronname_url(skids)
+    remote_get_neuron_name = remote_instance._get_single_neuronname_url(skids)
     response = remote_instance.fetch(remote_get_neuron_name)
 
     if 'error' in response:
@@ -2112,7 +2123,7 @@ def get_review_details(skids, remote_instance=None):
     post_data = []
 
     for s in skids:
-        urls.append(remote_instance.get_review_details_url(s))
+        urls.append(remote_instance._get_review_details_url(s))
         # For some reason this needs to fetched as POST (even though actual
         # POST data is not necessary)
         post_data.append({'placeholder': 0})
@@ -2215,7 +2226,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
                              'operation_type': op,
                              'search_freetext': search}
 
-        remote_get_logs_url = remote_instance.get_logs_url()
+        remote_get_logs_url = remote_instance._get_logs_url()
         logs += remote_instance.fetch(remote_get_logs_url,
                                       get_logs_postdata)['aaData']
 
@@ -2284,7 +2295,7 @@ def get_contributor_statistics(skids, remote_instance=None, separate=False):
             key = 'skids[%i]' % i
             get_statistics_postdata[key] = skids[i]
 
-        remote_get_statistics_url = remote_instance.get_contributions_url()
+        remote_get_statistics_url = remote_instance._get_contributions_url()
         stats = remote_instance.fetch(
             remote_get_statistics_url, get_statistics_postdata)
 
@@ -2306,7 +2317,7 @@ def get_contributor_statistics(skids, remote_instance=None, separate=False):
     else:
         get_statistics_postdata = [{'skids[0]': s} for s in skids]
         remote_get_statistics_url = [
-            remote_instance.get_contributions_url() for s in skids]
+            remote_instance._get_contributions_url() for s in skids]
 
         stats = _get_urls_threaded(
             remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata)
@@ -2375,7 +2386,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
             [str(d) for d in start_date])
         get_skeleton_list_GET_data['to'] = ''.join([str(d) for d in end_date])
 
-    remote_get_list_url = remote_instance.get_list_skeletons_url()
+    remote_get_list_url = remote_instance._get_list_skeletons_url()
     remote_get_list_url += '?%s' % urllib.parse.urlencode(
         get_skeleton_list_GET_data)
     skid_list = remote_instance.fetch(remote_get_list_url)
@@ -2507,7 +2518,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
                                 'end_date': r[1]
                                 }
 
-        remote_get_history_url = remote_instance.get_history_url()
+        remote_get_history_url = remote_instance._get_history_url()
 
         remote_get_history_url += '?%s' % urllib.parse.urlencode(
             get_history_GET_data)
@@ -2599,7 +2610,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance, coord
     if coord_format == 'NM':
         resolution = (1, 1, 1)
 
-    remote_nodes_list = remote_instance.get_node_list_url()
+    remote_nodes_list = remote_instance._get_node_list_url()
 
     node_list_postdata = {
         'left': left * resolution[0],
@@ -2780,7 +2791,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
         #remote_instance.logger.info( '%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (incursion, left, right, top, bottom, z1, z2) )
         #remote_instance.logger.info( 'Incursion %i' % incursion )
 
-        remote_nodes_list = remote_instance.get_node_list_url()
+        remote_nodes_list = remote_instance._get_node_list_url()
 
         node_list_postdata = {
             'left': left,
@@ -2945,7 +2956,7 @@ def get_user_list(remote_instance=None):
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    user_list = remote_instance.fetch(remote_instance.get_user_list_url())
+    user_list = remote_instance.fetch(remote_instance._get_user_list_url())
 
     columns = ['id', 'login', 'full_name', 'first_name', 'last_name', 'color']
 
@@ -2993,7 +3004,7 @@ def get_volume(volume_name, remote_instance=None):
     remote_instance.logger.info('Retrieving volume <%s>' % volume_name)
 
     # First, get volume ID
-    get_volumes_url = remote_instance.get_volumes()
+    get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
 
     volume_id = [e['id'] for e in response if e['name'] == volume_name]
@@ -3007,7 +3018,7 @@ def get_volume(volume_name, remote_instance=None):
         volume_id = volume_id[0]
 
     # Now download volume
-    url = remote_instance.get_volume_details(volume_id)
+    url = remote_instance._get_volume_details(volume_id)
     response = remote_instance.fetch(url)
 
     mesh_string = response['mesh']

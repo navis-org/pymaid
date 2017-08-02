@@ -8,12 +8,15 @@ This page will give you a quick overview about PyMaid functions.
 
 Contains definitions for neuron and neuronlist classes.
 
-:class:`pymaid.core.CatmaidNeuron`
+:class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`
 
-Representation of a **single** Catmaid neuron. Can be minimally initialized with just a skeleton ID. Data (e.g. nodes, connectors, name, review status, annotation) 
-are retrieved/calculated on-demand the first time they are **explicitly** requested:
+Representation of a single and multiple Catmaid neurons, respectively. Can be 
+minimally initialized with just skeleton IDs. Data (e.g. nodes, connectors, 
+name, review status, annotation) are retrieved/calculated on-demand the first 
+time they are **explicitly** requested. CatmaidNeuronList also allows indexing 
+similar to pandas DataFrames (see examples).
 
-Primary attributes:
+Selection of attributes:
 
 - ``skeleton_id``: neuron's skeleton ID	
 - ``neuron_name``: neuron's name
@@ -27,17 +30,25 @@ Primary attributes:
 - ``slabs``: returns slabs (linear segments)
 - ``igraph``: iGraph representation of the neuron
 
-:class:`pymaid.core.CatmaidNeuronList`
+Selection of class methods:
 
-Representation of a **list** of Catmaid neurons. Can be minimally initialized with just a skeleton ID.
-Has the same attributes as ``CatmaidNeuron`` objects. Additionally it allows indexing similar to 
-pandas DataFrames (see examples).
+- :func:`pymaid.core.CatmaidNeuron.plot3d`: create 3D plot of neuron(s)
+- :func:`pymaid.core.CatmaidNeuron.plot2d`: create 2D plot of neuron(s)
+- :func:`pymaid.core.CatmaidNeuron.prune_by_strahler`: prune neuron ends
+- :func:`pymaid.core.CatmaidNeuron.prune_distal_to`: cut off nodes distal to a given treenode
+- :func:`pymaid.core.CatmaidNeuron.prune_proximal_to`: cut off nodes proximal to a given treenode
+- :func:`pymaid.core.CatmaidNeuron.reroot`: reroot neuron to given node
+- :func:`pymaid.core.CatmaidNeuron.reload`: reload neuron(s) from server
+- :func:`pymaid.core.CatmaidNeuron.summary`: pandas DataFrame with basic parameters of neuron(s)
+- :func:`pymaid.core.CatmaidNeuron.downsample`: downsample neuron(s)
+- :func:`pymaid.core.CatmaidNeuron.copy`: returns deep copy of the object
 
-:mod:`pymaid.pymaid`:
----------------------
+:mod:`pymaid.pymaid`
+--------------------
 
-Currently **pymaid** features a range of wrappers to conveniently fetch data from CATMAID servers.
-Use e.g. ``help(get_edges)`` to learn more about their function, parameters and usage.
+Currently **pymaid** features a range of wrappers to conveniently fetch data 
+from CATMAID servers. Use e.g. ``help(get_edges)`` to learn more about their 
+function, parameters and usage.
 
 - :func:`pymaid.pymaid.add_annotations`: use to add annotation(s) to neuron(s)
 - :func:`pymaid.pymaid.edit_tags`: edit (add/remove) tags of treenodes or connectors
@@ -66,8 +77,8 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.pymaid.get_volume`: get volume (verts + faces) of CATMAID volumes
 - :func:`pymaid.pymaid.skid_exists`: checks if a skeleton ID exists
 
-:mod:`pymaid.igraph_catmaid`:
------------------------------
+:mod:`pymaid.igraph_catmaid`
+----------------------------
 
 - :func:`pymaid.igraph_catmaid.cluster_nodes_w_synapses`: uses iGraph's `shortest_paths_dijkstra` to cluster nodes with synapses
 - :func:`pymaid.igraph_catmaid.dist_from_root`: calculates geodesic (along-the-arbor) distances for nodes to root node
@@ -75,8 +86,8 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.igraph_catmaid.network2graph`: generates iGraph representation from set of neurons
 - :func:`pymaid.igraph_catmaid.neuron2graph`: generates iGraph representation of neuron morphology
 
-:mod:`pymaid.plot`:
--------------------
+:mod:`pymaid.plot`
+------------------
 
 - :func:`pymaid.plot.plot2d`: generates 2D plots of neurons
 - :func:`pymaid.plot.plot3d`: uses either `Vispy <http://vispy.org>`_ or `Plotly <http://plot.ly>`_ to generate 3D plots of neurons
@@ -84,16 +95,16 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.plot.clear3d`: clear 3D canvas
 - :func:`pymaid.plot.close3d`: close 3D canvas and wipe from memory
 
-:mod:`pymaid.cluster`:
-----------------------
+:mod:`pymaid.cluster`
+---------------------
 
 - :func:`pymaid.cluster.create_adjacency_matrix`: create a Pandas dataframe containing the adjacency matrix for two sets of neurons
 - :func:`pymaid.cluster.create_connectivity_distance_matrix`: returns distance matrix based on connectivity similarity (Jarrell et al., 2012)
 - :func:`pymaid.cluster.group_matrix`: groups matrix by columns or rows - use to e.g. collapse connectivity matrix into groups of neurons
 - :func:`pymaid.cluster.synapse_distance_matrix`: cluster synapses based on eucledian distance
 
-:mod:`pymaid.morpho`:
----------------------
+:mod:`pymaid.morpho`
+--------------------
 
 - :func:`pymaid.morpho.calc_cable`: calculate cable length of given neuron
 - :func:`pymaid.morpho.calc_strahler_index`: calculate strahler index for each node
@@ -106,17 +117,17 @@ Use e.g. ``help(get_edges)`` to learn more about their function, parameters and 
 - :func:`pymaid.morpho.reroot_neuron`: reroot neuron to a specific node
 - :func:`pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.dist_from_root` but does not use iGraph
 
-:mod:`pymaid.rmaid`:
-------------------
+:mod:`pymaid.rmaid`
+-------------------
 
 - :func:`pymaid.rmaid.init_rcatmaid`: initialize connection with Catmaid server in R
 - :func:`pymaid.rmaid.data2py`: wrapper to convert R data to Python 
 - :func:`pymaid.rmaid.nblast`: wrapper to nblast a set neurons against external database
-- :func:`pymaid.rmaid.nblast_allby_all`: wrapper to nblast a set of neurons against each other
+- :func:`pymaid.rmaid.nblast_allbyall`: wrapper to nblast a set of neurons against each other
 - :func:`pymaid.rmaid.neuron2py`: converts R neuron and neuronlist objects to Pymaid neurons
 - :func:`pymaid.rmaid.neuron2r`: converts Pymaid neuron and list of neurons to R neuron and neuronlist objects, respectively
 
-:mod:`pymaid.user_stats`:
+:mod:`pymaid.user_stats`
 -----------------------
 
 - :func:`pymaid.user_stats.get_time_invested`: calculate the time users have spent working on a set of neurons

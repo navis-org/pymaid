@@ -47,8 +47,7 @@ class CatmaidNeuron:
     x :             data to construct neuron from
                     1. skeleton ID or
                     2. pandas DataFrame or Series from pymaid.get_3D_skeleton() or
-                    3. another CatmaidNeuron (will create a deep copy)
-                    This will override other, redundant attributes
+                    3. another CatmaidNeuron (will create a deep copy). This will override other, redundant attributes.                    
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
                         neuron annotations, review status, etc.
@@ -552,10 +551,6 @@ class CatmaidNeuron:
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to neuron
 
-        Notes
-        -----
-        Provide either existing CatmaidInstance OR your credentials.
-
         Parameters
         ----------
         remote_instance :       pymaid.CatmaidInstance, optional
@@ -563,6 +558,11 @@ class CatmaidNeuron:
         http_user :             str, optional
         http_pw :               str, optional
         auth_token :            str, optional
+
+        Notes
+        -----
+        Provide either existing CatmaidInstance OR your credentials.
+
         """
         if remote_instance:
             self._remote_instance = remote_instance
@@ -640,9 +640,7 @@ class CatmaidNeuronList:
     x :                 data to construct neuron from
                         1. skeleton ID or
                         2. pandas DataFrame or Series from `pymaid.get_3D_skeleton()` or
-                        3. CatmaidNeuron (will create a deep copy)
-
-                        This will override other, redundant attributes
+                        3. CatmaidNeuron (will create a deep copy). This will override other, redundant attributes
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
                         neuron annotations, review status, etc.
@@ -984,10 +982,6 @@ class CatmaidNeuronList:
         """ Prune neurons based on strahler order. Will reroot neurons to
         soma if possible.
 
-        Notes
-        -----
-        Calls :func:`pymaid.morpho.prune_by_strahler`
-
         Parameters
         ----------
         to_prune :      {int, list, range}, optional
@@ -996,6 +990,11 @@ class CatmaidNeuronList:
                         2. ``to_prune = [1,2]`` removes indices 1 and 2
                         3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
                         4. ``to_prune = -1`` removes everything but the highest index 
+
+        See also
+        --------
+        :func:`pymaid.morpho.prune_by_strahler`
+                        Function called to prune.
 
         """
 
@@ -1071,10 +1070,6 @@ class CatmaidNeuronList:
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to all neurons
 
-        Notes
-        -----
-        Provide either existing CatmaidInstance OR your credentials.
-
         Parameters
         ----------
         remote_instance :       pymaid.CatmaidInstance, optional
@@ -1082,7 +1077,14 @@ class CatmaidNeuronList:
         http_user :             str, optional
         http_pw :               str, optional
         auth_token :            str, optional
+
+        Notes
+        -----
+        Provide either existing CatmaidInstance OR your credentials.
+        
         """
+
+
         if not remote_instance and server_url and auth_token:
             remote_instance = pymaid.CatmaidInstance(server_url,
                                                      http_user,
