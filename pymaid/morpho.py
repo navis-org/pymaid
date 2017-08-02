@@ -87,7 +87,7 @@ def classify_nodes(skdata, inplace=True):
 
     Parameters
     ----------
-    skdata :    {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :    {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
                 May contain multiple neurons    
     inplace :   bool, optional 
                 If false, nodes will be classified on a copy which is then 
@@ -95,8 +95,9 @@ def classify_nodes(skdata, inplace=True):
 
     Returns
     -------
-    skdata (if inplace=False)            
-               Added columns 'type' and 'has_connectors'.
+    skdata 
+               Only if inplace=False. Added columns 'type' and 'has_connectors'
+               to skdata.nodes
 
     """
 
@@ -145,14 +146,15 @@ def _generate_slabs(x, append=True):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    x :         {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
                 May contain multiple neurons
     append :    bool, optional 
                 If true slabs will be appended to neuron
 
     Returns
     -------
-    slabs :     list of lists containing treenode ids 
+    list      
+                Slabs as list of lists containing treenode ids
     """
 
     if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
@@ -213,7 +215,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
                          May contain multiple neurons
     resampling_factor :  int 
                          Factor by which to reduce the node count
@@ -324,15 +326,15 @@ def longest_neurite(skdata, root_to_soma=False):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
                May contain multiple neurons
     root_to_soma : bool, optional
                    If true, neuron will be rerooted to soma. Soma is the node 
-                   with >1000 radius. Default = False
+                   with >1000 radius.
 
     Returns
     -------
-    pandas DataFrame or Catmaid Object
+    pandas.DataFrame/Catmaidneuron object
                    Contains only node data of the longest neurite
     """
 
@@ -391,13 +393,13 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
                Must contain a SINGLE neuron
     new_root : {int, str}
-               Node ID or a tag of the node to reroot to 
+               Node ID or tag of the node to reroot to 
     inplace :  bool, optional
                If True the input neuron will be rerooted. Default = False 
 
     Returns
     -------
-    pandas Series or CatmaidNeuron object
+    pandas.Series or CatmaidNeuron object
                Containing the rerooted neuron
     """
 
@@ -532,8 +534,10 @@ def cut_neuron(skdata, cut_node, g=None):
 
     Returns
     -------
-    [1] neuron_dist : distal to the cut
-    [2] neuron_prox : proximal to the cut
+    neuron_dist 
+                Part of the neuron distal to the cut
+    neuron_prox 
+                Part of the neuron proximal to the cut
 
     Examples
     --------
@@ -721,9 +725,9 @@ def _cut_neuron(skdata, cut_node):
 
     Returns
     -------
-    [1] neuron_dist
+    neuron_dist
                Neuron object distal to the cut
-    [2] neuron_prox
+    neuron_prox
                Neuron object proximal to the cut
     """
     start_time = time.time()
@@ -873,10 +877,10 @@ def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], pos
 
     Returns
     -------
-    [1] pre_node_distances 
-       ``{'connector_id: distance_to_root[nm]'}`` for all presynaptic sistes of 
+    pre_node_distances 
+       ``{'connector_id: distance_to_root[nm]'}`` for all presynaptic sites of 
        this neuron
-    [2] post_node_distances 
+    post_node_distances 
        ``{'connector_id: distance_to_root[nm]'}`` for all postsynaptic sites of 
        this neuron
     """
@@ -967,8 +971,8 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     Parameters
     ----------
-    skdata : {int,str,CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series}       
-                If skeleton ID, 3d skeleton data will be pulled from CATMAID 
+    skdata : {int,str,CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series}       
+                If skeleton ID, 3D skeleton data will be pulled from CATMAID 
                 server
     smoothing : int, optional
                 Use to smooth neuron by downsampling. 
@@ -1046,11 +1050,10 @@ def calc_strahler_index(skdata, return_dict=False):
 
     Parameters
     ----------
-    skdata :      Skeleton data 
-                  From ``pymaid.pymaid.get_3D_skeleton()``
+    skdata :      {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series}       
+                  E.g. from  ``pymaid.pymaid.get_3D_skeleton()``
     return_dict : bool, optional
                   If True, a dict is returned instead of the dataframe. 
-                  Defaul = False
 
     Returns
     -------
@@ -1183,7 +1186,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
 
     Parameters
     ----------
-    x :             CatmaidNeuron or CatmaidNeuronList
+    x :             {core.CatmaidNeuron, core.CatmaidNeuronList}
     to_prune :      {int, list, range}, optional
                     Strahler indices to prune. 
                     1. ``to_prune = 1`` removes all leaf branches
@@ -1296,7 +1299,7 @@ def in_volume(points, volume, remote_instance=None):
 
     Parameters
     ----------
-    points :          {list of tuples, pandas DataFrame}
+    points :          {list of tuples, pandas.DataFrame}
                       Coordinates:  
                       1. List/np array -  ``[ ( x, y , z ), [ ... ] ]``
                       2. DataFrame - needs to have 'x','y','z' columns                      
@@ -1346,7 +1349,7 @@ def in_volume(points, volume, remote_instance=None):
 
 
 def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
-    """ DEPCREATED!
+    """ DEPCREATED as this works only with convex hulls, not for alpha-shapes (concave)
     Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 

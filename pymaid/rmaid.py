@@ -102,9 +102,9 @@ def init_rcatmaid(**kwargs):
 
     Parameters
     ----------
-    remote_instance :   CATMAID instance from pymaid.pymaid.CatmaidInstance()
-                        This is used to extract credentials. Overrides other 
-                        credentials provided!
+    remote_instance :   CATMAID instance 
+                        From pymaid.pymaid.CatmaidInstance(). This is used to 
+                        extract credentials. Overrides other credentials provided!
     server :            str, optional
                         Use this to set server URL if no remote_instance is 
                         provided
@@ -120,8 +120,8 @@ def init_rcatmaid(**kwargs):
 
     Returns
     ------- 
-    catmaid
-                        robject representing the rcatmaid library
+    catmaid :           R library
+                        R object representing the rcatmaid library
     """
 
     remote_instance = kwargs.get('remote_instance', None)
@@ -272,10 +272,10 @@ def neuron2py(neuron, remote_instance=None):
 
     Parameters
     ----------
-    neuron :            R neuron or neuronlist
+    neuron :            {R neuron, R neuronlist}
+                        Neuron to convert to Python
     remote_instance :   CATMAID instance, optional
-                        Provide if you want neuron names to be updated from. 
-                        Default=None
+                        Provide if you want neuron names to be updated from.
 
     Returns
     -------
@@ -499,7 +499,8 @@ def dotprops2py(dp, subset=None):
 
     Parameters
     ----------
-    dp :        dotprops neuronlist or neuronlistfh
+    dp :        {dotprops neuronlist,  neuronlistfh}
+                Dotprops object to convert
     subset :    {list of str, list of indices }, optional
                 Neuron names or indices. Default = None.
 
@@ -538,8 +539,8 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
 
     Parameters
     ----------
-    x :             neurons to blast
-                    This can be either:
+    x             
+                    Neurons to blast. This can be either:
                     1. A list of skeleton IDs
                     2. PyMaid neurons from e.g. pymaid.pymaid.get_3D_skeleton()
                     3. RCatmaid neuron objects
@@ -655,35 +656,36 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
 
     Parameters
     ----------
-    neuron :        neuron to blast
-                    This can be either:
+    x               
+                    Neuron to nblast. This can be either:
                     1. A single skeleton ID
                     2. PyMaid neuron from e.g. pymaid.pymaid.get_3D_skeleton()
                     3. RCatmaid neuron object
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only a SKID is provided
     db :            database, optional
-                    File containing dotproducts to blast against. 
-                    Default = None. This can be either:
+                    File containing dotproducts to blast against. This can be 
+                    either:
+
                     1. the name of a file in ``'flycircuit.datadir'``,
                     2. a path (e.g. ``'.../gmrdps.rds'``), 
                     3. an R file object (e.g. ``robjects.r("load('.../gmrdps.rds')")``)
                     4. a URL to load the list from (e.g. ``'http://.../gmrdps.rds'``)
 
-                    If None, rmaid.nblast() searches for a 'dpscanon.rds' in 
+                    If not provided, will search for a 'dpscanon.rds' file in 
                     'flycircuit.datadir'.
     ncores :        int, optional
-                    Number of cores to use for nblasting. Default = 4
+                    Number of cores to use for nblasting. 
     reverse :       bool, optional
                     If True, treats the neuron as NBLAST target rather than 
                     neurons of database. Makes sense for partial 
-                    reconstructions. Default = False
+                    reconstructions. 
     UseAlpha :      bool, optional
                     Emphasises neurons' straight parts (backbone) over parts 
-                    that have lots of branches. Default = False
+                    that have lots of branches. 
     mirror :        bool, optional
                     Whether to mirror the neuron or not b/c FlyCircuit neurons 
-                    are on fly's right. Default = True
+                    are on fly's right.
     normalised :    bool, optional
                     Whether to return normalised NBLAST scores. Default = True
     reference :     {string, R file object}, optional
@@ -851,7 +853,7 @@ class nbl_results:
 
     Attributes
     ----------
-    res :       pandas Dataframe 
+    res :       pandas.Dataframe 
                 Contains top N results
     sc :        Robject
                 Contains original RNblast forward scores 
@@ -900,21 +902,21 @@ class nbl_results:
         Parameters
         ----------
         hits :  {int, list of int, str, list of str}, optional
-                nblast hits to plot (default = 5). Can be:                     
+                nblast hits to plot (default = 5). Can be: 
+
                 1. int: e.g. hits = 5 for top 5 hits 
                 2 .list of ints: e.g. hits = [2,5] to plot hits 2 and 5 
                 3. string: e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
-                4. list of strings: 
-                   e.g. ['THMARCM-198F_seg1', npfMARCM-'F000003_seg002'] to
-                   plot multiple neurons by their gene name
+                4. list of strings: e.g. ['THMARCM-198F_seg1',
+                   npfMARCM-'F000003_seg002'] to plot multiple neurons by 
+                   their gene name
+
         plot_neuron :   bool 
                         If True, the nblast query neuron will be plotted. 
-                        Default = True
         plot_brain :    bool 
-                        If True, the reference brain will be plotted. 
-                        Default = True
+                        If True, the reference brain will be plotted.
         **kwargs    
-                        parameters passed to `plot.plot3d`. 
+                        Parameters passed to `plot.plot3d`. 
                         See `help(pymaid.plot.plot.plot3d)` for details.
 
         Returns

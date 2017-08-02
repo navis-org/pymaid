@@ -44,7 +44,8 @@ class CatmaidNeuron:
 
     Parameters
     ----------
-    x :             data to construct neuron from
+    x             
+                    Data to construct neuron from:
                     1. skeleton ID or
                     2. pandas DataFrame or Series from pymaid.get_3D_skeleton() or
                     3. another CatmaidNeuron (will create a deep copy). This will override other, redundant attributes.                    
@@ -482,7 +483,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        node :      {treenode_id, node tag}
+        node :      {treenode_id, node_tag}
                     Provide either a treenode ID or a (unique) tag
         """
         dist, prox = morpho.cut_neuron(self, node)
@@ -637,7 +638,8 @@ class CatmaidNeuronList:
 
     Parameters
     ----------
-    x :                 data to construct neuron from
+    x                 
+                        Data to construct neuron from. Can be either:
                         1. skeleton ID or
                         2. pandas DataFrame or Series from `pymaid.get_3D_skeleton()` or
                         3. CatmaidNeuron (will create a deep copy). This will override other, redundant attributes
@@ -1081,7 +1083,7 @@ class CatmaidNeuronList:
         Notes
         -----
         Provide either existing CatmaidInstance OR your credentials.
-        
+
         """
 
 

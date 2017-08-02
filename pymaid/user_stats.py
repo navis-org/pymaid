@@ -85,12 +85,14 @@ def get_user_contributions(x, remote_instance=None):
 
     Parameters
     ----------
-    x :                  Which neurons to check. Can be either:
-                         1. skeleton IDs (int or str)
-                         2. neuron name (str, must be exact match)
-                         3. annotation: e.g. 'annotation:PN right'
-                         4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :    Catmaid Instance   
+    x
+                        Which neurons to check. Can be either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, must be exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    remote_instance :   Catmaid Instance, optional
+                        Either pass explicitly or define globally.
 
     Returns
     -------
@@ -145,12 +147,14 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
 
     Parameters
     ----------
-    x :                Which neurons to check. Can be either:
+    x
+                       Which neurons to check. Can be either:
                        1. skeleton IDs (int or str)
                        2. neuron name (str, must be exact match)
                        3. annotation: e.g. 'annotation:PN right'
                        4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :  Catmaid Instance
+    remote_instance :  Catmaid Instance, optional
+                       Either pass explicitly or define globally.
     interval :         int, optional          
                        Size of the bins in minutes. Default = 1
     minimum_actions :  int, optional

@@ -344,11 +344,11 @@ class handler:
         Parameters
         ----------
         r :     float
-                red, range 0-1
+                Red value, range 0-1
         g :     float
-                green, range 0-1
+                Green value, range 0-1
         b :     float
-                blue, range 0-1
+                Blue value, range 0-1
 
         Notes
         -----
@@ -377,7 +377,7 @@ class handler:
         Parameters
         ----------
         r :         float
-                    new bevel radius
+                    New bevel radius
 
         Notes
         -----
@@ -509,11 +509,11 @@ class object_list:
         Parameters
         ----------
         r :     float
-                red, range 0-1
+                Red value, range 0-1
         g :     float
-                green, range 0-1
+                Green value, range 0-1
         b :     float
-                blue, range 0-1
+                Blue value, range 0-1
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
@@ -533,7 +533,7 @@ class object_list:
         Parameters
         ----------
         r :         float
-                    new bevel radius 
+                    New bevel radius 
         """
         for n in self.object_names:
             if n in bpy.data.objects:

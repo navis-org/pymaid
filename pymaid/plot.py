@@ -82,15 +82,15 @@ def close3d():
 
 
 def plot2d(*args, **kwargs):
-    """ Retrieves 3D skeletons and generates matplotlib object.   
+    """ Retrieves 3D skeletons and generates matplotlib object. Provide either 
+    skeleton IDs via ``skids`` or skeleton data via ``skdata``.  
 
     Parameters
-    ----------
-    Provide either skeleton IDs via ``skids`` or skeleton data via ``skdata``.
+    ----------    
 
-    skids :           {str, int, list of str, list of int}
+    skids :           {str, int, list of str, list of int}, optional
                       Skeleton IDs for neurons to plot
-    skdata :          {CatmaidNeuron, CatmaidNeuronList} 
+    skdata :          {CatmaidNeuron, CatmaidNeuronList}, optional
                       Skeleton data as retrieved by 
                       ``pymaid.pymaid.get_3D_skeleton()``
     remote_instance : Catmaid Instance, optional 
@@ -129,7 +129,7 @@ def plot2d(*args, **kwargs):
     Currently plots only frontal view (x,y axes). X and y limits have been set 
     to fit the adult EM volume -> adjust if necessary.
 
-    (Optional) *args and **kwargs:
+    (Optional) ``*args`` and ``**kwargs``:
 
     ``connectors`` (boolean, default = True )
        Plot connectors (synapses, gap junctions, abutting)
@@ -524,76 +524,83 @@ def plot3d(*args, **kwargs):
 
     skids :           {list of int, list of str}
                       list of CATMAID skeleton ids
-    skdata 
-                      skeleton data as retrieved by 
+    skdata :          {pandas.DataFrame, CatmaidNeuronList}
+                      Skeleton data as retrieved by 
                       ``pymaid.pymaid.get_3D_skeleton()``
-    dotprops 
-                      | pandas DataFrame containing neurons as dotprops 
-                      | Format:       ``name`` ``points``     ``vect``
-                      |               ``str``  ``DataFrame``  ``DataFrame``
-                      |
-                      | Format of ``points`` :    index   x     y     z                     
-                      | Format of ``vect``:       index   x     y     z
-    remote_instance : CATMAID remote instance
+    dotprops :        pandas.DataFrame
+                      Contains neurons as dotprops: points with associated vector
+
+                      >>> dotprops
+                      ...   name  points vect str DataFrame DataFrame
+                      ... 1
+                      ... 2
+                      >>> dotprops.points
+                      ...  index  x  y  z
+                      ... 1
+                      ... 2
+                      >>> dotprops.vect
+                      ...  index  x  y  z
+                      ... 1
+                      ... 2
+
+    remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids 
                       also necessary if you want to include volumes! If 
                       possible, will try to get remote instance from neuron 
                       object.                     
-    backend :         {'vispy','plotly'}, optional       
+    backend :         {'vispy','plotly'}, default = 'vispy'     
        | ``vispy`` uses OpenGL to generate high-performance 3D plots but is less pretty. 
-       | ``plotly`` generates 3D plots in .html which are shareable but take longer to generate.
-       | Default = ``vispy``
+       | ``plotly`` generates 3D plots in .html which are shareable but take longer to generate.       
 
-    connectors :      bool, optional 
-                      Plot synapses and gap junctions (default = False)
-    by_strahler :     bool, optional
-                      Will render the neuron by strahler index (default=False)
+    connectors :      bool, default=False
+                      Plot synapses and gap junctions.
+    by_strahler :     bool, default=False
+                      Will render the neuron by strahler index.
                       Does currently only work when backend = 'plotly'
-    cn_mesh_colors :  bool, optional 
-                      Plot connectors using mesh colors (default = False)
+    cn_mesh_colors :  bool, default=False
+                      Plot connectors using mesh colors.
     limits :          dict, optional
                       Manually override plot limits. 
                       Format: ``{'x' :[min,max], 'y':[min,max], 'z':[min,max]}``
-    auto_limits :     bool, optional
-                      Autoscales plot to fit the neurons (default = True)                         
-    downsampling :    int, optional   
-                      Set downsampling of neurons before plotting. 
-                      Default = None
-    clear3d :         bool, optional
+    auto_limits :     bool, default=True
+                      Autoscales plot to fit the neurons.
+    downsampling :    int, default=None
+                      Set downsampling of neurons before plotting.                       
+    clear3d :         bool, Default=False
                       If True, canvas is cleared before plotting (only for 
-                      vispy). Default = False
+                      vispy).
 
     volumes         
-       | volumes to plot. Can be:
+       | Volumes to plot. Can be:
        | 1. Volume name (str): e.g. ``"v13.LH_R"``
        | 2. List of names: e.g. ``['v13.LH_R', 'v13.LH_L']``
        | 3. Dict of names+color: e.g. ``{ 'v13.LH_R' : (255,0,0) }``
        | 4. Dict of dict: e.g. ``{'v13.LH_R': { 'color' : (255,0,0  } }``
        | 5. Dict with verts/faces: 
        |   e.g. ``{'my_neuropil': { 'verts': [ ], 'faces' : [], 'color': () }}``
-       |   If no color is provided, default (220,220,220) is used
-    colormap :        dict, optional
-                      ``{ skid : (r,g,b), ... }`` - color must be 0-255. 
-                      Default = random colors                     
-    fig_width,fig_height : int, optional   
-                      Use to define figure/window size (default = 1440/960)      
-    title :           str, optional          
-                      For plotly only! Plot title (default = 'Neuron plot')   
-    fig_autosize :    bool, optional    
-                      For plotly only! Autoscale figure size (default = False) 
+       |   If no color is provided, light grey (220,220,220) is used
+    colormap :        dict, default=random
+                      ``{ skid : (r,g,b), ... }`` - color must be 0-255.                                        
+    fig_width :       int, default=1440
+    fig_height :      int, default=960 
+                      Use to define figure/window size.
+    title :           str, default='Neuron plot'
+                      Plot title (for plotly only!)
+    fig_autosize :    bool, default=False
+                      For plotly only! Autoscale figure size.
                       Attention: autoscale overrides fig_width and fig_height      
 
     Returns
     --------
-    If ``backend = 'vispy'``
-       |Opens a 3D window and returns
-       |canvas : Vispy canvas object
-       |view : Vispy view object -> use to manipulate camera, add object, etc.
+    If ``backend = 'vispy'``::
+       1. Opens a 3D window and returns::
+       2. ``canvas`` - Vispy canvas object
+       3. ``view`` - Vispy view object -> use to manipulate camera, add object, etc.
 
-    If ``backend = 'plotly'``
-       |fig: dictionary to generate plotly 3d figure
-       | Use for example: ``plotly.offline.plot(fig, filename='3d_plot.html')``
-          to generate html file and open it webbrowser 
+    If ``backend = 'plotly'``::
+       1. ``fig`` - dictionary to generate plotly 3d figure
+       Use for example: ``plotly.offline.plot(fig, filename='3d_plot.html')``
+       to generate html file and open it webbrowser 
     """
 
     def _plot3d_vispy():
@@ -1314,25 +1321,25 @@ def plot_network(*args, **kwargs):
     ----------
     USE EITHER <skids>, <adj_mat> or <g> to specify what to plot  
 
-    neurons :         neurons as single or list of either:
+    neurons          
+                      neurons as single or list of either:
                       1. skeleton IDs (int or str)
                       2. neuron name (str, exact match)
                       3. annotation: e.g. 'annotation:PN right'
                       4. CatmaidNeuron or CatmaidNeuronList object
-    adj_mat :         Pandas dataframe
+    adj_mat :         pandas.DataFrame
                       Adjacency matrix, e.g. from 
                       ``cluster.create_adjacency_matrix()``
-    g :               igraph object
+    g :               iGraph object, optional
                       iGraph representation of the network
-    remote_instance : CATMAID remote instance
+    remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids
-
-    layout :          string (default = 'fr' -> Fruchterman-Reingold)
+    layout :          string, default = 'fr' -> Fruchterman-Reingold
                       See http://igraph.org/python/doc/tutorial/tutorial.html 
                       for available layouts
-    syn_cutoff :      int (default = False)
+    syn_cutoff :      int, default=False
                       If provided, connections will be maxed at this value
-    syn_threshold :   int (default = 0)
+    syn_threshold :   int, default=0
                       Edges with less connections are ignored
     groups :          dict 
                       Use to group neurons. Format: 
@@ -1340,12 +1347,12 @@ def plot_network(*args, **kwargs):
     colormap :        {str, tuple, dict }
                 | Set to 'random' (default) to assign random colors to neurons
                 | Use single tuple to assign the same color to all neurons:
-                | ( (0-255,0-255,0-255) ) 
+                | e.g. ``( (220,10,50) )``
                 | Use dict to assign rgb colors to individual neurons: 
-                | { neuron1 : (0-255,0-255,0-255), .. }
-    label_nodes :     boolean (default = True)
+                | e.g. ``{ neuron1 : (200,200,0), .. }``
+    label_nodes :     bool, default=True
                       Plot neuron labels
-    label_edges :     boolean (default = True)
+    label_edges :     bool, default=True
                       Plot edge labels
     node_hover_text : dict
                       Provide custom hover text for neurons:
@@ -1357,7 +1364,7 @@ def plot_network(*args, **kwargs):
 
     Returns
     -------
-    fig: plotly dict
+    figure : plotly dict
        Use for example ``plotly.offline.plot(fig, filename='plot.html')`` to 
        generate html file and open it webbrowser 
     """

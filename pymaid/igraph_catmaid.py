@@ -72,14 +72,16 @@ def network2graph(x, remote_instance=None, threshold=1):
 
     Parameters
     ----------
-    x :                 Catmaid Neurons as single or list of either:
+    x                  
+                        Catmaid Neurons as single or list of either:
                          1. skeleton IDs (int or str)
                          2. neuron name (str, exact match)
                          3. annotation: e.g. 'annotation:PN right'
                          4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :   CATMAID instance; either pass directly to function or 
-                        define globally as 'remote_instance'
-    threshold :         int
+    remote_instance :   CATMAID instance, optional 
+                        Either pass directly to function or define globally 
+                        as 'remote_instance'
+    threshold :         int, optional
                         Connections weaker than this will be excluded 
 
     Returns
@@ -127,7 +129,7 @@ def matrix2graph(adj_matrix, **kwargs):
 
     Parameters
     ----------
-    adj_matrix :      Pandas dataframe 
+    adj_matrix :      pandas.Dataframe
                       Adjacency matrix - e.g. from :func:`pymaid.cluster.create_adjacency_matrix`   
     syn_threshold :   int, optional     
                       Edges with less connections will be ignored
@@ -203,11 +205,11 @@ def neuron2graph(skdata, append=True):
 
     Parameters
     ----------
-    skdata :          {Pandas dataframe, CatmaidNeuron}
-                      Containing either a single or multiple neurons
+    skdata :          {pandas.DataFrame, CatmaidNeuron}
+                      Containing either a single or multiple neurons.
     append :          bool, optional
                       Unless False, graph is automatically appended to the 
-                      dataframe. Default = True
+                      dataframe.
 
     Returns
     -------
@@ -276,11 +278,11 @@ def dist_from_root(data, synapses_only=False):
 
     Parameters
     ----------
-    data :            {iGraph object, pandas DataFrame, CatmaidNeuron}
-                      Holds the skeleton data
+    data :            {iGraph object, pandas.DataFrame, CatmaidNeuron}
+                      Holds the skeleton data.
     synapses_only :   bool, optional
                       If True, only distances for nodes with synapses will be 
-                      returned (only makes sense if input is a Graph). Default = False
+                      returned (only makes sense if input is a Graph).
 
     Returns:
     -------     
@@ -343,7 +345,7 @@ def cluster_nodes_w_synapses(data, plot_graph=True):
     ----------
     data :         {CatmaidNeuron, iGraph object}
     plot_graph :   boolean, optional
-                   If true, plots a Graph. Default = True
+                   If true, plots a Graph. 
 
     Returns
     -------

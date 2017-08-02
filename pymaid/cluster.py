@@ -45,30 +45,32 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
 
     Parameters
     ----------
-    n_a :             Source neurons as single or list of either:
-                         1. skeleton IDs (int or str)
-                         2. neuron name (str, exact match)
-                         3. annotation: e.g. 'annotation:PN right'
-                         4. CatmaidNeuron or CatmaidNeuronList object
-    n_b :             Target neurons as single or list of either:
-                         1. skeleton IDs (int or str)
-                         2. neuron name (str, exact match)
-                         3. annotation: e.g. 'annotation:PN right'
-                         4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance : CATMAID instance
-    syn_cutoff :      int, optional
-                      If set, will cut off synapses above given value.
-                      Default = None
-    syn_threshold :   int, optional
-                      If set, will cut off synapses below given value.
-                      Default = None
-    row_groups, col_groups : dict, optional
-                      Use to collapse neuronsA/B into groups:
-                      ``{'Group1': [skid1,skid2,skid3], 'Group2' : [] }``
+    n_a           
+                        Source neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    n_b            
+                        Target neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    remote_instance :   CATMAID instance, optional
+    syn_cutoff :        int, optional
+                        If set, will cut off synapses above given value.                          
+    syn_threshold :     int, optional
+                        If set, will cut off synapses below given value.                      
+    row_groups :        dict, optional
+                        Use to collapse neuronsA/B into groups:
+                        ``{'Group1': [skid1,skid2,skid3], 'Group2' : [] }``
+    col_groups :        dict, optional
+                        See row_groups
 
     Returns
     -------
-    matrix :          pandas Dataframe
+    matrix :          pandas.Dataframe
 
     """
 
@@ -164,17 +166,20 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
 
     Parameters
     ----------
-    mat :                      {pandas DataFrame, numpy matrix}
-    row_groups, col_groups :   dicts, optional
-                               For pandas DataFrames members need to be column
-                               or index, for np they need to be slices indices:
-                         ``{ 'group name' : [ member1, member2, ... ], .. }``
-    method :                   {'AVERAGE', 'MAX', 'MIN'}
-                               Method by which groups are collapsed.
+    mat :               {pandas.DataFrame, numpy.array}
+                        Matrix to group
+    row_groups :        dict, optional
+                        For pandas DataFrames members need to be column
+                        or index, for np they need to be slices indices:
+                        ``{ 'group name' : [ member1, member2, ... ], .. }``
+    col_groups :        dict, optional
+                        See row_groups.
+    method :            {'AVERAGE', 'MAX', 'MIN'}
+                        Method by which groups are collapsed.
 
     Returns
     -------
-    pandas DataFrame
+    pandas.DataFrame    
     """
 
     # Convert numpy array to DataFrame
@@ -231,12 +236,13 @@ def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, 
 
     Parameters
     ----------
-    x :                  neurons as single or list of either:
+    x
+                         Neurons as single or list of either:
                          1. skeleton IDs (int or str)
                          2. neuron name (str, exact match)
                          3. annotation: e.g. 'annotation:PN right'
                          4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :    CATMAID instance
+    remote_instance :    CATMAID instance, optional
     upstream :           bool, optional
                          If True, upstream partners will be considered.
                          Default = True
@@ -556,7 +562,7 @@ def synapse_distance_matrix(synapse_data, labels=None, plot_matrix=True, method=
 
     Parameters
     ----------
-    synapse_data :    Pandas dataframe
+    synapse_data :    pandas.DataFrame
                       Contains the connector data (df.connectors)
     labels :          list of str, optional
                       Labels for each leaf of the dendrogram
@@ -569,7 +575,8 @@ def synapse_distance_matrix(synapse_data, labels=None, plot_matrix=True, method=
 
     Returns
     -------
-    dist_matrix :     numpy distance matrix
+    dist_matrix :     np.array 
+                      Distance matrix
     fig :             matplotlib object
                       Only if plot_matrix = True
     """
@@ -713,7 +720,7 @@ class clust_results:
 
         Parameters
         ---------
-        k :         int or float                    
+        k :         {int, float}
         criterion : str
                     Either 'maxclust' or 'distance'. If maxclust, k clusters
                     will be formed. If distance, clusters will be created at
@@ -748,7 +755,7 @@ class clust_results:
 
         Parameters
         ----------
-        k :         int or float
+        k :         {int, float}
         criterion : str
                     Either 'maxclust' or 'distance'. If maxclust, k clusters
                     will be formed. If distance, clusters will be created at
