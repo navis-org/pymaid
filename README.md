@@ -57,8 +57,8 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 
 ### Retrieve 3D skeleton data
 ```python
-from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
-from pymaid.plot import plot3d
+from pymaid.pymaid import CatmaidInstance, get_neuron
+from pymaid import plot
 from pymaid.core import CatmaidNeuron, CatmaidNeuronList
 
 #Initialize Catmaid instance 
@@ -68,7 +68,7 @@ myInstance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password
 n = CatmaidNeuron( '12345', remote_instance = myInstance )
 
 #Retrieve a list of skeletons using an annotation
-nl = get_3D_skeleton ( 'annotation:example_neurons' , myInstance )
+nl = get_neuron ( 'annotation:example_neurons' , myInstance )
 
 #nl is a CatmaidNeuronList object that manages data:
 #Notice that some entries show as 'NA' because that data has not yet been retrieved/calculated
@@ -97,11 +97,14 @@ branch_points = nl[0].nodes[ nl[0].nodes.type == 'branch' ].treenode_id
 
 #Plot neuron -> see help(pymaid.plot.plot3d) for accepted kwargs
 nl.plot3d()
+
+#Clear 3D viewer
+plot.clear3d()
 ```
 
 ### Cluster synapses based on distance along the arbor using iGraph
 ```python
-from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
+from pymaid.pymaid import CatmaidInstance, get_neuron
 from pymaid.igraph_catmaid import cluster_nodes_w_synapses
 from scipy import cluster
 
@@ -109,7 +112,7 @@ from scipy import cluster
 remote_instance = CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 
 #Retrieve 3D skeleton data for neuron of interest
-nl = get_3D_skeleton ( [ '12345' ], remote_instance, connector_flag = 1, tag_flag = 0 )
+nl = get_neuron ( [ '12345' ], remote_instance, connector_flag = 1, tag_flag = 0 )
 
 #(Optional) Consider downsampling for large neurons (preverses branch points, end points, synapses, etc.)
 nl.downsample( factor = 4 )

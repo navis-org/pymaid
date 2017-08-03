@@ -24,7 +24,7 @@ Examples
 >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
 >>> pymaid.remote_instance = rm
 >>> # Load a bunch of neurons
->>> neuronlist = pymaid.get_3D_skeleton('annotation:glomerulus DA1')
+>>> neuronlist = pymaid.get_neuron('annotation:glomerulus DA1')
 >>> handler = b3d.handler()
 >>> # Export neurons into Blender
 >>> handler.add( neuronlist )
@@ -403,13 +403,13 @@ class object_list:
     Notes
     -----
 
-    1. Object_lists should normally be constructed via the handler 
-    (see :class:`pymaid.b3d.handler`)! 
-    2. List works with object NAMES to prevent Blender from crashing when 
-    trying to access neurons that do not exist anymore. This also means that 
-    changing names manually will compromise a object list. 
-    3. Accessing a neuron list's attributes (see below) return another 
-    `object_list` class which you can use to manipulate the new subselection. 
+    1.  Object_lists should normally be constructed via the handler 
+        (see :class:`pymaid.b3d.handler`)! 
+    2.  List works with object NAMES to prevent Blender from crashing when 
+        trying to access neurons that do not exist anymore. This also means that 
+        changing names manually will compromise a object list. 
+    3.  Accessing a neuron list's attributes (see below) return another 
+        ``object_list`` class which you can use to manipulate the new subselection. 
 
     Attributes
     ----------
@@ -427,7 +427,7 @@ class object_list:
     >>> from pymaid import pymaid, b3d
     >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )
     >>> pymaid.remote_instance = rm
-    >>> nl = pymaid.get_3D_skeleton('annotation:glomerulus DA1')
+    >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> handler = b3d.handler()
     >>> handler.add( nl )
     >>> # Select only neurons on the right

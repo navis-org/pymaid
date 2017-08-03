@@ -11,7 +11,7 @@ Many basic parameters are readily accessible through attributes of :class:`pymai
 >>> from pymaid import pymaid
 >>> rm = pymaid.CatmaidInstance('server_url','user','pw','token')
 >>> pymaid.remote_instance = rm
->>> nl = pymaid.get_3D_skeletons('annotation:glomerulus DA1')
+>>> nl = pymaid.get_neurons('annotation:glomerulus DA1')
 >>> # Access single attribute: e.g. cable lengths [um]
 >>> nl.cable_length
 >>> # .. or get a full summary as pandas DataFrame

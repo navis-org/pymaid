@@ -93,6 +93,7 @@ class CatmaidNeuron:
     slabs :             list of treenode IDs
     soma :              treenode_id of soma
                         Returns None if no soma or 'NA' if data not available
+    root :              treenode_id of root
 
     Examples
     --------    
@@ -232,6 +233,8 @@ class CatmaidNeuron:
             return self.slabs
         elif key == 'soma':
             return self.get_soma()
+        elif key == 'root':
+            return self.get_root()
         elif key == 'df':
             self.get_skeleton()
             return self.df
@@ -364,6 +367,10 @@ class CatmaidNeuron:
             module_logger.warning('Multiple possible somas found')
             return temp
 
+    def get_root(self):
+        """Thin wrapper to get root node"""
+        return self.nodes[ self.nodes.parent_id.isnull() ].treenode_id.tolist()[0]
+
     def get_review(self, remote_instance=None):
         """Get review status for neuron"""
         if not remote_instance and not self._remote_instance:
@@ -385,7 +392,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.annotations = pymaid.get_annotations_from_list(
+        self.annotations = pymaid.get_annotations(
             self.skeleton_id, remote_instance)[str(self.skeleton_id)]
         return self.annotations
 
@@ -682,6 +689,7 @@ class CatmaidNeuronList:
                         Cable length in micrometers [um]
     slabs :             list of treenode IDs
     soma :              list of soma nodes
+    root :              list of root nodes
 
     Examples
     --------
@@ -839,6 +847,8 @@ class CatmaidNeuronList:
             return np.array([n.slabs for n in self.neurons])
         elif key == 'soma':
             return np.array([n.soma for n in self.neurons])
+        elif key == 'root':
+            return np.array([n.root for n in self.neurons])
         elif key == 'nodes':
             self.get_skeletons(skip_existing=True)
             return pd.DataFrame([n.nodes for n in self.neurons])
@@ -874,7 +884,7 @@ class CatmaidNeuronList:
             to_retrieve = [
                 n.skeleton_id for n in self.neurons if 'annotations' not in n.__dict__]
             if to_retrieve:
-                re = pymaid.get_annotations_from_list(
+                re = pymaid.get_annotations(
                     to_retrieve, remote_instance=self._remote_instance)
                 for n in [n for n in self.neurons if 'annotations' not in n.__dict__]:
                     n.annotations = re[str(n.skeleton_id)]
@@ -1033,8 +1043,7 @@ class CatmaidNeuronList:
                     pass
 
     def reload(self):
-        """ Update neuron skeletons.
-        """
+        """ Update neuron skeletons."""
         self.get_skeletons(skip_existing=False)
 
     def get_skeletons(self, skip_existing=False):

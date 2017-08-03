@@ -52,7 +52,7 @@ Examples
 >>> plotly.offline.plot(fig) 
 """
 
-from pymaid.pymaid import get_3D_skeleton, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids
+from pymaid.pymaid import get_neuron, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids
 from pymaid import core
 import logging
 import pandas as pd
@@ -96,8 +96,13 @@ def get_user_contributions(x, remote_instance=None):
 
     Returns
     -------
-    pandas DataFrame
-       contains `nodes`, `presynapses`, `postsynapses` by `user`   
+    pandas.DataFrame
+        DataFrame in which each row represents a user
+
+        >>> df
+        ...   user. nodes. presynapses  postsynapses
+        ... 0
+        ... 1
 
     See Also
     --------
@@ -163,8 +168,13 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
 
     Returns
     -------
-    pandas DataFrame
-       contains `total`, `creation`, `edition`, `review` per `user`   
+    pandas.DataFrame
+        DataFrame in which each row represents a user:
+
+        >>> df
+        ...   user  total  creation  edition   review
+        ... 0
+        ... 1
 
     Notes
     -----
@@ -183,7 +193,7 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
     user_list = get_user_list(remote_instance).set_index('id')
 
     if not isinstance(x, core.CatmaidNeuron) and not isinstance(x, core.CatmaidNeuronList):
-        skdata = get_3D_skeleton(skids, remote_instance=remote_instance)
+        skdata = get_neuron(skids, remote_instance=remote_instance)
     elif isinstance(x, core.CatmaidNeuron):
         skdata = core.CatmaidNeuronList(skdata)
     elif isinstance(x, core.CatmaidNeuronList):

@@ -25,7 +25,8 @@ Features
 Contribute
 ----------
 
-Source Code: https://github.com/schlegelp/PyMaid
+Source Code: https://github.com/schlegelp/PyMaid  
+
 Issue Tracker: https://github.com/schlegelp/PyMaid/issues
 
 Support

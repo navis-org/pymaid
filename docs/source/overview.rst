@@ -52,9 +52,10 @@ function, parameters and usage.
 
 - :func:`pymaid.pymaid.add_annotations`: use to add annotation(s) to neuron(s)
 - :func:`pymaid.pymaid.edit_tags`: edit (add/remove) tags of treenodes or connectors
-- :func:`pymaid.pymaid.get_3D_skeleton`: get neurons' skeleton(s) - i.e. what the 3D viewer in CATMAID shows
-- :func:`pymaid.pymaid.get_arbor`: similar to get_3D_skeleton but more detailed information on connectors
-- :func:`pymaid.pymaid.get_annotations_from_list`: get annotations of a set of neurons (annotation only)
+- :func:`pymaid.pymaid.get_neuron`: get neuron skeleton(s) - i.e. what the 3D viewer in CATMAID shows
+- :func:`pymaid.pymaid.get_arbor`: similar to get_neuron but more detailed information on connectors
+- :func:`pymaid.pymaid.get_annotations`: get annotations of a set of neurons (annotation only)
+- :func:`pymaid.pymaid.get_annotation_details`: get detailed annotations for a set of neurons (includes user and timestamp)
 - :func:`pymaid.pymaid.get_connectors`: get connectors (synapses, abutting and/or gap junctions) for set of neurons
 - :func:`pymaid.pymaid.get_connector_details`: get details for connector (i.e. all neurons connected to it)
 - :func:`pymaid.pymaid.get_contributor_statistics`: get contributors (nodes, synapses, etc) for a set of neurons
@@ -62,7 +63,6 @@ function, parameters and usage.
 - :func:`pymaid.pymaid.get_history`: retrieve project history similar to the project statistics widget
 - :func:`pymaid.pymaid.get_logs`: get what the log widged shows (merges, splits, etc.)
 - :func:`pymaid.pymaid.get_names`: retrieve names of a set of skeleton IDs
-- :func:`pymaid.pymaid.get_neuron_annotation`: get annotations of a **single** neuron (includes user and timestamp)
 - :func:`pymaid.pymaid.get_neurons_in_volume`: get neurons in a defined box volume
 - :func:`pymaid.pymaid.get_neuron_list`: retrieve neurons that fit certain criteria (e.g. user, size, dates)
 - :func:`pymaid.pymaid.get_treenode_table`: retrieve list of nodes within given volume
