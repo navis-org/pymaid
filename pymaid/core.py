@@ -24,6 +24,7 @@ import numpy as np
 import datetime
 import random
 from tqdm import tqdm
+from copy import copy, deepcopy
 
 from pymaid import igraph_catmaid, morpho, pymaid, plot
 
@@ -47,14 +48,14 @@ class CatmaidNeuron:
     x             
                     Data to construct neuron from:
                     1. skeleton ID or
-                    2. pandas DataFrame or Series from pymaid.get_3D_skeleton() or
+                    2. pandas DataFrame or Series from pymaid.get_neuron() or
                     3. another CatmaidNeuron (will create a deep copy). This will override other, redundant attributes.                    
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
                         neuron annotations, review status, etc.
     meta_data :         dict, optional
                         any additional data
-    copy :              boolean, optional
+    make_copy :         boolean, optional
                         If true, DataFrames are copied [.copy()] before being 
                         assigned to the neuron object to prevent 
                         backpropagation of subsequent changes to the data. 
@@ -112,7 +113,7 @@ class CatmaidNeuron:
     0   ...
     ...
     >>> #Initialize with skeleton data
-    >>> n = pymaid.get_3D_skeleton( 123456, remote_instance = rm )
+    >>> n = pymaid.get_neuron( 123456, remote_instance = rm )
     >>> # Get annotations from server
     >>> n.annotations
     [ 'annotation1', 'annotation2' ]
@@ -120,7 +121,12 @@ class CatmaidNeuron:
     >>> n.get_annotations()
     """
 
-    def __init__(self, x, remote_instance=None, meta_data=None, copy=True):
+    #Parameters for soma detection
+    soma_detection_radius = 100
+    #Soma tag - set to None if no tag needed
+    soma_detection_tag = 'soma'
+
+    def __init__(self, x, remote_instance=None, meta_data=None ):
         self.logger = logging.getLogger('CatmaidNeuron')
 
         if not self.logger.handlers:
@@ -130,7 +136,7 @@ class CatmaidNeuron:
             formatter = logging.Formatter(
                 '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             sh.setFormatter(formatter)
-            self.logger.addHandler(sh)
+            self.logger.addHandler(sh)        
 
         if isinstance(x, pd.DataFrame) or isinstance(x, CatmaidNeuronList):
             if x.shape[0] == 1:
@@ -139,6 +145,9 @@ class CatmaidNeuron:
                 raise Exception(
                     'Unable to construct CatmaidNeuron from data containing multiple neurons.')
 
+        if not isinstance(x, str) and not isinstance(x, int) and not isinstance(x, pd.Series) and not isinstance(x, CatmaidNeuron):
+            raise TypeError('Unable to construct CatmaidNeuron from data type %s' % str(type(x)))        
+
         if remote_instance is None:
             if 'remote_instance' in globals():
                 remote_instance = globals()['remote_instance']
@@ -146,65 +155,27 @@ class CatmaidNeuron:
         # These will be overriden if x is a CatmaidNeuron
         self._remote_instance = remote_instance
         self._meta_data = meta_data
-        self.date_retrieved = datetime.datetime.now().isoformat()
-        self._is_copy = copy
+        self.date_retrieved = datetime.datetime.now().isoformat()        
 
-        if isinstance(x, CatmaidNeuron):
-            self.skeleton_id = x.skeleton_id
-            if 'df' in x.__dict__:
-
-                if 'type' not in x.nodes:
-                    morpho.classify_nodes(x)
-
-                if copy:
-                    self.df = x.df.copy()
-                    self.df.nodes = self.df.nodes.copy()
-                    self.df.connectors = self.df.connectors.copy()
-
-                    if self.df.igraph is not None:
-                        self.df.igraph = self.df.igraph.copy()
-
-                self.nodes = self.df.nodes
-                self.connectors = self.df.connectors
-
-                if 'neuron_name' in self.df:
-                    self.neuron_name = self.df.neuron_name
-
-                if 'tags' in self.df:
-                    self.tags = self.df.tags
-
-            self._remote_instance = x._remote_instance
-            self._meta_data = x._meta_data
-            self.date_retrieved = x.date_retrieved
-
-            if 'igraph' in x.__dict__:
-                self.igraph = x.igraph
-                if copy:
-                    self.igraph = self.igraph.copy()
-
-        elif isinstance(x, pd.Series):
-            self.skeleton_id = x.skeleton_id
+        if isinstance(x, CatmaidNeuron) or isinstance(x, pd.Series):
+            self.skeleton_id = copy( x.skeleton_id )
 
             if 'type' not in x.nodes:
                 morpho.classify_nodes(x)
 
-            if copy:
-                self.df = x.copy()
-                self.df.nodes = self.df.nodes.copy()
-                self.df.connectors = self.df.connectors.copy()
+            self.nodes = copy( x.nodes )
+            self.connectors = copy( x.connectors )
+            
+            self.neuron_name = copy(x.neuron_name)
+            self.tags = copy(x.tags)
 
-                if self.df.igraph != None:
-                    self.df.igraph = self.df.igraph.copy()
+            if 'igraph' in x.__dict__:
+                self.igraph = x.igraph.copy()
 
-            self.nodes = self.df.nodes
-            self.connectors = self.df.connectors
-
-            if 'neuron_name' in self.df:
-                self.neuron_name = self.df.neuron_name
-
-            if 'tags' in self.df:
-                self.tags = self.df.tags
-
+            if isinstance(x,CatmaidNeuron):
+                self._remote_instance = x._remote_instance # Remote instance will not be copied!
+                self._meta_data = copy(x._meta_data)
+                self.date_retrieved = copy(x.date_retrieved)
         else:
             try:
                 int(x)  # Check if this is a skeleton ID
@@ -235,9 +206,6 @@ class CatmaidNeuron:
             return self.get_soma()
         elif key == 'root':
             return self.get_root()
-        elif key == 'df':
-            self.get_skeleton()
-            return self.df
         elif key == 'tags':
             self.get_skeleton()
             return self.tags
@@ -284,15 +252,15 @@ class CatmaidNeuron:
 
     def copy(self):
         """Create a copy of the neuron"""
-        return CatmaidNeuron(self, copy=True)
+        return CatmaidNeuron(self)
 
     def get_skeleton(self, remote_instance=None, **kwargs):
-        """Get skeleton data for neuron using pymaid.get_3D_skeleton() 
+        """Get skeleton data for neuron using pymaid.get_neuron() 
 
         Parameters
         ----------       
         **kwargs
-                    Will be passed to pymaid.get_3D_skeleton()
+                    Will be passed to pymaid.get_neuron()
                     e.g. to get the full treenode history use:
                     n.get_skeleton( with_history = True )
                     or to get abutting connectors:
@@ -300,7 +268,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`pymaid.pymaid.get_3D_skeleton` 
+        :func:`pymaid.pymaid.get_neuron` 
                     Function called to get skeleton information
         """
         if not remote_instance and not self._remote_instance:
@@ -309,13 +277,12 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
         self.logger.info('Retrieving skeleton data...')
-        skeleton = pymaid.get_3D_skeleton(
+        skeleton = pymaid.get_neuron(
             self.skeleton_id, remote_instance, return_neuron=False, kwargs=kwargs).ix[0]
 
         if 'type' not in skeleton.nodes:
             morpho.classify_nodes(skeleton)
-
-        self.df = skeleton
+        
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
         self.tags = skeleton.tags
@@ -341,31 +308,51 @@ class CatmaidNeuron:
         """Calculate igraph representation of neuron """
         level = igraph_catmaid.module_logger.level
         igraph_catmaid.module_logger.setLevel('WARNING')
-        self.igraph = igraph_catmaid.neuron2graph(self.df)
+        self.igraph = igraph_catmaid.neuron2graph(self)
         igraph_catmaid.module_logger.setLevel(level)
         return self.igraph
 
     def get_slabs(self):
         """Generate slabs from neuron"""
-        self.slabs = morpho._generate_slabs(self.df)
+        self.slabs = morpho._generate_slabs(self)
         return self.slabs
 
     def get_soma(self):
-        """Get soma -> Must have <soma> tag and radius > 100"""
-        tn = self.nodes[self.nodes.radius > 100].treenode_id.tolist()
+        """Search for soma
 
-        if 'soma' not in self.tags:
-            return None
-        else:
-            temp = [n for n in tn if n in self.tags['soma']]
+        Notes
+        -----
+        Uses either a treenode tag or treenode radius or a combination of both
+        to identify the soma. This is set in the class attributes 
+        ``soma_detection_radius`` and ``soma_detection_tag``. The default
+        values for these are: 
 
-            if len(temp) == 1:
-                return temp[0]
-            elif len(temp) == 0:
+            { 
+                soma_detection_radius = 100,
+                soma_detection_tag = 'soma'        
+            }
+
+        Returns
+        -------
+        treenode_id
+            Returns treenode ID if soma was found, None if no soma.
+                
+        """
+        tn = self.nodes[self.nodes.radius > self.soma_detection_radius].treenode_id.tolist()
+
+        if self.soma_detection_tag: 
+            if self.soma_detection_tag not in self.tags:
                 return None
+            else:
+                tn = [n for n in tn if n in self.tags[self.soma_detection_tag]]
 
-            module_logger.warning('Multiple possible somas found')
-            return temp
+        if len(tn) == 1:
+            return tn[0]
+        elif len(tn) == 0:
+            return None
+
+        module_logger.warning('Multiple possible somas found')
+        return tn
 
     def get_root(self):
         """Thin wrapper to get root node"""
@@ -430,10 +417,14 @@ class CatmaidNeuron:
 
         Examples
         --------
-        >>> nl = pymaid.get_3D_skeleton('annotation:uPN right')
+        >>> nl = pymaid.get_neuron('annotation:uPN right')
         >>> #Plot with connectors
         >>> nl.plot3d( connectors=True )               
         """
+
+        if 'remote_instance' not in kwargs:
+            kwargs.update({'remote_instance':self._remote_instance})
+
         if 'nodes' not in self.__dict__:
             self.get_skeleton()
         return plot.plot3d(skdata=CatmaidNeuronList(self), **kwargs)
@@ -464,10 +455,7 @@ class CatmaidNeuron:
             nl_copy.downsample(factor=factor)
             return nl_copy
 
-        morpho.downsample_neuron(self, factor, inplace=True)
-
-        # Make sure to also update neuron.df
-        self.df.nodes = self.nodes
+        morpho.downsample_neuron(self, factor, inplace=True)        
 
         # Delete outdated attributes
         self._clear_temp_attr()
@@ -549,7 +537,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        n = pymaid.get_3D_skeleton(
+        n = pymaid.get_neuron(
             self.skeleton_id, remote_instance=remote_instance)
         self.__init__(n, self._remote_instance, self._meta_data)
 
@@ -588,6 +576,20 @@ class CatmaidNeuron:
 
     def __repr__(self):
         return str(self.summary())
+
+    def __add__(self, to_add):
+        if isinstance(to_add, list):
+            if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
+                return CatmaidNeuronList(list(set([self] + to_add)))
+            else:
+                return CatmaidNeuronList(list(set([self] + [ CatmaidNeuron[n] for n in to_add ])))
+        elif isinstance(to_add, CatmaidNeuron):
+            return CatmaidNeuronList(list(set( [self] + [ to_add ])))
+        elif isinstance(to_add, CatmaidNeuronList):
+            return CatmaidNeuronList(list(set( [self] + to_add.neurons )))
+        else:
+            self.logger.error('Unable to add data of type %s.' %
+                              str(type(to_add)))
 
     def summary(self):
         """ Get summary over all neurons in this NeuronList
@@ -648,14 +650,14 @@ class CatmaidNeuronList:
     x                 
                         Data to construct neuron from. Can be either:
                         1. skeleton ID or
-                        2. pandas DataFrame or Series from `pymaid.get_3D_skeleton()` or
+                        2. pandas DataFrame or Series from `pymaid.get_neuron()` or
                         3. CatmaidNeuron (will create a deep copy). This will override other, redundant attributes
     remote_instance :   CatmaidInstance, optional
                         Storing this makes it more convenient to retrieve e.g. 
                         neuron annotations, review status, etc.
     meta_data :         dict, optional
                         Any additional data
-    copy :              boolean, optional
+    make_copy :         boolean, optional
                         If true, DataFrames are copied [.copy()] before being 
                         assigned to the neuron object to prevent 
                         backpropagation of subsequent changes to the data. 
@@ -702,7 +704,7 @@ class CatmaidNeuronList:
     >>> nl.review_status
     array([ 90, 10 ])
     >>> #Initialize with skeleton data
-    >>> nl = pymaid.get_3D_skeleton( [ 123456, 45677 ], remote_instance = rm )
+    >>> nl = pymaid.get_neuron( [ 123456, 45677 ], remote_instance = rm )
     >>> #Get annotations from server
     >>> nl.annotations
     [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
@@ -715,11 +717,11 @@ class CatmaidNeuronList:
     >>> #Index using annotation
     >>> subset = nl ['annotation:uPN right']
     >>> #Concatenate lists
-    >>> nl += pymaid.get_3D_skeleton( [ 912345 ], remote_instance = rm )
+    >>> nl += pymaid.get_neuron( [ 912345 ], remote_instance = rm )
 
     """
 
-    def __init__(self, x, remote_instance=None, copy=True):
+    def __init__(self, x, remote_instance=None, make_copy=True):
         self.logger = logging.getLogger('CatmaidNeuronList')
         if not self.logger.handlers:
             sh = logging.StreamHandler()
@@ -737,9 +739,9 @@ class CatmaidNeuronList:
         if not isinstance(x, list) and not isinstance(x, pd.DataFrame) and not isinstance(x, CatmaidNeuronList) and not isinstance(x, np.ndarray):
             self.neurons = list([x])
         elif isinstance(x, pd.DataFrame):
-            self.neurons = [x.ix[i] for i in range(x.shape[0])]
+            self.neurons = [ x.ix[i] for i in range(x.shape[0]) ]
         elif isinstance(x, CatmaidNeuronList):
-            self.neurons = x.neurons
+            self.neurons = [ n for n in x.neurons ] # This has to be made a copy otherwise changes in the list will backpropagate
         else:
             # We have to convert from numpy ndarray to list - do NOT remove
             # list() here
@@ -752,9 +754,9 @@ class CatmaidNeuronList:
 
         # Now convert into CatmaidNeurons if necessary
         for i, n in enumerate(self.neurons):
-            if not isinstance(n, CatmaidNeuron) or copy is True:
+            if not isinstance(n, CatmaidNeuron) or make_copy is True:                
                 self.neurons[i] = CatmaidNeuron(
-                    n, remote_instance=remote_instance, copy=copy)
+                    n, remote_instance=remote_instance)            
 
         # Add indexer class
         self.ix = _IXIndexer(self.neurons, self.logger)
@@ -857,10 +859,7 @@ class CatmaidNeuronList:
             return pd.DataFrame([n.connectors for n in self.neurons])
         elif key == 'tags':
             self.get_skeletons(skip_existing=True)
-            return np.array([n.tags for n in self.neurons])
-        elif key == 'df':
-            self.get_skeletons(skip_existing=True)
-            return pd.DataFrame([n.df for n in self.neurons])
+            return np.array([n.tags for n in self.neurons])        
 
         elif key == '_remote_instance':
             all_instances = [
@@ -919,8 +918,8 @@ class CatmaidNeuronList:
 
         if isinstance(subset, CatmaidNeuron):
             return subset
-        else:
-            return CatmaidNeuronList(subset)
+        
+        return CatmaidNeuronList(subset)
 
     def sum(self):
         """Returns sum numeric and boolean values over all neurons"""
@@ -934,7 +933,7 @@ class CatmaidNeuronList:
         """Use to return random subset of neurons"""
         indices = list(range(len(self.neurons)))
         random.shuffle(indices)
-        return [n for i, n in enumerate(self.neurons) if i in indices[:N]]
+        return CatmaidNeuronList( [n for i, n in enumerate(self.neurons) if i in indices[:N]] )
 
     def downsample(self, factor=5, inplace=True):
         """Downsamples all neurons by factor X
@@ -1061,13 +1060,12 @@ class CatmaidNeuronList:
             to_update = self.neurons
 
         if to_update:
-            skdata = pymaid.get_3D_skeleton(
+            skdata = pymaid.get_neuron(
                 [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_neuron=False).set_index('skeleton_id')
             for n in tqdm(to_update, desc='Extracting data'):
-                n.df = skdata.ix[str(n.skeleton_id)]
-
-                if 'type' not in n.df:
-                    morpho.classify_nodes(n.df)
+                
+                if 'type' not in skdata.ix[str(n.skeleton_id)].nodes:
+                    morpho.classify_nodes( skdata.ix[ str(n.skeleton_id) ] )
 
                 n.nodes = skdata.ix[str(n.skeleton_id)].nodes
                 n.connectors = skdata.ix[str(n.skeleton_id)].connectors
@@ -1122,6 +1120,10 @@ class CatmaidNeuronList:
         :func:`pymaid.plot.plot3d` 
                     Function called to generate 3d plot                  
         """
+
+        if 'remote_instance' not in kwargs:
+            kwargs.update({'remote_instance':self._remote_instance})
+
         self.get_skeletons(skip_existing=True)
         return plot.plot3d(skdata=self, **kwargs)
 
@@ -1155,7 +1157,7 @@ class CatmaidNeuronList:
         elif isinstance(to_add, CatmaidNeuron):
             return CatmaidNeuronList(list(set(self.neurons + [to_add])))
         elif isinstance(to_add, CatmaidNeuronList):
-            return CatmaidNeuronList(list(set(self.neurons + to_add)))
+            return CatmaidNeuronList(list(set(self.neurons + to_add.neurons)))
         else:
             self.logger.error('Unable to add data of type %s.' %
                               str(type(to_add)))
@@ -1182,7 +1184,7 @@ class CatmaidNeuronList:
 
     def copy(self):
         """Return copy of this CatmaidNeuronList """
-        return CatmaidNeuronList(self, copy=True)
+        return CatmaidNeuronList(self, make_copy=True)
 
     def head(self, n=5):
         """Return summary for top N neurons"""

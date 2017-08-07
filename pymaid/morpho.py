@@ -24,7 +24,6 @@ import logging
 import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
-from pyoctree import pyoctree
 
 from pymaid import pymaid, igraph_catmaid, core
 
@@ -41,6 +40,11 @@ if not module_logger.handlers:
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
+
+try:
+    from pyoctree import pyoctree
+except:
+    module_logger.error('Unable to import pyoctree - morpho.in_volume will not work!')
 
 
 def generate_list_of_childs(skdata):
@@ -194,7 +198,7 @@ def _generate_slabs(x, append=True):
              for sg in components]
 
     # Delete root node slab -> otherwise this will be its own slab
-    slabs = [l for l in slabs if l != root_node]
+    slabs = [l for l in slabs if len(l) != 1 and l[0] not in root_node]
 
     # Now add the parent to the last node of each slab (which should be a
     # branch point or the node)
@@ -544,9 +548,9 @@ def cut_neuron(skdata, cut_node, g=None):
     >>> #Example for multiple cuts 
     >>> from pymaid.igraph_catmaid import igraph_catmaid.neuron2graph
     >>> from pymaid.morpho import cut_neuron2
-    >>> from pymaid.pymaid import pymaid.get_3D_skeleton, CatmaidInstance
+    >>> from pymaid.pymaid import pymaid.get_neuron, CatmaidInstance
     >>> remote_instance = CatmaidInstance( url, http_user, http_pw, token )
-    >>> skeleton_dataframe =pymaid.get_3D_skeleton(skeleton_id,remote_instance)   
+    >>> skeleton_dataframe =pymaid.get_neuron(skeleton_id,remote_instance)   
     >>> #First cut
     >>> nA, nB = cut_neuron2( skeleton_data, cut_node1 )
     >>> #Second cut
@@ -999,7 +1003,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
             remote_instance = globals()['remote_instance']
 
     if isinstance(skdata, int) or isinstance(skdata, str):
-        skdata = pymaid.get_3D_skeleton([skdata], remote_instance).ix[0]
+        skdata = pymaid.get_neuron([skdata], remote_instance).ix[0]
 
     if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
@@ -1051,7 +1055,7 @@ def calc_strahler_index(skdata, return_dict=False):
     Parameters
     ----------
     skdata :      {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series}       
-                  E.g. from  ``pymaid.pymaid.get_3D_skeleton()``
+                  E.g. from  ``pymaid.pymaid.get_neuron()``
     return_dict : bool, optional
                   If True, a dict is returned instead of the dataframe. 
 
@@ -1234,10 +1238,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
     neuron.nodes = neuron.nodes[
         ~neuron.nodes.strahler_index.isin(to_prune)].reset_index(drop=True)
     neuron.connectors = neuron.connectors[neuron.connectors.treenode_id.isin(
-        neuron.nodes.treenode_id)].reset_index(drop=True)
-
-    neuron.df.nodes = neuron.nodes
-    neuron.df.connectors = neuron.connectors
+        neuron.nodes.treenode_id)].reset_index(drop=True)    
 
     # Remove temporary attributes
     neuron._clear_temp_attr()
@@ -1292,33 +1293,51 @@ def _walk_to_root(start_node, list_of_parents, visited_nodes):
     return round(sum(distances_traveled)), visited_nodes
 
 
-def in_volume(points, volume, remote_instance=None):
+def in_volume(x, volume, remote_instance=None, inplace=False):
     """ Uses pyoctree to test if points are within a given CATMAID volume.
     A ray is shot in random direction and checked for intersection with the
     volume. Odd number of intersections mean point is inside the volume
 
     Parameters
     ----------
-    points :          {list of tuples, pandas.DataFrame}
-                      Coordinates:  
+    x :               {list of tuples,pandas.DataFrame,CatmaidNeuron/List}
+                      
                       1. List/np array -  ``[ ( x, y , z ), [ ... ] ]``
                       2. DataFrame - needs to have 'x','y','z' columns                      
-    volume :          {str, volume dict} 
+
+    volume :          {str, volume dict, list of str} 
                       Name of the CATMAID volume to test OR dict with 
                       {'vertices':[],'faces':[]} as returned by e.g. 
                       :func:`pymaid.pymaid.get_volume()`
     remote_instance : CATMAID instance, optional
                       Pass if volume is a volume name
+    inplace :         bool, optional
+                      If False, a copy of the original DataFrames/Neuron is 
+                      returned. Does only apply to CatmaidNeuron or 
+                      CatmaidNeuronList objects. Does apply if multiple 
+                      volumes are provided
 
     Returns
     -------
-    list of bool
-                      True if in volume, False if not
+    CatmaidNeuron
+                      If input is CatmaidNeuron or CatmaidNeuronList - will
+                      return parts of the neuron (nodes and connectors) that
+                      are within the volume
+    list of bools
+                      If input is list or DataFrame - True if in volume, 
+                      False if not
+    dict
+                      If multiple volumes are provided as list of strings, 
+                      results will be returned as dict of above returns.
+    
     """
 
     if remote_instance is None:
         if 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
+
+    if isinstance(volume, list):
+        return { v : in_volume( x, v, remote_instance = remote_instance, inplace = False ) for v in volume }
 
     if isinstance(volume, str):
         volume = pymaid.get_volume(volume, remote_instance)
@@ -1332,24 +1351,56 @@ def in_volume(points, volume, remote_instance=None):
     mx = np.array(volume['vertices']).max(axis=0)
     mn = np.array(volume['vertices']).min(axis=0)
 
-    if isinstance(points, pd.DataFrame):
-        points = points[['x', 'y', 'z']].as_matrix()
+    if isinstance(x, pd.DataFrame):
+        points = x[['x', 'y', 'z']].as_matrix()
+    elif isinstance(x, core.CatmaidNeuron):
+        n = x
 
-    # Rays are along z axis
-    rayPointList = np.array(
-        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+        if not inplace:            
+            n = n.copy()
+            try:
+                del n.igraph
+            except:
+                pass
 
-    # Unfortunately rays are bidirectional -> we have to filter intersections
-    # by those that occur "above" the point
-    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
-                         2] >= points[k][2]])for k, ray in enumerate(rayPointList)]
+        n.nodes = n.nodes[ in_volume( n.nodes[['x','y','z']].as_matrix(), volume = volume ) ]
+        n.connectors = n.connectors[ n.connectors.treenode_id.isin( n.nodes.treenode_id.tolist() ) ]
 
-    # Count odd intersection
-    return [i % 2 != 0 for i in intersections]
+        #Fix root nodes
+        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() + [None] ), 'parent_id' ] = None
+
+        if not inplace:
+            return n  
+
+    elif isinstance(x, core.CatmaidNeuronList ):
+        nl = x
+
+        if not inplace:
+            nl = nl.copy()
+
+        for n in nl:
+            n = in_volume( n, volume = volume, inplace=True )
+
+        if not inplace:
+            return nl
+    else: 
+        points = x
+
+        # Rays are along z axis
+        rayPointList = np.array(
+            [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+
+        # Unfortunately rays are bidirectional -> we have to filter intersections
+        # by those that occur "above" the point
+        intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
+                             2] >= points[k][2]])for k, ray in enumerate(rayPointList)]
+
+        # Count odd intersection
+        return [i % 2 != 0 for i in intersections]
 
 
 def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
-    """ DEPCREATED as this works only with convex hulls, not for alpha-shapes (concave)
+    """ DEPCREATED as this works only with convex hulls, not for alpha-shapes (concave)!
     Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 

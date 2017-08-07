@@ -33,7 +33,10 @@ import vispy
 from vispy import scene
 from vispy.geometry import create_sphere
 
-vispy.use(app='PyQt5')
+try:
+    vispy.use(app='PyQt5')
+except:
+    pass
 
 import pandas as pd
 import numpy as np
@@ -92,7 +95,7 @@ def plot2d(*args, **kwargs):
                       Skeleton IDs for neurons to plot
     skdata :          {CatmaidNeuron, CatmaidNeuronList}, optional
                       Skeleton data as retrieved by 
-                      ``pymaid.pymaid.get_3D_skeleton()``
+                      ``pymaid.pymaid.get_neuron()``
     remote_instance : Catmaid Instance, optional 
                       Need this too if you are passing only skids
     *args 
@@ -106,7 +109,7 @@ def plot2d(*args, **kwargs):
     >>> fig, ax = plot.plot2d( skids = [12345, 45567], remote_instance = rm ) 
     >>> matplotlib.pyplot.show()
     >>> # 2. Manually download a neuron, modify it and plot it:
-    >>> skdata = pymaid.pymaid.get_3D_skeleton( [12345], rm )
+    >>> skdata = pymaid.pymaid.get_neuron( [12345], rm )
     >>> dist, prox = morpho.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
     >>> fig, ax = plot.plot2d( skdata = dist )
     >>> matplotlib.pyplot.show()   
@@ -211,7 +214,7 @@ def plot2d(*args, **kwargs):
             remote_instance = globals()['remote_instance']
 
     if not skdata and remote_instance and skids:
-        skdata = pymaid.get_3D_skeleton(skids, remote_instance, connector_flag=1,
+        skdata = pymaid.get_neuron(skids, remote_instance, connector_flag=1,
                                         tag_flag=0, get_history=False, time_out=None, get_abutting=True)
     elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         skdata = core.CatmaidNeuronList(skdata)
@@ -526,7 +529,7 @@ def plot3d(*args, **kwargs):
                       list of CATMAID skeleton ids
     skdata :          {pandas.DataFrame, CatmaidNeuronList}
                       Skeleton data as retrieved by 
-                      ``pymaid.pymaid.get_3D_skeleton()``
+                      ``pymaid.pymaid.get_neuron()``
     dotprops :        pandas.DataFrame
                       Contains neurons as dotprops: points with associated vector
 
@@ -655,7 +658,6 @@ def plot3d(*args, **kwargs):
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
                                 str(neuron.skeleton_id))
-
             try:
                 neuron_color = colormap[str(neuron.skeleton_id)]
             except:
@@ -665,9 +667,8 @@ def plot3d(*args, **kwargs):
                 neuron_color = np.array(neuron_color) / 255
 
             if not connectors_only:
-                # Get root node index
-                root_ix = neuron.nodes[neuron.nodes.parent_id.isnull()].index[
-                    0]
+                # Get root node indices (may be more than one if neuron has been cut weirdly)
+                root_ix = neuron.nodes[neuron.nodes.parent_id.isnull()].index.tolist()
 
                 # Extract treenode_coordinates and their parent's coordinates
                 neuron.nodes.set_index('treenode_id', inplace=True)
@@ -684,14 +685,15 @@ def plot3d(*args, **kwargs):
                 segments = [item for sublist in zip(
                     tn_coords, parent_coords) for item in sublist]
 
-                # Create line plot from segments. Note that we divide coords by
-                # a scale factor
-                t = scene.visuals.Line(pos=np.array(segments) * scale_factor,
-                                       color=neuron_color,
-                                       width=1,
-                                       connect='segments',
-                                       method='gl')
-                view.add(t)
+                if segments:
+                    # Create line plot from segments. Note that we divide coords by
+                    # a scale factor
+                    t = scene.visuals.Line(pos=np.array(segments) * scale_factor,
+                                           color=neuron_color,
+                                           width=1,
+                                           connect='segments',
+                                           method='gl')
+                    view.add(t)
 
                 # Extract and plot soma
                 soma = neuron.nodes[neuron.nodes.radius > 1]
@@ -701,7 +703,7 @@ def plot3d(*args, **kwargs):
                     sp = create_sphere(5, 5, radius=radius)
                     s = scene.visuals.Mesh(vertices=sp.get_vertices() + soma.ix[soma.index[0]][
                                            ['x', 'y', 'z']].as_matrix() * scale_factor, faces=sp.get_faces(), color=neuron_color)
-                    view.add(s)
+                    view.add(s)    
 
             if connectors or connectors_only:
                 for j in [0, 1, 2]:
@@ -781,15 +783,15 @@ def plot3d(*args, **kwargs):
             view.add(s)
 
         # Now add neuropils:
-        for v in volumes_data:
-            color = np.array(volumes_data[v]['color'])
-
-            if max(color) > 1:
-                color = color / 255
+        for v in volumes_data:            
+            color = np.array(volumes_data[v]['color'], dtype=float)
 
             # Add alpha
             if len(color) < 4:
-                color = np.append(color, [.5])
+                color = np.append(color, [.6])
+
+            if max(color) > 1:
+                color[:3] = color[:3] / 255            
 
             s = scene.visuals.Mesh(vertices=np.array(volumes_data[v][
                                    'verts']) * scale_factor, faces=volumes_data[v]['faces'], color=color)
@@ -1159,7 +1161,7 @@ def plot3d(*args, **kwargs):
 
     volumes = kwargs.get('volumes', [])
 
-    # Convert volumes to a dict { 'name' : {} }
+    # Convert volumes to a dict { 'name' : { 'color' : (r,g,b)} }
     if volumes:
         if isinstance(volumes, str):
             volumes = {volumes: {}}
@@ -1172,6 +1174,10 @@ def plot3d(*args, **kwargs):
                 else:
                     volumes = {
                         v['neuropil' + str(i)]: v for i, v in enumerate(volumes)}
+        elif isinstance(volumes, dict):
+            for v in volumes:
+                if isinstance(volumes[v], tuple) or isinstance( volumes[v], list ):
+                    volumes.update( { v : { 'color' : volumes[v] } } )
 
     syn_lay_new = kwargs.get('synapse_layout',  {})
     syn_lay = {0: {
@@ -1227,7 +1233,7 @@ def plot3d(*args, **kwargs):
             'You need to provide either a list of skeleton IDs and a CATMAID remote_instance OR skeleton data. See help(plot.plot3d).')
         return
     elif skdata.empty and skids and remote_instance:
-        skdata = pymaid.get_3D_skeleton(skids, remote_instance,
+        skdata = pymaid.get_neuron(skids, remote_instance,
                                         connector_flag=1,
                                         tag_flag=0,
                                         get_history=False,
@@ -1274,11 +1280,11 @@ def plot3d(*args, **kwargs):
         if 'color' in volumes[v]:
             c = volumes[v]['color']
         else:
-            c = (220, 220, 220)
+            c = (120, 120, 120, .6)
 
         if verts:
             volumes_data[v] = {'verts': verts,
-                               'faces': faces, 'color': (220, 220, 220)}
+                               'faces': faces, 'color': c }
 
     # Get boundaries of whats to plot
     min_x = min([n.nodes.x.min() for n in skdata.itertuples()] + [n.connectors.x.min()

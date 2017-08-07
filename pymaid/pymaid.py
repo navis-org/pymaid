@@ -83,8 +83,8 @@ class CatmaidInstance:
                     provide name for logging.getLogger if you like the CATMAID 
                     instance to log to a specific logger by default (None), a 
                     dedicated logger __name__ is created
-    debug :         bool (optional, default=False)
-                    if True, logging level is set to 'DEBUG' 
+    logger_level :  {'DEBUG','INFO','WARNING','ERROR'}, optional
+                    Sets logger level
     time_out :      integer or None
                     Time in second after which fetching data will time out 
                     (so as to not block the system)
@@ -123,7 +123,7 @@ class CatmaidInstance:
     >>> print(neuron_list)
     """
 
-    def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger=None, debug=False, time_out=None):
+    def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger=None, logger_level='INFO', time_out=None):
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
@@ -150,10 +150,7 @@ class CatmaidInstance:
 
             self.logger.addHandler(sh)
 
-            if not debug:
-                self.logger.setLevel(logging.INFO)
-            else:
-                self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logger_level)            
 
         self.logger.info(
             'CATMAID instance created. See help(CatmaidInstance) to learn how to define globally.')
@@ -285,7 +282,7 @@ class CatmaidInstance:
 
     def _get_intersects(self, vol_id, x, y, z):
         """ Use to test if point intersects with volume. """
-        return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(vol_id) + "/intersect") + '?%s' % urllib.parse.urlencode({'x': x, 'y': y, 'z': z})
+        return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(vol_id) + "/intersect") + '?%s' % urllib.parse.urlencode({'skids': x, 'y': y, 'z': z})
 
     def _get_volumes(self):
         """ Get list of all volumes in project. """
@@ -385,7 +382,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/stats/user-history")
 
 
-def _get_urls_threaded(urls, remote_instance, post_data=[]):
+def _get_urls_threaded(urls, remote_instance, post_data=[], desc = 'data'):
     """ Wrapper to retrieve a list of urls using threads
 
     Parameters
@@ -397,6 +394,8 @@ def _get_urls_threaded(urls, remote_instance, post_data=[]):
                         as 'remote_instance'       
     post_data :         list of dicts (optional)
                         needs to be the same size as urls
+    desc :              str, optional
+                        Will show description on status bar
 
     Returns
     -------
@@ -430,7 +429,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[]):
     start = cur_time = time.time()
     joined = 0
 
-    with tqdm(total=len(threads), desc='Retrieving neurons') as pbar:
+    with tqdm(total=len(threads), desc='Fetching %s' % desc) as pbar:
         while cur_time <= (start + time_out) and len([d for d in data if d is not None]) != len(threads):
             for t in threads:
                 if t in threads_closed:
@@ -631,7 +630,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         # 'True'/'False' needs to be lower case
         urls.append(remote_compact_skeleton_url)
 
-    skdata = _get_urls_threaded(urls, remote_instance)
+    skdata = _get_urls_threaded(urls, remote_instance, desc = 'neurons')
 
     # Retrieve abutting
     if get_abutting:
@@ -646,7 +645,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         urllib.parse.urlencode(get_connectors_GET_data))
             print(urls)
 
-        cn_data = _get_urls_threaded(urls, remote_instance)
+        cn_data = _get_urls_threaded(urls, remote_instance, desc = 'abutting')
 
         # Add abutting to other connectors in skdata with type == 2
         for i, cn in enumerate(cn_data):
@@ -703,7 +702,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         return df
 
 # This is for legacy reasons -> will remove eventually
-get_neuron = get_neuron
+get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
 
 
 def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1):
@@ -790,7 +789,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
         names[str(x[i])],
         str(x[i]),
         pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
-                                    'creator_id', 'x', 'y', 'z', 'radius', 'confidence']),
+                                    'creator_id', 'skids', 'y', 'z', 'radius', 'confidence']),
         pd.DataFrame(n[1], columns=['treenode_1', 'link_confidence', 'connector_id',
                                     'link_confidence', 'treenode_2', 'other_skeleton_id', 'relation_1', 'relation_2']),
         n[2]]
@@ -880,7 +879,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
     # Find out which connectors are in the volume of interest
     iv = morpho.in_volume(
-        cn_data[['x', 'y', 'z']], volume, remote_instance, approximate=approximate)
+        cn_data[['skids', 'y', 'z']], volume, remote_instance, approximate=approximate)
 
     # Get the subset of connectors within the volume
     cn_in_volume = cn_data[iv].copy()
@@ -956,6 +955,11 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         Relation can be:: upstream (incoming), downstream (outgoing) of the neurons
         of interest or gap junction
 
+    Warning
+    -------
+    By default, will exclude single node partners! Set ``min_size=1`` to return
+    ALL partners including placeholder nodes. 
+
     Notes
     -----
     Partners can show up multiple times if they are e.g. pre- AND postsynaptic!
@@ -985,7 +989,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         """ Helper to extract connectivity from data returned by CATMAID server
         """
         try:
-            return entry['x'][str(skid)]
+            return entry['skids'][str(skid)]
         except:
             return 0
 
@@ -1005,16 +1009,17 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
     remote_connectivity_url = remote_instance._get_connectivity_url()
 
     connectivity_post = {}
-    connectivity_post['bool_op'] = 'OR'
-    i = 0
-    for skid in x:
+    connectivity_post['boolean_op'] = 'OR'
+    connectivity_post['with_nodes'] = False
+
+    for i, skid in enumerate(x):
         tag = 'source_skeleton_ids[%i]' % i
-        connectivity_post[tag] = skid
-        i += 1
+        connectivity_post[tag] = skid     
 
     remote_instance.logger.info('Fetching connectivity')
     connectivity_data = remote_instance.fetch(
         remote_connectivity_url, connectivity_post)
+
     # Delete directions that we don't want
     connectivity_data.update(
         {d: [] for d in connectivity_data if d not in directions})
@@ -1025,10 +1030,10 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
     for d in connectivity_data:
         pop = set()
         for entry in connectivity_data[d]:
-            if sum([sum(connectivity_data[d][entry]['x'][n]) for n in connectivity_data[d][entry]['x']]) >= threshold:
-                for skid in connectivity_data[d][entry]['x']:
-                    connectivity_data[d][entry]['x'][skid] = sum(
-                        connectivity_data[d][entry]['x'][skid])
+            if sum([sum(connectivity_data[d][entry]['skids'][n]) for n in connectivity_data[d][entry]['skids']]) >= threshold:
+                for skid in connectivity_data[d][entry]['skids']:
+                    connectivity_data[d][entry]['skids'][skid] = sum(
+                        connectivity_data[d][entry]['skids'][skid])
             else:
                 pop.add(entry)
 
@@ -1125,7 +1130,7 @@ def get_names(x, remote_instance=None):
     get_names_postdata['self.project_id'] = remote_instance.project_id
 
     for i in range(len(x)):
-        key = 'x[%i]' % i
+        key = 'skids[%i]' % i
         get_names_postdata[key] = x[i]
 
     names = remote_instance.fetch(remote_get_names_url, get_names_postdata)
@@ -1268,7 +1273,7 @@ def get_treenode_table(x, remote_instance=None):
             skeleton_id)
         urls.append(remote_nodes_list_url)
 
-    node_list = _get_urls_threaded(urls, remote_instance)
+    node_list = _get_urls_threaded(urls, remote_instance, desc = 'tn tables')
 
     # Format of node_list: treenode_id, parent_node_id, confidence, x, y, z,
     # radius, creator, last_edited
@@ -1281,7 +1286,7 @@ def get_treenode_table(x, remote_instance=None):
 
     tn_table = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for nl in node_list for n in nl[0]],
                             columns=['skeleton_id', 'treenode_id', 'parent_node_id', 'confidence',
-                                     'x', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
+                                     'skids', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
                             dtype=object
                             )
 
@@ -1453,7 +1458,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
                         for e in remote_instance.fetch(remote_get_connectors_url)['links']]
 
     df = pd.DataFrame(cn_data,
-                      columns=['skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence',
+                      columns=['skeleton_id', 'connector_id', 'skids', 'y', 'z', 'confidence',
                                'creator_id', 'treenode_id', 'creation_time', 'edition_time', 'type'],
                       dtype=object
                       )
@@ -1721,7 +1726,7 @@ def get_annotation_details(x, remote_instance=None):
 
     # Get data
     annotations = [e['aaData'] for e in _get_urls_threaded(
-        url_list, remote_instance, post_data=postdata)]
+        url_list, remote_instance, post_data=postdata, desc = 'annotations')]
 
     # Get user list
     user_list = get_user_list(remote_instance).set_index('id')
@@ -1954,13 +1959,13 @@ def has_soma(x, remote_instance=None):
     return d
 
 
-def get_skids_by_name(tag, remote_instance=None, allow_partial=True):
+def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     """ Wrapper to retrieve the all neurons with matching name
 
     Parameters
     ----------
-    tag :               str
-                        Name to search for
+    names :             {str, list of str}
+                        Name(s) to search for
     allow_partial :     bool, optional
                         If True, partial matches are returned too    
     remote_instance :   CATMAID instance 
@@ -1988,26 +1993,33 @@ def get_skids_by_name(tag, remote_instance=None, allow_partial=True):
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    search_url = remote_instance._get_annotated_url()
-    annotation_post = {'name': str(
-        tag), 'rangey_start': 0, 'range_length': 500, 'with_annotations': False}
+    if isinstance(names, str):
+        names = [names]
 
-    results = remote_instance.fetch(search_url, annotation_post)
+    urls = []
+    post_data = []
+
+    for n in names:
+        urls.append( remote_instance._get_annotated_url() )
+        post_data.append( {  'name': str(n), 'rangey_start': 0, 
+                            'range_length': 500, 'with_annotations': False}
+                        )
+    
+    results = _get_urls_threaded(urls, remote_instance, post_data=post_data, desc = 'names')
 
     match = []
-    for e in results['entities']:
-        if allow_partial and e['type'] == 'neuron' and tag.lower() in e['name'].lower():
-            match.append([e['name'], e['skeleton_ids'][0]])
-        if not allow_partial and e['type'] == 'neuron' and e['name'] == tag:
-            match.append([e['name'], e['skeleton_ids'][0]])
+    for i,r in enumerate(results):
+        for e in r['entities']:
+            if allow_partial and e['type'] == 'neuron' and names[i].lower() in e['name'].lower():
+                match.append([e['name'], e['skeleton_ids'][0]])
+            if not allow_partial and e['type'] == 'neuron' and e['name'] == names[i]:
+                match.append([e['name'], e['skeleton_ids'][0]])
 
     df = pd.DataFrame(match,
                       columns=['name', 'skeleton_id']
                       )
 
-    df.sort_values(['name'], inplace=True)
-
-    return df
+    return df.sort_values(['name']).reset_index(drop=True)
 
 
 def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=False):
@@ -2175,7 +2187,7 @@ def edit_tags(node_list, tags, node_type, remote_instance=None, delete_existing=
     post_data = [
         {'tags': ','.join(tags), 'delete_existing': delete_existing} for n in node_list]
 
-    d = _get_urls_threaded(add_tags_urls, remote_instance, post_data=post_data)
+    d = _get_urls_threaded(add_tags_urls, remote_instance, post_data=post_data, desc = 'tags')
 
     return d
 
@@ -2235,7 +2247,7 @@ def get_review_details(x, remote_instance=None):
         # POST data is not necessary)
         post_data.append({'placeholder': 0})
 
-    rdata = _get_urls_threaded(urls, remote_instance, post_data=post_data)
+    rdata = _get_urls_threaded(urls, remote_instance, post_data=post_data, desc = 'review')
 
     for neuron in rdata:
         # There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
@@ -2348,7 +2360,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
 
     df = pd.DataFrame(logs,
                       columns=['user', 'operation', 'timestamp',
-                               'x', 'y', 'z', 'explanation']
+                               'skids', 'y', 'z', 'explanation']
                       )
 
     return df
@@ -2415,7 +2427,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
         get_statistics_postdata = {}
 
         for i in range(len(x)):
-            key = 'x[%i]' % i
+            key = 'skids[%i]' % i
             get_statistics_postdata[key] = x[i]
 
         remote_get_statistics_url = remote_instance._get_contributions_url()
@@ -2438,12 +2450,12 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
             dtype=object
         )
     else:
-        get_statistics_postdata = [{'x[0]': s} for s in x]
+        get_statistics_postdata = [{'skids[0]': s} for s in x]
         remote_get_statistics_url = [
             remote_instance._get_contributions_url() for s in x]
 
         stats = _get_urls_threaded(
-            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata)
+            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc = 'contributions')
 
         df = pd.DataFrame([[
             s,
@@ -2548,7 +2560,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     Returns
     -------
     pandas.Series
-            The Series has the following entries::
+            A pandas.Series with the following entries:
 
             {
             cable :             DataFrame containing cable created in nm. 
@@ -2779,13 +2791,13 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
 
     data = {'treenodes': pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], datetime.datetime.fromtimestamp(int(i[8])), i[9], ]
                                        for i in node_list[0]],
-                                      columns=['id', 'parent_id', 'x', 'y', 'z', 'confidence',
+                                      columns=['id', 'parent_id', 'skids', 'y', 'z', 'confidence',
                                                'radius', 'skeleton_id', 'edition_time', 'user_id'],
                                       dtype=object),
             'connectors':  pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], datetime.datetime.fromtimestamp(int(i[5])), i[6], i[7]]
                                          for i in node_list[1]],
                                         columns=[
-                                            'id', 'x', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
+                                            'id', 'skids', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
                                         dtype=object),
             'labels':      node_list[3],
             'node_limit_reached': node_list[4],
@@ -3235,10 +3247,10 @@ def get_volume(volume_name, remote_instance=None):
 
         final_faces.append(this_faces)
 
-    remote_instance.logger.info('Volume type: %s' % mesh_type)
-    remote_instance.logger.info(
+    remote_instance.logger.debug('Volume type: %s' % mesh_type)
+    remote_instance.logger.debug(
         '# of vertices after clean-up: %i' % len(final_vertices))
-    remote_instance.logger.info(
+    remote_instance.logger.debug(
         '# of faces after clean-up: %i' % len(final_faces))
 
     return dict(vertices=final_vertices, faces=final_faces)
@@ -3264,8 +3276,8 @@ def eval_skids(x, remote_instance=None):
 
     Returns
     -------
-    list 
-                    list containing skeleton IDs
+    list of str
+                    list containing skeleton IDs as strings
     """
 
     if remote_instance is None:
@@ -3277,10 +3289,11 @@ def eval_skids(x, remote_instance=None):
             return
 
     if isinstance(x, int) or isinstance(x, np.int64) or isinstance(x, np.int32) or isinstance(x, np.int):
-        return x
+        return str(x)
     elif isinstance(x, str) or isinstance(x, np.str):
         try:
-            return int(x)
+            int(x)
+            return str(x)
         except:
             if x.startswith('annotation:'):
                 return get_skids_by_annotation(x[11:], remote_instance=remote_instance)
@@ -3289,14 +3302,14 @@ def eval_skids(x, remote_instance=None):
             else:
                 return get_skids_by_name(x, remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
     elif isinstance(x, list) or isinstance(x, np.ndarray):
-        x = []
+        skids = []
         for e in x:
-            temp = eval_skids(e)
+            temp = eval_skids(e, remote_instance = remote_instance)
             if isinstance(temp, list):
-                x += temp
+                skids += temp
             else:
-                x.append(temp)
-        return list(set(x))
+                skids.append(temp)
+        return list(set(skids))
     elif isinstance(x, core.CatmaidNeuron):
         return [x.skeleton_id]
     elif isinstance(x, core.CatmaidNeuronList):

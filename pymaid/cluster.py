@@ -655,7 +655,7 @@ class clust_results:
     >>> rm = pymaid.CatmaidInstance('server_url','user','password','token')
     >>> pymaid.remote_instance = rm
     >>> #Get a bunch of neurons
-    >>> nl = pymaid.get_3D_skeleton('annotation:glomerulus DA1')
+    >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> #Perform all-by-all nblast
     >>> res = rmaid.nblast_allbyall( nl )
     >>> #res is a clustres object

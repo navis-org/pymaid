@@ -33,7 +33,7 @@ Examples
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 >>> #Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
->>> n = pymaid.pymaid.get_3D_skeleton( skeleton_id, rm )
+>>> n = pymaid.pymaid.get_neuron( skeleton_id, rm )
 >>> #Initialize R's rcatmaid 
 >>> rcatmaid = rmaid.init_rcatmaid( rm )
 >>> #Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
@@ -542,7 +542,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     x             
                     Neurons to blast. This can be either:
                     1. A list of skeleton IDs
-                    2. PyMaid neurons from e.g. pymaid.pymaid.get_3D_skeleton()
+                    2. PyMaid neurons from e.g. pymaid.pymaid.get_neuron()
                     3. RCatmaid neuron objects
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
@@ -570,7 +570,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     >>> rm = CatmaidInstance( url, http_user, http_pw, token )
     >>> pymaid.remote_instance = rm
     >>> #Get a bunch of neurons
-    >>> nl = pymaid.get_3D_skeleton('annotation:glomerulus DA1')
+    >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> #Blast against each other
     >>> res = rmaid.nblast_allbyall( nl )
     >>> # Cluster and create simple dendrogram
@@ -609,7 +609,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        x = pymaid.get_3D_skeleton(x, remote_instance)
+        x = pymaid.get_neuron(x, remote_instance)
         rn = neuron2r(x, convert_to_um=True)
     else:
         module_logger.error(
@@ -659,7 +659,7 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
     x               
                     Neuron to nblast. This can be either:
                     1. A single skeleton ID
-                    2. PyMaid neuron from e.g. pymaid.pymaid.get_3D_skeleton()
+                    2. PyMaid neuron from e.g. pymaid.pymaid.get_neuron()
                     3. RCatmaid neuron object
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only a SKID is provided
@@ -770,7 +770,7 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        rn = neuron2r(pymaid.get_3D_skeleton(
+        rn = neuron2r(pymaid.get_neuron(
             neuron, remote_instance).ix[0], convert_to_um=True)
     else:
         module_logger.error(

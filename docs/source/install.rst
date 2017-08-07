@@ -86,7 +86,7 @@ Vispy
 *****
 Used to visualise neurons in 3D. This requires you to have *one* of 
 the supported `backends <http://vispy.org/installation.html#backend-requirements>`_ 
-installed. During automatic installation PyMaid will try installing the QT5 
+installed. During automatic installation PyMaid will try installing the PyQt5 
 backend to fullfil this requirement.
 
   - Download: http://vispy.org/installation.html
@@ -114,6 +114,12 @@ Matplotlib
 Provides flexible drawing of graphs.
 
   - Download: http://matplotlib.sourceforge.net/
+
+tqdm
+****
+Neat progress bar
+
+  - Download: https://pypi.python.org/pypi/tqdm
 
 PyOctree
 ********
