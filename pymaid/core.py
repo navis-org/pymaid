@@ -23,6 +23,8 @@ import pandas as pd
 import numpy as np
 import datetime
 import random
+import json
+import os
 from tqdm import tqdm
 from copy import copy, deepcopy
 
@@ -35,13 +37,16 @@ class CatmaidNeuron:
 
     Notes
     -----
-    CatmaidNeuron can be minimally constructed from just a skeleton ID. 
-    Other parameters (nodes, connectors, neuron name, annotations, etc.) 
-    will then be retrieved from the server 'on-demand'. 
+    CatmaidNeuron can be minimally constructed from just a skeleton ID
+    and a CatmaidInstance. Other parameters (nodes, connectors, neuron name, 
+    annotations, etc.) will then be retrieved from the server 'on-demand'.
 
-    Ideally, a CatmaidNeuron is constructed from a pandas DataFrame (df)
-    containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
-    df.tags
+    The easiest way to construct a CatmaidNeuron is by using
+    :func:`pymaid.pymaid.get_neuron`. 
+
+    Manually, a complete CatmaidNeuron can be constructed from a pandas 
+    DataFrame (df) containing: df.nodes, df.connectors, df.skeleton_id, 
+    df.neuron_name, df.tags
 
     Parameters
     ----------
@@ -108,15 +113,15 @@ class CatmaidNeuron:
     >>> n.remote_instance = rm 
     >>> # Retrieve node data from server on-demand
     >>> n.nodes 
-    CatmaidNeuron - INFO - Retrieving skeleton data...
-        treenode_id  parent_id  creator_id  x  y  z radius confidence
-    0   ...
+    ... CatmaidNeuron - INFO - Retrieving skeleton data...
+    ...    treenode_id  parent_id  creator_id  x  y  z radius confidence
+    ... 0  ...
     ...
     >>> #Initialize with skeleton data
     >>> n = pymaid.get_neuron( 123456, remote_instance = rm )
     >>> # Get annotations from server
     >>> n.annotations
-    [ 'annotation1', 'annotation2' ]
+    ... [ 'annotation1', 'annotation2' ]
     >>> #Force update of annotations
     >>> n.get_annotations()
     """
@@ -278,7 +283,7 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
         self.logger.info('Retrieving skeleton data...')
         skeleton = pymaid.get_neuron(
-            self.skeleton_id, remote_instance, return_neuron=False, kwargs=kwargs).ix[0]
+            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]
 
         if 'type' not in skeleton.nodes:
             morpho.classify_nodes(skeleton)
@@ -641,7 +646,10 @@ class CatmaidNeuronList:
     Other parameters (nodes, connectors, neuron name, annotations, etc.) 
     will then be retrieved from the server 'on-demand'. 
 
-    Ideally, a CatmaidNeuron is constructed from a pandas DataFrame (df)
+    The easiest way to get a CatmaidNeuronList is by using 
+    :func:`pymaid.pymaid.get_neuron` (see examples).
+
+    Manually, a CatmaidNeuronList can constructed from a pandas DataFrame (df)
     containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
     df.tags for a set of neurons.
 
@@ -695,28 +703,28 @@ class CatmaidNeuronList:
 
     Examples
     --------
-    >>> #Initialize with just a Skeleton ID 
+    >>> # Initialize with just a Skeleton ID 
     >>> nl = CatmaidNeuronList( [ 123456, 45677 ] )
-    >>> #Add CatmaidInstance to neurons in neuronlist
+    >>> # Add CatmaidInstance to neurons in neuronlist
     >>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
     >>> nl.set_remote_instance( rm )
-    >>> #Retrieve review status from server on-demand
+    >>> # Retrieve review status from server on-demand
     >>> nl.review_status
-    array([ 90, 10 ])
-    >>> #Initialize with skeleton data
+    ... array([ 90, 10 ])
+    >>> # Initialize with skeleton data
     >>> nl = pymaid.get_neuron( [ 123456, 45677 ], remote_instance = rm )
-    >>> #Get annotations from server
+    >>> # Get annotations from server
     >>> nl.annotations
-    [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
+    ... [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
     >>> Index using node count
     >>> subset = nl [ nl.n_nodes > 6000 ]
-    >>> #Index by skeleton ID 
+    >>> # Index by skeleton ID 
     >>> subset = nl [ '123456' ]
-    >>> #Index by neuron name
+    >>> # Index by neuron name
     >>> subset = nl [ 'name1' ]
-    >>> #Index using annotation
+    >>> # Index using annotation
     >>> subset = nl ['annotation:uPN right']
-    >>> #Concatenate lists
+    >>> # Concatenate lists
     >>> nl += pymaid.get_neuron( [ 912345 ], remote_instance = rm )
 
     """
@@ -1061,7 +1069,7 @@ class CatmaidNeuronList:
 
         if to_update:
             skdata = pymaid.get_neuron(
-                [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_neuron=False).set_index('skeleton_id')
+                [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
             for n in tqdm(to_update, desc='Extracting data'):
                 
                 if 'type' not in skdata.ix[str(n.skeleton_id)].nodes:
@@ -1143,6 +1151,26 @@ class CatmaidNeuronList:
         """
         self.get_skeletons(skip_existing=True)
         return plot.plot2d(skdata=self, **kwargs)
+
+    def to_json(self, fname = 'selection.json'):
+        """ Saves neuron selection as json file which can be loaded
+        in CATMAID selection table.
+
+        Parameters
+        ----------
+        fname :     str, optional
+                    Filename to save selection to
+        """
+
+        data = [  dict( skeleton_id = int(n.skeleton_id),
+                        color = "#%02x%02x%02x" % (255, 255, 0),
+                        opacity = 1
+                        ) for n in self.neurons ]
+
+        with open(fname, 'w') as outfile:
+            json.dump(data, outfile)
+
+        self.logger.error('Selection saved as %s in %s' % (fname, os.getcwd() ))
 
     def __missing__(self, key):
         self.logger.error('No neuron matching the search critera.')

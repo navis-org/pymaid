@@ -1238,7 +1238,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
     neuron.nodes = neuron.nodes[
         ~neuron.nodes.strahler_index.isin(to_prune)].reset_index(drop=True)
     neuron.connectors = neuron.connectors[neuron.connectors.treenode_id.isin(
-        neuron.nodes.treenode_id)].reset_index(drop=True)    
+        neuron.nodes.treenode_id.tolist())].reset_index(drop=True)    
 
     # Remove temporary attributes
     neuron._clear_temp_attr()
@@ -1247,7 +1247,6 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
         return neuron
     else:
         return
-
 
 def _walk_to_root(start_node, list_of_parents, visited_nodes):
     """ Helper function for synapse_root_distances(): 

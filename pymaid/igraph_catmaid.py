@@ -87,6 +87,18 @@ def network2graph(x, remote_instance=None, threshold=1):
     Returns
     ------- 
     iGraph representation of the network 
+
+    Examples
+    --------
+    >>> from pymaid import igraph_catmaid, pymaid
+    >>> import igraph
+    >>> g = igraph_catmaid.network2graph('annotation:large network', remote_instance=rm)
+    >>> # Plot graph
+    >>> igraph.plot(g)
+    >>> # Plot with edge width
+    >>> igraph.plot(g, **{'edge_width': [ w/10 for w in g.es['weight'] ] })
+    >>> # Plot with edge label
+    >>> igraph.plot(g, **{'edge_label': g.es['weight'] })
     """
 
     if remote_instance is None:
@@ -100,7 +112,7 @@ def network2graph(x, remote_instance=None, threshold=1):
     module_logger.info('Generating graph from skeleton data...')
 
     skids = pymaid.eval_skids(x, remote_instance=remote_instance)
-    indices = {s: skids.index(s) for s in skids}
+    indices = { int(s): skids.index(s) for s in skids}
 
     try:
         neuron_names = x.neuron_names.tolist()
@@ -108,7 +120,7 @@ def network2graph(x, remote_instance=None, threshold=1):
         names = pymaid.get_names(skids, remote_instance=remote_instance)
         neuron_names = [names[str(n)] for n in skids]
 
-    edges = pymaid.get_edges(skids, remote_instance=None)
+    edges = pymaid.get_edges(skids, remote_instance=remote_instance)
     edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
                       for e in edges[edges.weight >= threshold].itertuples()]
 
@@ -118,7 +130,7 @@ def network2graph(x, remote_instance=None, threshold=1):
     g.add_edges(edges_by_index)
 
     g.vs['node_id'] = skids
-    g.vs['neuron_name'] = neuron_names
+    g.vs['neuron_name'] = g.vs['label'] = neuron_names
     g.es['weight'] = edges.weight.tolist()
 
     return g
@@ -338,20 +350,19 @@ def dist_from_root(data, synapses_only=False):
         return data
 
 
-def cluster_nodes_w_synapses(data, plot_graph=True):
+def cluster_nodes_w_synapses(data, plot_graph=False):
     """ Cluster nodes of an iGraph object based on distance
 
     Parameters
     ----------
     data :         {CatmaidNeuron, iGraph object}
-    plot_graph :   boolean, optional
-                   If true, plots a Graph. 
+    plot_graph :   bool, optional
+                   If True, plots a Graph. 
 
     Returns
     -------
-    cluster :      scipy clustering
-                   Plots dendrogram + distance matrix and returns hierachical 
-                   clustering
+    cluster :      linkage matrix
+                   Scipy hiearchical clustering encoded as linkage matrix
     """
 
     if isinstance(data, Graph):
@@ -391,7 +402,6 @@ def cluster_nodes_w_synapses(data, plot_graph=True):
         Z1 = cluster.hierarchy.dendrogram(Y_all, orientation='left')
         ax1.set_xticks([])
         ax1.set_yticks([])
-        module_logger.debug('Plotting graph.')
 
         # Compute and plot second dendrogram for synapse nodes only.
         ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
@@ -399,7 +409,6 @@ def cluster_nodes_w_synapses(data, plot_graph=True):
         ax2.set_xticks([])
         ax2.set_yticks([])
 
-        module_logger.debug('Plotting graph..')
         # Plot distance matrix.
         axmatrix = fig.add_axes([0.3, 0.1, 0.6, 0.6])
         idx1 = Z1['leaves']
@@ -412,10 +421,33 @@ def cluster_nodes_w_synapses(data, plot_graph=True):
         axmatrix.set_xticks([])
         axmatrix.set_yticks([])
 
-        module_logger.debug('Plotting graph...')
         # Plot colorbar.
         axcolor = fig.add_axes([0.91, 0.1, 0.02, 0.6])
         pylab.colorbar(im, cax=axcolor)
         fig.show()
 
     return Y_syn
+
+def _find_all_paths(g, start, end, mode = 'OUT', maxlen = None):
+    """ Find all paths between to vertices in an iGraph object. For some reason
+    this function is only in R-iGraph, not Python-iGraph. This is rather slow
+    and should not be used for large graphs.
+    """
+    def find_all_paths_aux(adjlist, start, end, path, maxlen = None):
+        path = path + [start]
+        if start == end:
+            return [path]
+        paths = []
+        if maxlen is None or len(path) <= maxlen:
+            for node in adjlist[start] - set(path):
+                paths.extend(find_all_paths_aux(adjlist, node, end, path, maxlen))
+        return paths
+    adjlist = [set(g.neighbors(node, mode = mode)) \
+        for node in range(g.vcount())]
+    all_paths = []
+    start = start if type(start) is list else [start]
+    end = end if type(end) is list else [end]
+    for s in start:
+        for e in end:
+            all_paths.extend(find_all_paths_aux(adjlist, s, e, [], maxlen))
+    return all_paths

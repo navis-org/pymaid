@@ -29,8 +29,8 @@ Examples
 >>> neuron_list = get_neuron ( ['12345','67890'] , myInstance )
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
-neuron_name                PN glomerulus DA1 27296 BH
-skeleton_id                                     27295
+neuron_name                       Example neuron name
+skeleton_id                                     12345
 n_nodes                                          9924
 n_connectors                                      437
 n_branch_nodes                                    207
@@ -61,8 +61,7 @@ import numpy as np
 import datetime
 from tqdm import tqdm
 
-from pymaid import core, morpho
-
+from pymaid import core, morpho, igraph_catmaid
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -86,15 +85,17 @@ class CatmaidInstance:
     logger_level :  {'DEBUG','INFO','WARNING','ERROR'}, optional
                     Sets logger level
     time_out :      integer or None
-                    Time in second after which fetching data will time out 
-                    (so as to not block the system)
-                    If set to None, time out will be max([ 0, len(requests) ])
+                    Time in seconds after which fetching data will time-out 
+                    (so as to not block the system).
+                    If set to None, time-out will be max([ 30, len(requests) ])
 
     Notes
     -----
     CatmaidInstance holds credentials and performs fetch operations. 
     You can either pass this object to each function individually or 
-    define module wide by using e.g: pymaid.remote_instance = CatmaidInstance
+    define module wide by using e.g:: 
+
+        pymaid.remote_instance = CatmaidInstance
 
     Examples
     --------
@@ -231,6 +232,11 @@ class CatmaidInstance:
     def _get_list_skeletons_url(self):
         """ Use to parse url for names for a list of skeleton ids (does need post data: self.project_id, skid). """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/")
+
+    def _get_graph_dps_url(self):
+        """ Use to parse url for getting connections between source and targets. """
+        return self.djangourl("/" + str(self.project_id) + "/graph/dps")
+
 
     def _get_completed_connector_links(self):
         """ Use to parse url for retrieval of completed connector links by given user 
@@ -497,7 +503,7 @@ class _retrieveUrlThreaded(threading.Thread):
             return None
 
 
-def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_history=False, get_merge_history=False, get_abutting=False, return_neuron=True, kwargs={}):
+def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_history=False, get_merge_history=False, get_abutting=False, return_df=False, kwargs={}):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids
 
     Parameters
@@ -520,8 +526,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         flag.
     tag_flag :          {0/False,1/True}, optional
                         Set if tags should be retrieved. 
-                        Possible values = 0/False or 1/True     
-                        -> e.g. 100s for 100 skeletons but at least 20s
+                        Possible values = 0/False or 1/True                             
     get_history:        bool, optional
                         If True, the returned skeleton data will contain 
                         creation date ([8]) and last modified ([9]) for each 
@@ -536,13 +541,13 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         as last modified (full circle).
                         The creator_id is always the original creator though.
     get_abutting:       bool, optional
-                        If True, will retrieve abutting connectors
-                        For some reason they are not part of /compact-json/, 
-                        so we have to retrieve them via /connectors/ and add 
-                        them to compact-json -> will give them connector type 3!
-    return_neuron :     bool, optional
-                        If True, a ``CatmaidNeuron`` for single neurons or a
-                        ``CatmaidNeuronList`` for multiple neurons is returned.
+                        If True, will retrieve abutting connectors. 
+                        For some reason they are not part of compact-json, 
+                        so they have to be retrieved via a separate API endpoint  
+                        -> will show up as connector type 3!
+    return_df :         bool, optional
+                        If True, a ``pandas.DataFrame`` instead of 
+                        ``CatmaidNeuron``/``CatmaidNeuronList`` is returned.
                         If False, a ``pandas.DataFrame`` is returned.
     **kwargs           
                         Above boolean parameters can also be passed as dict.
@@ -555,8 +560,6 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         For single neurons        
     :class:`pymaid.core.CatmaidNeuronList`
                         For a list of neurons
-    ``pandas.DataFrame``
-                        If return_neuron is False
 
     Notes
     -----    
@@ -569,16 +572,16 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         tags :                  dict containing the treenode tags: 
                                 { 'tag' : [ treenode_id, treenode_id, ... ] }        
 
-    Dataframe column titles for nodes and connectors should be self explanatory 
-    with one exception::
+    Dataframe column titles for ``nodes`` and ``connectors`` should be self 
+    explanatory with the exception of ``connectors['relation']``::
 
-        connectors['relation']::    
-                {
+        connectors['relation']     
+                
                     0 = presynapse
                     1 = postsynapse
                     2 = gap junction
                     3 = abutting connector
-                }
+                
     """
 
     if remote_instance is None:
@@ -602,7 +605,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     get_history = kwargs.get('get_history', get_history)
     get_merge_history = kwargs.get('get_merge_history', get_merge_history)
     get_abutting = kwargs.get('get_abutting', get_abutting)
-    return_neuron = kwargs.get('return_neuron', return_neuron)
+    return_df = kwargs.get('return_df', return_df)
 
     # Convert tag_flag, connector_tag, get_history and get_merge_history to
     # bool if necessary
@@ -693,28 +696,29 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     # Placeholder for igraph representations of neurons
     df['igraph'] = None
 
-    if return_neuron:
-        if df.shape[0] > 1:
-            return core.CatmaidNeuronList(df, remote_instance=remote_instance,)
-        else:
-            return core.CatmaidNeuron(df.ix[0], remote_instance=remote_instance,)
-    else:
+    if return_df:
         return df
+    
+    if df.shape[0] > 1:
+        return core.CatmaidNeuronList(df, remote_instance=remote_instance,)
+    else:
+        return core.CatmaidNeuron(df.ix[0], remote_instance=remote_instance,)
+    
 
 # This is for legacy reasons -> will remove eventually
 get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
 
 
 def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1):
-    """ Wrapper to retrieve the skeleton data for a list of skeleton ids.
+    """ Wrapper to retrieve the skeleton data for a list of skeleton ids.    
+    Similar to :func:`pymaid.pymaid.get_neuron` but the connector data includes 
+    the whole chain::
 
-    Notes
-    -----
-    Similar to get_neuron() but the connector data includes the whole
-    chain: treenode1 -> (link_confidence) -> connector -> (link_confidence)
-    -> treenode2. This means that connectors can shop up multiple times! 
-    I.e. if they have multiple postsynaptic targets. 
-    Does include connector x,y,z coordinates.
+        treenode1 -> (link_confidence) -> connector -> (link_confidence)
+        -> treenode2. 
+
+    This means that connectors can shop up multiple times (i.e. if they have
+    multiple postsynaptic targets). Does include connector x,y,z coordinates!
 
     Parameters
     ----------
@@ -803,8 +807,13 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
 def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_size=2, approximate=False):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
-    of interest WITHIN a given Catmaid Volume. Attention: total number of 
-    connections returned is not restricted to that volume.
+    of interest **within** a given CATMAID Volume. 
+
+    Important
+    ---------
+    Connecivity (total number of connections) returned is not restricted to 
+    that volume. It just means that at least a single connection is made
+    within queried volume.
 
     Parameters
     ----------
@@ -952,8 +961,8 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         ... 2   name3         skid3      node_count3  gapjunction  n_syn  n_syn .            
         ... ...
 
-        Relation can be:: upstream (incoming), downstream (outgoing) of the neurons
-        of interest or gap junction
+        ``relation`` can be ``upstream`` (incoming), ``downstream`` (outgoing) 
+        or ``gapjunction`` (gap junction)
 
     Warning
     -------
@@ -1234,7 +1243,7 @@ def get_treenode_table(x, remote_instance=None):
         DataFrame in which each row represents a treenode::
 
         >>> df
-        ...  skeleton_id  treenode_id  parent_id  confidence  x  y  z /
+        ...   skeleton_id  treenode_id  parent_id  confidence  x  y  z /
         ... 0          
         ... 1   
         ... 2         
@@ -1401,7 +1410,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     Notes
     -----
     DataFrame in which each row represents a link (connector <-> treenode)! Connectors may 
-    thus show up in multiple rows. Use e.g. df.connector_id.unique() to get 
+    thus show up in multiple rows. Use e.g. ``df.connector_id.unique()`` to get 
     a set of unique connector IDs.
     """
 
@@ -1756,7 +1765,10 @@ def get_annotation_details(x, remote_instance=None):
 def get_annotations(x, remote_instance=None):
     """ Wrapper to retrieve annotations for a list of skeleton ids.
     If a neuron has no annotations, it will not show up in returned dict!
-    Note: this API endpoint does not process more than 250 neurons at a time!
+    
+    Notes
+    ----- 
+    This API endpoint does not process more than 250 neurons at a time!
 
     Parameters
     ----------
@@ -1901,9 +1913,8 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
     return annotation_ids
 
 
-def has_soma(x, remote_instance=None):
-    """ Quick function to check if a neuron/a list of neurons have somas
-    Searches for nodes that have a 'soma' tag AND a radius > 500nm
+def has_soma(x, remote_instance=None, tag = 'soma', min_rad = 500):
+    """ Quick function to check if a neuron/a list of neurons have somas. 
 
     Parameters
     ----------
@@ -1917,11 +1928,16 @@ def has_soma(x, remote_instance=None):
     remote_instance :   CATMAID instance, optional  
                         Either pass directly to function or define  
                         globally as 'remote_instance'
+    tag :               {str, None}, optional
+                        Tag we expect the soma to have. Set to ``None`` if
+                        not applicable.
+    min_rad :           int, optional
+                        Minimum radius of soma.
 
     Returns
     -------
     dict 
-                        ``{ 'skid' : True, 'skid1' : False }``
+                        ``{ 'skid1' : True, 'skid2' : False, ...}``
     """
 
     if remote_instance is None:
@@ -1942,19 +1958,22 @@ def has_soma(x, remote_instance=None):
                         get_history=False,
                         )
 
-    skdata.set_index('skeleton_id', inplace=True)
-
     d = {}
-    for i, s in enumerate(x):
-        d[s] = False
-        if 'soma' not in skdata.ix[s].tags:
-            continue
+    for s in skdata:
+        if tag:
+            if tag in s.tags:
+                tn_with_tag = s.tags['soma']
+            else:
+                tn_with_tag = []
+        else:
+            tn_with_tag = s.nodes.treenode_id.tolist()
+        
+        tn_with_rad = s.nodes [ s.nodes.radius > min_rad ].treenode_id.tolist()
 
-        skdata.ix[s].nodes.set_index('treenode_id', inplace=True)
-
-        for tn in skdata.ix[s].tags['soma']:
-            if skdata.ix[s].nodes.ix[tn].radius > 500:
-                d[s] = True
+        if set(tn_with_tag) & set(tn_with_rad):
+            d[s.skeleton_id] = True
+        else:
+            d[s.skeleton_id] = False
 
     return d
 
@@ -2109,7 +2128,9 @@ def neuron_exists(x, remote_instance=None):
     Returns
     -------
     bool :
-                        True if skeleton exists, False if not
+                        True if skeleton exists, False if not. If multiple
+                        neurons are queried, returns a dict 
+                        ``{ skid1 : True, skid2 : False, ... }``
     """
 
     if remote_instance is None:
@@ -2580,21 +2601,21 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     ...                                 'http_user',
     ...                                 'http_pw',
     ...                                 'token')
-    >>> #get last week's history (using the default start/end dates)
+    >>> # Get last week's history (using the default start/end dates)
     >>> hist = pymaid.get_history( remote_instance = rm ) 
-    >>> #Plot cable created by all users over time
+    >>> # Plot cable created by all users over time
     >>> import matplotlib.pyplot as plt
     >>> hist.cable.T.plot()
     >>> plt.show()
-    >>> #Collapse users and plot sum of cable over time
+    >>> # Collapse users and plot sum of cable over time
     >>> hist.cable.sum(0).plot()
     >>> plt.show()
-    >>> #Plot single users cable (index by user login name)
+    >>> # Plot single users cable (index by user login name)
     >>> hist.cable.ix['schlegelp'].T.plot()
     >>> plt.show()
-    >>> #Sum up cable created this week by all users
+    >>> # Sum up cable created this week by all users
     >>> hist.cable.values.sum()
-    >>> #Get number of active (non-zero) users
+    >>> # Get number of active (non-zero) users
     >>> active_users = hist.cable.astype(bool).sum(axis=0)
     """
 
@@ -2733,26 +2754,26 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
     dict
         Dictionary containing the following entries::
 
-        "treenodes" : pandas.DataFrame::
+        "treenodes" : pandas.DataFrame
 
-        >>> dic['treenodes']
-        ...   id parent_id x y z confidence radius skeleton_id edition_time user_id
+        >>> dict['treenodes']
+        ...   treenode_id parent_id x y z confidence radius skeleton_id edition_time user_id
         ... 0
         ... 1
         ... 2
 
-        "connectors" : pandas.DataFrame::
+        "connectors" : pandas.DataFrame
 
-        >>> dic['connectors']
-        ...    id x y z confidence edition_time user_id partners
+        >>> dict['connectors']
+        ...    connector_id x y z confidence edition_time user_id partners
         ... 0
         ... 1
         ... 2
 
-        >>> dic['labels'] 
+        >>> dict['labels'] : dictionary
         ... { treenode_id : [ labels ] }
 
-        >>> dic['node_limit_reached'] 
+        >>> dict['node_limit_reached'] : boolean
         ... True/False; if True, node limit was exceeded                
 
     """
@@ -2791,13 +2812,13 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
 
     data = {'treenodes': pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], datetime.datetime.fromtimestamp(int(i[8])), i[9], ]
                                        for i in node_list[0]],
-                                      columns=['id', 'parent_id', 'skids', 'y', 'z', 'confidence',
+                                      columns=['treenode_id', 'parent_id', 'skids', 'y', 'z', 'confidence',
                                                'radius', 'skeleton_id', 'edition_time', 'user_id'],
                                       dtype=object),
             'connectors':  pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], datetime.datetime.fromtimestamp(int(i[5])), i[6], i[7]]
                                          for i in node_list[1]],
                                         columns=[
-                                            'id', 'skids', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
+                                            'connector_id', 'skids', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
                                         dtype=object),
             'labels':      node_list[3],
             'node_limit_reached': node_list[4],
@@ -3105,13 +3126,17 @@ def get_user_list(remote_instance=None):
         ... 0
         ... 1
 
-    Notes
-    -----
-    To convert into a  ``{user_id : details}`` dict, use 
-    ``user_list.set_index('id').T.to_dict()`` to: 
-    (1.) set user ID as index, 
-    (2.) transpose the dataframe and 
-    (3.) turn it into a dict { user_id: { } }
+    Examples
+    --------
+    >>> user_list = pymaid.get_user_list(remote_instance = rm)
+    >>> # To search for e.g. user ID 22
+    >>> user_list.set_index('id',inplace=True)
+    >>> user_list.ix[ 22 ]
+    >>> user_list.reset_index(inplace=True)
+    >>> # To convert into a classic dict
+    >>> d = user_list.set_index('id').T.to_dict()
+    >>> d[22]['first_name']
+    ... Philipp
     """
 
     if remote_instance is None:
@@ -3131,10 +3156,116 @@ def get_user_list(remote_instance=None):
                       )
 
     df.sort_values(['login'], inplace=True)
-    df.reset_index(inplace=True)
+    df.reset_index(inplace=True,drop=True)
 
     return df
 
+def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
+    """ Retrieves paths between two sets of neurons.
+    
+    Parameters
+    ----------
+    sources
+                        Source neurons.
+    targets
+                        Target neurons. ``sources`` and ``targets`` can be:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+
+    remote_instance :   CATMAID instance, optional  
+                        Either pass directly to function or define  
+                        globally as 'remote_instance'.
+    n_hops :            int, optional
+                        Number of hops allowed between sources and targets.
+    min_synapses :      int, optional
+                        Minimum number of synpases between source and target.
+
+    Returns
+    -------
+    igraph.Graph
+                iGraph object containing the neurons that connect 
+                sources and targets. Does only contain edges that 
+                connect sources and targets!
+
+    paths :     list
+                List of skeleton IDs that constitute paths from
+                sources to targets::
+
+                    [ [ source1, skid1, target1 ], [source2, skid2, target2 ], ...  ]
+
+    Important
+    ---------
+    The returned iGraph graph does **only** contain the edges that connnect
+    sources and targets. Other edges have been removed.
+
+    Examples
+    --------
+    >>> # This assumes that you have already set up a Catmaid Instance    
+    >>> from igraph import plot
+    >>> g, paths = pymaid.get_paths( ['annotation:glomerulus DA1'],
+    ...                              ['2333007'] )
+    >>> g
+    <igraph.Graph object at 0x11c857138>
+    >>> paths
+    [['57381', '4376732', '2333007'], ['57323', '630823', '2333007'], ...
+    >>> plot( g, layout = g.layout("kk"), 
+    ...       **{ 'edge_label' : g.es['weight'] } )
+
+    """
+    if remote_instance is None:
+        if 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print(
+                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return
+
+    sources = eval_skids(sources, remote_instance=remote_instance)
+    targets = eval_skids(targets, remote_instance=remote_instance)
+
+    if not isinstance(targets, list):
+        targets = [targets]
+
+    if not isinstance(sources, list):
+        sources = [sources]
+
+    url = remote_instance._get_graph_dps_url()
+    post_data = {    
+                    'n_hops' : n_hops,
+                    'min_synapses' : min_synapses
+                }
+
+    for i,s in enumerate(sources):
+        post_data[ 'sources[%i]' % i ] = s
+
+    for i,t in enumerate(targets):
+        post_data[ 'targets[%i]' % i ] = t
+
+    # Response is just a set of skeleton IDs
+    response = remote_instance.fetch( url, post = post_data)
+
+    # Turn neurons into an iGraph graph
+    g = igraph_catmaid.network2graph(response, remote_instance=remote_instance, threshold=min_synapses)
+
+    # Get all paths between sources and targets
+    all_paths = igraph_catmaid._find_all_paths( g,
+                                                [ i for i,v in enumerate(g.vs) if v['node_id'] in sources ],
+                                                [ i for i,v in enumerate(g.vs) if v['node_id'] in targets ],
+                                                maxlen = n_hops
+                                             )
+
+    # Delete edges that don't go from sources to targets from graph
+    edges_to_keep = set( )
+    for p in all_paths:
+        for i in range(len(p)-1):
+            edges_to_keep.add( ( p[i], p[i+1] ) )
+
+    g.delete_edges( [ (e.source,e.target) for e in g.es if (e.source,e.target) not in edges_to_keep ] )
+
+    return g, [ [ g.vs[i]['node_id'] for i in p ] for p in all_paths ]
 
 def get_volume(volume_name, remote_instance=None):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of 
@@ -3152,13 +3283,12 @@ def get_volume(volume_name, remote_instance=None):
     -------
     dict 
         Dictionary containing vertices and faces::
-
-        {        
-        vertices :          list of tuples
-                            ``[ (x,y,z), (x,y,z), .... ]``
-        faces :             list of tuples
-                            ``[ ( vertex_ix, vertex_ix, vertex_ix ), ... ]``
-        }
+               
+            vertices :      list of tuples
+                            [ (x,y,z), (x,y,z), .... ]
+            faces :         list of tuples
+                            [ ( vertex_ix, vertex_ix, vertex_ix ), ... ]
+        
 
     """
 

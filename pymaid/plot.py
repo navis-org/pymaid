@@ -105,7 +105,7 @@ def plot2d(*args, **kwargs):
 
     Examples
     --------
-    >>> # Plot two neurons and have plot2d download the skeleton data for you:
+    >>> # 1. Plot two neurons and have plot2d download the skeleton data for you:
     >>> fig, ax = plot.plot2d( skids = [12345, 45567], remote_instance = rm ) 
     >>> matplotlib.pyplot.show()
     >>> # 2. Manually download a neuron, modify it and plot it:
@@ -113,15 +113,16 @@ def plot2d(*args, **kwargs):
     >>> dist, prox = morpho.cut_neuron( skdata.ix[0], treenode_id = 4567 ) 
     >>> fig, ax = plot.plot2d( skdata = dist )
     >>> matplotlib.pyplot.show()   
-    >>> 3. #Plots brain in red, and mushroom body in green:
+    >>> # 3. Plots brain in red, and mushroom body in green:
     >>> plot.plot2d(  skids = [ 12346 ], 
     ...               remote_instance = rm, 
     ...               brain = (.8,.8,.8), 
     ...               MB = (.3,1,.3) )      
-    >>> 4. #Plots brain and mushroom body in grey
-    >>> plot.plot2d(   skids = [ 12346 ], 
-    ...               remote_instance = rm,
-    ...               *['brain', 'MB'] )
+    >>> # 4. Plots brain and mushroom body in grey
+    >>> fig, ax = plot.plot2d(   skids = [ 12346 ], 
+    ...                         remote_instance = rm,
+    ...                         *['brain', 'MB'] )
+    >>> matplotlib.pyplot.show()
 
     Returns
     --------
@@ -132,7 +133,7 @@ def plot2d(*args, **kwargs):
     Currently plots only frontal view (x,y axes). X and y limits have been set 
     to fit the adult EM volume -> adjust if necessary.
 
-    (Optional) ``*args`` and ``**kwargs``:
+    Optional ``*args`` and ``**kwargs``:
 
     ``connectors`` (boolean, default = True )
        Plot connectors (synapses, gap junctions, abutting)
@@ -531,7 +532,7 @@ def plot3d(*args, **kwargs):
                       Skeleton data as retrieved by 
                       ``pymaid.pymaid.get_neuron()``
     dotprops :        pandas.DataFrame
-                      Contains neurons as dotprops: points with associated vector
+                      Contains neurons as dotprops (points with associated vector)
 
                       >>> dotprops
                       ...   name  points vect str DataFrame DataFrame
@@ -569,7 +570,7 @@ def plot3d(*args, **kwargs):
                       Autoscales plot to fit the neurons.
     downsampling :    int, default=None
                       Set downsampling of neurons before plotting.                       
-    clear3d :         bool, Default=False
+    clear3d :         bool, default=False
                       If True, canvas is cleared before plotting (only for 
                       vispy).
 
@@ -595,13 +596,15 @@ def plot3d(*args, **kwargs):
 
     Returns
     --------
-    If ``backend = 'vispy'``::
-       1. Opens a 3D window and returns::
-       2. ``canvas`` - Vispy canvas object
-       3. ``view`` - Vispy view object -> use to manipulate camera, add object, etc.
+    If ``backend == 'vispy'``::
 
-    If ``backend = 'plotly'``::
-       1. ``fig`` - dictionary to generate plotly 3d figure
+       Opens a 3D window and returns:
+            ``canvas`` - Vispy canvas object
+            ``view`` - Vispy view object -> use to manipulate camera, add object, etc.
+
+    If ``backend == 'plotly'``::
+
+       ``fig`` - dictionary to generate plotly 3d figure
        Use for example: ``plotly.offline.plot(fig, filename='3d_plot.html')``
        to generate html file and open it webbrowser 
     """
@@ -1323,12 +1326,15 @@ def plot3d(*args, **kwargs):
 def plot_network(*args, **kwargs):
     """ Uses python-igraph and plotly to generate a network plot
 
+    Notes
+    -----
+    Use **either** ``neurons``, ``adj_mat`` or ``g`` to specify what to plot 
+
     Parameters
-    ----------
-    USE EITHER <skids>, <adj_mat> or <g> to specify what to plot  
+    ----------     
 
     neurons          
-                      neurons as single or list of either:
+                      Neurons as single or list of either:
                       1. skeleton IDs (int or str)
                       2. neuron name (str, exact match)
                       3. annotation: e.g. 'annotation:PN right'

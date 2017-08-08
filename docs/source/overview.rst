@@ -50,6 +50,7 @@ Currently **pymaid** features a range of wrappers to conveniently fetch data
 from CATMAID servers. Use e.g. ``help(get_edges)`` to learn more about their 
 function, parameters and usage.
 
+- :class:`pymaid.pymaid.CatmaidInstance`: this class is used you setup the connection to your CATMAID server
 - :func:`pymaid.pymaid.add_annotations`: use to add annotation(s) to neuron(s)
 - :func:`pymaid.pymaid.edit_tags`: edit (add/remove) tags of treenodes or connectors
 - :func:`pymaid.pymaid.get_arbor`: similar to get_neuron but more detailed information on connectors
