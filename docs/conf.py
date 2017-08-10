@@ -35,7 +35,7 @@ MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'pylab', 'bpy', 'pyoctre
                 'matplotlib', 'matplotlib.pyplot', 'plt', 'png',
                 'matplotlib.collections', 'matplotlib.lines', 'matplotlib.patches', 
                 'mlines','mpatches','mcollections',
-                'vispy','seaborn','vispy.geometry']
+                'vispy','seaborn','vispy.geometry', 'vispy.gloo.util', 'vispy.gloo.util._screenshot']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
