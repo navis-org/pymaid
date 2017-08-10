@@ -53,6 +53,7 @@ setup(
         "vispy>=0.4.0",
         "tqdm>=4.14.0",
         "pyqt5",
+        "pypng"
         #"rpy2>=2.8.5", #This throws an error when no R is installed on the system 
     ],
 
