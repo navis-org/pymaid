@@ -20,7 +20,7 @@ efficiently calculate distances and cluster synapses.
 Examples
 --------
 >>> from pymaid import CatmaidInstance, get_neuron
->>> from catmaid_igraph import neuron2graph, cluster_nodes_w_synapses
+>>> from igraph_catmaid import neuron2graph, cluster_nodes_w_synapses
 >>> remote_instance = CatmaidInstance(    'www.your.catmaid-server.org', 
 ...                                       'user', 
 ...                                       'password', 

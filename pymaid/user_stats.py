@@ -34,7 +34,7 @@ Examples
 2           Lacin   1300            1            20
 3              Li   1244            5            45
 ...
->>> #Get the time that each user has invested
+>>> # Get the time that each user has invested
 >>> time_inv = user_stats.get_time_invested(  skeleton_ids,
 ...                                           remote_instance = myInstance )
 >>> time_inv
@@ -44,7 +44,7 @@ Examples
 2             Li    150       114       65       0
 3          Lacin    133       119       30       0
 ...
->>> #Plot contributions as pie chart
+>>> # Plot contributions as pie chart
 >>> import plotly
 >>> fig = { "data" : [ { "values" : time_inv.total.tolist(), 
 ...         "labels" : time_inv.user.tolist(), 
@@ -100,7 +100,7 @@ def get_user_contributions(x, remote_instance=None):
         DataFrame in which each row represents a user
 
         >>> df
-        ...   user. nodes. presynapses  postsynapses
+        ...   user nodes presynapses  postsynapses
         ... 0
         ... 1
 
@@ -183,6 +183,17 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
 
     Please note that this does currently not take placement of postsynaptic 
     nodes into account!
+
+    Examples
+    --------
+    Plot pie chart of contributions per user using Plotly. This example 
+    assumes that you have already imported and set up pymaid.
+
+    >>> import plotly
+    >>> stats = pymaid.get_time_invested( skids, remote_instance )     
+    >>> fig = { "data" : [ { "values" : stats.total.tolist(), 
+    ...         "labels" : stats.user.tolist(), "type" : "pie" } ] } 
+    >>> plotly.offline.plot(fig)
     """
 
     skids = eval_skids(x, remote_instance)

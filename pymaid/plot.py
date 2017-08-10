@@ -24,6 +24,7 @@ import matplotlib.collections as mcollections
 import random
 import colorsys
 import logging
+import png
 
 import plotly.plotly as py
 import plotly.offline as pyoff
@@ -32,6 +33,7 @@ import plotly.graph_objs as go
 import vispy
 from vispy import scene
 from vispy.geometry import create_sphere
+from vispy.gloo.util import _screenshot
 
 try:
     vispy.use(app='PyQt5')
@@ -59,6 +61,26 @@ if not module_logger.handlers:
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
+
+def screenshot(file='screenshot.png', alpha = True):
+    """ Saves a screenshot of active canvas.
+
+    Parameters
+    ----------
+    file :      str, optional
+                Filename
+    alpha :     bool, optional
+                If True, alpha channel will be saved
+    """    
+    if alpha:
+        mode = 'RGBA'
+    else:
+        mode = 'RGB'
+
+    im = png.from_array( _screenshot( alpha = alpha ), mode = mode)
+    im.save(file)
+
+    return
 
 
 def clear3d():
@@ -585,14 +607,14 @@ def plot3d(*args, **kwargs):
        |   If no color is provided, light grey (220,220,220) is used
     colormap :        dict, default=random
                       ``{ skid : (r,g,b), ... }`` - color must be 0-255.                                        
-    fig_width :       int, default=1440
-    fig_height :      int, default=960 
+    width :           int, default=1440
+    height :          int, default=960 
                       Use to define figure/window size.
     title :           str, default='Neuron plot'
                       Plot title (for plotly only!)
     fig_autosize :    bool, default=False
                       For plotly only! Autoscale figure size.
-                      Attention: autoscale overrides fig_width and fig_height      
+                      Attention: autoscale overrides width and height      
 
     Returns
     --------
@@ -628,7 +650,7 @@ def plot3d(*args, **kwargs):
         if 'canvas' not in globals():
             global canvas
             canvas = scene.SceneCanvas(keys='interactive', size=(
-                fig_width, fig_height), bgcolor='white')
+                width, height), bgcolor='white')
             view = canvas.central_widget.add_view()
 
             # Add camera
@@ -1087,8 +1109,8 @@ def plot3d(*args, **kwargs):
                 )
 
         layout = dict(
-            width=fig_width,
-            height=fig_height,
+            width=width,
+            height=height,
             autosize=fig_autosize,
             title=pl_title,
             scene=dict(
@@ -1205,8 +1227,8 @@ def plot3d(*args, **kwargs):
 
     # Parameters for figure
     pl_title = kwargs.get('title', 'Neuron Plot')
-    fig_width = kwargs.get('fig_width', 1440)
-    fig_height = kwargs.get('fig_height', 960)
+    width = kwargs.get('width', 1440)
+    height = kwargs.get('height', 960)
     fig_autosize = kwargs.get('fig_autosize', False)
     limits = kwargs.get('limits', [])
     auto_limits = kwargs.get('auto_limits', True)
@@ -1399,8 +1421,8 @@ def plot_network(*args, **kwargs):
     node_hover_text = kwargs.get('node_hover_text', [])
     node_size = kwargs.get('node_size', 20)
 
-    fig_width = kwargs.get('fig_width', 1440)
-    fig_height = kwargs.get('fig_height', 960)
+    width = kwargs.get('width', 1440)
+    height = kwargs.get('height', 960)
     fig_autosize = kwargs.get('fig_autosize', False)
 
     if remote_instance is None:
@@ -1455,7 +1477,7 @@ def plot_network(*args, **kwargs):
     edges = []
     annotations = []
     for e in g.es:
-        width = 2 + 5 * round(e['weight']) / max(g.es['weight'])
+        e_width = 2 + 5 * round(e['weight']) / max(g.es['weight'])
 
         edges.append(
             go.Scatter(dict(
@@ -1465,7 +1487,7 @@ def plot_network(*args, **kwargs):
                 hoverinfo='text',
                 text=str(e['weight']),
                 line=dict(
-                    width=width,
+                    width=e_width,
                     color='rgb(255,0,0)'
                 )
             ))
@@ -1480,7 +1502,7 @@ def plot_network(*args, **kwargs):
             align='center',
             arrowhead=2,
             arrowsize=.5,
-            arrowwidth=width,
+            arrowwidth=e_width,
             arrowcolor='#636363',
             ax=pos[e.source][0],
             ay=pos[e.source][1],
@@ -1551,8 +1573,8 @@ def plot_network(*args, **kwargs):
             for i, e in enumerate(pos)]
 
     layout = dict(
-        width=fig_width,
-        height=fig_height,
+        width=width,
+        height=height,
         showlegend=False,
         annotations=annotations,
         xaxis=dict(

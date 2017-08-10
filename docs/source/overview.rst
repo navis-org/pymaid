@@ -18,16 +18,16 @@ similar to pandas DataFrames (see examples).
 
 Selection of attributes:
 
-- ``skeleton_id``: neuron's skeleton ID	
-- ``neuron_name``: neuron's name
-- ``nodes``: pandas DataFrame of treenode table
-- ``connectors``: pandas DataFrame of connector table
-- ``tags``: node tags
-- ``annotations``: list of neuron(s) annotations
+- ``skeleton_id``: neurons' skeleton ID	
+- ``neuron_name``: neurons' name
+- ``nodes``: treenode table as pandas DataFrame
+- ``connectors``: connector table pandas DataFrame
+- ``tags``: node tags (dict)
+- ``annotations``: list of neurons' annotations
 - ``cable_length``: cable length(s) in nm
 - ``review_status``: review status of neuron(s)
-- ``soma``: returns treenode ID of soma (if applicable)
-- ``slabs``: returns slabs (linear segments)
+- ``soma``: treenode ID of soma (if applicable)
+- ``slabs``: slabs (linear segments)
 - ``igraph``: iGraph representation of the neuron
 
 Selection of class methods:
@@ -42,6 +42,7 @@ Selection of class methods:
 - :func:`pymaid.core.CatmaidNeuron.summary`: pandas DataFrame with basic parameters of neuron(s)
 - :func:`pymaid.core.CatmaidNeuron.downsample`: downsample neuron(s)
 - :func:`pymaid.core.CatmaidNeuron.copy`: returns deep copy of the object
+- :func:`pymaid.core.CatmaidNeuron.to_json`: saves neuronlist as json that can be opend in CATMAID's selection widget
 
 :mod:`pymaid.pymaid`
 --------------------
@@ -52,7 +53,8 @@ function, parameters and usage.
 
 - :class:`pymaid.pymaid.CatmaidInstance`: this class is used you setup the connection to your CATMAID server
 - :func:`pymaid.pymaid.add_annotations`: use to add annotation(s) to neuron(s)
-- :func:`pymaid.pymaid.edit_tags`: edit (add/remove) tags of treenodes or connectors
+- :func:`pymaid.pymaid.add_tags`: add tags of treenodes or connectors
+- :func:`pymaid.pymaid.delete_tags`: delete tags of treenodes or connectors
 - :func:`pymaid.pymaid.get_arbor`: similar to get_neuron but more detailed information on connectors
 - :func:`pymaid.pymaid.get_annotations`: get annotations of a set of neurons (annotation only)
 - :func:`pymaid.pymaid.get_annotation_details`: get detailed annotations for a set of neurons (includes user and timestamp)
@@ -69,11 +71,15 @@ function, parameters and usage.
 - :func:`pymaid.pymaid.get_node_user_details`: get details (creator, edition time, etc.) for individual nodes
 - :func:`pymaid.pymaid.get_partners`: retrieve connected partners for a list of neurons
 - :func:`pymaid.pymaid.get_partners_in_volume`: retrieve connected partners for a list of neurons within a given Catmaid volume
+- :func:`pymaid.pymaid.get_paths`: get possible paths between two sets of neurons
 - :func:`pymaid.pymaid.get_review`: get review status for set of neurons
 - :func:`pymaid.pymaid.get_review_details`: get review status (reviewer + timestamp) for each individual node
 - :func:`pymaid.pymaid.get_skids_by_annotation`: get skeleton IDs that are annotated with a given annotation
 - :func:`pymaid.pymaid.get_skids_by_name`: get skeleton IDs of neurons with given names
+- :func:`pymaid.pymaid.get_node_tags`: get tags of a set of treenodes or connectors
+- :func:`pymaid.pymaid.get_treenode_info`: retrieve info (i.e. skeleton ID) for a set of treenodes
 - :func:`pymaid.pymaid.get_treenode_table`: retrieve treenode table for given neurons
+- :func:`pymaid.pymaid.get_user_annotations`: get list of annotations used by given user(s)
 - :func:`pymaid.pymaid.get_user_list`: get list of users in the project
 - :func:`pymaid.pymaid.get_volume`: get volume (verts + faces) of CATMAID volumes
 
@@ -95,6 +101,7 @@ function, parameters and usage.
 - :func:`pymaid.plot.plot_network`: uses iGraph and `Plotly <http://plot.ly>`_ to generate network plots
 - :func:`pymaid.plot.clear3d`: clear 3D canvas
 - :func:`pymaid.plot.close3d`: close 3D canvas and wipe from memory
+- :func:`pymaid.plot.screenshot`: save screenshot
 
 :mod:`pymaid.cluster`
 ---------------------

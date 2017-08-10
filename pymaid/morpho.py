@@ -24,6 +24,7 @@ import logging
 import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
+from tqdm import tqdm
 
 from pymaid import pymaid, igraph_catmaid, core
 
@@ -44,7 +45,8 @@ if not module_logger.handlers:
 try:
     from pyoctree import pyoctree
 except:
-    module_logger.error('Unable to import pyoctree - morpho.in_volume will not work!')
+    module_logger.error(
+        'Unable to import pyoctree - morpho.in_volume will not work!')
 
 
 def generate_list_of_childs(skdata):
@@ -52,7 +54,7 @@ def generate_list_of_childs(skdata):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :   {CatmaidNeuron,CatmaidNeuronList} 
                Must contain a SINGLE neuron
 
     Returns
@@ -91,10 +93,10 @@ def classify_nodes(skdata, inplace=True):
 
     Parameters
     ----------
-    skdata :    {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
-                May contain multiple neurons    
+    skdata :    {CatmaidNeuron,CatmaidNeuronList} 
+                Neuron(s) to classify nodes for.
     inplace :   bool, optional 
-                If false, nodes will be classified on a copy which is then 
+                If False, nodes will be classified on a copy which is then 
                 returned
 
     Returns
@@ -150,7 +152,7 @@ def _generate_slabs(x, append=True):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
+    x :         {CatmaidNeuron,CatmaidNeuronList} 
                 May contain multiple neurons
     append :    bool, optional 
                 If true slabs will be appended to neuron
@@ -219,12 +221,13 @@ def downsample_neuron(skdata, resampling_factor, inplace=False):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
-                         May contain multiple neurons
-    resampling_factor :  int 
-                         Factor by which to reduce the node count
-    inplace :            bool, optional   
-                         If True, will modify original data
+    skdata :            {CatmaidNeuron,CatmaidNeuronList} 
+                        Neuron(s) to downsample
+    resampling_factor : int 
+                        Factor by which to reduce the node count
+    inplace :           bool, optional   
+                        If True, will modify original neuron. If False, a 
+                        downsampled copy is returned.
 
     Returns
     -------
@@ -330,11 +333,11 @@ def longest_neurite(skdata, root_to_soma=False):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series} 
-               May contain multiple neurons
-    root_to_soma : bool, optional
-                   If true, neuron will be rerooted to soma. Soma is the node 
-                   with >1000 radius.
+    skdata :        {CatmaidNeuron,CatmaidNeuronList} 
+                    May contain multiple neurons
+    root_to_soma :  bool, optional
+                    If True, neuron will be rerooted to soma. Soma is the node 
+                    with >1000 radius.
 
     Returns
     -------
@@ -394,7 +397,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :   {CatmaidNeuron, CatmaidNeuronList} 
                Must contain a SINGLE neuron
     new_root : {int, str}
                Node ID or tag of the node to reroot to 
@@ -531,7 +534,7 @@ def cut_neuron(skdata, cut_node, g=None):
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :   {CatmaidNeuron, CatmaidNeuronList} 
                Must contain a SINGLE neuron
     cut_node : {int, str}
                Node ID or a tag of the node to cut   
@@ -717,12 +720,12 @@ def cut_neuron(skdata, cut_node, g=None):
 
 
 def _cut_neuron(skdata, cut_node):
-    """ Cuts a neuron at given point and returns two new neurons. Does not use
-    igraph (slower)
+    """ DEPRECATED! Cuts a neuron at given point and returns two new neurons. 
+    Does not use igraph (slower)
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
+    skdata :   {CatmaidNeuron, CatmaidNeuronList} 
                Must contain a SINGLE neuron
     cut_node : {int, str}    
                Node ID or a tag of the node to cut
@@ -872,12 +875,14 @@ def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], pos
 
     Parameters
     ----------  
-    skdata :   {CatmaidNeuron,CatmaidNeuronList,pandas DataFrame,pandas Series} 
-               Must contain a SINGLE neuron
-    pre_skid_filter : list of int, optional
-               If provided, only synapses from these neurons will be processed
+    skdata :            {CatmaidNeuron, CatmaidNeuronList} 
+                        Must contain a SINGLE neuron
+    pre_skid_filter :   list of int, optional
+                        If provided, only synapses from these neurons will be 
+                        processed.
     post_skid_filter : list of int, optional 
-               If provided, only synapses to these neurons will be processed
+                        If provided, only synapses to these neurons will be 
+                        processed.
 
     Returns
     -------
@@ -975,18 +980,17 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     Parameters
     ----------
-    skdata : {int,str,CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series}       
-                If skeleton ID, 3D skeleton data will be pulled from CATMAID 
-                server
-    smoothing : int, optional
-                Use to smooth neuron by downsampling. 
-                Default = 1 (no smoothing)                  
-    remote_instance : CATMAID instance, optional
-                Pass if skdata is a skeleton ID
-    return_skdata : bool, optional
-                If True: instead of the final cable length, a dataframe 
-                containing the distance to each treenode's parent. 
-                Default = False
+    skdata :            {int, str, CatmaidNeuron, CatmaidNeuronList}       
+                        If skeleton ID (str or in), 3D skeleton data will be 
+                        pulled from CATMAID server
+    smoothing :         int, optional
+                        Use to smooth neuron by downsampling. 
+                        Default = 1 (no smoothing)                  
+    remote_instance :   CATMAID instance, optional
+                        Pass if skdata is a skeleton ID
+    return_skdata :     bool, optional
+                        If True: instead of the final cable length, a dataframe 
+                        containing the distance to each treenode's parent.                         
 
     Returns
     -------
@@ -1054,7 +1058,7 @@ def calc_strahler_index(skdata, return_dict=False):
 
     Parameters
     ----------
-    skdata :      {CatmaidNeuron,CatmaidNeuronList,pandas.DataFrame,pandas.Series}       
+    skdata :      {CatmaidNeuron, CatmaidNeuronList}       
                   E.g. from  ``pymaid.pymaid.get_neuron()``
     return_dict : bool, optional
                   If True, a dict is returned instead of the dataframe. 
@@ -1238,7 +1242,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
     neuron.nodes = neuron.nodes[
         ~neuron.nodes.strahler_index.isin(to_prune)].reset_index(drop=True)
     neuron.connectors = neuron.connectors[neuron.connectors.treenode_id.isin(
-        neuron.nodes.treenode_id.tolist())].reset_index(drop=True)    
+        neuron.nodes.treenode_id.tolist())].reset_index(drop=True)
 
     # Remove temporary attributes
     neuron._clear_temp_attr()
@@ -1247,6 +1251,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
         return neuron
     else:
         return
+
 
 def _walk_to_root(start_node, list_of_parents, visited_nodes):
     """ Helper function for synapse_root_distances(): 
@@ -1299,8 +1304,8 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
 
     Parameters
     ----------
-    x :               {list of tuples,pandas.DataFrame,CatmaidNeuron/List}
-                      
+    x :               {list of tuples, CatmaidNeuron, CatmaidNeuronList}
+
                       1. List/np array -  ``[ ( x, y , z ), [ ... ] ]``
                       2. DataFrame - needs to have 'x','y','z' columns                      
 
@@ -1328,7 +1333,29 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
     dict
                       If multiple volumes are provided as list of strings, 
                       results will be returned as dict of above returns.
-    
+
+    Examples
+    --------
+    >>> # Advanced example (assumes you already set up a CATMAID instance)
+    >>> # Check with which antennal lobe glomeruli a neuron intersects
+    >>> # First get names of glomeruli
+    >>> all_volumes = remote_instance.fetch( remote_instance._get_volumes() )
+    >>> right_gloms = [ v['name'] for v in all_volumes if v['name'].endswith('glomerulus') ]
+    >>> # Neuron to check
+    >>> n = pymaid.get_neuron('name:PN unknown glomerulus', remote_instance = remote_instance )
+    >>> # Get intersections
+    >>> res = morpho.in_volume( n, right_gloms, remote_instance = remote_instance )
+    >>> # Extract cable
+    >>> cable = { v : res[v].cable_length for v in res  }
+    >>> # Plot graph
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> df = pd.DataFrame( list( cable.values() ), 
+    ...                    index = list( cable.keys() )
+    ...                   )
+    >>> df.boxplot()
+    >>> plt.show()
+
     """
 
     if remote_instance is None:
@@ -1336,7 +1363,11 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
             remote_instance = globals()['remote_instance']
 
     if isinstance(volume, list):
-        return { v : in_volume( x, v, remote_instance = remote_instance, inplace = False ) for v in volume }
+        data = dict()
+        for v in tqdm(volume, desc='Volumes'):
+            data[v] = in_volume(
+                x, v, remote_instance=remote_instance, inplace=False)
+        return data
 
     if isinstance(volume, str):
         volume = pymaid.get_volume(volume, remote_instance)
@@ -1355,34 +1386,37 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
     elif isinstance(x, core.CatmaidNeuron):
         n = x
 
-        if not inplace:            
+        if not inplace:
             n = n.copy()
             try:
                 del n.igraph
             except:
                 pass
 
-        n.nodes = n.nodes[ in_volume( n.nodes[['x','y','z']].as_matrix(), volume = volume ) ]
-        n.connectors = n.connectors[ n.connectors.treenode_id.isin( n.nodes.treenode_id.tolist() ) ]
+        n.nodes = n.nodes[
+            in_volume(n.nodes[['x', 'y', 'z']].as_matrix(), volume=volume)]
+        n.connectors = n.connectors[
+            n.connectors.treenode_id.isin(n.nodes.treenode_id.tolist())]
 
-        #Fix root nodes
-        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() + [None] ), 'parent_id' ] = None
+        # Fix root nodes
+        n.nodes.loc[~n.nodes.parent_id.isin(
+            n.nodes.treenode_id.tolist() + [None]), 'parent_id'] = None
 
         if not inplace:
-            return n  
+            return n
 
-    elif isinstance(x, core.CatmaidNeuronList ):
+    elif isinstance(x, core.CatmaidNeuronList):
         nl = x
 
         if not inplace:
             nl = nl.copy()
 
         for n in nl:
-            n = in_volume( n, volume = volume, inplace=True )
+            n = in_volume(n, volume=volume, inplace=True)
 
         if not inplace:
             return nl
-    else: 
+    else:
         points = x
 
         # Rays are along z axis
@@ -1399,8 +1433,8 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
 
 
 def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
-    """ DEPCREATED as this works only with convex hulls, not for alpha-shapes (concave)!
-    Uses scipy to test if points are within a given CATMAID volume.
+    """ DEPCREATED as this works only with convex hulls, not for alpha-shapes 
+    (concave)! Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 
 
@@ -1408,7 +1442,7 @@ def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_
     ----------
     points :          list of tuples
                       Coordinates. Format ``[ ( x, y , z ), [ ... ] ]``. 
-                      Can be numpy array, pandas df or list
+                      Can be numpy array, pandas DataFrame or list
     volume :          {str, volume dict} 
                       Name of the CATMAID volume to test or list of vertices 
                       as returned by ``pymaid.pymaid.get_volume()``

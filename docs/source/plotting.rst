@@ -3,6 +3,13 @@ Plotting
 
 Pymaid contains functions for 2 and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plot` module and represent wrappers for `matplotlib <http://www.matplotlib.org>`_ for 2D, `vispy <http://www.vispy.org>`_ and `plotly <http://plot.ly>`_ for 3D.
 
+.. note::
+   If you are experiencing issues when using vispy
+   as backend, you should try installing the dev
+   version (currently 0.5.0dev0) directly from 
+   `Github <https://github.com/vispy/vispy>`_.
+   The version installed from PIP is 0.4.0.
+
 Plotting Neurons
 ================
 
@@ -43,15 +50,17 @@ Adding volumes:
 >>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot using standard parameters
 >>> nl.plot3d()
+>>> # Save screenshot
+>>> plot.screenshot('screenshot.png', alpha = True)
 
 The canvas persistent and survives simply closing the window. Calling :func:`pymaid.plot.plot3d` again will add objects to the canvas and open it again.
 
 >>> # Add another set of neurons
 >>> nl2 = core.CatmaidNeuronList([987675,543210], remote_instance = rm)
 >>> nl2.plot3d()
->>> # To clear canvas either pass parameter when plotting
+>>> # To clear canvas either pass parameter when plotting...
 >>> nl2.plot3d(clear3d=True)
->>> # ... or call explicitly
+>>> # ... or call function to clear
 >>> plot.clear3d()
 >>> # To wipe canvas from memory
 >>> plot.close3d()
@@ -72,6 +81,14 @@ By default, calling :func:`pymaid.plot.plot3d` uses the vispy backend and does n
    Qt, GLFW,SDL2, Wx, or Pyglet. By default, pymaid
    installs and sets PyQt5 as vispy's backend. If
    you need to change that use e.g. ``vispy.use(app='PyQt4')``
+
+Navigating the 3D viewer
+++++++++++++++++++++++++
+
+1. Rotating: Hold left mousebutton
+2. Zooming: Use the mousewheel or left+right-click and drag
+3. Panning: Hold left mousebutton + shift
+4. Perspective: Hold left and right mousbutton + shift
 
 Adding volumes:
 +++++++++++++++

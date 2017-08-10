@@ -109,7 +109,7 @@ class CatmaidNeuron:
     >>> n = CatmaidNeuron( 123456 ) 
     >>> # Initialize Catmaid connections
     >>> rm = CatmaidInstance(server_url, http_user, http_pw, token) 
-    >>> #Add CatmaidInstance to the neuron for convenience    
+    >>> # Add CatmaidInstance to the neuron for convenience    
     >>> n.remote_instance = rm 
     >>> # Retrieve node data from server on-demand
     >>> n.nodes 
@@ -117,19 +117,14 @@ class CatmaidNeuron:
     ...    treenode_id  parent_id  creator_id  x  y  z radius confidence
     ... 0  ...
     ...
-    >>> #Initialize with skeleton data
+    >>> # Initialize with skeleton data
     >>> n = pymaid.get_neuron( 123456, remote_instance = rm )
     >>> # Get annotations from server
     >>> n.annotations
     ... [ 'annotation1', 'annotation2' ]
-    >>> #Force update of annotations
+    >>> # Force update of annotations
     >>> n.get_annotations()
-    """
-
-    #Parameters for soma detection
-    soma_detection_radius = 100
-    #Soma tag - set to None if no tag needed
-    soma_detection_tag = 'soma'
+    """    
 
     def __init__(self, x, remote_instance=None, meta_data=None ):
         self.logger = logging.getLogger('CatmaidNeuron')
@@ -160,7 +155,12 @@ class CatmaidNeuron:
         # These will be overriden if x is a CatmaidNeuron
         self._remote_instance = remote_instance
         self._meta_data = meta_data
-        self.date_retrieved = datetime.datetime.now().isoformat()        
+        self.date_retrieved = datetime.datetime.now().isoformat() 
+
+        #Parameters for soma detection
+        self.soma_detection_radius = 100
+        #Soma tag - set to None if no tag needed
+        self.soma_detection_tag = 'soma'       
 
         if isinstance(x, CatmaidNeuron) or isinstance(x, pd.Series):
             self.skeleton_id = copy( x.skeleton_id )
@@ -181,6 +181,9 @@ class CatmaidNeuron:
                 self._remote_instance = x._remote_instance # Remote instance will not be copied!
                 self._meta_data = copy(x._meta_data)
                 self.date_retrieved = copy(x.date_retrieved)
+
+                self.soma_detection_radius = copy(x.soma_detection_radius)                
+                self.soma_detection_tag = copy(x.soma_detection_tag)
         else:
             try:
                 int(x)  # Check if this is a skeleton ID
@@ -330,12 +333,12 @@ class CatmaidNeuron:
         Uses either a treenode tag or treenode radius or a combination of both
         to identify the soma. This is set in the class attributes 
         ``soma_detection_radius`` and ``soma_detection_tag``. The default
-        values for these are: 
+        values for these are::
 
-            { 
-                soma_detection_radius = 100,
+            
+                soma_detection_radius = 100 
                 soma_detection_tag = 'soma'        
-            }
+            
 
         Returns
         -------
