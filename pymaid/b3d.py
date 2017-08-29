@@ -49,12 +49,12 @@ except:
 
 module_logger = logging.getLogger('Blender')
 
-if not module_logger.handlers:
+if len( module_logger.handlers ) == 0:
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 

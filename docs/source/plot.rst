@@ -1,7 +1,7 @@
-The plot module
----------------
+The plotting module
+-------------------
 
-.. automodule:: pymaid.plot
+.. automodule:: pymaid.plotting
     :members:
     :undoc-members:
     :show-inheritance:

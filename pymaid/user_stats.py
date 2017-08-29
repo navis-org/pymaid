@@ -56,20 +56,24 @@ from pymaid.pymaid import get_neuron, get_user_list, get_node_user_details, get_
 from pymaid import core
 import logging
 import pandas as pd
+from tqdm import tqdm
+import sys
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
 
-if not module_logger.handlers:
+if len( module_logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
+
+__all__ = ['get_user_contributions','get_time_invested',]
 
 
 def get_user_contributions(x, remote_instance=None):
@@ -112,7 +116,9 @@ def get_user_contributions(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             module_logger.error(
@@ -146,7 +152,7 @@ def get_user_contributions(x, remote_instance=None):
     return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
-def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
+def get_time_invested(x, remote_instance, interval=1, minimum_actions=15):
     """ Takes a list of skeleton IDs and calculates the time each user has 
     spent working on this set of neurons.
 
@@ -161,15 +167,15 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
     remote_instance :  Catmaid Instance, optional
                        Either pass explicitly or define globally.
     interval :         int, optional          
-                       Size of the bins in minutes. Default = 1
+                       Size of the bins in minutes. Default = 1 minute.
     minimum_actions :  int, optional
                        Minimum number of actions per bin to be counted as 
-                       active. Default = 1
+                       active.
 
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a user:
+        DataFrame in which each row represents a user. 
 
         >>> df
         ...   user  total  creation  edition   review
@@ -184,6 +190,12 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
     Please note that this does currently not take placement of postsynaptic 
     nodes into account!
 
+    Be aware of the ``minimum_actions`` parameter: at low settings even 
+    a single actions (e.g. connecting a node) will add considerably to time 
+    invested. To keep total reconstruction time comparable to what Catmaid
+    calculates, you should consider about 15 actions/minute (= a click every
+    4 seconds).
+
     Examples
     --------
     Plot pie chart of contributions per user using Plotly. This example 
@@ -193,7 +205,7 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
     >>> stats = pymaid.get_time_invested( skids, remote_instance )     
     >>> fig = { "data" : [ { "values" : stats.total.tolist(), 
     ...         "labels" : stats.user.tolist(), "type" : "pie" } ] } 
-    >>> plotly.offline.plot(fig)
+    >>> plotly.offline.plot(fig)    
     """
 
     skids = eval_skids(x, remote_instance)
@@ -203,7 +215,7 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
 
     user_list = get_user_list(remote_instance).set_index('id')
 
-    if not isinstance(x, core.CatmaidNeuron) and not isinstance(x, core.CatmaidNeuronList):
+    if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         skdata = get_neuron(skids, remote_instance=remote_instance)
     elif isinstance(x, core.CatmaidNeuron):
         skdata = core.CatmaidNeuronList(skdata)
@@ -217,15 +229,16 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
         node_ids += n.nodes.treenode_id.tolist()
         connector_ids += n.connectors.connector_id.tolist()
 
-    node_details = get_node_user_details(
-        node_ids + connector_ids, remote_instance=remote_instance)
+    # Get node details
+    node_details = get_node_user_details( 
+        node_ids + connector_ids, remote_instance=remote_instance )
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = pd.DataFrame(
+    creation_timestamps = pd.DataFrame( 
         node_details[['user', 'creation_time']].values, columns=['user', 'timestamp'])
 
-    # Dataframe for edition times
-    edition_timestamps = pd.DataFrame(
+    # Dataframe for edition times 
+    edition_timestamps = pd.DataFrame( 
         node_details[['editor', 'edition_time']].values, columns=['user', 'timestamp'])
 
     # Generate dataframe for reviews
@@ -246,23 +259,23 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=1):
     }
 
     # Get total time spent
-    for u in all_timestamps.user.unique():
+    for u in tqdm(all_timestamps.user.unique(), desc='Calc. total'):
         stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
             'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
     # Get reconstruction time spent
-    for u in creation_timestamps.user.unique():
+    for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.'):
         stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
             'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
     # Get edition time spent
-    for u in edition_timestamps.user.unique():
+    for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition'):
         stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
             'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
     # Get time spent reviewing
-    for u in review_timestamps.user.unique():
+    for u in tqdm(review_timestamps.user.unique(), desc='Calc. review'):
         stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
             'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
     module_logger.info(
         'Done! Use e.g. plotly to generate a plot: \n stats = get_time_invested( skids, remote_instance ) \n fig = { "data" : [ { "values" : stats.total.tolist(), "labels" : stats.user.tolist(), "type" : "pie" } ] } \n plotly.offline.plot(fig) ')
 
-    return pd.DataFrame([[user_list.ix[u].last_name, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True)
+    return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True)

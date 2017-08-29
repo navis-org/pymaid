@@ -43,11 +43,12 @@ Examples
 
 """
 
+import sys
 import math
 import pylab
 import numpy as np
-from igraph import *
-from scipy import cluster, spatial
+from igraph import Graph
+import scipy.cluster
 import logging
 import pandas as pd
 import time
@@ -56,15 +57,18 @@ from pymaid import core, pymaid
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.DEBUG)
-if not module_logger.handlers:
+if len( module_logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
+
+
+__all__ = ['network2graph','neuron2graph','matrix2graph','cluster_nodes_w_synapses','dist_from_root']
 
 
 def network2graph(x, remote_instance=None, threshold=1):
@@ -102,7 +106,9 @@ def network2graph(x, remote_instance=None, threshold=1):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -391,21 +397,21 @@ def cluster_nodes_w_synapses(data, plot_graph=False):
     distance_matrix_syn = np.delete(distance_matrix_syn, not_synapse_nodes, 1)
 
     module_logger.info('Clustering nodes with synapses...')
-    Y_syn = cluster.hierarchy.ward(distance_matrix_syn)
+    Y_syn = scipy.cluster.hierarchy.ward(distance_matrix_syn)
 
     if plot_graph:
         module_logger.debug('Plotting graph')
         # Compute and plot first dendrogram for all nodes.
         fig = pylab.figure(figsize=(8, 8))
         ax1 = fig.add_axes([0.09, 0.1, 0.2, 0.6])
-        Y_all = cluster.hierarchy.ward(distance_matrix)
-        Z1 = cluster.hierarchy.dendrogram(Y_all, orientation='left')
+        Y_all = scipy.cluster.hierarchy.ward(distance_matrix)
+        Z1 = scipy.cluster.hierarchy.dendrogram(Y_all, orientation='left')
         ax1.set_xticks([])
         ax1.set_yticks([])
 
         # Compute and plot second dendrogram for synapse nodes only.
         ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
-        Z2 = cluster.hierarchy.dendrogram(Y_syn)
+        Z2 = scipy.cluster.hierarchy.dendrogram(Y_syn)
         ax2.set_xticks([])
         ax2.set_yticks([])
 

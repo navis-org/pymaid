@@ -18,6 +18,7 @@
 """ This module contains functions to analyse and manipulate neuron morphology.
 """
 
+import sys
 import math
 import time
 import logging
@@ -32,13 +33,13 @@ from pymaid import pymaid, igraph_catmaid, core
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
 
-if not module_logger.handlers:
+if len( module_logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
@@ -48,6 +49,7 @@ except:
     module_logger.error(
         'Unable to import pyoctree - morpho.in_volume will not work!')
 
+__all__ = ['calc_cable','calc_strahler_index','classify_nodes','cut_neuron','downsample_neuron','in_volume','longest_neurite','prune_by_strahler','reroot_neuron','synapse_root_distances']
 
 def generate_list_of_childs(skdata):
     """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -520,7 +522,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     # Recalculate graph
     df.igraph = igraph_catmaid.neuron2graph(df)
 
-    module_logger.info('Info: %s #%s successfully rerooted (%s s)' % (
+    module_logger.info('%s #%s successfully rerooted (%s s)' % (
         df.neuron_name, df.skeleton_id, round(time.time() - start_time, 1)))
 
     if not inplace:
@@ -617,8 +619,9 @@ def cut_neuron(skdata, cut_node, g=None):
         parent_node_index = g.es.select(_source=cut_node_index)[0].target
     except:
         module_logger.error(
-            'Unable to find parent for cut node. Cut node = root?')
-        raise Exception('Unable to find parent for cut node. Cut node = root?')
+            'Unable to find parent for cut node. Is cut node = root?')
+        #parent_node_index = g.es.select(_target=cut_node_index)[0].source
+        raise Exception('Unable to find parent for cut node. Is cut node = root?')
 
     # Now calculate the min cut
     mc = g.st_mincut(parent_node_index, cut_node_index, capacity=None)
@@ -895,7 +898,9 @@ def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], pos
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             module_logger.error(
@@ -1003,7 +1008,9 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
 
     if isinstance(skdata, int) or isinstance(skdata, str):
@@ -1309,10 +1316,9 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
                       1. List/np array -  ``[ ( x, y , z ), [ ... ] ]``
                       2. DataFrame - needs to have 'x','y','z' columns                      
 
-    volume :          {str, volume dict, list of str} 
-                      Name of the CATMAID volume to test OR dict with 
-                      {'vertices':[],'faces':[]} as returned by e.g. 
-                      :func:`pymaid.pymaid.get_volume()`
+    volume :          {str, list of str, core.volumes} 
+                      Name of the CATMAID volume to test OR core.volumes dict
+                      as returned by e.g. :func:`pymaid.pymaid.get_volume()`
     remote_instance : CATMAID instance, optional
                       Pass if volume is a volume name
     inplace :         bool, optional
@@ -1359,7 +1365,9 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
 
     if isinstance(volume, list):
@@ -1464,7 +1472,9 @@ def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
 
     if type(volume) == type(str()):

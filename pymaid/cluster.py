@@ -20,23 +20,30 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import logging
-from scipy import cluster, spatial
+import scipy.cluster
+import scipy.spatial
 import colorsys
+from tqdm import tqdm
+import itertools
+import sys
+import multiprocessing as mp
 
-from pymaid import pymaid, core, plot
+from pymaid import pymaid, core, plotting
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
-if not module_logger.handlers:
+if len( module_logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
+
+__all__ = ['create_adjacency_matrix','cluster_by_connectivity','cluster_by_synapse_placement','cluster_xyz','create_adjacency_matrix','group_matrix']
 
 
 def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
@@ -75,7 +82,9 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             module_logger.error(
@@ -88,10 +97,10 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
 
     # Make sure neurons are strings, not integers
     neurons = list(set([str(n) for n in list(set(neuronsA + neuronsB))]))
-    neuronsA = [ str(n) for n in neuronsA ]
-    neuronsB = [ str(n) for n in neuronsB ]
+    neuronsA = [str(n) for n in neuronsA]
+    neuronsB = [str(n) for n in neuronsB]
 
-    #Make sure neurons are unique
+    # Make sure neurons are unique
     neuronsA = sorted(set(neuronsA), key=neuronsA.index)
     neuronsB = sorted(set(neuronsB), key=neuronsB.index)
 
@@ -175,7 +184,7 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
     col_groups :        dict, optional
                         See row_groups.
     method :            {'AVERAGE', 'MAX', 'MIN'}
-                        Method by which groups are collapsed.
+                        Method by which values are collapsed into groups.
 
     Returns
     -------
@@ -230,9 +239,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
     return new_mat
 
 
-def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, downstream=True, threshold=1, filter_skids=[], exclude_skids=[], plot_matrix=True, min_nodes=2, similarity='vertex_normalized'):
+def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True, threshold=1, include_skids=[], exclude_skids=[], min_nodes=2, similarity='vertex_normalized'):
     """ Wrapper to calculate connectivity similarity and creates a distance
-    matrix for a set of neurons. Uses Ward's algorithm for clustering.
+    matrix for a set of neurons. 
 
     Parameters
     ----------
@@ -258,26 +267,25 @@ def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, 
     min_nodes :          int, optional
                          Minimum number of nodes for a partners to be
                          considered. Default = 2
-    filter_skids :       list of skeleton IDs, optional
+    include_skids :      {see x}, optional
                          If filter_skids is not empty, only neurons whose skids
                          are in filter_skids will be considered when
                          calculating similarity score
-    exclude_skids :      list of skeleton IDs, optional
+    exclude_skids :      {see x}, optional
                          Neurons to exclude from calculation of connectivity
-                         similarity
-    plot_matrix :        bool, optional
-                         If True, a plot will be generated. Default = True
+                         similarity  
 
     Returns
     -------
-    dist_matrix :        Pandas dataframe
-                         Distance matrix containing all-by-all connectivity
-    cg :                 Seaborn cluster grid plot
-                         Only if ``plot_matrix = True``
+    :func:`pymaid.cluster.clust_results`
+                         Holds distance matrix and contains wrappers to plot
+                         dendograms.
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             module_logger.error(
@@ -295,9 +303,7 @@ def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, 
     if upstream is True:
         directions.append('upstream')
     if downstream is True:
-        directions.append('downstream')
-
-    module_logger.info('Retrieving and filtering connectivity')
+        directions.append('downstream')    
 
     # Retrieve connectivity and apply filters
     connectivity = pymaid.get_partners(
@@ -306,17 +312,17 @@ def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, 
     # Filter direction
     # connectivity = connectivity[ connectivity.relation.isin(directions) ]
 
-    if filter_skids or exclude_skids:
+    if include_skids or exclude_skids:
         module_logger.info(
             'Filtering connectivity. %i entries before filtering' % (connectivity.shape[0]))
 
-        if filter_skids:
+        if include_skids:
             connectivity = connectivity[
-                connectivity.skeleton_id.isin(filter_skids)]
+                connectivity.skeleton_id.isin(pymaid.eval_skids(include_skids, remote_instance=remote_instance))]
 
         if exclude_skids:
             connectivity = connectivity[
-                ~connectivity.skeleton_id.isin(exclude_skids)]
+                ~connectivity.skeleton_id.isin(pymaid.eval_skids(exclude_skids, remote_instance=remote_instance))]
 
         module_logger.info('%i entries after filtering' %
                            (connectivity.shape[0]))
@@ -353,14 +359,16 @@ def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, 
         if this_cn.shape[0] == 0:
             module_logger.warning('No %s partners found: filtered?' % d)
 
-        # Compare all neurons vs all neurons
-        for i, neuronA in enumerate(neurons):
-            print('%s (%i of %i)' % (str(neuronA), i, len(neurons)), end=', ')
-            for neuronB in neurons:
-                matching_indices = _calc_connectivity_matching_index(
-                    neuronA, neuronB, this_cn, vertex_score=vertex_score, nA_cn=cn_subsets[neuronA], nB_cn=cn_subsets[neuronB])
-                matching_scores[d][neuronA][
-                    neuronB] = matching_indices[similarity]
+        pool = mp.Pool()
+        combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB]) for nA in neurons for nB in neurons ]   
+
+        matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d ))
+
+        pool.close()
+        pool.join()    
+
+        for i,v in enumerate(combinations):
+            matching_scores[d].loc[ v[0],v[1] ] = matching_indices[i][similarity]
 
     # Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
     # that have predominantly either only up- or downstream partners!
@@ -395,24 +403,16 @@ def create_connectivity_distance_matrix(x, remote_instance=None, upstream=True, 
     dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
     # dist_matrix.index = [ neuron_names[str(n)] for n in dist_matrix.index ]
 
-    if plot_matrix:
-        import seaborn as sns
+    results = clust_results(dist_matrix)
 
-        linkage = cluster.hierarchy.ward(dist_matrix.as_matrix())
-        cg = sns.clustermap(
-            dist_matrix, row_linkage=linkage, col_linkage=linkage)
+    if isinstance(x, CatmaidNeuronList):
+        results.neurons = x
 
-        # Rotate labels
-        plt.setp(cg.ax_heatmap.xaxis.get_majorticklabels(), rotation=90)
-        plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
+    return results
 
-        # Increase padding
-        cg.fig.subplots_adjust(right=.8, top=.95, bottom=.2)
-
-        return dist_matrix, cg
-
-    return dist_matrix
-
+def _unpack_connectivity_helper(x):
+    """Helper function to unpack values from pool"""    
+    return _calc_connectivity_matching_index( x[0], x[1], x[2], vertex_score=x[3], nA_cn=x[4], nB_cn=x[5]  )
 
 def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_threshold=1, min_nodes=1, **kwargs):
     """ Calculates and returns various matching indices between two neurons.
@@ -463,7 +463,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     |                           -> value will be between 0 and 1; if one neuronB
     |                           has only few connections (percentage) to a shared
     |                           partner, the final value will also be small
-    |
+    
     |vertex_normalized =        Matching index that rewards shared and punishes
     |                           non-shared partners. Vertex similarity based on
     |                           Jarrell et al., 2012:
@@ -553,81 +553,198 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
         similarity_indices['matching_index_synapses'] = 0
         similarity_indices['matching_index_weighted_synapses'] = 0
 
-    return similarity_indices
+    return similarity_indices   
 
+def _unpack_synapse_helper(x):
+    """Helper function to unpack values from pool"""    
+    return _calc_synapse_similarity( x[0], x[1], x[2], x[3], x[4] )
 
-def synapse_distance_matrix(synapse_data, labels=None, plot_matrix=True, method='ward'):
-    """ Takes a list of CATMAID synapses, calculates EUCLEDIAN distance matrix
-    and clusters them (WARD algorithm)
+def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=True):
+    """ Calculates synapses similarity score.
+
+    Notes
+    -----
+    Synapse similarity score is calculated by calculating for each synapse of
+    neuron A: (1) the distance to the closest (eucledian) synapse in neuron B 
+    and (2) comparing the synapse density around synapse A and B. This is type
+    sensitive: presynapses will only be matched with presynapses, post with 
+    post, etc. The formula is described in Schlegel et al., eLife (2017).
 
     Parameters
     ----------
-    synapse_data :    pandas.DataFrame
-                      Contains the connector data (df.connectors)
-    labels :          list of str, optional
-                      Labels for each leaf of the dendrogram
-                      (e.g. connector ids).
-    plot_matrix :     boolean, optional
-                      If True, matrix figure is generated and returned
-    method : {'single', 'ward', 'complete', 'average', 'weighted', 'centroid'}
-                      Method used for hierarchical clustering from
-                      ``(scipy.cluster.hierarchy.linkage)``
+    (neuronA, neuronB) :    CatmaidNeuron    
+    sigma :                 int, optional
+                            Distance in nanometer that is considered to be 
+                            "close"
+    omega :                 int, optional
+                            Radius in nanometer over which to calculate 
+                            synapse density 
+    mu_score :              bool, optional
+                            If True, score is calculated as mean between A->B 
+                            and B->A comparison.
 
     Returns
     -------
-    dist_matrix :     np.array 
-                      Distance matrix
-    fig :             matplotlib object
-                      Only if plot_matrix = True
+    synapse_similarity_score
+    """
+
+    all_values = []
+
+    # Iterate over all types of connectors
+    for r in neuronA.connectors.relation.unique():
+        # Skip if either neuronA or neuronB don't have this synapse type
+        if neuronB.connectors[ neuronB.connectors.relation == r ].empty:
+            all_values += [0] * neuronA.connectors[ neuronA.connectors.relation == r ].shape[0]
+            continue
+
+        #Get inter-neuron matrix
+        dist_mat = scipy.spatial.distance.cdist(  neuronA.connectors[ neuronA.connectors.relation == r ][['x','y','z']], 
+                                            neuronB.connectors[ neuronB.connectors.relation == r ][['x','y','z']] )
+
+        #Get index of closest synapse in neuron B
+        closest_ix = np.argmin(dist_mat,axis=1)
+
+        #Get closest distances
+        closest_dist = dist_mat.min(axis=1)
+
+        #Get intra-neuron matrices for synapse density checking
+        distA = scipy.spatial.distance.pdist( neuronA.connectors[ neuronA.connectors.relation == r ][['x','y','z']] )
+        distA = scipy.spatial.distance.squareform(distA)
+        distB = scipy.spatial.distance.pdist( neuronB.connectors[ neuronB.connectors.relation == r ][['x','y','z']] )
+        distB = scipy.spatial.distance.squareform(distB)
+
+        #Calculate number of synapses closer than OMEGA. This does count itself!
+        closeA = (distA <= omega).sum(axis=1) 
+        closeB = (distB <= omega).sum(axis=1) 
+
+        #Now calculate the scores over all synapses
+        for a in range(distA.shape[0]):            
+            this_synapse_value = math.exp( -1 * math.fabs(closeA[a] - closeB[ closest_ix[a] ]) / (closeA[a] + closeB[ closest_ix[a] ]) ) * math.exp( -1 * (closest_dist[a]**2) / (2 * sigma**2))
+            all_values.append(this_synapse_value)   
+
+    score = sum(all_values)/len(all_values)
+
+    if mu_score:
+        return ( score +  _calc_synapse_similarity(neuronB, neuronA, sigma=sigma, omega=sigma, mu_score=False))/2
+    else:
+        return score
+
+def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remote_instance=None):
+    """ Clusters neurons based on their synapse placement.
+
+    Notes
+    -----
+    Distances score is calculated by calculating for each synapse of
+    neuron A: (1) the distance to the closest (eucledian) synapse in neuron B 
+    and (2) comparing the synapse density around synapse A and B. This is type
+    sensitive: presynapses will only be matched with presynapses, post with 
+    post, etc. The formula is described in Schlegel et al., eLife (2017).
+
+    Parameters
+    ----------
+    x
+                        Neurons as single or list of either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    sigma :             int, optional
+                        Distance in nanometer between synapses that is 
+                        considered to be "close"
+    omega :             int, optional
+                        Radius in nanometer over which to calculate synapse 
+                        density 
+    mu_score :          bool, optional
+                        If True, score is calculated as mean between A->B and 
+                        B->A comparison.
+    remote_instance :   CatmaidInstance, optional
+                        Need to provide if neurons (x) are only skids or 
+                        annotation(s).
+
+    Returns
+    -------
+    :class:`pymaid.cluster.cluster_res'
+                Class that contains distance matrix and methods to plot 
+                dendrograms.
+    """         
+
+    if not isinstance(x, core.CatmaidNeuronList):
+        if remote_instance is None:
+            if 'remote_instance' in sys.modules:
+                remote_instance = sys.modules['remote_instance']
+            elif 'remote_instance' in globals():
+                remote_instance = globals()['remote_instance']
+            else:
+                raise Exception(
+                    'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+        neurons = pymaid.get_neuron(x, remote_instance=remote_instance)
+    else:
+        neurons = x  
+
+    dist_matrix = pd.DataFrame(
+        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, columns=neurons.skeleton_id)    
+
+    pool = mp.Pool()
+    combinations = [ (nA,nB,sigma,omega,mu_score) for nA in neurons for nB in neurons ]   
+
+    scores = list(tqdm( pool.imap( _unpack_synapse_helper, combinations, chunksize=10 ), total=len(combinations), desc='Processing' ))
+
+    pool.close()
+    pool.join()    
+
+    for i,v in enumerate(combinations):
+        dist_matrix.loc[ v[0].skeleton_id,v[1].skeleton_id ] = scores[i]
+
+    res = clust_results(dist_matrix)
+    res.neurons = neurons
+
+    print('\n') #This is necessary - otherwise tqdm characters stay on the last line
+    return res
+
+
+def cluster_xyz(x, labels=None):
+    """ Thin wrapper for scipy.scipy.spatial.distance. Takes a list of x,y,z 
+    coordinates and calculates EUCLEDIAN distance matrix.
+
+    Parameters
+    ----------
+    x :             pandas.DataFrame
+                    Must contain x,y,z columns
+    labels :        list of str, optional
+                    Labels for each leaf of the dendrogram
+                    (e.g. connector ids).
+
+    Returns
+    -------
+    :class:`pymaid.cluster.clust_results`
+                      Contains distance matrix and methods to generate plots.
+
+    Examples
+    --------
+    This examples assumes you understand the basics of using pymaid.
+
+    >>> from pymaid import pymaid, cluster
+    >>> import matplotlib.pyplot as plt
+    >>> pymaid.remote_instance = CatmaidInstance('server','user','pw','token')
+    >>> n = pymaid.get_neuron(16)
+    >>> rs = cluster.cluster_xyz(n.connectors, labels=n.connectors.connector_id.tolist())
+    >>> rs.plot_matrix()
+    >>> plt.show()
     """
 
     # Generate numpy array containing x, y, z coordinates
     try:
-        s = synapse_data[['x', 'y', 'z']].as_matrix()
+        s = x[['x', 'y', 'z']].as_matrix()
     except:
         module_logger.error(
             'Please provide dataframe connector data of exactly a single neuron')
         return
 
     # Calculate euclidean distance matrix
-    condensed_dist_mat = spatial.distance.pdist(s, 'euclidean')
-    squared_dist_mat = spatial.distance.squareform(condensed_dist_mat)
+    condensed_dist_mat = scipy.spatial.distance.pdist(s, 'euclidean')
+    squared_dist_mat = scipy.spatial.distance.squareform(condensed_dist_mat)
 
-    if plot_matrix:
-        # Compute and plot first dendrogram for all nodes.
-        fig = pylab.figure(figsize=(8, 8))
-        ax1 = fig.add_axes([0.09, 0.1, 0.2, 0.6])
-        Y = cluster.hierarchy.linkage(squared_dist_mat, method=method)
-        Z1 = cluster.hierarchy.dendrogram(Y, orientation='left', labels=labels)
-        ax1.set_xticks([])
-        ax1.set_yticks([])
-
-        # Compute and plot second dendrogram.
-        ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
-        Y = cluster.hierarchy.linkage(squared_dist_mat, method=method)
-        Z2 = cluster.hierarchy.dendrogram(Y, labels=labels)
-        ax2.set_xticks([])
-        ax2.set_yticks([])
-
-        # Plot distance matrix.
-        axmatrix = fig.add_axes([0.3, 0.1, 0.6, 0.6])
-        idx1 = Z1['leaves']
-        idx2 = Z2['leaves']
-        D = squared_dist_mat
-        D = D[idx1, :]
-        D = D[:, idx2]
-        im = axmatrix.matshow(
-            D, aspect='auto', origin='lower', cmap=pylab.cm.YlGnBu)
-        axmatrix.set_xticks([])
-        axmatrix.set_yticks([])
-
-        # Plot colorbar.
-        axcolor = fig.add_axes([0.91, 0.1, 0.02, 0.6])
-        pylab.colorbar(im, cax=axcolor)
-
-        return squared_dist_mat, fig
-    else:
-        return squared_dist_mat
+    return clust_results(squared_dist_mat, labels=labels)
 
 
 class clust_results:
@@ -644,8 +761,8 @@ class clust_results:
     Attributes
     ----------
     mat :       Distance matrix
-    linkage :   Hierarchical clustering. Run :func:`pymaid.cluster.clustres.cluster`
-                to generate linkage.res
+    linkage :   Hierarchical clustering. Run :func:`pymaid.cluster.clust_results.cluster`
+                to generate linkage.res. By default, WARD's algorithm is used.
     leafs :     list of skids
 
     Examples
@@ -658,11 +775,12 @@ class clust_results:
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> #Perform all-by-all nblast
     >>> res = rmaid.nblast_allbyall( nl )
-    >>> #res is a clustres object
-    >>> res.plot_mpl()
+    >>> #res is a clust_results object
+    >>> res.plot_matrix()
     >>> plt.show()
     >>> #Extract 5 clusters
     >>> res.get_clusters( 5, criterion = 'maxclust' )
+
     """
 
     def __init__(self, mat, labels=None):
@@ -676,22 +794,23 @@ class clust_results:
         if key == 'linkage':
             self.cluster()
             return self.linkage
-        elif key in ['leafs','leaves']:
-            return [ self.mat.columns.tolist()[i] for i in cluster.hierarchy.leaves_list(self.linkage) ]
+        elif key in ['leafs', 'leaves']:
+            return [self.mat.columns.tolist()[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
 
-    def cluster(self, method='single'):
+    def cluster(self, method='ward'):
         """ Cluster distance matrix. This will automatically be called when
         attribute linkage is requested for the first time.
 
         Parameters
         ----------
-        method :    str
+        method :    str, optional
                     Clustering method (see scipy.cluster.hierarchy.linkage 
                     for reference)
         """
-        self.linkage = cluster.hierarchy.linkage(self.mat, method=method)
 
-    def plot_mpl(self, color_threshold=None, return_dendrogram = False):
+        self.linkage = scipy.cluster.hierarchy.linkage(self.mat, method=method)
+
+    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None):
         """ Plot dendrogram using matplotlib
 
         Parameters
@@ -700,28 +819,109 @@ class clust_results:
                             Coloring threshold for dendrogram
         return_dendrogram : bool, optional
                             If true, dendrogram object is returned
+        labels :            list of str, optional
+                            Labels in order of original observation
         """
 
-        plt.figure()
-        dn = cluster.hierarchy.dendrogram( self.linkage, 
-                                           color_threshold=color_threshold, 
-                                           labels=self.labels,
-                                           leaf_rotation=90)
+        if not labels:
+            labels = self.labels
 
+        plt.figure()
+        dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
+                                          color_threshold=color_threshold,
+                                          labels=labels,
+                                          leaf_rotation=90)
+        plt.tight_layout()
         module_logger.info(
             'Use matplotlib.pyplot.show() to render dendrogram.')
 
         if return_dendrogram:
             return dn
 
+    def plot_matrix2(self):
+        """ Plot distance matrix and dendrogram using seaborn. This package
+        needs to be installed manually.
+
+        Returns
+        -------
+        seaborn.clustermap
+        """
+
+        try:
+            import seaborn as sns
+        except:
+            raise ImportError('Need seaborn package installed.')
+
+        cg = sns.clustermap(
+            self.mat, row_linkage=self.linkage, col_linkage=self.linkage)
+
+        # Rotate labels
+        plt.setp(cg.ax_heatmap.xaxis.get_majorticklabels(), rotation=90)
+        plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
+
+        # Increase padding
+        cg.fig.subplots_adjust(right=.8, top=.95, bottom=.2)
+
+        module_logger.info(
+            'Use matplotlib.pyplot.show() to render figure.')
+
+        return cg
+
+    def plot_matrix(self):
+        """ Plot distance matrix and dendrogram using matplotlib.
+
+        Returns
+        -------
+        matplotlib figure
+        """
+
+        # Compute and plot first dendrogram for all nodes.
+        fig = pylab.figure(figsize=(8, 8))
+        ax1 = fig.add_axes([0.09, 0.1, 0.2, 0.6])
+        Z1 = scipy.cluster.hierarchy.dendrogram(
+            self.linkage, orientation='left', labels=self.labels)
+        ax1.set_xticks([])
+        ax1.set_yticks([])
+
+        # Compute and plot second dendrogram.
+        ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
+        Z2 = scipy.cluster.hierarchy.dendrogram(self.linkage, labels=self.labels)
+        ax2.set_xticks([])
+        ax2.set_yticks([])
+
+        # Plot distance matrix.
+        axmatrix = fig.add_axes([0.3, 0.1, 0.6, 0.6])
+        idx1 = Z1['leaves']
+        idx2 = Z2['leaves']
+        D = self.mat.copy()
+
+        if isinstance(D, pd.DataFrame):
+            D = D.as_matrix()
+
+        D = D[idx1, :]
+        D = D[:, idx2]
+        im = axmatrix.matshow(
+            D, aspect='auto', origin='lower', cmap=pylab.cm.YlGnBu)
+        axmatrix.set_xticks([])
+        axmatrix.set_yticks([])
+
+        # Plot colorbar.
+        axcolor = fig.add_axes([0.91, 0.1, 0.02, 0.6])
+        pylab.colorbar(im, cax=axcolor)
+
+        module_logger.info(
+            'Use matplotlib.pyplot.show() to render figure.')
+
+        return fig
+
     def plot3d(self, k=5, criterion='maxclust', **kwargs):
         """Plot neuron using :func:`pymaid.plot.plot3d`. Will only work if
         instance has neurons attached to it.
 
         Parameters
-        ---------
+        ----------
         k :         {int, float}
-        criterion : str
+        criterion : str, optional
                     Either 'maxclust' or 'distance'. If maxclust, k clusters
                     will be formed. If distance, clusters will be created at
                     threshold k.
@@ -734,29 +934,51 @@ class clust_results:
         :func:`pymaid.plot.plot3d` 
                     Function called to generate 3d plot                  
         """
+
         if 'neurons' not in self.__dict__:
-            module_logger.error('This works only with cluster results from neurons')
-            return None
+            module_logger.error(
+                'This works only with cluster results from neurons')
+            return None       
 
-        cl = self.get_clusters(k, criterion, use_labels=False)
+        cmap = get_colormap(self, k=k, criterion=criterion)
 
-        cl = [ [ self.mat.index.tolist()[i] for i in l ] for l in cl ]
+        kwargs.update({'color': cmap})
 
-        colors = [ colorsys.hsv_to_rgb(1/len(cl)*i,1,1) for i in range( len(cl) + 1 ) ]
+        return plotting.plot3d(self.neurons, **kwargs)
 
-        cmap = { n : colors[i] for i in range(len(cl)) for n in cl[i] }        
-
-        kwargs.update({'colormap':cmap})
-
-        return plot.plot3d(skdata=self.neurons, **kwargs)
- 
-    def get_clusters(self, k, criterion='maxclust', use_labels=True):
-        """ Wrapper for cluster.hierarchy.fcluster to get clusters
+    def get_colormap(self, k=5, criterion='maxclust'):
+        """Generate colormap based on clustering
 
         Parameters
         ----------
         k :         {int, float}
-        criterion : str
+        criterion : str, optional
+                    Either 'maxclust' or 'distance'. If maxclust, k clusters
+                    will be formed. If distance, clusters will be created at
+                    threshold k.  
+        
+        Returns
+        -------
+        dict
+                    {'skeleton_id': (r,g,b),...}           
+        """
+
+        cl = self.get_clusters(k, criterion, use_labels=False)
+
+        cl = [[self.mat.index.tolist()[i] for i in l] for l in cl]
+
+        colors = [colorsys.hsv_to_rgb(1 / len(cl) * i, 1, 1)
+                  for i in range(len(cl) + 1)]
+
+        return {n: colors[i] for i in range(len(cl)) for n in cl[i]}
+
+    def get_clusters(self, k, criterion='maxclust', use_labels=True):
+        """ Wrapper for cluster.hierarchy.fcluster to get clusters.
+
+        Parameters
+        ----------
+        k :         {int, float}
+        criterion : str, optional
                     Either 'maxclust' or 'distance'. If maxclust, k clusters
                     will be formed. If distance, clusters will be created at
                     threshold k.
@@ -770,9 +992,10 @@ class clust_results:
         list 
                     list of clusters [ [leaf1, leaf5], [leaf2, ...], ... ]
         """
-        cl = cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
+
+        cl = scipy.cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
 
         if self.labels and use_labels:
             return [[self.labels[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
         else:
-            return [[j for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl))]
+            return [[j for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]

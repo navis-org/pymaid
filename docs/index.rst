@@ -60,6 +60,7 @@ Table of Contents
    source/user_stats
    source/rmaid
    source/b3d
+   source/troubleshooting   
 
 
 Indices and tables

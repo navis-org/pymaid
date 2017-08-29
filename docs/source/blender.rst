@@ -41,7 +41,6 @@ Quickstart
 
 >>> from pymaid import pymaid, b3d
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
->>> pymaid.remote_instance = rm
 >>> # Fetch a bunch of neurons
 >>> nl = pymaid.get_3D_skeleton( 'annotation: glomerulus DA1' )
 >>> # Initialise handler

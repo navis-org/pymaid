@@ -1,5 +1,5 @@
 pymaid
-======
+====== 
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 Tested with CATMAID latest release version 2017.05.17 - if you are working with older versions you may experience incompatibilities due to 
 API changes.
@@ -52,6 +52,7 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 - [Plotly](http://plot.ly)
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - *Attention*: rpy2 is not automatically installed as dependency as it requires R to be installed. In order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
 - [pyoctree](https://pypi.python.org/pypi/pyoctree/)
+- [pypng](https://pythonhosted.org/pypng/)
 
 ## Quickstart:
 

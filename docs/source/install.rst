@@ -99,7 +99,7 @@ Used to visualise neurons in 2D. Alternative to Vispy based on WebGL.
 
 iGraph
 ******
-Provides fast analysis of graphs (networks and neurons)
+Provides fast analysis of graphs (networks and neurons).
 
   - Download: http://igraph.org/python/#downloads
 
@@ -117,9 +117,16 @@ Provides flexible drawing of graphs.
 
 tqdm
 ****
-Neat progress bar
+Neat progress bar.
 
   - Download: https://pypi.python.org/pypi/tqdm
+
+PyPNG
+*****
+Generates PNG images.
+
+  - Docs: https://pythonhosted.org/pypng/
+  - Install from PIP: ``pip install pypng``
 
 PyOctree
 ********

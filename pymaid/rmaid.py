@@ -52,6 +52,7 @@ Examples
 
 import logging
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -60,18 +61,19 @@ import numpy as np
 
 from colorsys import hsv_to_rgb
 
-from pymaid import core, pymaid, plot, cluster
+import pymaid.cluster as pyclust
+from pymaid import core, pymaid, plotting
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
-if not module_logger.handlers:
+if len( module_logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
@@ -95,6 +97,7 @@ except:
     module_logger.error(
         'R library "nat" not found! Please install from within R.')
 
+__all__ = ['neuron2r','neuron2py','init_rcatmaid','data2py','nbl_results','nblast','nblast_allbyall']
 
 def init_rcatmaid(**kwargs):
     """ This function initializes the R catmaid package from Jefferis 
@@ -131,7 +134,9 @@ def init_rcatmaid(**kwargs):
     authtoken = kwargs.get('authtoken', None)
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
 
     if remote_instance:
@@ -362,8 +367,8 @@ def neuron2py(neuron, remote_instance=None):
 
 
 def neuron2r(neuron, convert_to_um=False):
-    """ Converts a PyMaid neuron or list of neurons (DataFrames) to the 
-    corresponding neuron/neuronlist object in R.
+    """ Converts a PyMaid neuron or neuronlist to the corresponding 
+    neuron/neuronlist object in R.
 
     Notes
     -----
@@ -506,8 +511,9 @@ def dotprops2py(dp, subset=None):
 
     Returns
     -------
-    pandas Dataframe
-        Contains dotprops. Can be passed to `plot.plot3d( dotprops = df )`
+    core.dotprops
+        Subclass of pandas DataFrame. Contains dotprops. 
+        Can be passed to `plotting.plot3d( dotprops )`
     """
 
     # Check if list is on demand
@@ -531,7 +537,7 @@ def dotprops2py(dp, subset=None):
 
     df['points'] = points
 
-    return df
+    return core.dotprops(df)
 
 
 def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=False):
@@ -557,9 +563,9 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     Returns
     -------
     nblast_results
-        Instance of :class:`pymaid.cluster.clust_results` that holds distance 
+        Instance of :class:`pymaid.cluster.cluster_res` that holds distance 
         matrix and contains wrappers to cluster and plot data. Please use 
-        help(clust_results) to learn more and see example below.
+        help(nblast_results) to learn more and see example below.
 
     Examples
     --------
@@ -575,7 +581,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     >>> res = rmaid.nblast_allbyall( nl )
     >>> # Cluster and create simple dendrogram
     >>> res.cluster(method='ward')
-    >>> res.plot_mpl()
+    >>> res.plot_matrix()
     >>> plt.show()
     """
 
@@ -588,7 +594,9 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     doParallel.registerDoParallel(cores=ncores)
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
 
     if 'rpy2' in str(type(x)):
@@ -640,12 +648,12 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
         name_dict = x.summary().set_index('skeleton_id')[
             'neuron_name'].to_dict()
-        res = cluster.clust_results(
+        res = pyclust.clust_results(
             matrix, labels=[name_dict[n] for n in matrix.columns])
         res.neurons = x
         return res
     else:
-        return cluster.clust_results(matrix)
+        return pyclust.clust_results(matrix)
 
 
 def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
@@ -726,7 +734,9 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
     doParallel.registerDoParallel(cores=ncores)
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
 
     try:
@@ -897,7 +907,7 @@ class nbl_results:
         self.res.reset_index(inplace=True, drop=True)
 
     def plot(self, hits=5, plot_neuron=True, plot_brain=True, **kwargs):
-        """ Wrapper to plot nblast hits using ``pymaid.plot.plot.plot3d()``
+        """ Wrapper to plot nblast hits using ``pymaid.plot3d()``
 
         Parameters
         ----------
@@ -916,18 +926,18 @@ class nbl_results:
         plot_brain :    bool 
                         If True, the reference brain will be plotted.
         **kwargs    
-                        Parameters passed to `plot.plot3d`. 
-                        See `help(pymaid.plot.plot.plot3d)` for details.
+                        Parameters passed to `plotting.plot3d`. 
+                        See `help(pymaid.plotting.plot3d)` for details.
 
         Returns
         -------
-        Depending on the backends used by `plot.plot.plot3d()`:
+        Depending on the backends used by `pymaid.plotting.plot3d()`:
 
         vispy (default) : canvas, view
         plotly : matplotlib figure
 
         You can specify the backend by using e.g. `backend = 'plotly'` in 
-        **kwargs. See `help(pymaid.plot.plot.plot3d)` for details.
+        **kwargs. See `help(pymaid.plotting.plot3d)` for details.
         """
 
         nl = self.get_dps(hits)
@@ -955,24 +965,18 @@ class nbl_results:
         else:
             volumes = []
 
+        kwargs.update({'colormap': cmap,
+                               'downsampling': 1})
+
         if nl:
             if plot_neuron is True:
                 n_py = neuron2py(self.neuron)
                 # We have to bring the soma radius down to um -> this may mess
                 # up soma detection elsewhere, so be carefull!
-                n_py.ix[0].nodes.radius /= 1000
-                kwargs.update({'skdata': n_py,
-                               'dotprops': dotprops2py(nl),
-                               'colormap': cmap,
-                               'volumes': volumes,
-                               'downsampling': 1})
-                return plot.plot3d(**kwargs)
+                n_py.ix[0].nodes.radius /= 1000                
+                return plotting.plot3d([n_py, dotprops2py(nl), volumes ], **kwargs)
             else:
-                kwargs.update({'dotprops': dotprops2py(nl),
-                               'colormap': cmap,
-                               'volumes': volumes,
-                               'downsampling': 1})
-                return plot.plot3d(**kwargs)
+                return plotting.plot3d([dotprops2py(nl), volumes], **kwargs)
 
     def get_dps(self, entries):
         """ Wrapper to retrieve dotproducts from DPS database (neuronlistfh) 

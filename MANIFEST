@@ -6,7 +6,7 @@ pymaid/cluster.py
 pymaid/core.py
 pymaid/igraph_catmaid.py
 pymaid/morpho.py
-pymaid/plot.py
+pymaid/plotting.py
 pymaid/pymaid.py
 pymaid/rmaid.py
 pymaid/user_stats.py

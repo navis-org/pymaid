@@ -59,10 +59,34 @@ import re
 import pandas as pd
 import numpy as np
 import datetime
-from tqdm import tqdm
+from tqdm import tqdm, trange
+import sys
 
 from pymaid import core, morpho, igraph_catmaid
 
+__all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_skeleton',
+            'get_3D_skeletons','get_annotation_details','get_annotation_id',
+            'get_annotation_list','get_annotations','get_arbor',
+            'get_connector_details','get_connectors','get_contributor_statistics',
+            'get_edges','get_history','get_logs','get_names','get_neuron','get_neuron_list',
+            'get_neurons','get_neurons_in_box','get_neurons_in_volume','get_node_tags',
+            'get_node_user_details','get_nodes_in_volume','get_partners','get_partners_in_volume',
+            'get_paths','get_review','get_review_details','get_skids_by_annotation',
+            'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
+            'get_user_list','get_volume','has_soma','neuron_exists']
+
+# Set up logging
+module_logger = logging.getLogger(__name__)
+module_logger.setLevel(logging.INFO)
+if len( module_logger.handlers ) == 0:    
+    # Generate stream handler
+    sh = logging.StreamHandler()
+    sh.setLevel(logging.INFO)
+    # Create formatter and add it to the handlers
+    formatter = logging.Formatter(
+                '%(levelname)-5s : %(message)s (%(name)s)')
+    sh.setFormatter(formatter)
+    module_logger.addHandler(sh)
 
 class CatmaidInstance:
     """ A class giving access to a CATMAID instance.
@@ -79,16 +103,15 @@ class CatmaidInstance:
                     User token - see CATMAID documentation on how to get it.
     project_id :    int, optional
                     ID of your project. Default = 1
-    logger :        optional
-                    provide name for logging.getLogger if you like the CATMAID 
-                    instance to log to a specific logger by default (None), a 
-                    dedicated logger __name__ is created
     logger_level :  {'DEBUG','INFO','WARNING','ERROR'}, optional
-                    Sets logger level
-    time_out :      integer or None
+                    Sets logger level (module-wide)
+    time_out :      {int, None}
                     Time in seconds after which fetching data will time-out 
                     (so as to not block the system).
                     If set to None, time-out will be max([ 30, len(requests) ])
+    set_global :    bool, optional
+                    If True, this remote instance will be set as global by
+                    adding it as module 'remote_instance' to sys.modules.
 
     Notes
     -----
@@ -125,7 +148,7 @@ class CatmaidInstance:
     >>> print(neuron_list)
     """
 
-    def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger=None, logger_level='INFO', time_out=None):
+    def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger_level='INFO', time_out=None, set_global=True):
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
@@ -135,27 +158,18 @@ class CatmaidInstance:
         self.time_out = time_out
         self.project_id = project_id
 
-        # If pymaid is not run as module, make sure logger has a at least a
-        # StreamHandler
-        if not logger:
-            self.logger = logging.getLogger(__name__)
+        module_logger.setLevel(logger_level)
+
+        if set_global:            
+            self.set_global()
         else:
-            self.logger = logging.getLogger(logger)
-
-        if not self.logger.handlers:
-            sh = logging.StreamHandler()
-            sh.setLevel(logging.DEBUG)
-            # Create formatter and add it to the handlers
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            sh.setFormatter(formatter)
-
-            self.logger.addHandler(sh)
-
-        self.logger.setLevel(logger_level)
-
-        self.logger.info(
+            module_logger.info(
             'CATMAID instance created. See help(CatmaidInstance) to learn how to define globally.')
+
+    def set_global(self):
+        """Sets this variable as global by attaching it as sys.module"""
+        sys.modules['remote_instance'] = self
+        module_logger.info('Global CATMAID instance set.')
 
     def djangourl(self, path):
         """ Expects the path to lead with a slash '/'. """
@@ -180,7 +194,7 @@ class CatmaidInstance:
 
             data = urllib.parse.urlencode(post)
             data = data.encode('utf-8')
-            self.logger.debug('Encoded postdata: %s' % data)
+            module_logger.debug('Encoded postdata: %s' % data)
             # headers = {'Content-Type': 'application/json', 'Accept':'application/json'}
             request = urllib.request.Request(url, data=data)
         else:
@@ -191,6 +205,10 @@ class CatmaidInstance:
         response = self.opener.open(request)
 
         return json.loads(response.read().decode("utf-8"))
+
+    def _get_catmaid_version(self):
+        """ Use to parse url for retrieving CATMAID server version"""
+        return self.djangourl('/version')
 
     def _get_stack_info_url(self, sid):
         """ Use to parse url for retrieving stack infos. """
@@ -396,7 +414,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/stats/user-history")
 
 
-def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data'):
+def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=None):
     """ Wrapper to retrieve a list of urls in parallel using threads
 
     Parameters
@@ -409,8 +427,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data'):
     post_data :         list of dicts, optional
                         Needs to be the same size as urls
     desc :              str, optional
-                        Description to show on status bar
-
+                        Description to show on status bar    
     Returns
     -------
     data               
@@ -426,7 +443,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data'):
     else:
         time_out = remote_instance.time_out
 
-    remote_instance.logger.debug(
+    module_logger.debug(
         'Creating %i threads to retrieve data' % len(urls))
     for i, url in enumerate(urls):
         if post_data:
@@ -436,10 +453,10 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data'):
             t = _retrieveUrlThreaded(url, remote_instance)
         t.start()
         threads[str(i)] = t
-        remote_instance.logger.debug('Threads: %i' % len(threads))
-    remote_instance.logger.debug('%i threads generated.' % len(threads))
+        module_logger.debug('Threads: %i' % len(threads))
+    module_logger.debug('%i threads generated.' % len(threads))
 
-    remote_instance.logger.debug('Joining threads...')
+    module_logger.debug('Joining threads...')
 
     start = cur_time = time.time()
     joined = 0
@@ -457,20 +474,20 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data'):
             cur_time = time.time()
             pbar.update(len(threads_closed))
 
-            remote_instance.logger.debug('Closing Threads: %i ( %is until time out )' % (
+            module_logger.debug('Closing Threads: %i ( %is until time out )' % (
                 len(threads_closed), round(time_out - (cur_time - start))))
 
     if cur_time > (start + time_out):
-        remote_instance.logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % (
+        module_logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % (
             len([d for d in data if d != None]), len(threads)))
-        remote_instance.logger.warning(
+        module_logger.warning(
             'Consider increasing time to time-out via remote_instance.time_out')
         for t in threads:
             if t not in threads_closed:
-                remote_instance.logger.warning(
+                module_logger.warning(
                     'Did not close thread for url: ' + urls[int(t)])
     else:
-        remote_instance.logger.debug(
+        module_logger.debug(
             'Success! %i of %i urls retrieved.' % (len(threads_closed), len(urls)))
 
     return data
@@ -489,7 +506,7 @@ class _retrieveUrlThreaded(threading.Thread):
             self.tag_flag = 1
             self.remote_instance = remote_instance
         except:
-            remote_instance.logger.error(
+            module_logger.error(
                 'Failed to initiate thread for ' + self.url)
 
     def run(self):
@@ -507,7 +524,7 @@ class _retrieveUrlThreaded(threading.Thread):
             threading.Thread.join(self)
             return self.data
         except:
-            remote_instance.logger.error(
+            module_logger.error(
                 'Failed to join thread for ' + self.url)
             return None
 
@@ -593,7 +610,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -601,6 +620,23 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
             return
 
     x = eval_skids(x, remote_instance=remote_instance)
+
+    if len(x) > 100:
+        module_logger.warning(
+            'Large list of neurons requested - must retrieve %i neurons in bouts of 100.' % len(x))
+        nl = core.CatmaidNeuronList([])
+
+        for i in trange(0, len(x), 100, desc='Bouts'):
+            nl += get_neuron(x[i:i + 100],
+                             remote_instance=remote_instance,
+                             connector_flag=connector_flag,
+                             tag_flag=tag_flag,
+                             get_history=get_history,
+                             get_merge_history=get_merge_history,
+                             get_abutting=get_abutting,
+                             return_df=return_df,
+                             **kwargs)
+        return nl
 
     if not isinstance(x, (list, np.ndarray)):
         to_retrieve = [x]
@@ -645,7 +681,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     # Retrieve abutting
     if get_abutting:
-        remote_instance.logger.debug(
+        module_logger.debug(
             'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
         urls = []
 
@@ -654,7 +690,6 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                                        'relation_type': 'abutting'}
             urls.append(remote_instance._get_connectors_url() + '?%s' %
                         urllib.parse.urlencode(get_connectors_GET_data))
-            print(urls)
 
         cn_data = _get_urls_threaded(urls, remote_instance, desc='abutting')
 
@@ -769,7 +804,9 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -793,7 +830,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
         skdata.append(arbor_data)
 
-        remote_instance.logger.debug('%s retrieved' % str(s))
+        module_logger.debug('%s retrieved' % str(s))
 
     names = get_names(x, remote_instance)
 
@@ -832,8 +869,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    volume :            {str, volume dict, list of str} 
-                        Name of the CATMAID volume to test OR dict with 
+    volume :            {str, list of str, core.volume } 
+                        Name of the CATMAID volume to test OR volume dict with 
                         {'vertices':[],'faces':[]} as returned by e.g. 
                         :func:`pymaid.pymaid.get_volume()`
     remote_instance :   CATMAID instance 
@@ -874,7 +911,11 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -891,7 +932,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                              incoming_synapses=True, outgoing_synapses=True,
                              abutting=False, gap_junctions=True, )
 
-    remote_instance.logger.info(
+    module_logger.info(
         '%i connectors retrieved - now checking for intersection with volume...' % cn_data.shape[0])
 
     # Find out which connectors are in the volume of interest
@@ -901,7 +942,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     # Get the subset of connectors within the volume
     cn_in_volume = cn_data[iv].copy()
 
-    remote_instance.logger.info(
+    module_logger.info(
         '%i connectors in volume - retrieving connected neurons...' % cn_in_volume.shape[0])
 
     # Get details and extract connected x
@@ -921,7 +962,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     filtered_connectivity = connectivity[
         connectivity.skeleton_id.isin(skids_in_volume)].copy().reset_index()
 
-    remote_instance.logger.info('%i unique partners left after filtering (%i of %i connectors in given volume)' % (
+    module_logger.info('%i unique partners left after filtering (%i of %i connectors in given volume)' % (
         len(filtered_connectivity.skeleton_id.unique()), cn_in_volume.shape[0], cn_data.shape[0]))
 
     return filtered_connectivity
@@ -1010,7 +1051,9 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
             return 0
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1032,7 +1075,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         tag = 'source_skeleton_ids[%i]' % i
         connectivity_post[tag] = skid
 
-    remote_instance.logger.info('Fetching connectivity')
+    module_logger.info('Fetching connectivity')
     connectivity_data = remote_instance.fetch(
         remote_connectivity_url, connectivity_post)
 
@@ -1063,7 +1106,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
     names = get_names([n for d in connectivity_data for n in connectivity_data[
                       d]] + x, remote_instance)
 
-    remote_instance.logger.info('Done. Found %i up- %i downstream neurons' % (
+    module_logger.info('Done. Found %i up- %i downstream neurons' % (
         len(connectivity_data['incoming']), len(connectivity_data['outgoing'])))
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
@@ -1126,7 +1169,9 @@ def get_names(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1151,22 +1196,26 @@ def get_names(x, remote_instance=None):
 
     names = remote_instance.fetch(remote_get_names_url, get_names_postdata)
 
-    remote_instance.logger.debug(
+    module_logger.debug(
         'Names for %i of %i skeleton IDs retrieved' % (len(names), len(x)))
 
     return(names)
 
 
-def get_node_user_details(treenode_ids, remote_instance=None):
+def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
     """ Wrapper to retrieve user info for a list of treenode and/or connectors
 
     Parameters
     ----------
     treenode_ids :      list
                         list of treenode ids (can also be connector ids!)
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         Either pass directly to function or define globally as 
                         ``remote_instance``
+    chunk_size :        int, optional
+                        Querying large number of node will result in server 
+                        errors. We will thus query them in amenable bouts.
+
 
     Returns
     ------- 
@@ -1188,27 +1237,33 @@ def get_node_user_details(treenode_ids, remote_instance=None):
         treenode_ids = [treenode_ids]
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_instance.logger.info(
+    module_logger.info(
         'Retrieving details for %i nodes...' % len(treenode_ids))
 
     remote_nodes_details_url = remote_instance._get_node_info_url()
 
-    get_node_details_postdata = {
-    }
+    data = dict()
 
-    for i, tn in enumerate(treenode_ids):
-        key = 'node_ids[%i]' % i
-        get_node_details_postdata[key] = tn
+    for ix in tqdm(range(0, len(treenode_ids), chunk_size), desc='Bouts'):
+        get_node_details_postdata = dict()
 
-    data = remote_instance.fetch(
-        remote_nodes_details_url, get_node_details_postdata)
+        for k, tn in enumerate(treenode_ids[ix:ix + chunk_size]):
+            key = 'node_ids[%i]' % k
+            get_node_details_postdata[key] = tn
+
+        data.update(remote_instance.fetch(
+            remote_nodes_details_url, get_node_details_postdata
+        )
+        )
 
     data_columns = ['creation_time', 'user',  'edition_time',
                     'editor', 'reviewers', 'review_times']
@@ -1263,7 +1318,9 @@ def get_treenode_table(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1275,7 +1332,7 @@ def get_treenode_table(x, remote_instance=None):
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
 
-    remote_instance.logger.info(
+    module_logger.info(
         'Retrieving %i treenode table(s)...' % len(x))
 
     user_list = get_user_list(remote_instance)
@@ -1346,7 +1403,9 @@ def get_edges(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1422,7 +1481,9 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1479,7 +1540,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
                       dtype=object
                       )
 
-    remote_instance.logger.info(
+    module_logger.info(
         '%i connectors for %i neurons retrieved' % (df.shape[0], len(x)))
 
     return df
@@ -1514,7 +1575,9 @@ def get_connector_details(connector_ids, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1535,7 +1598,7 @@ def get_connector_details(connector_ids, remote_instance=None):
     connectors += remote_instance.fetch(remote_get_connectors_url,
                                         get_connectors_postdata)
 
-    remote_instance.logger.info('Data for %i of %i unique connector IDs retrieved' % (
+    module_logger.info('Data for %i of %i unique connector IDs retrieved' % (
         len(connectors), len(set(connector_ids))))
 
     columns = ['connector_id', 'presynaptic_to', 'postsynaptic_to',
@@ -1584,7 +1647,9 @@ def get_review(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1646,7 +1711,9 @@ def add_annotations(x, annotations, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1673,7 +1740,7 @@ def add_annotations(x, annotations, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(annotations[i])
 
-    remote_instance.logger.info(remote_instance.fetch(
+    module_logger.info(remote_instance.fetch(
         add_annotations_url, add_annotations_postdata))
 
     return
@@ -1707,7 +1774,9 @@ def get_user_annotations(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1742,7 +1811,7 @@ def get_user_annotations(x, remote_instance=None):
         url_list, remote_instance, post_data=postdata, desc='annotations')]
 
     # Add user login
-    for i, u in enumerate(ids):        
+    for i, u in enumerate(ids):
         for an in annotations[i]:
             an.append(user_list.set_index('id').ix[u].login)
 
@@ -1751,8 +1820,8 @@ def get_user_annotations(x, remote_instance=None):
 
     # Create dataframe
     df = pd.DataFrame(annotations,
-                      columns=['annotation', 'annotated_on', 'times_used', 
-                               'user_id' , 'annotation_id' ,'user_login'],
+                      columns=['annotation', 'annotated_on', 'times_used',
+                               'user_id', 'annotation_id', 'user_login'],
                       dtype=object
                       )
 
@@ -1798,7 +1867,9 @@ def get_annotation_details(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1886,7 +1957,9 @@ def get_annotations(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -1923,7 +1996,7 @@ def get_annotations(x, remote_instance=None):
 
         return(annotation_list)
     except:
-        remote_instance.logger.error(
+        module_logger.error(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
         raise Exception(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
@@ -1949,14 +2022,16 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_instance.logger.debug('Retrieving list of annotations...')
+    module_logger.debug('Retrieving list of annotations...')
 
     remote_annotation_list_url = remote_instance._get_annotation_list()
     annotation_list = remote_instance.fetch(remote_annotation_list_url)
@@ -1968,17 +2043,17 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
         for d in annotation_list['annotations']:
             if d['name'] == annotations and allow_partial is False:
                 annotation_ids[d['name']] = d['id']
-                remote_instance.logger.debug(
+                module_logger.debug(
                     'Found matching annotation: %s' % d['name'])
                 annotations_matched.add(d['name'])
                 break
             elif annotations in d['name'] and allow_partial is True:
                 annotation_ids[d['name']] = d['id']
-                remote_instance.logger.debug(
+                module_logger.debug(
                     'Found matching annotation: %s' % d['name'])
 
         if not annotation_ids:
-            remote_instance.logger.warning(
+            module_logger.warning(
                 'Could not retrieve annotation id for: ' + annotations)
 
     elif type(annotations) == type(list()):
@@ -1986,17 +2061,17 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
             if d['name'] in annotations and allow_partial is False:
                 annotation_ids[d['name']] = d['id']
                 annotations_matched.add(d['name'])
-                remote_instance.logger.debug(
+                module_logger.debug(
                     'Found matching annotation: %s' % d['name'])
             elif True in [a in d['name'] for a in annotations] and allow_partial is True:
                 annotation_ids[d['name']] = d['id']
                 annotations_matched |= set(
                     [a for a in annotations if a in d['name']])
-                remote_instance.logger.debug(
+                module_logger.debug(
                     'Found matching annotation: %s' % d['name'])
 
         if len(annotations) != len(annotations_matched):
-            remote_instance.logger.warning('Could not retrieve annotation id(s) for: ' + str(
+            module_logger.warning('Could not retrieve annotation id(s) for: ' + str(
                 [a for a in annotations if a not in annotations_matched]))
 
     return annotation_ids
@@ -2027,10 +2102,20 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     -------
     dict 
                         ``{ 'skid1' : True, 'skid2' : False, ...}``
+
+    Note
+    ----
+    There is no short-cut for this information - we have to load the 3D 
+    skeleton to get the soma. If you need the 3D skeletons anyway, it is more
+    sufficient to use :func:`pymaid.pymaid.get_neuron` to get a neuronlist
+    and then use the :attribute:`pymaid.core.CatmaidNeuronList.soma` 
+    attribute.
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2094,7 +2179,9 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2151,37 +2238,39 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
 
-    remote_instance.logger.info(
+    module_logger.info(
         'Looking for Annotation(s): ' + str(annotations))
     annotation_ids = get_annotation_id(
         annotations, remote_instance,  allow_partial=allow_partial)
 
     if not annotation_ids:
-        remote_instance.logger.error(
+        module_logger.error(
             'No matching annotation found! Returning None')
         raise Exception('No matching annotation found!')
 
     if allow_partial is True:
-        remote_instance.logger.debug(
+        module_logger.debug(
             'Found id(s): %s (partial matches included)' % len(annotation_ids))
     elif type(annotations) == type(list()):
-        remote_instance.logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
+        module_logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
             str(annotation_ids), len(annotations) - len(annotation_ids)))
     elif type(annotations) == type(str()):
-        remote_instance.logger.debug('Found id: %s | Unable to retrieve: %i' % (
+        module_logger.debug('Found id: %s | Unable to retrieve: %i' % (
             list(annotation_ids.keys())[0], 1 - len(annotation_ids)))
 
     annotated_skids = []
-    remote_instance.logger.debug(
+    module_logger.debug(
         'Retrieving x for annotationed neurons...')
-    for an_id in tqdm(annotation_ids.values(),desc='annotations'):
+    for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                            'range_length': 500, 'with_annotations': False}
@@ -2193,7 +2282,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
             if entry['type'] == 'neuron':
                 annotated_skids.append(str(entry['skeleton_ids'][0]))
 
-    remote_instance.logger.info(
+    module_logger.info(
         'Found %i skeletons with matching annotation(s)' % len(annotated_skids))
 
     return(annotated_skids)
@@ -2224,7 +2313,9 @@ def neuron_exists(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2245,7 +2336,7 @@ def neuron_exists(x, remote_instance=None):
         return True
 
 
-def get_treenode_info( treenode_ids, remote_instance =None ):
+def get_treenode_info(treenode_ids, remote_instance=None):
     """ This wrapper will retrieve info for a set of treenodes.
 
     Parameters
@@ -2269,7 +2360,9 @@ def get_treenode_info( treenode_ids, remote_instance =None ):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2277,22 +2370,22 @@ def get_treenode_info( treenode_ids, remote_instance =None ):
             return
 
     if not isinstance(treenode_ids, (list, np.ndarray)):
-        treenode_ids = [ treenode_ids ]
-    
-    urls = [ remote_instance._get_treenode_info_url( tn ) for tn in treenode_ids ]
-    post_data = [ {'None':0} for tn in treenode_ids ]
+        treenode_ids = [treenode_ids]
+
+    urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]
+    post_data = [{'None': 0} for tn in treenode_ids]
 
     data = _get_urls_threaded(urls, remote_instance,
-                           post_data=post_data, desc='info')
+                              post_data=post_data, desc='info')
 
-    df = pd.DataFrame( [ [ treenode_ids[i] ] + list(n.values()) for i,n in enumerate(data) ],
-                        columns = ['treenode_id'] + list( data[0].keys() )
-                    )
+    df = pd.DataFrame([[treenode_ids[i]] + list(n.values()) for i, n in enumerate(data)],
+                      columns=['treenode_id'] + list(data[0].keys())
+                      )
 
     return df
 
 
-def get_node_tags( node_ids, node_type, remote_instance =None ):
+def get_node_tags(node_ids, node_type, remote_instance=None):
     """ This wrapper will retrieve labels (tags) for a set of treenodes.
 
     Parameters
@@ -2321,7 +2414,9 @@ def get_node_tags( node_ids, node_type, remote_instance =None ):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2329,24 +2424,24 @@ def get_node_tags( node_ids, node_type, remote_instance =None ):
             return
 
     if not isinstance(node_ids, (list, np.ndarray)):
-        node_ids = [ node_ids ]
+        node_ids = [node_ids]
 
-    #Make sure node_ids are strings
-    node_ids = [ str(n) for n in node_ids ]
-    
+    # Make sure node_ids are strings
+    node_ids = [str(n) for n in node_ids]
+
     url = remote_instance._get_node_labels_url()
 
-    if node_type in ['TREENODE','TREENODES']:
+    if node_type in ['TREENODE', 'TREENODES']:
         key = 'treenode_ids'
-    elif node_type in ['CONNECTOR','CONNECTORS']:
+    elif node_type in ['CONNECTOR', 'CONNECTORS']:
         key = 'connector_ids'
     else:
-        raise TypeError('Unknown node_type parameter: %s' % str( node_type) )
-    
-    post_data = { key : ','.join( [ str(tn) for tn in node_ids ] ) }
+        raise TypeError('Unknown node_type parameter: %s' % str(node_type))
 
-    return remote_instance.fetch( url, post = post_data )
-    
+    post_data = {key: ','.join([str(tn) for tn in node_ids])}
+
+    return remote_instance.fetch(url, post=post_data)
+
 
 def delete_tags(node_list, tags, node_type, remote_instance=None):
     """ Wrapper to remove tag(s) for a list of treenode(s) or connector(s).
@@ -2398,17 +2493,19 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return   
+            return
 
     if not isinstance(node_list, (list, np.ndarray)):
         node_list = [node_list]
 
-    #Make sure node list is strings
+    # Make sure node list is strings
     node_list = [str(n) for n in node_list]
 
     if not isinstance(tags, (list, np.ndarray)):
@@ -2416,20 +2513,24 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
     if tags != [None]:
         # First, get existing tags for these nodes
-        existing_tags = get_node_tags( node_list, node_type, remote_instance=remote_instance )
+        existing_tags = get_node_tags(
+            node_list, node_type, remote_instance=remote_instance)
 
         # Check if our treenodes actually exist
-        if [ n for n in node_list if n not in existing_tags ]:
-            remote_instance.logger.warning('Skipping %i nodes without tags' % len([ n for n in node_list if n not in existing_tags ]))
-            [ node_list.remove(n) for n in [ n for n in node_list if n not in existing_tags ] ]
+        if [n for n in node_list if n not in existing_tags]:
+            module_logger.warning('Skipping %i nodes without tags' % len(
+                [n for n in node_list if n not in existing_tags]))
+            [node_list.remove(n) for n in [
+                n for n in node_list if n not in existing_tags]]
 
         # Remove tags from that list that we want to have deleted
-        existing_tags = { n : [ t for t in existing_tags[n] if t not in tags ] for n in node_list }
+        existing_tags = {n: [t for t in existing_tags[
+            n] if t not in tags] for n in node_list}
     else:
-        existing_tags = ''    
+        existing_tags = ''
 
     # Use the add_tags function to override existing tags
-    return add_tags(node_list, existing_tags, node_type, remote_instance=remote_instance, override_existing=True)    
+    return add_tags(node_list, existing_tags, node_type, remote_instance=remote_instance, override_existing=True)
 
 
 def add_tags(node_list, tags, node_type, remote_instance=None, override_existing=False):
@@ -2473,7 +2574,9 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2489,19 +2592,18 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
     if node_type in ['TREENODE', 'TREENODES']:
         add_tags_urls = [
             remote_instance._treenode_add_tag_url(n) for n in node_list]
-    elif node_type in ['CONNECTOR','CONNECTORS']:
+    elif node_type in ['CONNECTOR', 'CONNECTORS']:
         add_tags_urls = [
-            remote_instance._connector_add_tag_url(n) for n in node_list]    
+            remote_instance._connector_add_tag_url(n) for n in node_list]
     else:
-        raise TypeError('Unknown node_type parameter: %s' % str( node_type) )
+        raise TypeError('Unknown node_type parameter: %s' % str(node_type))
 
-    if isinstance( tags, dict ):
+    if isinstance(tags, dict):
         post_data = [
             {'tags': ','.join(tags[n]), 'delete_existing': override_existing} for n in node_list]
-    else:        
+    else:
         post_data = [
             {'tags': ','.join(tags), 'delete_existing': override_existing} for n in node_list]
-
 
     d = _get_urls_threaded(add_tags_urls, remote_instance,
                            post_data=post_data, desc='tags')
@@ -2528,21 +2630,20 @@ def get_review_details(x, remote_instance=None):
 
     Returns
     -------
-    list
-        list of reviewed nodes 
+    pandas DataFrame
+        DataFrame in which each row respresents a node.
 
-        >>> print(l)
-        [   node_id, 
-          [ 
-          [ reviewer1, timestamp],
-          [ reviewer2, timestamp] 
-          ] 
-        ]
+        >>> print(df)
+        treenode_id  skeleton_id  reviewer1  reviewer2  reviewer 3
+           12345       12345123     datetime    NaN      datetime        
+
 
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2567,14 +2668,25 @@ def get_review_details(x, remote_instance=None):
     rdata = _get_urls_threaded(
         urls, remote_instance, post_data=post_data, desc='review')
 
-    for neuron in rdata:
+    for i, neuron in enumerate(rdata):
         # There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
         #node_ids = []
         for arbor in neuron:
-            node_list += [(n['id'], n['rids'])
+            node_list += [(n['id'], x[i], n['rids'])
                           for n in arbor['sequence'] if n['rids']]
 
-    return node_list
+    tn_to_skid = {n[0]: n[1] for n in node_list}
+    node_dict = {n[0]: {u[0]: datetime.datetime.strptime(
+        u[1][:16], '%Y-%m-%dT%H:%M') for u in n[2]} for n in node_list}
+
+    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+
+    df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(0)
+    df.columns = [user_list.ix[u].login for u in df.columns]
+    df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.tolist()]
+    df.index.name = 'treenode_id'
+
+    return df.reset_index(drop=False)
 
 
 def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, search=''):
@@ -2612,7 +2724,9 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2684,7 +2798,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
     return df
 
 
-def get_contributor_statistics(x, remote_instance=None, separate=False):
+def get_contributor_statistics(x, remote_instance=None, separate=False, _split=500):
     """ Wrapper to retrieve contributor statistics for given skeleton ids.
     By default, stats are given over all neurons.
 
@@ -2702,11 +2816,14 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
                         globally as 'remote_instance'
     separate :          bool, optional
                         If true, stats are given per neuron
+    _split :            int, optional
+                        Splits the data requests into bouts of X neurons to 
+                        prevent time outs.
 
     Returns
     -------
-    pandas.DataFrame
-        DataFrame in which each row represents a neuron
+    pandas.DataFrame or pandas.Series
+        Series (if ``separate=False``), otherwise DataFrame:
 
         >>> df
             skeleton_id node_contributors multiuser_review_minutes  ..      
@@ -2724,9 +2841,21 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
         2
         3
 
+    Examples
+    --------
+    >>> # Plot contributions as pie chart
+    >>> cont = pymaid.get_contributor_statistics(x )
+    >>> import plotly
+    >>> fig = { "data" : [ { "values" : list(cont.node_contributors.values()), 
+    ...         "labels" : list(cont.node_contributors.keys()), 
+    ...         "type" : "pie" } ] } 
+    >>> plotly.offline.plot(fig) 
+
     """
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2741,30 +2870,44 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
     columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',  'pre_contributors',
                'n_postsynapses', 'post_contributors', 'multiuser_review_minutes', 'construction_minutes', 'min_review_minutes']
 
+    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+
     if not separate:
-        get_statistics_postdata = {}
+        with tqdm(total=len(x)) as pbar:
+            stats = []
+            for j in range(0, len(x), _split):
+                pbar.update(j * _split)
+                get_statistics_postdata = {}
 
-        for i in range(len(x)):
-            key = 'skids[%i]' % i
-            get_statistics_postdata[key] = x[i]
+                for i in range(j, min(len(x), j + _split)):
+                    key = 'skids[%i]' % i
+                    get_statistics_postdata[key] = x[i]
 
-        remote_get_statistics_url = remote_instance._get_contributions_url()
-        stats = remote_instance.fetch(
-            remote_get_statistics_url, get_statistics_postdata)
+                remote_get_statistics_url = remote_instance._get_contributions_url()
+                stats.append(remote_instance.fetch(
+                    remote_get_statistics_url, get_statistics_postdata))
 
-        df = pd.DataFrame([[
+        # Now generate DataFrame
+        node_contributors = {user_list.ix[int(u)].login: sum([st['node_contributors'][u] for st in stats if u in st[
+            'node_contributors']]) for st in stats for u in st['node_contributors']}
+        pre_contributors = {user_list.ix[int(u)].login: sum([st['pre_contributors'][u] for st in stats if u in st[
+            'pre_contributors']]) for st in stats for u in st['pre_contributors']}
+        post_contributors = {user_list.ix[int(u)].login: sum([st['post_contributors'][u] for st in stats if u in st[
+            'post_contributors']]) for st in stats for u in st['post_contributors']}
+
+        df = pd.Series([
             x,
-            stats['n_nodes'],
-            stats['node_contributors'],
-            stats['n_pre'],
-            stats['pre_contributors'],
-            stats['n_post'],
-            stats['post_contributors'],
-            stats['multiuser_review_minutes'],
-            stats['construction_minutes'],
-            stats['min_review_minutes']
-        ]],
-            columns=columns,
+            sum([st['n_nodes'] for st in stats]),
+            node_contributors,
+            sum([st['n_pre'] for st in stats]),
+            pre_contributors,
+            sum([st['n_post'] for st in stats]),
+            post_contributors,
+            sum([st['multiuser_review_minutes'] for st in stats]),
+            sum([st['construction_minutes'] for st in stats]),
+            sum([st['min_review_minutes'] for st in stats])
+        ],
+            index=columns,
             dtype=object
         )
     else:
@@ -2778,11 +2921,14 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
         df = pd.DataFrame([[
             s,
             stats[i]['n_nodes'],
-            stats[i]['node_contributors'],
+            {user_list.ix[u].login: stats[i]['node_contributors'][u]
+                for u in stats[i]['node_contributors']},
             stats[i]['n_pre'],
-            stats[i]['pre_contributors'],
+            {user_list.ix[u].login: stats[i]['pre_contributors'][u]
+                for u in stats[i]['pre_contributors']},
             stats[i]['n_post'],
-            stats[i]['post_contributors'],
+            {user_list.ix[u].login: stats[i]['post_contributors'][u]
+                for u in stats[i]['post_contributors']},
             stats[i]['multiuser_review_minutes'],
             stats[i]['construction_minutes'],
             stats[i]['min_review_minutes']
@@ -2793,7 +2939,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False):
     return df
 
 
-def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by=None):
+def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by=None, minimum_cont=None):
     """ Wrapper to retrieves a list of all skeletons that fit given parameters 
     (see variables). If no parameters are provided, all existing skeletons are 
     returned!
@@ -2803,25 +2949,67 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     remote_instance :   CatmaidInstance, optional                        
                         Either pass directly to function or define  
                         globally as 'remote_instance'.
-    user :              int, optional
-                        A single user_id.
+    user :              {int, str, list}, optional
+                        User ID(s) (int) or login(s) (str).
+    minimum_cont :      int, optional
+                        Minimum contribution (in nodes) to a neuron in order
+                        for it to be counted. Only applicable if ``user`` is
+                        provided. If multiple users are provided contribution
+                        is calculated across all users. Minimum contribution
+                        does NOT take start and end dates into account!
     node_count :        int, optional
-                        Minimum number of nodes.
-    start_date :        list of integers, optional 
+                        Minimum size of returned neuron (number of nodes).                        
+    start_date :        {datetime, list of integers}, optional 
                         [year, month, day]
                         Only consider neurons created after.
-    end_date :          list of integers , optional
+    end_date :          {datetime, list of integers}, optional
                         [year, month, day]
                         Only consider neurons created before.
+    reviewed_by :       {int, str}, optional
+                        User ID or login name of reviewer. 
 
     Returns
     -------
     list              
                         ``[ skid, skid, skid, ... ]``
+
+    Examples
+    --------
+    Get all neurons a given users have worked on in the last week. This example
+    assumes that you have already set up a CATMAID instance.
+
+    >>> # We are using user IDs but you can also use login names
+    >>> import datetime
+    >>> last_week = datetime.date.today() - datetime.date.timedelta(days=7)
+    >>> skids = pymaid.get_neuron_list( user = [16,20], 
+    ...                                 start_date = last_week,
+    ...                                 remote_instance = remote_instance )
+
     """
 
+    def _contribution_helper(skids, users, minimum_cont, remote_instance):
+        """ Helper to test if users have contributed more than X nodes to 
+        neuron.
+
+        Returns
+        -------
+        Filtered list of skeleton IDs
+        """
+        try:
+            [int(u) for u in users]
+        except:
+            user_list = get_user_list(
+                remote_instance=remote_instance).set_index('login').id
+            users = [user_list.ix[u] for u in users]
+
+        nl = get_neuron(skids, remote_instance=remote_instance)
+
+        return [n.skeleton_id for n in nl if n.nodes[n.nodes.creator_id.isin(users)].shape[0] > minimum_cont]
+
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2830,11 +3018,49 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
 
     get_skeleton_list_GET_data = {'nodecount_gt': node_count}
 
+    if isinstance(user, str) or isinstance(reviewed_by, str):
+        user_list = get_user_list(
+            remote_instance=remote_instance).set_index('login').id
+
     if user:
-        get_skeleton_list_GET_data['created_by'] = user
+        if isinstance(user, (list, np.ndarray)):
+            skid_list = list()
+            for u in tqdm(user, desc='Fetching users'):
+                skid_list += get_neuron_list(remote_instance=remote_instance,
+                                             user=u,
+                                             node_count=node_count,
+                                             start_date=start_date,
+                                             end_date=end_date,
+                                             reviewed_by=reviewed_by,
+                                             minimum_cont=None)
+
+            if minimum_cont:
+                skid_list = _contribution_helper(
+                    list(set(skid_list)), user, minimum_cont, remote_instance)
+
+            return list(set(skid_list))
+        else:
+            try:
+                get_skeleton_list_GET_data['created_by'] = int(user)
+            except:
+                get_skeleton_list_GET_data['created_by'] = user_list.ix[user]
 
     if reviewed_by:
-        get_skeleton_list_GET_data['reviewed_by'] = reviewed_by
+        try:
+            get_skeleton_list_GET_data['reviewed_by'] = int(reviewed_by)
+        except:
+            get_skeleton_list_GET_data[
+                'reviewed_by'] = user_list.ix[reviewed_by]
+
+    if start_date and not end_date:
+        today = datetime.date.today()
+        end_date = (today.year, today.month, today.day)
+
+    if isinstance(start_date, datetime.date):
+        start_date = [start_date.year, start_date.month, start_date.day]
+
+    if isinstance(end_date, datetime.date):
+        end_date = [end_date.year, end_date.month, end_date.day]
 
     if start_date and end_date:
         get_skeleton_list_GET_data['from'] = ''.join(
@@ -2846,7 +3072,11 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         get_skeleton_list_GET_data)
     skid_list = remote_instance.fetch(remote_get_list_url)
 
-    return skid_list
+    if minimum_cont and user:
+        skid_list = _contribution_helper(
+            list(set(skid_list)), [user], minimum_cont, remote_instance)
+
+    return list(set(skid_list))
 
 
 def get_history(remote_instance=None, start_date=(datetime.date.today() - datetime.timedelta(days=7)).isoformat(), end_date=datetime.date.today().isoformat(), split=True):
@@ -2862,16 +3092,16 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     remote_instance :   CATMAID instance, optional  
                         Either pass directly to function or define globally as 
                         'remote_instance'                             
-    start_date :        {datetime, str, tuple}, optional, default=today
+    start_date :        {datetime, str, tuple}, optional, default=last week
                         dates can be either::
                             - datetime.date
                             - datetime.datetime
                             - str 'YYYY-MM-DD' format, e.g. '2016-03-09'
                             - tuple ( YYYY, MM, DD ), e.g. (2016,3,9)    
-    end_date :          {datetime, str, tuple}, optional, default=last week
+    end_date :          {datetime, str, tuple}, optional, default=today
                         See start_date
     split :             bool, optional
-                        If True, history will be requested in bouts of 6 months
+                        If True, history will be requested in bouts of 6 months.
                         Useful if you want to look at a very big time window 
                         as this can lead to gateway timeout
 
@@ -2928,7 +3158,9 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         return temp
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -2939,7 +3171,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         start_date = start_date.isoformat()
     elif isinstance(start_date, datetime.datetime):
         start_date = start_date.isoformat()[:10]
-    elif isinstance(start_date, tuple):
+    elif isinstance(start_date, (tuple, list)):
         start_date = datetime.date(start_date[0], start_date[
                                    1], start_date[2]).isoformat()
 
@@ -2947,7 +3179,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         end_date = end_date.isoformat()
     elif isinstance(end_date, datetime.datetime):
         end_date = end_date.isoformat()[:10]
-    elif isinstance(end_date, tuple):
+    elif isinstance(end_date, (tuple, list)):
         end_date = datetime.date(end_date[0], end_date[
                                  1], end_date[2]).isoformat()
 
@@ -2956,7 +3188,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         start = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
         end = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        remote_instance.logger.info(
+        module_logger.info(
             'Retrieving %i days of history in bouts!' % (end - start).days)
 
         # First make big bouts of roughly 6 months each
@@ -2983,7 +3215,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         remote_get_history_url += '?%s' % urllib.parse.urlencode(
             get_history_GET_data)
 
-        remote_instance.logger.debug(
+        module_logger.debug(
             'Retrieving user history from %s to %s ' % (r[0], r[1]))
 
         data.append(remote_instance.fetch(remote_get_history_url))
@@ -3076,7 +3308,9 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3136,8 +3370,8 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
 
     Parameters
     ----------
-    volumes :               list of str
-                            Single or list of CATMAID volume names.
+    volumes :               {str, core.volume, list thereof}
+                            Single or list of CATMAID volumes.
     remote_instance :       CATMAID instance 
                             Either pass directly to function or define 
                             globally as 'remote_instance'
@@ -3163,7 +3397,9 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3176,7 +3412,11 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
     neurons = []
 
     for v in volumes:
-        volume = get_volume(v, remote_instance)
+        if not isinstance(v, core.volume):
+            volume = get_volume(v, remote_instance)
+        else:
+            volume = v
+
         verts = volume['vertices']
 
         bbox = ((int(min([v[0] for v in verts])), int(max([v[0] for v in verts]))),
@@ -3186,7 +3426,7 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
                  int(max([v[2] for v in verts])))
                 )
 
-        remote_instance.logger.info('Retrieving nodes in volume: %s...' % v)
+        module_logger.info('Retrieving nodes in volume: %s...' % v)
         temp = get_neurons_in_box(bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[
                                   2][0], bbox[2][1], remote_instance=remote_instance)
 
@@ -3201,16 +3441,16 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
             n in v for v in neurons]]
 
     if min_size > 1:
-        remote_instance.logger.info('Filtering neurons for size...')
+        module_logger.info('Filtering neurons for size...')
         rev = get_review(list(set(neurons)), remote_instance)
         neurons = rev[rev.total_node_count > min_size].skeleton_id.tolist()
 
     if only_soma:
-        remote_instance.logger.info('Filtering neurons for somas...')
+        module_logger.info('Filtering neurons for somas...')
         soma = has_soma(list(set(neurons)), remote_instance)
         neurons = [n for n in neurons if soma[n] is True]
 
-    remote_instance.logger.info('Done. %i unique neurons found in volume(s): %s' % (
+    module_logger.info('Done. %i unique neurons found in volume(s): %s' % (
         len(set(neurons)), (',').join(volumes)))
 
     return list(set(neurons))
@@ -3249,7 +3489,9 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3269,9 +3511,9 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
 
     def get_nodes(left, right, top, bottom, z1, z2, remote_instance, incursion):
 
-        remote_instance.logger.debug('%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (
+        module_logger.debug('%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (
             incursion, left, right, top, bottom, z1, z2))
-        remote_instance.logger.debug('Incursion %i' % incursion)
+        module_logger.debug('Incursion %i' % incursion)
 
         remote_nodes_list = remote_instance._get_node_list_url()
 
@@ -3298,7 +3540,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
             remote_nodes_list, node_list_postdata)
 
         if node_list[3] is True:
-            remote_instance.logger.debug('Incursing.')
+            module_logger.debug('Incursing.')
             incursion += 8
             node_list = list()
             # Front left top
@@ -3385,7 +3627,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
             # If limit not reached, node list is still an array of 4
             return node_list[0], incursion - 1
 
-        remote_instance.logger.info(
+        module_logger.info(
             "%i Incursion complete (%i nodes received)" % (incursion, len(node_list)))
 
         return node_list, incursion
@@ -3399,7 +3641,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
     for node in node_list:
         skeletons.add(node[7])
 
-    remote_instance.logger.info("Done: %i nodes from %i unique neurons retrieved." % (
+    module_logger.info("Done: %i nodes from %i unique neurons retrieved." % (
         len(node_list), len(skeletons)))
 
     return list(skeletons)
@@ -3444,7 +3686,9 @@ def get_user_list(remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3521,7 +3765,9 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
 
     """
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3577,7 +3823,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     return g, [[g.vs[i]['node_id'] for i in p] for p in all_paths]
 
 
-def get_volume(volume_name, remote_instance=None):
+def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6)):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of 
     vertices and faces.
 
@@ -3588,12 +3834,16 @@ def get_volume(volume_name, remote_instance=None):
     remote_instance :   CATMAID instance, optional
                         Either pass directly to function or define  
                         globally as ``remote_instance``
+    color :             tuple, optional
+                        R,G,B,alpha values used by :func:`pymaid.plotting.plot3d`
 
     Returns
     -------
-    dict 
-        Dictionary containing vertices and faces::
+    core.volume 
+        Essentially a dictionary containing name, vertices and faces::
 
+            name :          str
+            volume_id :     int
             vertices :      list of tuples
                             [ (x,y,z), (x,y,z), .... ]
             faces :         list of tuples
@@ -3603,7 +3853,9 @@ def get_volume(volume_name, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3613,7 +3865,7 @@ def get_volume(volume_name, remote_instance=None):
     if not isinstance(volume_name, str):
         raise TypeError('Volume name must be str')
 
-    remote_instance.logger.info('Retrieving volume <%s>' % volume_name)
+    module_logger.info('Retrieving volume <%s>' % volume_name)
 
     # First, get volume ID
     get_volumes_url = remote_instance._get_volumes()
@@ -3622,7 +3874,7 @@ def get_volume(volume_name, remote_instance=None):
     volume_id = [e['id'] for e in response if e['name'] == volume_name]
 
     if not volume_id:
-        remote_instance.logger.error(
+        module_logger.error(
             'Did not find a matching volume for name %s' % volume_name)
         raise Exception(
             'Did not find a matching volume for name %s' % volume_name)
@@ -3669,7 +3921,7 @@ def get_volume(volume_name, remote_instance=None):
                     for i in range(0,  len(v) - 2, 3)]
 
     else:
-        remote_instance.logger.error("Unknown volume type: %s" % mesh_type)
+        module_logger.error("Unknown volume type: %s" % mesh_type)
         raise Exception("Unknown volume type: %s" % mesh_type)
 
     # For some reason, in this format vertices occur multiple times - we have
@@ -3687,13 +3939,55 @@ def get_volume(volume_name, remote_instance=None):
 
         final_faces.append(this_faces)
 
-    remote_instance.logger.debug('Volume type: %s' % mesh_type)
-    remote_instance.logger.debug(
+    module_logger.debug('Volume type: %s' % mesh_type)
+    module_logger.debug(
         '# of vertices after clean-up: %i' % len(final_vertices))
-    remote_instance.logger.debug(
+    module_logger.debug(
         '# of faces after clean-up: %i' % len(final_faces))
 
-    return dict(vertices=final_vertices, faces=final_faces)
+    return core.volume(name=volume_name,
+                       volume_id=volume_id,
+                       vertices=final_vertices,
+                       faces=final_faces,
+                       color=color)
+
+
+def get_annotation_list(remote_instance=None):
+    """ Thin wrapper to get a list of all annotations in the project. 
+
+    Parameters
+    ----------
+    remote_instance : CatmaidInstance, optional
+
+    Returns
+    -------
+    pandas DataFrame
+            DataFrame in which each row represents an annotation
+
+            >>> print(user_list)
+              annotation_id   annotation   users
+            0
+            1
+
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
+            remote_instance = globals()['remote_instance']
+        else:
+            print(
+                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            return
+
+    an = remote_instance.fetch(remote_instance._get_annotation_list())[
+        'annotations']
+
+    df = pd.DataFrame.from_dict(an)
+    df.columns = ['annotation_id', 'annotation', 'users']
+
+    return df
 
 
 def eval_skids(x, remote_instance=None):
@@ -3721,7 +4015,9 @@ def eval_skids(x, remote_instance=None):
     """
 
     if remote_instance is None:
-        if 'remote_instance' in globals():
+        if 'remote_instance' in sys.modules:
+            remote_instance = sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
             remote_instance = globals()['remote_instance']
         else:
             print(
@@ -3759,6 +4055,6 @@ def eval_skids(x, remote_instance=None):
     elif isinstance(x, pd.Series):
         return [x.skeleton_id]
     else:
-        remote_instance.logger.error(
+        module_logger.error(
             'Unable to extract x from type %s' % str(type(x)))
         raise TypeError('Unable to extract x from type %s' % str(type(x)))
