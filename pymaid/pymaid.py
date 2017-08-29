@@ -73,7 +73,7 @@ __all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_
             'get_node_user_details','get_nodes_in_volume','get_partners','get_partners_in_volume',
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
-            'get_user_list','get_volume','has_soma','neuron_exists']
+            'get_user_list','get_volume','has_soma','neuron_exists','delete_tags']
 
 # Set up logging
 module_logger = logging.getLogger(__name__)

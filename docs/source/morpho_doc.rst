@@ -8,7 +8,7 @@ Basic properties
 
 Many basic parameters are readily accessible through attributes of :class:`pymaid.core.CatmaidNeuron` or :class:`pymaid.core.CatmaidNeuronList`
 
->>> from pymaid import pymaid
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance('server_url','user','pw','token')
 >>> nl = pymaid.get_neurons('annotation:glomerulus DA1')
 >>> # Access single attribute: e.g. cable lengths [um]
@@ -25,9 +25,9 @@ The :mod:`pymaid.morpho` module let's you perform (virtual) surgery on neurons. 
 
 Some examples continuing with above neuronlist ``nl``:
 
->>> from pymaid import morpho, core, plot
+>>> import pymaid
 >>> # Cut a neuron in two using either a treenode ID or (in this case) a node tag
->>> distal, proximal = morpho.cut_neuron( nl[0], cut_node='SCHLEGEL_LH' )
+>>> distal, proximal = pymaid.cut_neuron( nl[0], cut_node='SCHLEGEL_LH' )
 >>> # Plot neuron fragments
 >>> core.CatmaidNeuronList( [ distal, proximal ] ).plot3d()
 >>> # Alternatively, we can also just prune bits off a neuron objects

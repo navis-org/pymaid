@@ -18,13 +18,13 @@ Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.Catm
 2D Plotting
 -----------
 
->>> from pymaid import core, pymaid
+>>> import pymaid
 >>> import matplib.pyplot as plt
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
->>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
+>>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot using standard parameters
 >>> fig, ax = nl.plot2d()
 2017-07-25 14:56:08,701 - pymaid.plotting - INFO - Done. Use matplotlib.pyplot.show() to show plot.
@@ -42,28 +42,28 @@ Adding volumes
 3D Plotting
 -----------
 
->>> from pymaid import core, pymaid, plotting
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
->>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
+>>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot using standard parameters
 >>> nl.plot3d()
 >>> # Save screenshot
->>> plotting.screenshot('screenshot.png', alpha = True)
+>>> pymaid.screenshot('screenshot.png', alpha = True)
 
 The canvas persistent and survives simply closing the window. Calling :func:`pymaid.plotting.plot3d` again will add objects to the canvas and open it again.
 
 >>> # Add another set of neurons
->>> nl2 = core.CatmaidNeuronList([987675,543210], remote_instance = rm)
+>>> nl2 = pymaid.CatmaidNeuronList([987675,543210], remote_instance = rm)
 >>> nl2.plot3d()
 >>> # To clear canvas either pass parameter when plotting...
 >>> nl2.plot3d(clear3d=True)
 >>> # ... or call function to clear
->>> plotting.clear3d()
+>>> pymaid.clear3d()
 >>> # To wipe canvas from memory
->>> plotting.close3d()
+>>> pymaid.close3d()
 
 By default, calling :func:`pymaid.plotting.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
 
@@ -95,12 +95,12 @@ Adding volumes
 
 :func:`pymaid.plotting.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
 
->>> from pymaid import plotting, pymaid
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
->>> nl = core.CatmaidNeuronList([123456, 567890], remote_instance = rm)
+>>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot volumes without specifying color
 >>> nl.plot3d( ['v13.LH_R', 'v13_LH_L'] )
 >>> # Provide colors
@@ -110,7 +110,7 @@ Adding volumes
 
 You can also pass your own custom volumes as dictionarys:
 
->>> cust_vol = core.volume( my_volumes = dict (
+>>> cust_vol = pymaid.volume( my_volumes = dict (
 ...            				vertices = [ (1,2,1),(5,6,7),(8,6,4) ],
 ...           				faces = [ (0,1,2) ],
 ...							name = 'custom volume',
@@ -123,7 +123,7 @@ Plotting Networks
 
 :func:`pymaid.plotting.plot_network` is a wrapper to plot networks using plotly. It's rather slow for large-ish graphs though
 
->>> from pymaid import plotting, pymaid, core
+>>> import pymaid
 >>> import plotly.offline as poff
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
 ...                              'HTTP_USER' , 
@@ -132,5 +132,5 @@ Plotting Networks
 >>> pns = pymaid.get_skids_by_annotation('PN right')
 >>> partners = pymaid.get_partners( pns )
 >>> all_skeleton_ids = pns + partners.skeleton_id.tolist()
->>> fig = plotting.plot_network( all_skeleton_ids, remote_instance = rm )
+>>> fig = pymaid.plot_network( all_skeleton_ids, remote_instance = rm )
 >>> poff.plot(fig)

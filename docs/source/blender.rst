@@ -39,10 +39,12 @@ Quickstart
 
 :mod:`pymaid.b3d` provides a simple handler that let's you add, select and manipulate neurons from within the Blender terminal. Try this from within Blender's console:
 
->>> from pymaid import pymaid, b3d
+>>> import pymaid
+>>> # The b3d is not automatically loaded when importing the pymaid package
+>>> from pymaid import b3d
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 >>> # Fetch a bunch of neurons
->>> nl = pymaid.get_3D_skeleton( 'annotation: glomerulus DA1' )
+>>> nl = pymaid.get_neuron( 'annotation: glomerulus DA1' )
 >>> # Initialise handler
 >>> handler = b3d.handler()
 >>> # Load neurons into scene

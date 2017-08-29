@@ -8,14 +8,14 @@ Quickstart Guide
 ================
 At the beginning of each session, you have to initialise a :class:`pymaid.pymaid.CatmaidInstance` that holds your credentials for the Catmaid server. In most examples, this instance is assigned to a variable called ``remote_instance`` or just ``rm``. Here we are requesting a list of two neurons from the server:
 
->>> from pymaid.pymaid import CatmaidInstance, get_3D_skeleton
+>>> import pymaid
 >>> #HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
 ... #http authentification
->>> rm = CatmaidInstance(    'www.your.catmaid-server.org' , 
+>>> rm = pymaid.CatmaidInstance(    'www.your.catmaid-server.org' , 
 ...                          'HTTP_USER' , 
 ...                          'HTTP_PASSWORD', 
 ...                          'TOKEN' )
->>> neuron_list = get_3D_skeleton ( ['12345','67890'] )
+>>> neuron_list = pymaid.get_neuron ( ['12345','67890'] )
 >>> #To access individual neurons, use neuron_list like a normal list object
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
@@ -48,8 +48,8 @@ Neuron data is (in most cases) stored as :class:`pymaid.core.CatmaidNeuron`. Mul
 
 You can minimally create an neuron object with just its skeleton ID:
 
->>> from pymaid import core
->>> neuron = core.CatmaidNeuron( 123456 )
+>>> import pymaid
+>>> neuron = pymaid.CatmaidNeuron( 123456 )
 
 Attributes of this neuron will be retrieved from the server on-demand. For this, you will have to assign a :class:`pymaid.pymaid.CatmaidInstance` to that neuron:
 
@@ -57,12 +57,12 @@ Attributes of this neuron will be retrieved from the server on-demand. For this,
 >>> # Retrieve the name of the neuron on-demand
 >>> neuron.neuron_name
 >>> # You can also just pass an existing instance 
->>> neuron = core.CatmaidNeuron( 123456, remote_instance = rm )
+>>> neuron = pymaid.CatmaidNeuron( 123456, remote_instance = rm )
 
 Some functions already return partially completed neurons (e.g. :func:`pymaid.pymaid.get_3D_skeleton`)
 
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token' )
->>> neuron = pymaid.pymaid.get_3D_skeleton( 123456, remote_instance = rm )
+>>> neuron = pymaid.get_neuron( 123456, remote_instance = rm )
 
 All functions that explicitly require you to pass a ``skids`` parameter (e.g. :func:`pymaid.pymaid.get_3D_skeleton`) accept either:
 
@@ -73,13 +73,13 @@ All functions that explicitly require you to pass a ``skids`` parameter (e.g. :f
 
 Some examples:
 
->>> from pymaid import pymaid
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> # Create neuron list from annotation
->>> neuron_list = pymaid.get_3D_skeleton( 'annotation:glomerulus DA1', remote_instance = rm )
+>>> neuron_list = pymaid.get_neuron( 'annotation:glomerulus DA1', remote_instance = rm )
 >>> # Get partners of these neurons
 >>> partners = pymaid.get_partners( neuron_list, remote_instance = rm)
 >>> # Use a neuron name when adding an annotation
@@ -92,14 +92,14 @@ Connection to the server: CatmaidInstance
 -----------------------------------------
 As you instanciate :class:`pymaid.pymaid.CatmaidInstance`, it is made the default remote instance and you don't need to pass it on to any function explicitly.
 
->>> from pymaid import pymaid
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token')
 2017-08-24 19:31:22,663 - pymaid.pymaid - INFO - Global CATMAID instance set.
 >>> partners = pymaid.get_partners( [12345,67890] )
 
 However, if you pass a :class:`pymaid.pymaid.CatmaidInstance` explicitly to a function, any globally defined remote instance is overruled:
 
->>> from pymaid import pymaid
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token', set_global=False )
 >>> partners = pymaid.get_partners( [12345,67890], remote_instance = rm )
 
@@ -114,15 +114,15 @@ The project ID is part of the CatmaidInstance and defaults to 1. You can change 
 
 :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList` objects will store a CatmaidInstance and use it to pull data from the server on-demand:
 
->>> from pymaid import pymaid, core
+>>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> # Initialise with a CatmaidInstance
->>> nl = core.CatmaidNeuronList( [12345,67890], remote_instance = rm )
+>>> nl = pymaid.CatmaidNeuronList( [12345,67890], remote_instance = rm )
 >>> # Initialise without and add later
->>> nl = core.CatmaidNeuronList( [12345,67890] )
+>>> nl = pymaid.CatmaidNeuronList( [12345,67890] )
 >>> nl.set_remote_instance(rm)
 >>> # Alternatively
 >>> nl.set_remote_instance( server_url = 'www.your.catmaid-server.org', 
@@ -139,12 +139,11 @@ Accessing data
 
 As laid out in the Quickstart, :class:`pymaid.core.CatmaidNeuron` can be initialised with just a skeleton ID and the rest will then be requested/calculated on-demand:
 
->>> from pymaid.core import CatmaidNeuron
->>> from pymaid.pymaid import CatmaidInstance
+>>> import pymaid
 >>> # Initialize a new neuron
->>> n = CatmaidNeuron( 123456 ) 
+>>> n = pymaid.CatmaidNeuron( 123456 ) 
 >>> # Initialize Catmaid connections
->>> rm = CatmaidInstance(server_url, http_user, http_pw, token) 
+>>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token) 
 >>> # Add CatmaidInstance to the neuron for convenience    
 >>> n.set_remote_instance(rm) 
 
@@ -174,7 +173,7 @@ All this data is loaded once upon the first explicit request and then stored in 
 
 Attributes in :class:`pymaid.core.CatmaidNeuronList` work much the same way but instead you will get that data for all neurons that are within that neuron list.
 
->>> nl = CatmaidNeuronList( [ 123456, 456789, 123455 ], remote_instance = rm ) 
+>>> nl = pymaid.CatmaidNeuronList( [ 123456, 456789, 123455 ], remote_instance = rm ) 
 >>> nl.skeleton_id
 [ 123456, 456789, 123455 ]
 >>> nl.review_status
@@ -186,9 +185,9 @@ Indexing CatmaidNeuronLists
 :class:`pymaid.core.CatmaidNeuron` is much like pandas DataFrames in that it allows some fancing indexing
 
 >>> # Initialize with just a Skeleton ID 
->>> nl = CatmaidNeuronList( [ 123456, 45677 ] )
+>>> nl = pymaid.CatmaidNeuronList( [ 123456, 45677 ] )
 >>> # Add CatmaidInstance to neurons in neuronlist
->>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
+>>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token)
 >>> nl.set_remote_instance( rm )
 >>> # Index using node count
 >>> subset = nl [ nl.n_nodes > 6000 ]
@@ -199,7 +198,7 @@ Indexing CatmaidNeuronLists
 >>> # Index by list of skeleton IDs
 >>> subset = nl [ [ '12345', '67890' ] ]
 >>> # Concatenate lists
->>> nl += pymaid.get_3D_skeleton( [ 912345 ], remote_instance = rm )
+>>> nl += pymaid.get_neuron( [ 912345 ], remote_instance = rm )
 >>> # Remove item(s)
 >>> subset = nl - [ 45677 ]
 
@@ -207,8 +206,8 @@ Namespace
 =========
 PyMaid is separated into several modules (e.g. core, plotting, etc.). It is useful to keep that organisation if you are writing lots of code:
 
->>> from pymaid import pymaid, cluster
->>> rm = pymaid.CatmaidInstance(server_url, user, pw, token)
+>>> from pymaid import core, pymaid, cluster
+>>> rm = core.CatmaidInstance(server_url, user, pw, token)
 >>> neurons = pymaid.get_neuron('annotation:EXAMPLE')
 >>> clusters = cluster.cluster_by_synapse_placement(neurons)
 
@@ -218,5 +217,3 @@ If you are going for convenvience, you can also just import the main package - t
 >>> rm = pymaid.CatmaidInstance(server_url, user, pw, token)
 >>> neurons = pymaid.get_neuron('annotation:EXAMPLE')
 >>> clusters = pymaid.cluster_by_synapse_placement(neurons)
-
-For examples, we will always use the explicit method.
