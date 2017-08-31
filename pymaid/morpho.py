@@ -299,25 +299,24 @@ def downsample_neuron(skdata, resampling_factor, inplace=False):
                     this_node = np
             else:
                 new_parents[this_node] = None
-                break
-
+                break    
     new_nodes = df.nodes[
-        [n.treenode_id in new_parents for n in df.nodes.itertuples()]]
-    new_nodes.parent_id = [new_parents[n.treenode_id]
-                           for n in new_nodes.itertuples()]
+        [tn in new_parents for tn in df.nodes.treenode_id]].copy()    
+    new_nodes.loc[:,'parent_id'] = [new_parents[tn]
+                           for tn in new_nodes.treenode_id]    
 
     # We have to temporarily set parent of root node from 1 to an integer
-    root_index = new_nodes[new_nodes.parent_id.isnull()].index[0]
-    new_nodes.loc[root_index, 'parent_id'] = 0
-
-    new_nodes.parent_id = new_nodes.parent_id.values.astype(
+    root_index = new_nodes[new_nodes.parent_id.isnull()].index[0]    
+    new_nodes.loc[root_index, 'parent_id'] = 0    
+    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(
         int)  # first convert everything to int
-    new_nodes.parent_id = new_nodes.parent_id.values.astype(
+    
+    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(
         object)  # then back to object so that we can add a 'None'
-
+    
     # Reassign parent_id None to root node
     new_nodes.loc[root_index, 'parent_id'] = None
-
+    
     module_logger.info('Nodes before/after: %i/%i ' %
                        (len(df.nodes), len(new_nodes)))
 
@@ -331,7 +330,8 @@ def downsample_neuron(skdata, resampling_factor, inplace=False):
 
 
 def longest_neurite(skdata, root_to_soma=False):
-    """ Returns a neuron consisting only of the longest neurite
+    """ Returns a neuron consisting only of the longest neurite (based on 
+    geodesic distance)
 
     Parameters
     ----------
@@ -444,7 +444,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
             new_root = df.tags[new_root][0]
 
     if df.nodes.set_index('treenode_id').ix[new_root].parent_id == None:
-        module_logger.warning('New root is old root - skipping')
+        module_logger.info('New root == old root! No need to reroot.')
         if not inplace:
             return df
         else:
@@ -550,16 +550,14 @@ def cut_neuron(skdata, cut_node, g=None):
 
     Examples
     --------
-    >>> #Example for multiple cuts 
-    >>> from pymaid.igraph_catmaid import igraph_catmaid.neuron2graph
-    >>> from pymaid.morpho import cut_neuron2
-    >>> from pymaid.pymaid import pymaid.get_neuron, CatmaidInstance
-    >>> remote_instance = CatmaidInstance( url, http_user, http_pw, token )
-    >>> skeleton_dataframe =pymaid.get_neuron(skeleton_id,remote_instance)   
-    >>> #First cut
+    >>> # Example for multiple cuts 
+    >>> import pymaid    
+    >>> remote_instance = pymaid.CatmaidInstance( url, http_user, http_pw, token )
+    >>> skeleton_dataframe = pymaid.get_neuron(skeleton_id,remote_instance)   
+    >>> # First cut
     >>> nA, nB = cut_neuron2( skeleton_data, cut_node1 )
-    >>> #Second cut
-    >>> nA, nB = cut_neuron2( skeleton_data, cut_node2 )  
+    >>> # Second cut
+    >>> nD, nE = cut_neuron2( nA, cut_node2 )  
     """
     start_time = time.time()
 
@@ -1068,7 +1066,7 @@ def calc_strahler_index(skdata, return_dict=False):
     skdata :      {CatmaidNeuron, CatmaidNeuronList}       
                   E.g. from  ``pymaid.pymaid.get_neuron()``
     return_dict : bool, optional
-                  If True, a dict is returned instead of the dataframe. 
+                  If True, a dict is returned instead of the CatmaidNeuron/List. 
 
     Returns
     -------
@@ -1141,7 +1139,7 @@ def calc_strahler_index(skdata, return_dict=False):
             nodes_processed.append(this_node)
             starting_points_done.append(this_node)
 
-            # Now walk down this spone
+            # Now walk down this spine
             # Find parent
             spine = [this_node]
 
@@ -1197,7 +1195,7 @@ def calc_strahler_index(skdata, return_dict=False):
 
 
 def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, force_strahler_update=False):
-    """ Prune neuron based on strahler order
+    """ Prune neuron based on strahler order.
 
     Parameters
     ----------
@@ -1211,7 +1209,8 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
     reroot_soma :   bool, optional
                     If True, neuron will be rerooted to its soma
     inplace :       bool, optional
-                    If False, pruning is performed on copy of original neuron.    
+                    If False, pruning is performed on copy of original neuron
+                    which is then returned.    
 
     Returns
     -------
@@ -1350,7 +1349,7 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
     >>> # Neuron to check
     >>> n = pymaid.get_neuron('name:PN unknown glomerulus', remote_instance = remote_instance )
     >>> # Get intersections
-    >>> res = morpho.in_volume( n, right_gloms, remote_instance = remote_instance )
+    >>> res = pymaid.in_volume( n, right_gloms, remote_instance = remote_instance )
     >>> # Extract cable
     >>> cable = { v : res[v].cable_length for v in res  }
     >>> # Plot graph

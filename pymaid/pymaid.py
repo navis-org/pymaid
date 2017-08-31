@@ -19,14 +19,14 @@
 
 Examples
 --------
->>> from pymaid.pymaid import CatmaidInstance, get_neuron
+>>> import pymaid
 >>> # HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
 ... # http authentification
->>> myInstance = CatmaidInstance(   'www.your.catmaid-server.org' , 
-...                                 'HTTP_USER' , 
-...                                 'HTTP_PASSWORD', 
-...                                 'TOKEN' )
->>> neuron_list = get_neuron ( ['12345','67890'] , myInstance )
+>>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
+...                                      'HTTP_USER' , 
+...                                      'HTTP_PASSWORD', 
+...                                      'TOKEN' )
+>>> neuron_list = pymaid.get_neuron ( ['12345','67890'] , myInstance )
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
 neuron_name                       Example neuron name
@@ -128,22 +128,17 @@ class CatmaidInstance:
     data, here is how it goes:
 
     >>> # 1.) Fetch raw skeleton data for a single neuron
-    >>> from pymaid.pymaid import CatmaidInstance
-    >>> myInstance = CatmaidInstance(   'www.your.catmaid-server.org', 
-    ...                                 'user', 
-    ...                                 'password', 
-    ...                                 'token' 
-    ...                             )
+    >>> import pymaid
+    >>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
+    ...                                      'user', 
+    ...                                      'password', 
+    ...                                      'token' 
+    ...                                     )
     >>> skeleton_id = 12345
     >>> 3d_skeleton_url = myInstance._get_compact_skeleton_url( skeleton_id )
     >>> raw_data = myInstance.fetch( 3d_skeleton_url )
-    >>> # 2.) Use wrapper to generate CatmaidNeuron objects
-    >>> from pymaid.pymaid import CatmaidInstance, get_neuron
-    >>> myInstance = CatmaidInstance(   'www.your.catmaid-server.org', 
-    ...                                 'user', 
-    ...                                 'password', 
-    ...                                 'token' )
-    >>> neuron_list = get_neuron ( ['12345','67890'] , myInstance )    
+    >>> # 2.) Alternatively, use wrapper which returns CatmaidNeuron objects        
+    >>> neuron_list = pymaid.get_neuron ( skeleton_id , myInstance )    
     >>> # Print summary
     >>> print(neuron_list)
     """
@@ -2476,7 +2471,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     Examples
     --------
     Use this to clean up end-related tags from non-end treenodes
-    >>> from pymaid import pymaid
+    >>> import pymaid
     >>> # Load neuron
     >>> n = pymaid.get_neuron( 16 )
     >>> # Get non-end nodes 
@@ -3123,7 +3118,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     Examples
     --------
     >>> import matplotlib.pyplot as plt
-    >>> from pymaid import pymaid
+    >>> import pymaid
     >>> rm = pymaid.CatmaidInstance(    'server_url', 
     ...                                 'http_user',
     ...                                 'http_pw',
@@ -4045,7 +4040,7 @@ def eval_skids(x, remote_instance=None):
                 skids += temp
             else:
                 skids.append(temp)
-        return list(set(skids))
+        return sorted(set(skids), key=skids.index)
     elif isinstance(x, core.CatmaidNeuron):
         return [x.skeleton_id]
     elif isinstance(x, core.CatmaidNeuronList):

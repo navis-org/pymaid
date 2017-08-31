@@ -23,8 +23,7 @@ See https://github.com/jefferis and https://github.com/alexanderbates
 
 Examples
 --------
->>> from pymaid import pymaid
->>> from pymaid import rmaid
+>>> import pymaid
 >>> import matplotlib.pyplot as plt
 >>> from rpy2.robjects.packages import importr
 >>> #Load nat as module
@@ -33,17 +32,17 @@ Examples
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 >>> #Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
->>> n = pymaid.pymaid.get_neuron( skeleton_id, rm )
+>>> n = pymaid.get_neuron( skeleton_id, rm )
 >>> #Initialize R's rcatmaid 
->>> rcatmaid = rmaid.init_rcatmaid( rm )
+>>> rcatmaid = pymaid.init_rcatmaid( rm )
 >>> #Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
->>> n_r = rmaid.neuron2r( n.ix[0] )
+>>> n_r = pymaid.neuron2r( n.ix[0] )
 >>> #Use nat to prune the neuron
 >>> n_pruned = nat.prune_strahler( n_r )
 >>> #Convert back to pymaid object
->>> n_py = rmaid.neuron2py( n_pruned, rm )
+>>> n_py = pymaid.neuron2py( n_pruned, rm )
 >>> #Nblast pruned neuron (assumes FlyCircuit database is saved locally)
->>> results = rmaid.nblast( n_pruned )
+>>> results = pymaid.nblast( n_pruned )
 >>> #Sort results by mu score
 >>> results.sort('mu_score')
 >>> #Plot top hits
@@ -67,13 +66,13 @@ from pymaid import core, pymaid, plotting
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
-if len( module_logger.handlers ) == 0:
+if len(module_logger.handlers) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
+        '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
@@ -83,7 +82,6 @@ from rpy2.robjects import pandas2ri
 
 cl = robjects.r('class')
 names = robjects.r('names')
-
 
 try:
     nat = importr('nat')
@@ -97,7 +95,9 @@ except:
     module_logger.error(
         'R library "nat" not found! Please install from within R.')
 
-__all__ = ['neuron2r','neuron2py','init_rcatmaid','data2py','nbl_results','nblast','nblast_allbyall']
+__all__ = ['neuron2r', 'neuron2py', 'init_rcatmaid',
+           'data2py', 'nbl_results', 'nblast', 'nblast_allbyall']
+
 
 def init_rcatmaid(**kwargs):
     """ This function initializes the R catmaid package from Jefferis 
@@ -118,7 +118,7 @@ def init_rcatmaid(**kwargs):
                         Use this to set http password if no remote_instance 
                         is provided
     authtoken :         str, optional
-                        Use this to set user tokenif no remote_instance is 
+                        Use this to set user token if no remote_instance is 
                         provided
 
     Returns
@@ -540,7 +540,7 @@ def dotprops2py(dp, subset=None):
     return core.dotprops(df)
 
 
-def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=False):
+def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_count(), UseAlpha=False):
     """ Wrapper to use R's nat:nblast_allbyall (https://github.com/jefferislab/nat.nblast/). 
 
     Parameters
@@ -554,8 +554,8 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
                         Only neccessary if only skeleton IDs are provided
     normalize :     bool, optional
                     If true, matrix is normalized using z-score.
-    ncores :        int, optional
-                    Number of cores to use for nblasting. Default = 4
+    n_cores :       int, optional
+                    Number of cores to use for nblasting. Default is os.cpu_count()
     UseAlpha :      bool, optional
                     Emphasises neurons' straight parts (backbone) over parts 
                     that have lots of branches. Default = False
@@ -569,16 +569,14 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
 
     Examples
     --------
-    >>> from pymaid.pymaid import CatmaidInstance
-    >>> from pymaid import rmaid
+    >>> import pymaid
     >>> import matplotlib.pyplot as plt
     >>> #Initialize connection to Catmaid server
-    >>> rm = CatmaidInstance( url, http_user, http_pw, token )
-    >>> pymaid.remote_instance = rm
+    >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
     >>> #Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> #Blast against each other
-    >>> res = rmaid.nblast_allbyall( nl )
+    >>> res = pymaid.nblast_allbyall( nl )
     >>> # Cluster and create simple dendrogram
     >>> res.cluster(method='ward')
     >>> res.plot_matrix()
@@ -588,10 +586,10 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
     start_time = time.time()
 
     domc = importr('doMC')
-    cores = robjects.r('registerDoMC(%i)' % ncores)
+    cores = robjects.r('registerDoMC(%i)' % n_cores)
 
     doParallel = importr('doParallel')
-    doParallel.registerDoParallel(cores=ncores)
+    doParallel.registerDoParallel(cores=n_cores)
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -656,7 +654,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, ncores=4, UseAlpha=
         return pyclust.clust_results(matrix)
 
 
-def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
+def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
     """ Wrapper to use R's nblast (https://github.com/jefferis/nat). Provide 
     neuron to nblast either as skeleton ID or neuron object. This essentially 
     recapitulates what elmr's (https://github.com/jefferis/elmr) nblast_fafb 
@@ -682,8 +680,9 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
 
                     If not provided, will search for a 'dpscanon.rds' file in 
                     'flycircuit.datadir'.
-    ncores :        int, optional
-                    Number of cores to use for nblasting. 
+    n_cores :       int, optional
+                    Number of cores to use for nblasting. Default is 
+                    os.cpu_count().
     reverse :       bool, optional
                     If True, treats the neuron as NBLAST target rather than 
                     neurons of database. Makes sense for partial 
@@ -708,16 +707,15 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
 
     Examples
     --------
-    >>> from pymaid.pymaid import CatmaidInstance
-    >>> from pymaid import rmaid
+    >>> import pymaid
     >>> #Initialize connection to Catmaid server
     >>> rm = CatmaidInstance( url, http_user, http_pw, token )
     >>> #Blast a neuron against default (FlyCircuit) database
-    >>> nbl = rmaid.nblast( skid = 16, remote_instance = rm  )
+    >>> nbl = pymaid.nblast( skid = 16, remote_instance = rm  )
     >>> #See contents of nblast_res object
     >>> help(nbl)
     >>> #Get results as Pandas Dataframe
-    >>> nbl.res
+    >>> nbl.results
     >>> #Plot histogram of results
     >>> nbl.plot.hist(alpha=.5)
     >>> #Sort and plot the first hits
@@ -728,10 +726,10 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
     start_time = time.time()
 
     domc = importr('doMC')
-    cores = robjects.r('registerDoMC(%i)' % ncores)
+    cores = robjects.r('registerDoMC(%i)' % n_cores)
 
     doParallel = importr('doParallel')
-    doParallel.registerDoParallel(cores=ncores)
+    doParallel.registerDoParallel(cores=n_cores)
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -772,22 +770,23 @@ def nblast(neuron, remote_instance=None, db=None, ncores=4, reverse=False, norma
         if neuron.shape[0] > 1:
             module_logger.warning(
                 'You provided more than a single neuron. Blasting only against the first: %s' % neuron.ix[0].neuron_name)
-        rn = neuron2r(neuron.ix[0], convert_to_um=True)
+        rn = neuron2r(neuron.ix[0], convert_to_um=False)
     elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
-        rn = neuron2r(neuron, convert_to_um=True)
+        rn = neuron2r(neuron, convert_to_um=False)
     elif isinstance(neuron, str) or isinstance(neuron, int):
         if not remote_instance:
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
         rn = neuron2r(pymaid.get_neuron(
-            neuron, remote_instance).ix[0], convert_to_um=True)
+            neuron, remote_instance), convert_to_um=False)
     else:
         module_logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
         return
 
-    # Bring catmaid neuron into reference brain space
+    # Bring catmaid neuron into reference brain space -> this also converts to
+    # um
     if isinstance(reference, str):
         reference = robjects.r(reference)
     rn = nat_templatebrains.xform_brain(
@@ -863,7 +862,7 @@ class nbl_results:
 
     Attributes
     ----------
-    res :       pandas.Dataframe 
+    results :   pandas.Dataframe 
                 Contains top N results
     sc :        Robject
                 Contains original RNblast forward scores 
@@ -882,18 +881,23 @@ class nbl_results:
 
     Examples
     --------
-    >>> #Blast neuron by skeleton ID
-    >>> nbl = rmaid.nblast( skid, remote_instance = rm )
-    >>> #Sort results by mu_score
-    >>> nbl.res.sort( 'mu_score' )
-    >>> #Show table
-    >>> nbl.res
-    >>> #3D plot top 5 hits using vispy
+    >>> import pymaid
+    >>> # Blast neuron by skeleton ID
+    >>> nbl = pymaid.nblast( skid, remote_instance = rm )
+    >>> # Sort results by mu_score
+    >>> nbl.sort( 'mu_score' )
+    >>> # Show table
+    >>> nbl.results
+    >>> # 3D plot top 5 hits using vispy
     >>> canvas, view = nbl.plot(hits=5)
+    >>> # Show distribution of results
+    >>> import matplotlib.pyplot as plt
+    >>> nbl.results.hist( layout=(3,1), sharex=True)
+    >>> plt.show()
     """
 
     def __init__(self, results, sc, scr, neuron, xdp, dps_db, nblast_param):
-        self.res = results  # this is pandas Dataframe holding top N results
+        self.results = results  # this is pandas Dataframe holding top N results
         self.sc = sc  # original Nblast forward scores
         self.scr = scr  # original Nblast reverse scores (Top N only)
         self.neuron = neuron  # the transformed neuron that was nblasted
@@ -903,10 +907,10 @@ class nbl_results:
         self.date = datetime.now()  # time of nblasting
 
     def sort(self, columns):
-        self.res.sort_values(columns, inplace=True, ascending=False)
-        self.res.reset_index(inplace=True, drop=True)
+        self.results.sort_values(columns, inplace=True, ascending=False)
+        self.results.reset_index(inplace=True, drop=True)
 
-    def plot(self, hits=5, plot_neuron=True, plot_brain=True, **kwargs):
+    def plot3d(self, hits=5, plot_neuron=True, plot_brain=True, **kwargs):
         """ Wrapper to plot nblast hits using ``pymaid.plot3d()``
 
         Parameters
@@ -942,8 +946,13 @@ class nbl_results:
 
         nl = self.get_dps(hits)
 
+        n_py = neuron2py(self.neuron)
+        # We have to bring the soma radius down to um -> this may mess
+        # up soma detection elsewhere, so be carefull!
+        n_py.ix[0].nodes.radius /= 1000
+
         # Create colormap with the query neuron being black
-        cmap = {self.neuron[8]: (0, 0, 0)}
+        cmap = { n_py.skeleton_id : (0, 0, 0)}
 
         colors = np.linspace(0, 1, len(nl) + 1)
         colors = np.array([hsv_to_rgb(c, 1, 1) for c in colors])
@@ -960,21 +969,18 @@ class nbl_results:
             faces = faces.tolist()
             # [ [i,i+1,i+2] for i in range( int( len(verts)/3 ) ) ]
 
-            volumes = {self.param['reference'][8][0]
-                : {'verts': verts, 'faces': faces}}
+            volumes = {self.param['reference'][8][0]: {'verts': verts, 'faces': faces}}
         else:
             volumes = []
 
-        kwargs.update({'colormap': cmap,
-                               'downsampling': 1})
+        kwargs.update({'colors': cmap,
+                       'downsampling': 1})
+
+        module_logger.info('Colormap:' + str(cmap) )
 
         if nl:
-            if plot_neuron is True:
-                n_py = neuron2py(self.neuron)
-                # We have to bring the soma radius down to um -> this may mess
-                # up soma detection elsewhere, so be carefull!
-                n_py.ix[0].nodes.radius /= 1000                
-                return plotting.plot3d([n_py, dotprops2py(nl), volumes ], **kwargs)
+            if plot_neuron is True:               
+                return plotting.plot3d([n_py, dotprops2py(nl), volumes], **kwargs)
             else:
                 return plotting.plot3d([dotprops2py(nl), volumes], **kwargs)
 
@@ -1000,12 +1006,12 @@ class nbl_results:
         """
 
         if isinstance(entries, int):
-            return self.db.rx(robjects.StrVector(self.res.ix[:entries - 1].gene_name.tolist()))
+            return self.db.rx(robjects.StrVector(self.results.ix[:entries - 1].gene_name.tolist()))
         elif isinstance(entries, str):
             return self.db.rx(db.rx(entries))
         elif isinstance(entries, list):
             if isinstance(entries[0], int):
-                return self.db.rx(robjects.StrVector(self.res.ix[entries].gene_name.tolist()))
+                return self.db.rx(robjects.StrVector(self.results.ix[entries].gene_name.tolist()))
             elif isinstance(entries[0], str):
                 return self.db.rx(robjects.StrVector(entries))
         else:

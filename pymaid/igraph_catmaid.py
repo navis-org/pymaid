@@ -19,24 +19,23 @@ efficiently calculate distances and cluster synapses.
 
 Examples
 --------
->>> from pymaid import CatmaidInstance, get_neuron
->>> from igraph_catmaid import neuron2graph, cluster_nodes_w_synapses
->>> remote_instance = CatmaidInstance(    'www.your.catmaid-server.org', 
-...                                       'user', 
-...                                       'password', 
-...                                       'token' 
-...                                    )
+>>> import pymaid
+>>> remote_instance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
+...                                           'user', 
+...                                           'password', 
+...                                           'token' 
+...                                         )
 >>> #Example skid
 >>> skid = '12345'
 >>> #Retrieve 3D skeleton data for neuron of interest
->>> skdata = get_neuron ( [ example_skid ], 
-...                             remote_instance, 
+>>> skdata = pymaid.get_neuron ( [ example_skid ], 
+...                              remote_instance, 
 ...                              connector_flag = 1, 
-...                              tag_flag = 0 )[0]
+...                              tag_flag = 0 )
 >>> #Cluster synapses - generates plot and returns clustering for nodes with synapses
->>> syn_linkage = cluster_nodes_w_synapses( skdata, plot_graph = True )
+>>> syn_linkage = pymaid.cluster_nodes_w_synapses( skdata, plot_graph = True )
 >>> #Find the last two clusters (= the two biggest):
->>> clusters = cluster.hierarchy.fcluster( syn_linkage, 2, criterion='maxclust')
+>>> clusters = syn_linkage.get_clusters( 2, criterion='maxclust')
 >>> #Print summary
 >>> print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters), 
 ... len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
@@ -94,9 +93,9 @@ def network2graph(x, remote_instance=None, threshold=1):
 
     Examples
     --------
-    >>> from pymaid import igraph_catmaid, pymaid
+    >>> import pymaid
     >>> import igraph
-    >>> g = igraph_catmaid.network2graph('annotation:large network', remote_instance=rm)
+    >>> g = pymaid.network2graph('annotation:large network', remote_instance=rm)
     >>> # Plot graph
     >>> igraph.plot(g)
     >>> # Plot with edge width
@@ -161,15 +160,15 @@ def matrix2graph(adj_matrix, **kwargs):
 
     Examples
     --------
-    >>> from pymaid import pymaid, cluster, igraph_catmaid
+    >>> import pymaid
     >>> from igraph import plot as gplot
     >>> remote_instance = pymaid.CatmaidInstance(   URL, 
     ...                                             HTTP_USER, 
     ...                                             HTTP_PW, 
     ...                                             TOKEN )
     >>> neurons = pymaid.get_skids_by_annotation( 'right_pns' ,remote_instance)
-    >>> mat = cluster.matrix2graph(neurons,neurons,remote_instance)
-    >>> g = igraph_catmaid.matrix2graph ( mat )
+    >>> mat = pymaid.matrix2graph(neurons,neurons,remote_instance)
+    >>> g = pymaid.matrix2graph ( mat )
     >>> #Use fruchterman-Reingold algorithm
     >>> layout = g.layout('fr')
     >>> gplot( g, layout = layout )

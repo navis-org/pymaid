@@ -43,10 +43,10 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['create_adjacency_matrix','cluster_by_connectivity','cluster_by_synapse_placement','cluster_xyz','create_adjacency_matrix','group_matrix']
+__all__ = ['adjacency_matrix','cluster_by_connectivity','cluster_by_synapse_placement','cluster_xyz','group_matrix']
 
 
-def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
+def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
     """ Wrapper to generate a matrix for synaptic connections between neuronsA
     -> neuronsB (unidirectional!)
 
@@ -58,12 +58,13 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    n_b            
+    n_b                 optional
                         Target neurons as single or list of either:
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
+                        If not provided, source neurons are also target neurons.
     remote_instance :   CATMAID instance, optional
     syn_cutoff :        int, optional
                         If set, will cut off synapses above given value.                          
@@ -79,6 +80,20 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
     -------
     matrix :          pandas.Dataframe
 
+    Examples
+    --------
+    Generate and plot a adjacency matrix
+    >>> import seaborn as sns
+    >>> import matplotlib.pyplot as plt
+    >>> import pymaid
+    >>> rm = pymaid.CatmaidInstance(url, user, pw,, token)
+    >>> neurons = pymaid.get_neurons('annotation:test')
+    >>> mat = pymaid.adjacency_matrix( neurons )
+    >>> g = sns.heatmap(adj_mat, square=True)
+    >>> g.set_yticklabels(g.get_yticklabels(), rotation = 0, fontsize = 8)
+    >>> g.set_xticklabels(g.get_xticklabels(), rotation = 90, fontsize = 6)
+    >>> plt.show()
+
     """
 
     if remote_instance is None:
@@ -91,6 +106,9 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             raise Exception(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+
+    if not n_b:
+        n_b = n_a
 
     neuronsA = pymaid.eval_skids(n_a, remote_instance=remote_instance)
     neuronsB = pymaid.eval_skids(n_b, remote_instance=remote_instance)
@@ -148,7 +166,7 @@ def create_adjacency_matrix(n_a, n_b, remote_instance=None, row_groups={}, col_g
                 edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
 
     matrix = pd.DataFrame(
-        np.zeros((len(neuronsA), len(neuronsB))), index=neuronsA, columns=neuronsB)
+        np.zeros((len(neuronsA), len(neuronsB))), index=neuronsA, columns=neuronsB)     
 
     for nA in neuronsA:
         for nB in neuronsB:
@@ -400,12 +418,12 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     module_logger.info('All done.')
 
     # Rename rows and columns
-    dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
+    #dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
     # dist_matrix.index = [ neuron_names[str(n)] for n in dist_matrix.index ]
 
-    results = clust_results(dist_matrix)
+    results = clust_results(dist_matrix, labels = [ neuron_names[str(n)] for n in dist_matrix.columns ] )
 
-    if isinstance(x, CatmaidNeuronList):
+    if isinstance(x, core.CatmaidNeuronList):
         results.neurons = x
 
     return results
@@ -723,11 +741,11 @@ def cluster_xyz(x, labels=None):
     --------
     This examples assumes you understand the basics of using pymaid.
 
-    >>> from pymaid import pymaid, cluster
+    >>> import pymaid
     >>> import matplotlib.pyplot as plt
     >>> pymaid.remote_instance = CatmaidInstance('server','user','pw','token')
     >>> n = pymaid.get_neuron(16)
-    >>> rs = cluster.cluster_xyz(n.connectors, labels=n.connectors.connector_id.tolist())
+    >>> rs = pymaid.cluster_xyz(n.connectors, labels=n.connectors.connector_id.tolist())
     >>> rs.plot_matrix()
     >>> plt.show()
     """
@@ -767,14 +785,13 @@ class clust_results:
 
     Examples
     --------
-    >>> from pymaid import pymaid, rmaid
+    >>> import pymaid
     >>> import matplotlib.pyplot as plt
-    >>> rm = pymaid.CatmaidInstance('server_url','user','password','token')
-    >>> pymaid.remote_instance = rm
+    >>> rm = pymaid.CatmaidInstance('server_url','user','password','token')    
     >>> #Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> #Perform all-by-all nblast
-    >>> res = rmaid.nblast_allbyall( nl )
+    >>> res = pymaid.nblast_allbyall( nl )
     >>> #res is a clust_results object
     >>> res.plot_matrix()
     >>> plt.show()
@@ -795,7 +812,27 @@ class clust_results:
             self.cluster()
             return self.linkage
         elif key in ['leafs', 'leaves']:
-            return [self.mat.columns.tolist()[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
+            return self.get_leafs()
+
+    def get_leafs(self, use_labels=False):
+        """ Use to retrieve labels.
+
+        Parameters
+        ----------
+        use_labels :    bool, optional
+                        If True, self.labels will be returned. If False, will
+                        use either columns (if matrix is pandas DataFrame)
+                        or indices (if matrix is np.ndarray)
+        """
+
+        if isinstance(self.mat, pd.DataFrame):
+            if use_labels:
+                return [self.labels[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
+            else:
+                return [self.mat.columns.tolist()[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
+        else:
+            return scipy.cluster.hierarchy.leaves_list(self.linkage)
+
 
     def cluster(self, method='ward'):
         """ Cluster distance matrix. This will automatically be called when
@@ -810,7 +847,7 @@ class clust_results:
 
         self.linkage = scipy.cluster.hierarchy.linkage(self.mat, method=method)
 
-    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None):
+    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None):
         """ Plot dendrogram using matplotlib
 
         Parameters
@@ -826,7 +863,9 @@ class clust_results:
         if not labels:
             labels = self.labels
 
-        plt.figure()
+        if not fig:
+            fig = plt.figure()
+
         dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
                                           color_threshold=color_threshold,
                                           labels=labels,
@@ -837,6 +876,8 @@ class clust_results:
 
         if return_dendrogram:
             return dn
+        else:
+            return fig
 
     def plot_matrix2(self):
         """ Plot distance matrix and dendrogram using seaborn. This package
@@ -963,7 +1004,7 @@ class clust_results:
                     {'skeleton_id': (r,g,b),...}           
         """
 
-        cl = self.get_clusters(k, criterion, use_labels=False)
+        cl = self.get_clusters(k, criterion, return_type='indices')
 
         cl = [[self.mat.index.tolist()[i] for i in l] for l in cl]
 
@@ -972,20 +1013,22 @@ class clust_results:
 
         return {n: colors[i] for i in range(len(cl)) for n in cl[i]}
 
-    def get_clusters(self, k, criterion='maxclust', use_labels=True):
+    def get_clusters(self, k, criterion='maxclust', return_type='labels'):
         """ Wrapper for cluster.hierarchy.fcluster to get clusters.
 
         Parameters
         ----------
-        k :         {int, float}
-        criterion : str, optional
-                    Either 'maxclust' or 'distance'. If maxclust, k clusters
-                    will be formed. If distance, clusters will be created at
-                    threshold k.
-        use_labels : bool, optional
-                     If true and labels have been provided, they will be used
-                     to return clusters. Otherwise, indices of the original
-                     matrix (self.mat) is returned.    
+        k :             {int, float}
+        criterion :     str, optional
+                        Either 'maxclust' or 'distance'. If maxclust, k 
+                        clusters will be formed. If distance, clusters will be 
+                        created at threshold k.
+        return_type :   {'labels','indices','columns','rows'}
+                        Determines what to construct the clusters of. 'labels'
+                        only works if labels are provided. 'indices' refers
+                        to index in distance matrix. 'columns'/'rows' works
+                        if distance matrix is pandas DataFrame
+                        
 
         Returns
         -------
@@ -995,7 +1038,11 @@ class clust_results:
 
         cl = scipy.cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
 
-        if self.labels and use_labels:
+        if self.labels and return_type.lower()=='labels':
             return [[self.labels[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
+        elif return_type.lower() == 'rows':
+            return [[self.mat.columns.tolist()[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
+        elif return_type.lower() == 'columns':
+            return [[self.mat.index.tolist()[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
         else:
             return [[j for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]

@@ -123,7 +123,7 @@ Functions to plot neurons:
 
 Functions for clustering:
 
-- :func:`pymaid.cluster.create_adjacency_matrix`: create a Pandas dataframe containing the adjacency matrix for two sets of neurons
+- :func:`pymaid.cluster.adjacency_matrix`: create a Pandas dataframe containing the adjacency matrix for two sets of neurons
 - :func:`pymaid.cluster.cluster_by_connectivity`: returns distance matrix based on connectivity similarity (Jarrell et al., 2012)
 - :func:`pymaid.cluster.group_matrix`: groups matrix by columns or rows - use to e.g. collapse connectivity matrix into groups of neurons
 - :func:`pymaid.cluster.cluster_xyz`: cluster points (synapses, nodes) based on eucledian distance

@@ -19,11 +19,11 @@ neurons.
 
 Examples
 --------
->>> from pymaid import pymaid, user_stats
->>> myInstance = CatmaidInstance(   'www.your.catmaid-server.org' , 
-...                                 'HTTP_USER' , 
-...                                 'HTTP_PASSWORD', 
-...                                 'TOKEN' )
+>>> import pymaid
+>>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
+...                                      'HTTP_USER' , 
+...                                      'HTTP_PASSWORD', 
+...                                      'TOKEN' )
 >>> skeleton_ids = pymaid.get_skids_by_annotation('Hugin')
 >>> cont = user_stats.get_user_contributions( skeleton_ids, 
 ...                                           remote_instance = myInstance)
@@ -35,8 +35,8 @@ Examples
 3              Li   1244            5            45
 ...
 >>> # Get the time that each user has invested
->>> time_inv = user_stats.get_time_invested(  skeleton_ids,
-...                                           remote_instance = myInstance )
+>>> time_inv = pymaid.get_time_invested(  skeleton_ids,
+...                                       remote_instance = myInstance )
 >>> time_inv
             user  total  creation  edition  review
 0       Schlegel   4649      3224     2151    1204
@@ -152,7 +152,7 @@ def get_user_contributions(x, remote_instance=None):
     return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
-def get_time_invested(x, remote_instance, interval=1, minimum_actions=15):
+def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, treenodes=True, connectors=True):
     """ Takes a list of skeleton IDs and calculates the time each user has 
     spent working on this set of neurons.
 
@@ -171,6 +171,10 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=15):
     minimum_actions :  int, optional
                        Minimum number of actions per bin to be counted as 
                        active.
+    treenodes :        bool, optional
+                       If False, treenodes will not be taken into account
+    connectors :       bool, optional
+                       If False, connectors will not be taken into account
 
     Returns
     -------
@@ -226,8 +230,10 @@ def get_time_invested(x, remote_instance, interval=1, minimum_actions=15):
     node_ids = []
     connector_ids = []
     for n in skdata.itertuples():
-        node_ids += n.nodes.treenode_id.tolist()
-        connector_ids += n.connectors.connector_id.tolist()
+        if treenodes:
+            node_ids += n.nodes.treenode_id.tolist()
+        if connectors:
+            connector_ids += n.connectors.connector_id.tolist()
 
     # Get node details
     node_details = get_node_user_details( 

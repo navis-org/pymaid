@@ -55,7 +55,7 @@ Installing from source
  https://github.com/schlegelp/PyMaid/tree/master/dist
 
 2. Unpack and change directory to the source directory
- (it should have the files README.txt and setup.py).
+ (the one with setup.py).
 
 3. Run :samp:`python setup.py install` to build and install
 

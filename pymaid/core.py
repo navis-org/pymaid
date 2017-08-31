@@ -121,12 +121,11 @@ class CatmaidNeuron:
 
     Examples
     --------    
-    >>> from pymaid.core import CatmaidNeuron
-    >>> from pymaid.pymaid import CatmaidInstance
+    >>> import pymaid    
     >>> # Initialize a new neuron
-    >>> n = CatmaidNeuron( 123456 ) 
+    >>> n = pymaid.CatmaidNeuron( 123456 ) 
     >>> # Initialize Catmaid connections
-    >>> rm = CatmaidInstance(server_url, http_user, http_pw, token) 
+    >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token) 
     >>> # Add CatmaidInstance to the neuron for convenience    
     >>> n.remote_instance = rm 
     >>> # Retrieve node data from server on-demand
@@ -180,12 +179,20 @@ class CatmaidNeuron:
 
             self.nodes = copy(x.nodes)
             self.connectors = copy(x.connectors)
-
-            self.neuron_name = copy(x.neuron_name)
+            
             self.tags = copy(x.tags)
+
+            # There is no common query for CatmaidNeuron and pd.Series
+            try:
+                self.neuron_name = copy(x.neuron_name)
+            except:
+                pass
 
             if 'igraph' in x.__dict__:
                 self.igraph = x.igraph.copy()
+
+            if 'slabs' in x.__dict__:
+                self.slabs = x.slabs.copy()
 
             if isinstance(x, CatmaidNeuron):
                 # Remote instance will not be copied!
@@ -332,7 +339,8 @@ class CatmaidNeuron:
         return self.igraph
 
     def get_slabs(self):
-        """Generate slabs from neuron"""
+        """Generate slabs for neuron"""
+        module_logger.debug('Generating slabs for neuron %s' % str(self.skeleton_id))
         self.slabs = morpho._generate_slabs(self)
         return self.slabs
 
@@ -764,9 +772,9 @@ class CatmaidNeuronList:
     Examples
     --------
     >>> # Initialize with just a Skeleton ID 
-    >>> nl = CatmaidNeuronList( [ 123456, 45677 ] )
+    >>> nl = pymaid.CatmaidNeuronList( [ 123456, 45677 ] )
     >>> # Add CatmaidInstance to neurons in neuronlist
-    >>> rm = CatmaidInstance(server_url, http_user, http_pw, token)
+    >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token)
     >>> nl.set_remote_instance( rm )
     >>> # Retrieve review status from server on-demand
     >>> nl.review_status
@@ -843,7 +851,7 @@ class CatmaidNeuronList:
             pool = mp.Pool(self.n_cores)            
             converted = list(tqdm( pool.imap( self._convert_helper, to_convert, chunksize=10 ), total=len(to_convert), desc='Making neurons' ))
             pool.close()
-            pool.join()  
+            pool.join()
 
             for i,c in enumerate(to_convert):
                 self.neurons[ c[2] ] = converted[ i ]
@@ -986,9 +994,12 @@ class CatmaidNeuronList:
 
         elif key == '_remote_instance':
             all_instances = [
-                n._remote_instance for n in self.neurons if n._remote_instance != None]
+                n._remote_instance for n in self.neurons if n._remote_instance != None]            
+
             if len(set(all_instances)) > 1:
-                module_logger.warning(
+                # Note that multiprocessing causes remote_instances to be pickled
+                # and thus not be the same anymore
+                module_logger.debug(
                     'Neurons are using multiple remote_instances! Returning first entry.')
             elif len(set(all_instances)) == 0:
                 raise Exception(
@@ -1246,6 +1257,29 @@ class CatmaidNeuronList:
                     n.neuron_name = names[str(n.skeleton_id)]
                 except:
                     pass
+
+    def _generate_slabs(self):
+        """ Helper function to use multiprocessing to generate slabs for all
+        neurons. This will NOT force update of existing slabs! This is about
+        1.5X faster than calling them individually on a 4 core system.
+        """
+
+        to_retrieve = [ n for n in self.neurons if 'slabs' not in n.__dict__ ]
+        to_retrieve_ix = [ i for i,n in enumerate(self.neurons) if 'slabs' not in n.__dict__ ]
+
+        pool = mp.Pool(self.n_cores)        
+        update = list(tqdm( pool.imap( self._generate_slabs_helper, to_retrieve, chunksize=10 ), total=len(to_retrieve), desc='Gen. slabs' ))
+        pool.close()
+        pool.join()        
+
+        for ix,n in zip(to_retrieve_ix,update):
+            self.neurons[ ix ] = n
+
+    def _generate_slabs_helper(self, x):
+        """ Helper function to parallelise basic operations"""   
+        if 'slabs' not in x.__dict__:         
+            _ = x.slabs        
+        return x      
 
     def reload(self):
         """ Update neuron skeletons."""

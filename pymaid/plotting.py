@@ -635,7 +635,7 @@ def plot3d(x, *args, **kwargs):
     >>> # This plots two neuronlists, two volumes and a single neuron
     >>> pymaid.plot3d( [ nl1, nl2, vol, 'v13.AL_R', 233007 ] )    
     >>> # Pass kwargs
-    >>> plpymaidot.plot3d(nl1, connectors=True, clear3d=True, )     
+    >>> pymaid.plot3d(nl1, connectors=True, clear3d=True, )     
     """
 
     def _plot3d_vispy():
@@ -899,6 +899,10 @@ def plot3d(x, *args, **kwargs):
         fib_points = _fibonacci_sphere(samples=30)
 
         module_logger.info('Generating traces...')
+
+        #Generate slabs for all neurons at once -> uses multi-cores!
+        skdata._generate_slabs()
+
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
                                 str(neuron.skeleton_id))
@@ -915,15 +919,7 @@ def plot3d(x, *args, **kwargs):
                 if 'type' not in neuron.nodes:
                     morpho.classify_nodes(neuron)
 
-                soma = neuron.nodes[neuron.nodes.radius > 1]
-
-                module_logger.debug('Generating traces...')
-
-                # Now make traces
-                try:
-                    neuron.slabs
-                except:
-                    neuron.slabs = morpho._generate_slabs(neuron)
+                soma = neuron.nodes[neuron.nodes.radius > 1]                
 
                 coords = _slabs_to_coords(neuron, neuron.slabs, invert=True)
 
@@ -1328,7 +1324,7 @@ def plot3d(x, *args, **kwargs):
     if downsampling > 1 and not connectors_only and not skdata.empty:
         module_logger.info('Downsampling neurons...')
         morpho.module_logger.setLevel('ERROR')
-        skdata = morpho.downsample_neuron(skdata, downsampling)
+        skdata.downsample( downsampling )
         morpho.module_logger.setLevel('INFO')
         module_logger.info('Downsampling finished.')
     elif skdata.shape[0] > 100:
@@ -1610,7 +1606,9 @@ def _parse_objects(x,remote_instance=None):
 
     # Collect neuron objects and collate to single Neuronlist
     skdata = core.CatmaidNeuronList([ob for ob in x if isinstance(
-        ob, (pd.DataFrame, pd.Series, core.CatmaidNeuron, core.CatmaidNeuronList))])
+        ob, (pd.DataFrame, pd.Series, core.CatmaidNeuron, core.CatmaidNeuronList)) 
+        and not isinstance(ob, (core.dotprops, core.volume))], # dotprops and volumes are instances of pd.DataFrames
+        make_copy=False)
 
     # Collect dotprops
     dotprops = [ob for ob in x if isinstance(ob,core.dotprops)]
