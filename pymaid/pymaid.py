@@ -61,6 +61,7 @@ import numpy as np
 import datetime
 from tqdm import tqdm, trange
 import sys
+import math
 
 from pymaid import core, morpho, igraph_catmaid
 
@@ -618,7 +619,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     if len(x) > 100:
         module_logger.warning(
-            'Large list of neurons requested - must retrieve %i neurons in bouts of 100.' % len(x))
+            'Large list of neurons requested. Retrieving %i neurons in %i bouts.' % (len(x), math.ceil(len(x)/100)) )
         nl = core.CatmaidNeuronList([])
 
         for i in trange(0, len(x), 100, desc='Bouts'):
@@ -3818,19 +3819,22 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     return g, [[g.vs[i]['node_id'] for i in p] for p in all_paths]
 
 
-def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6)):
+def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), combine_vols=True):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of 
     vertices and faces.
 
     Parameters
     ----------
-    volume_name :       str
-                        Name of the volume to import - must be EXACT!
+    volume_name :       str, list of str
+                        Name(s) of the volume to import - must be EXACT!
     remote_instance :   CATMAID instance, optional
                         Either pass directly to function or define  
                         globally as ``remote_instance``
     color :             tuple, optional
                         R,G,B,alpha values used by :func:`pymaid.plotting.plot3d`
+    combine_vols :      bool, optional
+                        If True and multiple volumes are requested, the will 
+                        be combined into a single volume. 
 
     Returns
     -------
@@ -3856,6 +3860,13 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6)):
             print(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             return
+
+    if isinstance(volume_name, list):
+        if combine_vols:
+            return core.volume.combine( [ get_volume( v, remote_instance=remote_instance, color=color ) 
+                                        for v in volume_name ], color = color )
+        else:
+            return { v : get_volume( v, remote_instance=remote_instance, color=color ) for v in volume_name }
 
     if not isinstance(volume_name, str):
         raise TypeError('Volume name must be str')

@@ -27,8 +27,7 @@ Neurons and lists of neurons are represented by
 They can be minimally initialized with just skeleton IDs but usually you would
 get them returned from :func:`pymaid.pymaid.get_neuron`.
 
-Data (e.g. nodes, connectors, name, review status, annotation) are r
-etrieved/calculated on-demand the first time they are **explicitly** requested. 
+Data (e.g. nodes, connectors, name, review status, annotation) are retrieved/calculated on-demand the first time they are **explicitly** requested. 
 CatmaidNeuronList also allows indexing similar to pandas DataFrames 
 (see examples).
 

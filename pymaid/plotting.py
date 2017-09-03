@@ -1233,7 +1233,10 @@ def plot3d(x, *args, **kwargs):
         return
 
     if not remote_instance and isinstance(skdata, core.CatmaidNeuronList):
-        remote_instance = skdata._remote_instance
+        try:
+            remote_instance = skdata._remote_instance
+        except:
+            pass
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -1269,11 +1272,14 @@ def plot3d(x, *args, **kwargs):
     elif isinstance(color,str):
         color = tuple( [ int(c *255) for c in mcl.to_rgb(color) ] )
         colormap = {n: color for n in skdata.skeleton_id.tolist()}
+    else:
+        colormap = {}
 
     # Make sure colors are 0-255
-    if max([ v for n in colormap for v in colormap[n] ]) <= 1:
-        module_logger.warning('Looks like RGB values are 0-1. Converting to 0-255.')
-        colormap = { n : tuple( [ int(v * 255) for v in colormap[n] ] ) for n in colormap }   
+    if colormap:
+        if max([ v for n in colormap for v in colormap[n] ]) <= 1:
+            module_logger.warning('Looks like RGB values are 0-1. Converting to 0-255.')
+            colormap = { n : tuple( [ int(v * 255) for v in colormap[n] ] ) for n in colormap }   
 
     # Get and prepare volumes
     volumes_data = {}
@@ -1285,10 +1291,9 @@ def plot3d(x, *args, **kwargs):
                 return
             else:
                 v = pymaid.get_volume(v, remote_instance)
-
-        if verts:
-            volumes_data[ v['name'] ] = {'verts': v['vertices'],
-                               'faces': v['faces'], 'color': v['color']}
+        
+        volumes_data[ v['name'] ] = {'verts': v['vertices'],
+                           'faces': v['faces'], 'color': v['color']}
 
     # Get boundaries of what to plot
     min_x = min([n.nodes.x.min() for n in skdata.itertuples()] + 
@@ -1605,10 +1610,12 @@ def _parse_objects(x,remote_instance=None):
             pass
 
     # Collect neuron objects and collate to single Neuronlist
-    skdata = core.CatmaidNeuronList([ob for ob in x if isinstance(
+    neuron_obj = [ob for ob in x if isinstance(
         ob, (pd.DataFrame, pd.Series, core.CatmaidNeuron, core.CatmaidNeuronList)) 
-        and not isinstance(ob, (core.dotprops, core.volume))], # dotprops and volumes are instances of pd.DataFrames
-        make_copy=False)
+        and not isinstance(ob, (core.dotprops, core.volume))] # dotprops and volumes are instances of pd.DataFrames
+    
+    skdata = core.CatmaidNeuronList( neuron_obj, make_copy=False)
+    
 
     # Collect dotprops
     dotprops = [ob for ob in x if isinstance(ob,core.dotprops)]

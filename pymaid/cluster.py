@@ -64,7 +64,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-                        If not provided, source neurons are also target neurons.
+                        If not provided, source neurons = target neurons.
     remote_instance :   CATMAID instance, optional
     syn_cutoff :        int, optional
                         If set, will cut off synapses above given value.                          
@@ -72,7 +72,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                         If set, will cut off synapses below given value.                      
     row_groups :        dict, optional
                         Use to collapse neuronsA/B into groups:
-                        ``{'Group1': [skid1,skid2,skid3], 'Group2' : [] }``
+                        ``{'Group1': [skid1,skid2], 'Group2' : [..], .. }``
     col_groups :        dict, optional
                         See row_groups
 
@@ -181,7 +181,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
             if e < syn_threshold:
                 e = 0
 
-            matrix[nB][nA] = e
+            matrix.loc[ nA, nB ] = e
 
     module_logger.info('Finished')
 
@@ -681,7 +681,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
 
     Returns
     -------
-    :class:`pymaid.cluster.cluster_res'
+    :class:`pymaid.cluster.clust_results'
                 Class that contains distance matrix and methods to plot 
                 dendrograms.
     """         
@@ -1046,3 +1046,44 @@ class clust_results:
             return [[self.mat.index.tolist()[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
         else:
             return [[j for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
+
+    def to_tree(self):
+        """ Turns linkage to ete3 tree. 
+
+        Returns
+        -------
+        ete 3 tree
+        """
+        try:
+            import ete3
+        except:
+            raise ImportError('Please install ete3 package to sue this function.')
+
+        max_dist = self.linkage[-1][2]
+        n_original_obs = self.mat.shape[0] 
+
+        list_of_childs = { n_original_obs+i : e[:2] for i,e in enumerate(self.linkage) }
+        list_of_parents = { int(e[0]) : int(n_original_obs+i) for i,e in enumerate(self.linkage) }
+        list_of_parents.update( { int(e[1]) : int(n_original_obs+i) for i,e in enumerate(self.linkage) } )
+        
+        total_dist = { n_original_obs+i : e[2] for i,e in enumerate(self.linkage) }        
+        # Process total distance into distances between nodes (root = 0)
+        dist_to_parent = { n : max_dist - total_dist[ list_of_parents[n] ] for n in list_of_parents }
+
+        names = { i : n for i,n in enumerate(self.mat.columns.tolist())}       
+
+        # Create empty tree
+        tree = ete3.Tree()
+
+        # Start with root node
+        root = sorted ( list( list_of_childs.keys() ), reverse=True)[0]
+        treenodes = { root : tree.add_child() }
+
+        for k in sorted(list( list_of_childs.keys()), reverse=True):
+            e = list_of_childs[k]
+            treenodes[ e[0] ] = treenodes[k].add_child(dist=dist_to_parent[e[0]], name=names.get(e[0],None) )
+            treenodes[ e[1] ] = treenodes[k].add_child(dist=dist_to_parent[e[1]], name=names.get(e[1],None) )
+
+        return tree
+
+

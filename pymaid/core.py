@@ -455,7 +455,7 @@ class CatmaidNeuron:
 
         if 'nodes' not in self.__dict__:
             self.get_skeleton()
-        return plotting.plot3d(CatmaidNeuronList(self), **kwargs)
+        return plotting.plot3d(CatmaidNeuronList(self, make_copy=False), **kwargs)
 
     def get_name(self, remote_instance=None):
         """Retrieve name of neuron"""
@@ -551,6 +551,22 @@ class CatmaidNeuron:
 
         # Clear temporary attributes
         self._clear_temp_attr()
+
+    def prune_by_volume(self, v):
+        """ Prune neuron by intersection with given volume(s).
+
+        Parameters
+        ----------
+        v :     {str, pymaid.core.volume, list of either}
+                Volume(s) to check for intersection
+        """ 
+        if not isinstance(v, volume):            
+            v = pymaid.get_volume(v, combine_vols=True, remote_instance=self._remote_instance)
+
+        morpho.in_volume(self, v, inplace=True, remote_instance=self._remote_instance)
+
+        # Clear temporary attributes
+        self._clear_temp_attr()        
 
     def reload(self, remote_instance=None):
         """Reload neuron from server. 
@@ -1231,6 +1247,34 @@ class CatmaidNeuronList:
         x[0].prune_by_strahler(to_prune=x[1])                
         return x[0]
 
+    def prune_by_volume(self, v):
+        """ Prune neuron by intersection with given volume(s).
+
+        Parameters
+        ----------
+        v :     {str, pymaid.core.volume, list of either}
+                Volume(s) to check for intersection
+        """ 
+        
+        if not isinstance(v, volume):            
+            v = pymaid.get_volume(v, combine_vols=True) 
+
+        _set_loggers('ERROR')
+
+        pool = mp.Pool(self.n_cores)
+        combinations = [ (n,v) for i,n in enumerate(self.neurons) ]   
+        self.neurons = list(tqdm( pool.imap( self._prune_by_volume_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning' ))
+
+        pool.close()
+        pool.join()
+
+        _set_loggers('INFO')
+
+    def _prune_by_volume_helper(self, x):
+        """ Helper function to parallelise basic operations"""
+        x[0].prune_by_volume(x[1])
+        return x[0]
+
     def get_review(self, skip_existing=False):
         """ Use to get/update review status"""
         to_retrieve = [
@@ -1508,3 +1552,64 @@ class volume(dict):
 
     Attributes could be: .volume, .bbox, .color
     """
+
+    @classmethod
+    def combine(self, x, name='comb_vol', color=(120, 120, 120, .6)):
+        """ Combine volumes into a single one
+
+        Parameters
+        ----------
+        x :     list or dict of volumes
+
+        Returns
+        -------
+        volume
+        """
+
+        if isinstance(x, volume):
+            return x
+
+        if isinstance(x, dict):
+            x = list(x.values())
+
+        if not isinstance(x, list):
+            raise TypeError('x must be list of volumes')
+        elif False in [ isinstance(v, volume) for v in x ]:
+            raise TypeError('x must be list of volumes')
+
+        vertices = []
+        faces = []
+
+        for v in x:
+            offs = len(vertices)
+            vertices += v['vertices']
+            faces += [ [ f[0]+offs, f[1]+offs, f[2]+offs ] for f in v['faces'] ]
+
+        return volume( vertices = vertices, faces = faces, name=name, color=color )
+
+    def plot3d(self, **kwargs):
+        """Plot neuron using pymaid.plot.plot3d()  
+
+        Parameters
+        ----------      
+        **kwargs
+                Will be passed to plot3d() 
+                See help(pymaid.plotting.plot3d) for a list of keywords      
+
+        See Also
+        --------
+        :func:`pymaid.plotting.plot3d` 
+                    Function called to generate 3d plot   
+
+        Examples
+        --------
+        >>> vol = pymaid.get_volume('v13.LH_R')        
+        >>> vol.plot3d( color = (255,0,0) )
+        """
+
+        if 'color' in kwargs:
+            self['color'] = kwargs['color']
+        
+        return plotting.plot3d(self, **kwargs)
+
+

@@ -43,12 +43,6 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-try:
-    from pyoctree import pyoctree
-except:
-    module_logger.error(
-        'Unable to import pyoctree - morpho.in_volume will not work!')
-
 __all__ = ['calc_cable','calc_strahler_index','classify_nodes','cut_neuron','downsample_neuron','in_volume','longest_neurite','prune_by_strahler','reroot_neuron','synapse_root_distances']
 
 def generate_list_of_childs(skdata):
@@ -1304,9 +1298,14 @@ def _walk_to_root(start_node, list_of_parents, visited_nodes):
 
 
 def in_volume(x, volume, remote_instance=None, inplace=False):
-    """ Uses pyoctree to test if points are within a given CATMAID volume.
-    A ray is shot in random direction and checked for intersection with the
-    volume. Odd number of intersections mean point is inside the volume
+    """ Test if points are within a given CATMAID volume.
+
+    Important
+    ---------
+    This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_ 
+    which is only an optional dependency of PyMaid. If pyoctree is not 
+    installed, we will fall back to using scipy ConvexHull instead of ray
+    casting. This is slower and may give wrong positives for concave meshes!
 
     Parameters
     ----------
@@ -1361,7 +1360,7 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
     >>> df.boxplot()
     >>> plt.show()
 
-    """
+    """    
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -1377,16 +1376,7 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
         return data
 
     if isinstance(volume, str):
-        volume = pymaid.get_volume(volume, remote_instance)
-
-    # Create octree
-    tree = pyoctree.PyOctree(np.array(volume['vertices'], dtype=float),
-                             np.array(volume['faces'], dtype=np.int32)
-                             )
-
-    # Generate rays for points
-    mx = np.array(volume['vertices']).max(axis=0)
-    mn = np.array(volume['vertices']).min(axis=0)
+        volume = pymaid.get_volume(volume, remote_instance)        
 
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].as_matrix()
@@ -1401,7 +1391,7 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
                 pass
 
         n.nodes = n.nodes[
-            in_volume(n.nodes[['x', 'y', 'z']].as_matrix(), volume=volume)]
+            in_volume(n.nodes[['x', 'y', 'z']].as_matrix(), volume)]
         n.connectors = n.connectors[
             n.connectors.treenode_id.isin(n.nodes.treenode_id.tolist())]
 
@@ -1419,55 +1409,49 @@ def in_volume(x, volume, remote_instance=None, inplace=False):
             nl = nl.copy()
 
         for n in nl:
-            n = in_volume(n, volume=volume, inplace=True)
+            n = in_volume(n, volume, inplace=True)
 
         if not inplace:
             return nl
     else:
         points = x
+        try:
+            import pyoctree
+            return _in_volume_ray( points, volume )            
+        except:
+            module_logger.warning('Package pyoctree not found. Falling back to ConvexHull.')
+            return _in_volume_convex( points, volume, approximate=False )
 
-        # Rays are along z axis
-        rayPointList = np.array(
-            [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+def _in_volume_ray(points, volume):
+    """ Uses pyoctree's raycsasting to test if points are within a given 
+    CATMAID volume.    
+    """
 
-        # Unfortunately rays are bidirectional -> we have to filter intersections
-        # by those that occur "above" the point
-        intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
-                             2] >= points[k][2]])for k, ray in enumerate(rayPointList)]
+    # Generate rays for points
+    mx = np.array(volume['vertices']).max(axis=0)
+    mn = np.array(volume['vertices']).min(axis=0)
 
-        # Count odd intersection
-        return [i % 2 != 0 for i in intersections]
+    # Create octree
+    tree = pyoctree.PyOctree(np.array(volume['vertices'], dtype=float),
+                             np.array(volume['faces'], dtype=np.int32)
+                             )
+    
+    rayPointList = np.array(
+                [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+
+    # Unfortunately rays are bidirectional -> we have to filter intersections
+    # by those that occur "above" the point
+    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
+                         2] >= points[k][2]])for k, ray in enumerate(rayPointList)]
+
+    # Count odd intersection
+    return [i % 2 != 0 for i in intersections]
 
 
-def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
-    """ DEPCREATED as this works only with convex hulls, not for alpha-shapes 
-    (concave)! Uses scipy to test if points are within a given CATMAID volume.
+def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
+    """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
     convex hull. 
-
-    Parameters
-    ----------
-    points :          list of tuples
-                      Coordinates. Format ``[ ( x, y , z ), [ ... ] ]``. 
-                      Can be numpy array, pandas DataFrame or list
-    volume :          {str, volume dict} 
-                      Name of the CATMAID volume to test or list of vertices 
-                      as returned by ``pymaid.pymaid.get_volume()``
-    remote_instance : CATMAID instance, optional
-                      Pass if volume is a volume name
-    approximate :     bool
-                      if True, bounding box around the volume is used. Will 
-                      speed up calculations a lot! Default = False
-    ignore_axis :     list of integers, optional
-                      Provide axes that should be ignored. Only works when
-                      approximate = True. For example ignore_axis = [0,1]
-                      will ignore x and y axis, and include nodes that fit
-                      within z axis of the bounding box. Default = None
-
-    Returns
-    -------
-    list of bool
-                      True if in volume, False if not
     """
 
     if remote_instance is None:
@@ -1486,9 +1470,11 @@ def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_
         intact_verts = list(intact_hull.vertices)
 
         if isinstance(points, list):
-            points = pd.DataFrame(points)
+            points = np.array(points)
+        elif isinstance(points, pd.DataFrame):
+            points = points.to_matrix()
 
-        return [list(ConvexHull(np.append(verts, list([p]), axis=0)).vertices) == intact_verts for p in points.itertuples(index=False)]
+        return [list(ConvexHull(np.append(verts, list([p]), axis=0)).vertices) == intact_verts for p in points]
     else:
         bbox = [(min([v[0] for v in verts]), max([v[0] for v in verts])),
                 (min([v[1] for v in verts]), max([v[1] for v in verts])),
@@ -1498,4 +1484,4 @@ def _in_volume2(points, volume, remote_instance=None, approximate=False, ignore_
         for a in ignore_axis:
             bbox[a] = (float('-inf'), float('inf'))
 
-        return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points.itertuples(index=False)]
+        return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]

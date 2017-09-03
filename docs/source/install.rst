@@ -128,7 +128,7 @@ Generates PNG images.
   - Docs: https://pythonhosted.org/pypng/
   - Install from PIP: ``pip install pypng``
 
-PyOctree
+PyOctree (optional)
 ********
 Generates octrees from meshes to compute ray casting. Used to check if objects are within volume.
 

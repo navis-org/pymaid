@@ -24,7 +24,6 @@ Examples
 >>> from pymaid import b3d
 >>> # Initialise connection to CATMAID server
 >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
->>> pymaid.remote_instance = rm
 >>> # Load a bunch of neurons
 >>> neuronlist = pymaid.get_neuron('annotation:glomerulus DA1')
 >>> handler = b3d.handler()
@@ -92,11 +91,11 @@ class handler:
 
     Examples
     --------
-    >>> import pymaid
+    >>> # This example assumes you have alread imported and set up pymaid
     >>> # b3d module has to be imported explicitly
     >>> from pymaid import b3d
     >>> # Get some neurons (you have already set up a remote instance?)
-    >>> nl = pymaid.CatmaidNeuronList( [ 12345, 67890 ], remote_instance = rm )
+    >>> nl = pymaid.CatmaidNeuronList( [ 12345, 67890 ] )
     >>> # Initialize handler
     >>> handler = b3d.handler()
     >>> # Add neurons
@@ -432,8 +431,7 @@ class object_list:
     >>> import pymaid
     >>> #b3d module has to be import explicitly
     >>> from pymaid import b3d
-    >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )
-    >>> pymaid.remote_instance = rm
+    >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )    
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> handler = b3d.handler()
     >>> handler.add( nl )

@@ -71,7 +71,7 @@ __all__ = ['network2graph','neuron2graph','matrix2graph','cluster_nodes_w_synaps
 
 
 def network2graph(x, remote_instance=None, threshold=1):
-    """ Generates igraph network object for a set of neurons
+    """ Generates igraph network object
 
     Parameters
     ----------
@@ -81,6 +81,8 @@ def network2graph(x, remote_instance=None, threshold=1):
                          2. neuron name (str, exact match)
                          3. annotation: e.g. 'annotation:PN right'
                          4. CatmaidNeuron or CatmaidNeuronList object
+                         5. Adjacency matrix (pd.DataFrame, rows=sources,
+                            columns=targets)
     remote_instance :   CATMAID instance, optional 
                         Either pass directly to function or define globally 
                         as 'remote_instance'
@@ -102,6 +104,8 @@ def network2graph(x, remote_instance=None, threshold=1):
     >>> igraph.plot(g, **{'edge_width': [ w/10 for w in g.es['weight'] ] })
     >>> # Plot with edge label
     >>> igraph.plot(g, **{'edge_label': g.es['weight'] })
+    >>> # Save as graphml to import into e.g. Cytoscape
+    >>> g.save('graph.graphml')
     """
 
     if remote_instance is None:
@@ -112,22 +116,31 @@ def network2graph(x, remote_instance=None, threshold=1):
         else:
             print(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+            return    
 
-    module_logger.info('Generating graph from skeleton data...')
+    if not isinstance(x, pd.DataFrame):
+        module_logger.info('Generating network from skeleton IDs...')
+        skids = pymaid.eval_skids(x, remote_instance=remote_instance)
+        indices = { int(s): skids.index(s) for s in skids}
 
-    skids = pymaid.eval_skids(x, remote_instance=remote_instance)
-    indices = { int(s): skids.index(s) for s in skids}
+        try:
+            neuron_names = x.neuron_names.tolist()
+        except:
+            names = pymaid.get_names(skids, remote_instance=remote_instance)
+            neuron_names = [names[str(n)] for n in skids]
 
-    try:
-        neuron_names = x.neuron_names.tolist()
-    except:
-        names = pymaid.get_names(skids, remote_instance=remote_instance)
-        neuron_names = [names[str(n)] for n in skids]
+        edges = pymaid.get_edges(skids, remote_instance=remote_instance)
+        edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
+                          for e in edges[edges.weight >= threshold].itertuples()]
+        weight = edges[ edges.weight >= threshold ].weight.tolist()
+    else:
+        module_logger.info('Generating network from adjacancy matrix...')
+        skids = list(set( x.columns.tolist() + x.index.tolist() ))
+        neuron_names = skids
 
-    edges = pymaid.get_edges(skids, remote_instance=remote_instance)
-    edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
-                      for e in edges[edges.weight >= threshold].itertuples()]
+        edges = [ [i,j] for i in x.index.tolist() for j in x.columns.tolist() if x.ix[i][j] >= threshold ]       
+        edges_by_index = [ [ skids.index(e[0]), skids.index(e[1]) ] for e in edges ] 
+        weight = [ x.ix[i][j] for i in range( x.shape[0] ) for j in range( x.shape[1]) if x.ix[i][j] >= threshold ]
 
     # Generate graph and assign custom properties
     g = Graph(directed=True)
@@ -136,7 +149,7 @@ def network2graph(x, remote_instance=None, threshold=1):
 
     g.vs['node_id'] = skids
     g.vs['neuron_name'] = g.vs['label'] = neuron_names
-    g.es['weight'] = edges.weight.tolist()
+    g.es['weight'] = weight
 
     return g
 

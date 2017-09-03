@@ -11,7 +11,7 @@ PyOctree fails compiling because of 'fopenmp'
 Solution: 
 +++++++++
 1. Download and extract the PyOctree Github `repository <https://github.com/mhogg/pyoctree>`_. 
-2. Open ``setup.py`` and set ``BUILD_ARGS['mingw32'] = [ ]`` and ``LINK_ARGS['unix']     = [ ]``
+2. Open ``setup.py`` and set ``BUILD_ARGS['mingw32'] = [ ]`` and ``LINK_ARGS['unix'] = [ ]``
 3. Open a terminal, navigate to the directory containing ``setup.py`` and run ``python setup.py install`` (if your default Python is 2.7, use ``python3``)
 
 
