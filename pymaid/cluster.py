@@ -107,7 +107,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
             raise Exception(
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
-    if not n_b:
+    if n_b is None:
         n_b = n_a
 
     neuronsA = pymaid.eval_skids(n_a, remote_instance=remote_instance)
@@ -201,7 +201,7 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
                         ``{ 'group name' : [ member1, member2, ... ], .. }``
     col_groups :        dict, optional
                         See row_groups.
-    method :            {'AVERAGE', 'MAX', 'MIN'}
+    method :            {'AVERAGE', 'MAX', 'MIN','SUM'}
                         Method by which values are collapsed into groups.
 
     Returns
@@ -233,8 +233,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
         clean_col_groups[col] = [c for c in col_groups[
             col] if c in mat.columns.tolist()]
 
-    module_logger.warning(
-        'Unable to find the following indices - will skip them: %s' % ', '.join(list(set(not_found))))
+    if not found:
+        module_logger.warning(
+            'Unable to find the following indices - will skip them: %s' % ', '.join(list(set(not_found))))
 
     new_mat = pd.DataFrame(np.zeros((len(clean_row_groups), len(
         clean_col_groups))), index=clean_row_groups.keys(), columns=clean_col_groups.keys())
@@ -247,10 +248,14 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
             try:
                 if method == 'AVERAGE':
                     new_mat.ix[row][col] = sum(flat_values) / len(flat_values)
-                if method == 'MAX':
+                elif method == 'MAX':
                     new_mat.ix[row][col] = max(flat_values)
-                if method == 'MIN':
+                elif method == 'MIN':
                     new_mat.ix[row][col] = min(flat_values)
+                elif method == 'SUM':
+                    new_mat.ix[row][col] = sum(flat_values)
+                else:
+                    raise ValueError('Unknown method provided.')
             except:
                 new_mat.ix[row][col] = 0
 
@@ -380,7 +385,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         pool = mp.Pool()
         combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB]) for nA in neurons for nB in neurons ]   
 
-        matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d ))
+        matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d, disable=module_logger.getEffectiveLevel()>=40 ))
 
         pool.close()
         pool.join()    
@@ -705,7 +710,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
     pool = mp.Pool()
     combinations = [ (nA,nB,sigma,omega,mu_score) for nA in neurons for nB in neurons ]   
 
-    scores = list(tqdm( pool.imap( _unpack_synapse_helper, combinations, chunksize=10 ), total=len(combinations), desc='Processing' ))
+    scores = list(tqdm( pool.imap( _unpack_synapse_helper, combinations, chunksize=10 ), total=len(combinations), desc='Processing', disable=module_logger.getEffectiveLevel()>=40 ))
 
     pool.close()
     pool.join()    
@@ -981,7 +986,7 @@ class clust_results:
                 'This works only with cluster results from neurons')
             return None       
 
-        cmap = get_colormap(self, k=k, criterion=criterion)
+        cmap = self.get_colormap(k=k, criterion=criterion)
 
         kwargs.update({'color': cmap})
 
@@ -1027,8 +1032,7 @@ class clust_results:
                         Determines what to construct the clusters of. 'labels'
                         only works if labels are provided. 'indices' refers
                         to index in distance matrix. 'columns'/'rows' works
-                        if distance matrix is pandas DataFrame
-                        
+                        if distance matrix is pandas DataFrame                        
 
         Returns
         -------

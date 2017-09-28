@@ -74,7 +74,8 @@ __all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_
             'get_node_user_details','get_nodes_in_volume','get_partners','get_partners_in_volume',
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
-            'get_user_list','get_volume','has_soma','neuron_exists','delete_tags']
+            'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
+            'get_segments']
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -457,7 +458,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=N
     start = cur_time = time.time()
     joined = 0
 
-    with tqdm(total=len(threads), desc='Fetching %s' % desc) as pbar:
+    with tqdm(total=len(threads), desc='Fetching %s' % desc, disable=module_logger.getEffectiveLevel()>=40 ) as pbar:
         while cur_time <= (start + time_out) and len([d for d in data if d is not None]) != len(threads):
             for t in threads:
                 if t in threads_closed:
@@ -605,34 +606,32 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
     if len(x) > 100:
         module_logger.warning(
             'Large list of neurons requested. Retrieving %i neurons in %i bouts.' % (len(x), math.ceil(len(x)/100)) )
-        nl = core.CatmaidNeuronList([])
-
-        for i in trange(0, len(x), 100, desc='Bouts'):
-            nl += get_neuron(x[i:i + 100],
+        
+        df = []
+        for i in trange(0, len(x), 100, desc='Bouts', disable=module_logger.getEffectiveLevel()>=40):
+            df.append( get_neuron(x[i:i + 100],
                              remote_instance=remote_instance,
                              connector_flag=connector_flag,
                              tag_flag=tag_flag,
                              get_history=get_history,
                              get_merge_history=get_merge_history,
                              get_abutting=get_abutting,
-                             return_df=return_df,
+                             return_df=True,
                              **kwargs)
-        return nl
+                     )
+        df = pd.concat(df, ignore_index=True )
+               
+        if not return_df:
+            return core.CatmaidNeuronList(df, remote_instance=remote_instance)
+        else:
+            return df
 
     if not isinstance(x, (list, np.ndarray)):
         to_retrieve = [x]
@@ -799,15 +798,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -816,7 +807,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
     skdata = []
 
-    for s in tqdm(x, desc='Retrieving arbors'):
+    for s in tqdm(x, desc='Retrieving arbors', disable=module_logger.getEffectiveLevel()>=40):
         # Create URL for retrieving example skeleton from server
         remote_compact_arbor_url = remote_instance._get_compact_arbor_url(
             s, node_flag, connector_flag, tag_flag)
@@ -865,7 +856,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    volume :            {str, list of str, core.volume } 
+    volume :            {str, list of str, core.Volume } 
                         Name of the CATMAID volume to test OR volume dict with 
                         {'vertices':[],'faces':[]} as returned by e.g. 
                         :func:`pymaid.pymaid.get_volume()`
@@ -906,17 +897,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                             Get neurons within given volume
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1046,15 +1027,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         except:
             return 0
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1164,15 +1137,7 @@ def get_names(x, remote_instance=None):
                         ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1209,7 +1174,7 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
                         Either pass directly to function or define globally as 
                         ``remote_instance``
     chunk_size :        int, optional
-                        Querying large number of node will result in server 
+                        Querying large number of nodes will result in server 
                         errors. We will thus query them in amenable bouts.
 
 
@@ -1232,15 +1197,7 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
     if type(treenode_ids) != type(list()):
         treenode_ids = [treenode_ids]
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     module_logger.info(
         'Retrieving details for %i nodes...' % len(treenode_ids))
@@ -1249,17 +1206,19 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
 
     data = dict()
 
-    for ix in tqdm(range(0, len(treenode_ids), chunk_size), desc='Bouts'):
-        get_node_details_postdata = dict()
+    with tqdm(total=len(treenode_ids), disable=module_logger.getEffectiveLevel()>=40, desc='Nodes') as pbar:
+        for ix in range(0, len(treenode_ids), chunk_size):    
+            get_node_details_postdata = dict()
 
-        for k, tn in enumerate(treenode_ids[ix:ix + chunk_size]):
-            key = 'node_ids[%i]' % k
-            get_node_details_postdata[key] = tn
+            for k, tn in enumerate(treenode_ids[ix:ix + chunk_size]):
+                key = 'node_ids[%i]' % k
+                get_node_details_postdata[key] = tn
 
-        data.update(remote_instance.fetch(
-            remote_nodes_details_url, get_node_details_postdata
-        )
-        )
+            data.update(remote_instance.fetch(
+                remote_nodes_details_url, get_node_details_postdata
+                                            )
+                        )
+            pbar.update( (ix+1) * chunk_size) 
 
     data_columns = ['creation_time', 'user',  'edition_time',
                     'editor', 'reviewers', 'review_times']
@@ -1313,15 +1272,7 @@ def get_treenode_table(x, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1398,15 +1349,7 @@ def get_edges(x, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1476,15 +1419,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     ``df.connector_id.unique()`` to get a set of unique connector IDs.
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1570,15 +1505,7 @@ def get_connector_details(connector_ids, remote_instance=None):
         ... 2    
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     remote_get_connectors_url = remote_instance._get_connector_details_url()
 
@@ -1642,15 +1569,7 @@ def get_review(x, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1661,14 +1580,20 @@ def get_review(x, remote_instance=None):
 
     get_review_postdata = {}
 
-    for i in range(len(x)):
-        key = 'skeleton_ids[%i]' % i
-        get_review_postdata[key] = str(x[i])
+    names = {}
+    review_status = {}
+    for j in tqdm(range(0,len(x),500), desc='Rev. status'):
+        for i in range(j,j+500):
+            key = 'skeleton_ids[%i]' % i
+            get_review_postdata[key] = str(x[i])
 
-    names = get_names(x, remote_instance)
+        temp_names = get_names(x, remote_instance)
 
-    review_status = remote_instance.fetch(
-        remote_get_reviews_url, get_review_postdata)
+        temp_review_status = remote_instance.fetch(
+            remote_get_reviews_url, get_review_postdata)
+
+        names.update(temp_names)
+        review_status.update(temp_review_status)
 
     df = pd.DataFrame([[s,
                         names[str(s)],
@@ -1706,15 +1631,7 @@ def add_annotations(x, annotations, remote_instance=None):
     Nothing
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -1769,15 +1686,7 @@ def get_user_annotations(x, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -1862,15 +1771,7 @@ def get_annotation_details(x, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     skids = eval_skids(x, remote_instance=remote_instance)
 
@@ -1952,15 +1853,7 @@ def get_annotations(x, remote_instance=None):
                         is slower.
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -2017,15 +1910,7 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
                         ``{ 'annotation_name' : 'annotation_id', ....}``
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     module_logger.debug('Retrieving list of annotations...')
 
@@ -2108,15 +1993,7 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     attribute.
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -2126,10 +2003,11 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     skdata = get_neuron(x, remote_instance=remote_instance,
                         connector_flag=0, tag_flag=1,
                         get_history=False,
+                        return_df = True # no need to make proper neurons
                         )
 
     d = {}
-    for s in skdata:
+    for s in skdata.itertuples():
         if tag:
             if tag in s.tags:
                 tn_with_tag = s.tags['soma']
@@ -2174,15 +2052,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if isinstance(names, str):
         names = [names]
@@ -2233,15 +2103,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
                             ``[skid1, skid2, skid3 ]``
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     module_logger.info(
         'Looking for Annotation(s): ' + str(annotations))
@@ -2308,15 +2170,7 @@ def neuron_exists(x, remote_instance=None):
                         ``{ skid1 : True, skid2 : False, ... }``
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -2355,15 +2209,7 @@ def get_treenode_info(treenode_ids, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if not isinstance(treenode_ids, (list, np.ndarray)):
         treenode_ids = [treenode_ids]
@@ -2409,15 +2255,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if not isinstance(node_ids, (list, np.ndarray)):
         node_ids = [node_ids]
@@ -2488,15 +2326,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if not isinstance(node_list, (list, np.ndarray)):
         node_list = [node_list]
@@ -2569,15 +2399,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if not isinstance(node_list, (list, np.ndarray)):
         node_list = [node_list]
@@ -2605,6 +2427,55 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
                            post_data=post_data, desc='tags')
 
     return d
+
+def get_segments(x, remote_instance=None):
+    """ Retrieves list of segments for a neuron just like the review widget.
+
+    Parameters
+    -----------
+    x             
+                        Neurons to retrieve. Can be either:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    remote_instance :   CATMAID instance, optional  
+                        Either pass directly to function or define  
+                        globally as 'remote_instance'
+
+    Returns
+    -------
+    list
+                List of treenode IDs, ordered by length. If multiple neurons
+                are requested, returns a dict { skid : [], ... }
+
+    """
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    x = eval_skids(x, remote_instance=remote_instance)
+
+    if not isinstance(x, (list, np.ndarray)):
+        x = [x]
+
+    node_list = []
+    urls = []
+    post_data = []
+
+    for s in x:
+        urls.append(remote_instance._get_review_details_url(s))
+        # For some reason this needs to fetched as POST (even though actual
+        # POST data is not necessary)
+        post_data.append({'placeholder': 0})
+
+    rdata = _get_urls_threaded(
+        urls, remote_instance, post_data=post_data, desc='segments')
+
+    if len(x) > 1:
+        return { x[i] : [ [ tn['id'] for tn in arb['sequence']  ] for arb in rdata[i] ] for i in range(len(x)) }
+    else:
+        return [ [ tn['id'] for tn in arb['sequence']  ] for arb in rdata[0] ]
 
 
 def get_review_details(x, remote_instance=None):
@@ -2636,15 +2507,7 @@ def get_review_details(x, remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -2719,15 +2582,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if not operations:
         operations = [-1]
@@ -2788,7 +2643,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
 
     df = pd.DataFrame(logs,
                       columns=['user', 'operation', 'timestamp',
-                               'skids', 'y', 'z', 'explanation']
+                               'x', 'y', 'z', 'explanation']
                       )
 
     return df
@@ -2848,15 +2703,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
     >>> plotly.offline.plot(fig) 
 
     """
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x = eval_skids(x, remote_instance=remote_instance)
 
@@ -2869,10 +2716,10 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
     if not separate:
-        with tqdm(total=len(x)) as pbar:
+        with tqdm(total=len(x), desc='Contr. stats', disable=module_logger.getEffectiveLevel()>=40) as pbar:
             stats = []
             for j in range(0, len(x), _split):
-                pbar.update(j * _split)
+                pbar.update(j)
                 get_statistics_postdata = {}
 
                 for i in range(j, min(len(x), j + _split)):
@@ -2912,18 +2759,18 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
             remote_instance._get_contributions_url() for s in x]
 
         stats = _get_urls_threaded(
-            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='contributions')
+            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='Contributions')
 
         df = pd.DataFrame([[
             s,
             stats[i]['n_nodes'],
-            {user_list.ix[u].login: stats[i]['node_contributors'][u]
+            {user_list.ix[int(u)].login: stats[i]['node_contributors'][u]
                 for u in stats[i]['node_contributors']},
             stats[i]['n_pre'],
-            {user_list.ix[u].login: stats[i]['pre_contributors'][u]
+            {user_list.ix[int(u)].login: stats[i]['pre_contributors'][u]
                 for u in stats[i]['pre_contributors']},
             stats[i]['n_post'],
-            {user_list.ix[u].login: stats[i]['post_contributors'][u]
+            {user_list.ix[int(u)].login: stats[i]['post_contributors'][u]
                 for u in stats[i]['post_contributors']},
             stats[i]['multiuser_review_minutes'],
             stats[i]['construction_minutes'],
@@ -3002,15 +2849,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
 
         return [n.skeleton_id for n in nl if n.nodes[n.nodes.creator_id.isin(users)].shape[0] > minimum_cont]
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     get_skeleton_list_GET_data = {'nodecount_gt': node_count}
 
@@ -3021,7 +2860,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if user:
         if isinstance(user, (list, np.ndarray)):
             skid_list = list()
-            for u in tqdm(user, desc='Fetching users'):
+            for u in tqdm(user, desc='Fetching users', disable=module_logger.getEffectiveLevel()>=40):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=u,
                                              node_count=node_count,
@@ -3153,15 +2992,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
                 temp.append(0)
         return temp
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if isinstance(start_date, datetime.date):
         start_date = start_date.isoformat()
@@ -3200,7 +3031,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         rounds = [(start_date, end_date)]
 
     data = []
-    for r in tqdm(rounds, desc='Retrieving history'):
+    for r in tqdm(rounds, desc='Retrieving history', disable=module_logger.getEffectiveLevel()>=40):
         get_history_GET_data = {'self.project_id': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
@@ -3303,15 +3134,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     # Set resolution to 1:1 if coordinates are already in nm
     if coord_format == 'NM':
@@ -3362,11 +3185,12 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
     Warning  
     -------
     Depending on the number of nodes in that volume, this can take quite a 
-    while!
+    while! Also: by default, will return also single-node neurons - use the
+    min_size parameter to change that behaviour.
 
     Parameters
     ----------
-    volumes :               {str, core.volume, list thereof}
+    volumes :               {str, core.Volume, list thereof}
                             Single or list of CATMAID volumes.
     remote_instance :       CATMAID instance 
                             Either pass directly to function or define 
@@ -3392,23 +3216,15 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
                             given volume
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
-    if type(volumes) != type(list()):
-        volumes = [volumes]
+    if not isinstance(volumes, (list, np.ndarray)):
+        volumes = [ volumes ]
 
     neurons = []
 
     for v in volumes:
-        if not isinstance(v, core.volume):
+        if not isinstance(v, core.Volume):
             volume = get_volume(v, remote_instance)
         else:
             volume = v
@@ -3456,8 +3272,8 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
     """ Retrieves neurons with processes within a defined volume. Because the 
     API returns only a limited number of neurons at a time, the defined volume 
     has to be chopped into smaller pieces for crowded areas - may thus take 
-    some time! Unlike pymaid.get_neurons_in_volume(), this function will 
-    retrieve ALL neurons within the box - not just the once entering/exiting.
+    some time! UThis function will retrieve ALL neurons within the box - not 
+    just the once entering/exiting.
 
     Parameters
     ----------
@@ -3484,15 +3300,9 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
                             ``[ skeleton_id, skeleton_id, ... ]``
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    #Should think about chopping the volume into bits of size X even before recursively retrieving nodes-> might speed up things
+
+    remote_instance = _eval_remote_instance(remote_instance)
 
     x_y_resolution = kwargs.get('xy_res', 3.8)
     z_resolution = kwargs.get('z_res', 35)
@@ -3505,11 +3315,11 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
         z1 *= z_resolution
         z2 *= z_resolution
 
-    def get_nodes(left, right, top, bottom, z1, z2, remote_instance, incursion):
+    def get_nodes(left, right, top, bottom, z1, z2, remote_instance, recursion):
 
         module_logger.debug('%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (
-            incursion, left, right, top, bottom, z1, z2))
-        module_logger.debug('Incursion %i' % incursion)
+            recursion, left, right, top, bottom, z1, z2))
+        module_logger.debug('Recursion %i' % recursion)
 
         remote_nodes_list = remote_instance._get_node_list_url()
 
@@ -3536,101 +3346,101 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
             remote_nodes_list, node_list_postdata)
 
         if node_list[3] is True:
-            module_logger.debug('Incursing.')
-            incursion += 8
+            module_logger.debug('Incursing...')
+            recursion += 8
             node_list = list()
             # Front left top
-            temp, incursion = get_nodes(left,
+            temp, recursion = get_nodes(left,
                                         left + (right - left) / 2,
                                         top,
                                         top + (bottom - top) / 2,
                                         z1,
                                         z1 + (z2 - z1) / 2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Front right top
-            temp, incursion = get_nodes(left + (right - left) / 2,
+            temp, recursion = get_nodes(left + (right - left) / 2,
                                         right,
                                         top,
                                         top + (bottom - top) / 2,
                                         z1,
                                         z1 + (z2 - z1) / 2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Front left bottom
-            temp, incursion = get_nodes(left,
+            temp, recursion = get_nodes(left,
                                         left + (right - left) / 2,
                                         top + (bottom - top) / 2,
                                         bottom,
                                         z1,
                                         z1 + (z2 - z1) / 2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Front right bottom
-            temp, incursion = get_nodes(left + (right - left) / 2,
+            temp, recursion = get_nodes(left + (right - left) / 2,
                                         right,
                                         top + (bottom - top) / 2,
                                         bottom,
                                         z1,
                                         z1 + (z2 - z1) / 2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Back left top
-            temp, incursion = get_nodes(left,
+            temp, recursion = get_nodes(left,
                                         left + (right - left) / 2,
                                         top,
                                         top + (bottom - top) / 2,
                                         z1 + (z2 - z1) / 2,
                                         z2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Back right top
-            temp, incursion = get_nodes(left + (right - left) / 2,
+            temp, recursion = get_nodes(left + (right - left) / 2,
                                         right,
                                         top,
                                         top + (bottom - top) / 2,
                                         z1 + (z2 - z1) / 2,
                                         z2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Back left bottom
-            temp, incursion = get_nodes(left,
+            temp, recursion = get_nodes(left,
                                         left + (right - left) / 2,
                                         top + (bottom - top) / 2,
                                         bottom,
                                         z1 + (z2 - z1) / 2,
                                         z2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
             # Back right bottom
-            temp, incursion = get_nodes(left + (right - left) / 2,
+            temp, recursion = get_nodes(left + (right - left) / 2,
                                         right,
                                         top + (bottom - top) / 2,
                                         bottom,
                                         z1 + (z2 - z1) / 2,
                                         z2,
-                                        remote_instance, incursion)
+                                        remote_instance, recursion)
             node_list += temp
 
         else:
             # If limit not reached, node list is still an array of 4
-            return node_list[0], incursion - 1
+            return node_list[0], recursion - 1
 
         module_logger.info(
-            "%i Incursion complete (%i nodes received)" % (incursion, len(node_list)))
+            "Recursion %i complete (%i nodes received)" % (recursion, len(node_list)))
 
-        return node_list, incursion
+        return node_list, recursion
 
-    incursion = 1
-    node_list, incursion = get_nodes(
-        left, right, top, bottom, z1, z2, remote_instance, incursion)
+    recursion = 1
+    node_list, recursion = get_nodes(
+        left, right, top, bottom, z1, z2, remote_instance, recursion)
 
     # Collapse list into unique skeleton ids
     skeletons = set()
@@ -3681,15 +3491,7 @@ def get_user_list(remote_instance=None):
     ... Michaela
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     user_list = remote_instance.fetch(remote_instance._get_user_list_url())
 
@@ -3760,15 +3562,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     ...       **{ 'edge_label' : g.es['weight'] } )
 
     """
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     sources = eval_skids(sources, remote_instance=remote_instance)
     targets = eval_skids(targets, remote_instance=remote_instance)
@@ -3826,7 +3620,8 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
     Parameters
     ----------
     volume_name :       str, list of str
-                        Name(s) of the volume to import - must be EXACT!
+                        Name(s) of the volume to import - must be EXACT! 
+                        If volume = None, will return list of available volumes.
     remote_instance :   CATMAID instance, optional
                         Either pass directly to function or define  
                         globally as ``remote_instance``
@@ -3838,7 +3633,7 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
 
     Returns
     -------
-    core.volume 
+    core.Volume 
         Essentially a dictionary containing name, vertices and faces::
 
             name :          str
@@ -3848,27 +3643,18 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
             faces :         list of tuples
                             [ ( vertex_ix, vertex_ix, vertex_ix ), ... ]
 
-
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if isinstance(volume_name, list):
         if combine_vols:
-            return core.volume.combine( [ get_volume( v, remote_instance=remote_instance, color=color ) 
+            return core.Volume.combine( [ get_volume( v, remote_instance=remote_instance, color=color ) 
                                         for v in volume_name ], color = color )
         else:
             return { v : get_volume( v, remote_instance=remote_instance, color=color ) for v in volume_name }
 
-    if not isinstance(volume_name, str):
+    if not isinstance(volume_name, (str, type(None))):
         raise TypeError('Volume name must be str')
 
     module_logger.info('Retrieving volume <%s>' % volume_name)
@@ -3876,6 +3662,9 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
     # First, get volume ID
     get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
+
+    if not volume_name:
+        return pd.DataFrame.from_dict(response)
 
     volume_id = [e['id'] for e in response if e['name'] == volume_name]
 
@@ -3951,7 +3740,7 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
     module_logger.debug(
         '# of faces after clean-up: %i' % len(final_faces))
 
-    return core.volume(name=volume_name,
+    return core.Volume(name=volume_name,
                        volume_id=volume_id,
                        vertices=final_vertices,
                        faces=final_faces,
@@ -3977,15 +3766,7 @@ def get_annotation_list(remote_instance=None):
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     an = remote_instance.fetch(remote_instance._get_annotation_list())[
         'annotations']
@@ -3994,6 +3775,24 @@ def get_annotation_list(remote_instance=None):
     df.columns = ['annotation_id', 'annotation', 'users']
 
     return df
+
+
+def _eval_remote_instance(remote_instance):
+    """ Evaluates remote instance and checks for globally defined remote
+    instances as fall back
+    """
+
+    if remote_instance is None:
+        if 'remote_instance' in sys.modules:
+            return sys.modules['remote_instance']
+        elif 'remote_instance' in sys.modules:
+            return sys.modules['remote_instance']
+        elif 'remote_instance' in globals():
+            return globals()['remote_instance']
+        else:
+            raise Exception(
+                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+    return remote_instance
 
 
 def eval_skids(x, remote_instance=None):
@@ -4020,15 +3819,7 @@ def eval_skids(x, remote_instance=None):
                     list containing skeleton IDs as strings
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            print(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            return
+    remote_instance = _eval_remote_instance(remote_instance)
 
     if isinstance(x, (int, np.int64, np.int32, np.int)):
         return str(x)

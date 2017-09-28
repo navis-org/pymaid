@@ -15,7 +15,8 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" Interface with Blender
+""" Interface with Blender. Unlike other moduls of PyMaid, this module is
+not automatically imported as it only works from within Blender.
 
 Examples
 --------
@@ -124,44 +125,50 @@ class handler:
         self.conversion = conversion
         self.cn_dict = handler.cn_dict
 
-        # Add indexer class
-        self.ix = _IXIndexer(self)
+    def _selection_helper(self, type):        
+        return [ ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == type ]
+
+    def _cn_selection_helper(self, cn_type):        
+        return [ ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == 'CONNECTORS' and ob['cn_type'] == cn_type ]
 
     def __getattr__(self, key):
         if key == 'neurons' or key == 'neuron' or key == 'neurites':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'NEURON'])
+            return object_list( self._selection_helper('NEURON') )
         elif key == 'connectors' or key == 'connector':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'CONNECTORS'])
+            return object_list( self._selection_helper('CONNECTORS') )
         elif key == 'soma' or key == 'somas':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'SOMA'])
+            return object_list( self._selection_helper('SOMA') )
         elif key == 'selected':
             return object_list([ob.name for ob in bpy.context.selected_objects if 'catmaid_object' in ob])
         elif key == 'presynapses':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'CONNECTORS' and ob['cn_type'] == 0])
+            return object_list( self._cn_selection_helper(0) )
         elif key == 'postsynapses':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'CONNECTORS' and ob['cn_type'] == 1])
+            return object_list( self._cn_selection_helper(1) )
         elif key == 'gapjunctions':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'CONNECTORS' and ob['cn_type'] == 2])
+            return object_list( self._cn_selection_helper(2) )
         elif key == 'abutting':
-            return object_list([ob.name for ob in bpy.data.objects if ob['type'] == 'CONNECTORS' and ob['cn_type'] == 3])
+            return object_list( self._cn_selection_helper(3) )
         elif key == 'all':
             return self.neurons + self.connectors + self.soma
         else:
             raise AttributeError('Unknown attribute ' + key)
 
-    def add(self, x, neurites=True, soma=True, connectors=True):
+    def add(self, x, neurites=True, soma=True, connectors=True, redraw=True):
         """ Add neuron(s) to scene
 
         Parameters
         ----------
-        x :             {CatmaidNeuron, CatmaidNeuronList}
-                        Neuron(s) to import into Blender
+        x :             {CatmaidNeuron, CatmaidNeuronList, core.Volume}
+                        Objects to import into Blender
         neurites :      bool, optional
                         Plot neurites. Default = True
         soma :          bool, optional
                         Plot somas. Default = True
         connectors :    bool, optional
                         Plot connectors. Default = True
+        redraw :        bool, optional
+                        If True, will redraw update window after each neuron.
+                        May slow down loading!
         """
 
         if isinstance(x, core.CatmaidNeuron):
@@ -171,7 +178,10 @@ class handler:
             for n in x:
                 self._create_neuron(n, neurites=neurites,
                                     soma=soma, connectors=connectors)
-                bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+                if redraw:
+                    bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+        elif isinstance(x, core.Volume):
+            self._create_mesh( x )
         else:
             module_logger.error(
                 'Unable to interpret data type ' + str(type(x)))
@@ -202,7 +212,7 @@ class handler:
     def _create_neurites(self, x, mat):
         """Create neuron branches """
         cu = bpy.data.curves.new(x.neuron_name + ' mesh', 'CURVE')
-        ob = bpy.data.objects.new('#' + x.neuron_name, cu)
+        ob = bpy.data.objects.new('#%s - %s' % (x.skeleton_id, x.neuron_name), cu)
         bpy.context.scene.objects.link(ob)
         ob.location = (0, 0, 0)
         ob.show_name = True
@@ -308,6 +318,42 @@ class handler:
 
         return
 
+    def _create_mesh(self, volume):
+        """ Create mesh 
+
+        Parameters
+        ----------
+        volume :    {core.Volume, dict}
+                    Must contain 'faces', 'vertices'
+        """
+        mesh_name = volume.get('name', 'mesh')
+
+        verts = volume['vertices']
+
+        if not isinstance(verts, pd.DataFrame):
+            verts = pd.DataFrame(verts)
+
+        # Convert to Blender space and invert Y
+        verts *= self.conversion
+        verts[1] *= -1
+
+        # Switch y and z 
+        blender_verts = verts[[0,2,1]].values.tolist()
+
+        me = bpy.data.meshes.new(mesh_name + '_mesh')
+        ob = bpy.data.objects.new(mesh_name, me)
+
+        scn = bpy.context.scene
+        scn.objects.link(ob)
+        scn.objects.active = ob
+        ob.select = True       
+
+        me.from_pydata(blender_verts, [], volume['faces'])
+        me.update()
+
+        bpy.ops.object.shade_smooth()
+
+
     def select(self, x, *args):
         """ Select given neurons
 
@@ -374,6 +420,15 @@ class handler:
         >>> handler.connectors.colorize()
         """
         self.neurons.colorize()
+
+    def emit(self, v):
+        self.neurons.emit(v)
+
+    def use_transparency(self, v):
+        self.neurons.use_transparency(v)
+
+    def alpha(self, v):
+        self.neurons.alpha(v)
 
     def bevel(self, r):
         """Change bevel of ALL neurons
@@ -532,6 +587,27 @@ class object_list:
             if n in bpy.data.objects:
                 bpy.data.objects[n].active_material.diffuse_color = c
 
+    def emit(self,e):
+        """ Change emit value (0-1)
+        """
+        for ob in bpy.data.objects:
+            if ob.name in self.object_names:
+                ob.active_material.emit = e
+
+    def use_transparency(self,t):
+        """ Change transparency (True/False)
+        """
+        for ob in bpy.data.objects:
+            if ob.name in self.object_names:
+                ob.active_material.use_transparency = t
+
+    def alpha(self,a):
+        """ Change alpha (0-1)
+        """
+        for ob in bpy.data.objects:
+            if ob.name in self.object_names:
+                ob.active_material.alpha = a
+
     def bevel(self, r):
         """Change bevel of objects
 
@@ -569,3 +645,4 @@ class object_list:
         """Delete neurons in the selection"""
         self.select(unselect_others=True)
         bpy.ops.object.delete()
+

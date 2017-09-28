@@ -107,6 +107,7 @@ plot.clear3d()
 ```python
 import pymaid
 from scipy import cluster
+import matplotlib.pyplot as plt
 
 #Initiate Catmaid instance
 remote_instance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
@@ -117,11 +118,15 @@ nl = pymaid.get_neuron ( [ '12345' ], remote_instance, connector_flag = 1, tag_f
 #(Optional) Consider downsampling for large neurons (preverses branch points, end points, synapses, etc.)
 nl.downsample( factor = 4 )
 
-#Cluster synapses - generates plot and returns clustering for nodes with synapses
-syn_linkage = pymaid.cluster_nodes_w_synapses( ds_neuron, plot_graph = True )
+#Cluster by synapse synapse placement
+clust_res = pymaid.cluster_by_synapse_placement( ds_neuron )
+
+#Plot dendrogram
+clust_res.plot_dendrogram()
+plt.show()
 
 #Find the last two clusters (= the two largest clusters):
-clusters = cluster.hierarchy.fcluster( syn_linkage, 2, criterion='maxclust')
+clusters = clust_res.get_clusters( k=2, criterion='maxclust')
 
 #Print summary
 print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))

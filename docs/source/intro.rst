@@ -11,10 +11,10 @@ At the beginning of each session, you have to initialise a :class:`pymaid.pymaid
 >>> import pymaid
 >>> #HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
 ... #http authentification
->>> rm = pymaid.CatmaidInstance(    'www.your.catmaid-server.org' , 
-...                          'HTTP_USER' , 
-...                          'HTTP_PASSWORD', 
-...                          'TOKEN' )
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
+...                              'HTTP_USER' , 
+...                              'HTTP_PASSWORD', 
+...                              'TOKEN' )
 >>> neuron_list = pymaid.get_neuron ( ['12345','67890'] )
 >>> #To access individual neurons, use neuron_list like a normal list object
 >>> neuron_list[0]
@@ -59,12 +59,12 @@ Attributes of this neuron will be retrieved from the server on-demand. For this,
 >>> # You can also just pass an existing instance 
 >>> neuron = pymaid.CatmaidNeuron( 123456, remote_instance = rm )
 
-Some functions already return partially completed neurons (e.g. :func:`pymaid.pymaid.get_3D_skeleton`)
+Some functions already return partially completed neurons (e.g. :func:`pymaid.pymaid.get_neuron`)
 
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token' )
 >>> neuron = pymaid.get_neuron( 123456, remote_instance = rm )
 
-All functions that explicitly require you to pass a ``skids`` parameter (e.g. :func:`pymaid.pymaid.get_3D_skeleton`) accept either:
+All functions that explicitly require you to pass a ``skids`` parameter (e.g. :func:`pymaid.pymaid.get_neuron`) accept either:
 
 1. skeleton IDs (int or str)
 2. neuron name (str, exact match)

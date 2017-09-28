@@ -511,7 +511,7 @@ def dotprops2py(dp, subset=None):
 
     Returns
     -------
-    core.dotprops
+    core.Dotprops
         Subclass of pandas DataFrame. Contains dotprops. 
         Can be passed to `plotting.plot3d( dotprops )`
     """
@@ -537,7 +537,7 @@ def dotprops2py(dp, subset=None):
 
     df['points'] = points
 
-    return core.dotprops(df)
+    return core.Dotprops(df)
 
 
 def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_count(), UseAlpha=False):
@@ -952,7 +952,7 @@ class nbl_results:
         n_py.ix[0].nodes.radius /= 1000
 
         # Create colormap with the query neuron being black
-        cmap = { n_py.skeleton_id : (0, 0, 0)}
+        cmap = { n_py.ix[0].skeleton_id : (0, 0, 0)}
 
         colors = np.linspace(0, 1, len(nl) + 1)
         colors = np.array([hsv_to_rgb(c, 1, 1) for c in colors])

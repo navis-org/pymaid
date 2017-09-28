@@ -69,7 +69,7 @@ __all__ = ['screenshot','plot2d','plot3d','plot_network','clear3d','close3d']
 
 
 def screenshot(file='screenshot.png', alpha=True):
-    """ Saves a screenshot of active canvas.
+    """ Saves a screenshot of active 3D canvas.
 
     Parameters
     ----------
@@ -168,6 +168,9 @@ def plot2d(x, *args, **kwargs):
 
     Optional ``*args`` and ``**kwargs``:
 
+    ``view`` (str, {'dorsal','lateral','frontal'})
+       By default, frontal view is plotted.
+
     ``connectors`` (boolean, default = True )
        Plot connectors (synapses, gap junctions, abutting)
 
@@ -186,6 +189,11 @@ def plot2d(x, *args, **kwargs):
        values for each axis: ``{ 'x' : [ int, int ], 'y' : [ int, int ] }``
        If ``auto_limits = False`` and ``limits = None``, a hard-coded fallback is used
        - this may not suit your needs!
+
+    ``ax`` (matplotlib ax, default=None)
+       Pass an ax object if you want to plot on an existing canvas
+
+    ``color`` (tuple, dict)
 
     Neuropil names can be passed either as *args or as **kwargs. Passing them as
     *args will cause them to be plotted in gray; passing neuropil names as **kwargs
@@ -243,6 +251,32 @@ def plot2d(x, *args, **kwargs):
     zoom = kwargs.get('zoom', False)
     limits = kwargs.get('limits', None)
     auto_limits = kwargs.get('auto_limits', False)
+    ax = kwargs.get('ax', None)
+    color = kwargs.get('color', None)
+    view = kwargs.get('view', 'frontal')
+
+    if not color and (skdata.shape[0] + _dotprops.shape[0])>0:
+        cm = _random_colors(
+            skdata.shape[0] + _dotprops.shape[0], color_space='RGB', color_range=1)
+        colormap = {}
+
+        if not skdata.empty:
+            colormap.update(
+                {str(n): cm[i] for i, n in enumerate(skdata.skeleton_id.tolist())})            
+        if not _dotprops.empty:
+            colormap.update({str(n): cm[i + skdata.shape[0]]
+                             for i, n in enumerate(_dotprops.gene_name.tolist())})            
+    elif isinstance(color, dict):
+        colormap = {n: tuple(color[n]) for n in color}
+    elif isinstance(color,(list,tuple)):        
+        colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}
+        print(color)
+        print(colormap)
+    elif isinstance(color,str):
+        color = tuple( [ int(c *255) for c in mcl.to_rgb(color) ] )
+        colormap = {n: color for n in skdata.skeleton_id.tolist()}
+    else:
+        colormap = {}
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -254,8 +288,11 @@ def plot2d(x, *args, **kwargs):
         skdata += pymaid.get_neuron(x, remote_instance, connector_flag=1,
                                    tag_flag=0, get_history=False, get_abutting=True)    
 
-    fig, ax = plt.subplots(figsize=(8, 8))
-    ax.set_aspect('equal')
+    if not ax:
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.set_aspect('equal')
+    else:
+        fig = None #we don't really need this    
 
     args = [a.lower() for a in args]
     kwargs = {k.lower(): kwargs[k] for k in kwargs}
@@ -379,12 +416,7 @@ def plot2d(x, *args, **kwargs):
     plt.axis('off')
 
     module_logger.debug('Plot limits set to: x= %i -> %i; y = %i -> %i' % (catmaid_limits[
-                        'x'][0], catmaid_limits['x'][1], -catmaid_limits['y'][0], -catmaid_limits['y'][1]))
-
-    if skdata.shape[0] > 1:
-        colormap = _random_colors(len(skdata), color_space='RGB')
-    else:
-        colormap = [(float(0), float(0), float(0))]
+                        'x'][0], catmaid_limits['x'][1], -catmaid_limits['y'][0], -catmaid_limits['y'][1]))    
 
     # Create slabs (lines)
     for i, neuron in enumerate(skdata.itertuples()):
@@ -410,16 +442,16 @@ def plot2d(x, *args, **kwargs):
             for k, l in enumerate(lines):
                 # User first line to assign a legend
                 if k == 0:
-                    this_line = mlines.Line2D([int(x[0]) for x in l], [- int(y[1]) for y in l], lw=1, alpha=.9, color=colormap[
-                                              i], label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id))
+                    this_line = mlines.Line2D([int(x[0]) for x in l], [-int(y[1]) for y in l], lw=1, alpha=.9, color=colormap[ neuron.skeleton_id ], 
+                                label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id))
                 else:
                     this_line = mlines.Line2D(
-                        [int(x[0]) for x in l], [- int(y[1]) for y in l], lw=1, alpha=.9, color=colormap[i])
+                        [int(x[0]) for x in l], [- int(y[1]) for y in l], lw=1, alpha=.9, color=colormap[ neuron.skeleton_id ])
                 ax.add_line(this_line)
 
             for n in soma.itertuples():
                 s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius, alpha=.9,
-                                    fill=True, color=colormap[i], zorder=4, edgecolor='none')
+                                    fill=True, color=colormap[ neuron.skeleton_id ], zorder=4, edgecolor='none')
                 ax.add_patch(s)
 
         if connectors or connectors_only:
@@ -557,7 +589,7 @@ def plot3d(x, *args, **kwargs):
     ----------
 
     x :               {skeleton IDs, core.CatmaidNeuron, core.CatmaidNeuronList,
-                       core.dotprops, core.volumes}
+                       core.Dotprops, core.Volumes}
                       Objects to plot:: 
 
                         - int is intepreted as skeleton ID(s) 
@@ -1468,7 +1500,7 @@ def plot_network(x, *args, **kwargs):
     edges = []
     annotations = []
     for e in g.es:
-        e_width = 2 + 5 * round(e['weight']) / max(g.es['weight'])
+        e_width = 2 + 5 * round(e['weight']) / max(g.es['weight'])        
 
         edges.append(
             go.Scatter(dict(
@@ -1612,13 +1644,13 @@ def _parse_objects(x,remote_instance=None):
     # Collect neuron objects and collate to single Neuronlist
     neuron_obj = [ob for ob in x if isinstance(
         ob, (pd.DataFrame, pd.Series, core.CatmaidNeuron, core.CatmaidNeuronList)) 
-        and not isinstance(ob, (core.dotprops, core.volume))] # dotprops and volumes are instances of pd.DataFrames
+        and not isinstance(ob, (core.Dotprops, core.Volume))] # dotprops and volumes are instances of pd.DataFrames
     
     skdata = core.CatmaidNeuronList( neuron_obj, make_copy=False)
     
 
     # Collect dotprops
-    dotprops = [ob for ob in x if isinstance(ob,core.dotprops)]
+    dotprops = [ob for ob in x if isinstance(ob,core.Dotprops)]
 
     if len(dotprops) == 1:
         dotprops = dotprops[0]
@@ -1628,6 +1660,6 @@ def _parse_objects(x,remote_instance=None):
         dotprops = pd.concat(dotprops)
 
     # Collect and parse volumes
-    volumes = [ ob for ob in x if isinstance(ob, (core.volume, str) ) ]
+    volumes = [ ob for ob in x if isinstance(ob, (core.Volume, str) ) ]
 
     return skids, skdata, dotprops, volumes

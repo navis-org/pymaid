@@ -152,7 +152,7 @@ def get_user_contributions(x, remote_instance=None):
     return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
-def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, treenodes=True, connectors=True):
+def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=10, treenodes=True, connectors=True, timeseries=False):
     """ Takes a list of skeleton IDs and calculates the time each user has 
     spent working on this set of neurons.
 
@@ -175,6 +175,10 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, t
                        If False, treenodes will not be taken into account
     connectors :       bool, optional
                        If False, connectors will not be taken into account
+    timeseries :       bool, optional
+                       If True, instead of time invested per user, will
+                       return time invested per day. Returns only total time
+                       invested (creation+edition+review)
 
     Returns
     -------
@@ -182,14 +186,22 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, t
         DataFrame in which each row represents a user. 
 
         >>> df
-        ...   user  total  creation  edition   review
+        ...   user  total  creation  edition  review
         ... 0
         ... 1
 
-    Notes
-    -----
+        or if timeseries = True, DataFrame in which each row is timeseries
+        of TOTAL time invested.
+        >>> df
+        ...       date date date ...
+        ... user1
+        ... user2        
+
+
+    Important
+    ---------
     Values represent minutes. Creation/Edition/Review can overlap! This is why 
-    total time spent is < creation + edition + review.
+    total time spent is != creation + edition + review.
 
     Please note that this does currently not take placement of postsynaptic 
     nodes into account!
@@ -199,6 +211,11 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, t
     invested. To keep total reconstruction time comparable to what Catmaid
     calculates, you should consider about 15 actions/minute (= a click every
     4 seconds).
+
+    CATMAID gives reconstruction time across all users. Here we calculate
+    the time spent tracing for individuals. This may lead to a discrepancy
+    between sum of time invested over of all users from this function vs.
+    CATMAID's reconstruction time.
 
     Examples
     --------
@@ -220,9 +237,10 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, t
     user_list = get_user_list(remote_instance).set_index('id')
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        skdata = get_neuron(skids, remote_instance=remote_instance)
-    elif isinstance(x, core.CatmaidNeuron):
-        skdata = core.CatmaidNeuronList(skdata)
+        x = get_neuron(skids, remote_instance=remote_instance)
+
+    if isinstance(x, core.CatmaidNeuron):
+        skdata = core.CatmaidNeuronList(x)
     elif isinstance(x, core.CatmaidNeuronList):
         skdata = x
 
@@ -257,31 +275,38 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=15, t
     all_timestamps = pd.concat(
         [creation_timestamps, edition_timestamps, review_timestamps], axis=0)
 
-    stats = {
-        'total': {u: 0 for u in all_timestamps.user.unique()},
-        'creation': {u: 0 for u in all_timestamps.user.unique()},
-        'edition': {u: 0 for u in all_timestamps.user.unique()},
-        'review': {u: 0 for u in all_timestamps.user.unique()}
-    }
+    if not timeseries:
+        stats = {
+            'total': {u: 0 for u in all_timestamps.user.unique()},
+            'creation': {u: 0 for u in all_timestamps.user.unique()},
+            'edition': {u: 0 for u in all_timestamps.user.unique()},
+            'review': {u: 0 for u in all_timestamps.user.unique()}
+        }
 
-    # Get total time spent
-    for u in tqdm(all_timestamps.user.unique(), desc='Calc. total'):
-        stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
-            'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-    # Get reconstruction time spent
-    for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.'):
-        stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
-            'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-    # Get edition time spent
-    for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition'):
-        stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
-            'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-    # Get time spent reviewing
-    for u in tqdm(review_timestamps.user.unique(), desc='Calc. review'):
-        stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
-            'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+        # Get total time spent
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
+            stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+        # Get reconstruction time spent
+        for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=module_logger.getEffectiveLevel()>=40):
+            stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+        # Get edition time spent
+        for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=module_logger.getEffectiveLevel()>=40):
+            stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+        # Get time spent reviewing
+        for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=module_logger.getEffectiveLevel()>=40):
+            stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
-    module_logger.info(
-        'Done! Use e.g. plotly to generate a plot: \n stats = get_time_invested( skids, remote_instance ) \n fig = { "data" : [ { "values" : stats.total.tolist(), "labels" : stats.user.tolist(), "type" : "pie" } ] } \n plotly.offline.plot(fig) ')
+        module_logger.info(
+            'Done! Use e.g. plotly to generate a plot: \n stats = get_time_invested( skids, remote_instance ) \n fig = { "data" : [ { "values" : stats.total.tolist(), "labels" : stats.user.tolist(), "type" : "pie" } ] } \n plotly.offline.plot(fig) ')
 
-    return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True)
+        return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True)
+
+    else:
+        # Get total time spent
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
+            stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
