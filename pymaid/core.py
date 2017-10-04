@@ -178,8 +178,8 @@ class CatmaidNeuron:
             if 'type' not in x.nodes:
                 morpho.classify_nodes(x)
 
-            self.nodes = copy(x.nodes)
-            self.connectors = copy(x.connectors)
+            self.nodes = x.nodes.copy()
+            self.connectors = x.connectors.copy()
             
             self.tags = copy(x.tags)
 

@@ -44,7 +44,10 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['calc_cable','calc_strahler_index','classify_nodes','cut_neuron','downsample_neuron','in_volume','longest_neurite','prune_by_strahler','reroot_neuron','synapse_root_distances','cable_within_distance']
+__all__ = [ 'calc_cable','calc_strahler_index','classify_nodes','cut_neuron',
+            'downsample_neuron','in_volume','longest_neurite',
+            'prune_by_strahler','reroot_neuron','synapse_root_distances',
+            'cable_within_distance','stitch_neurons']
 
 def generate_list_of_childs(skdata):
     """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -108,9 +111,9 @@ def classify_nodes(skdata, inplace=True):
         skdata = skdata.copy()
 
     # If more than one neuron
-    if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        for i in range(skdata.shape[0]):
-            skdata.ix[i] = classify_nodes(skdata.ix[i], inplace=inplace)
+    if isinstance(skdata, (pd.DataFrame, core.CatmaidNeuronList)):
+        for i in trange(skdata.shape[0], 'Classifying'):
+            classify_nodes(skdata.ix[i], inplace=True)
     elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         list_of_childs = generate_list_of_childs(skdata)
         
@@ -1610,3 +1613,107 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
             bbox[a] = (float('-inf'), float('inf'))
 
         return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
+
+
+def stitch_neurons( *neurons, tn_to_stitch=None, method='ALL'):
+    """ Function to stich multiple neurons together. The first neuron provided
+    will be the master neuron. Unless treenode_ids are provided, neurons will
+    be stitched at the closest distance (see method parameter).
+
+    Parameters
+    ----------
+    neurons :           CatmaidNeuron/CatmaidNeuronList
+                        Neurons to stitch.
+    tn_to_stitch :      List of treenode IDs, optional
+                        If provided, these treenodes will be preferentially
+                        used to stitch neurons together. If there are more 
+                        than two possible treenodes for a single stitching
+                        operation, the two closest are used.
+    method :            {'LEAFS','ALL'}, optional
+                        Defines automated stitching mode: if 'LEAFS', only
+                        leaf (including root) nodes will be considered for
+                        stitching. If 'ALL', all treenodes are considered.
+
+    Returns
+    -------
+    core.CatmaidNeuron
+    """
+
+    if method not in ['LEAFS', 'ALL']:
+        raise ValueError('Unknown method: %s' % str(method))
+
+    for n in neurons:
+        if not isinstance(n, (core.CatmaidNeuron, core.CatmaidNeuronList) ):
+            raise TypeError( 'Unable to stitch non-CatmaidNeuron objects' )
+        elif isinstance( n, (core.CatmaidNeuronList,list) ):
+            neurons += n.neurons
+
+    #Use copies of the original neurons!
+    neurons = [ n.copy() for n in neurons if isinstance(n, core.CatmaidNeuron )]
+
+    if len(neurons) < 2:
+        raise ValueError('Need at least 2 neurons to stitch, found %i' % len(neurons))
+
+    module_logger.debug('Stitching %i neurons...' % len(neurons))
+
+    stitched_n = neurons[0]
+
+    if tn_to_stitch and not isinstance(tn_to_stitch, (list, np.ndarray)):
+        tn_to_stitch = [ tn_to_stitch ]
+        tn_to_stitch = [ str(tn) for tn in tn_to_stitch ]
+
+    for nB in neurons[1:]:
+        #First find treenodes to connect
+        if tn_to_stitch and set(tn_to_stitch) & set(stitched_n.nodes.treenode_id) and set(tn_to_stitch) & set(nB.nodes.treenode_id):
+            treenodesA = stitched_n.nodes.set_index('treenode_id').ix[ tn_to_stitch ].reset_index()
+            treenodesB = nB.nodes.set_index('treenode_id').ix[ tn_to_stitch ].reset_index()
+        elif method == 'LEAFS':
+            treenodesA = stitched_n.nodes[ stitched_n.nodes.type.isin(['end','root']) ].reset_index()
+            treenodesB = nB.nodes[ nB.nodes.type.isin(['end','root']) ].reset_index()
+        else:
+            treenodesA = stitched_n.nodes
+            treenodesB = nB.nodes
+
+        #Calculate pairwise distances
+        pdist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
+                                              treenodesB[['x','y','z']].values, 
+                                              metric='euclidean' )                
+
+        #Get the closest treenodes
+        tnA = treenodesA.ix[ pdist.argmin(axis=0)[0] ].treenode_id
+        tnB = treenodesB.ix[ pdist.argmin(axis=1)[0] ].treenode_id
+
+        module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
+
+        #Reroot neuronB onto the node that will be stitched
+        nB.reroot( tnB )
+
+        #Change neuronA root node's parent to treenode of neuron B
+        nB.nodes.loc[ nB.nodes.parent_id.isnull(), 'parent_id' ] = tnA
+
+        #Add nodes, connectors and tags onto the stitched neuron
+        stitched_n.nodes = pd.concat( [ stitched_n.nodes, nB.nodes ], ignore_index=True )
+        stitched_n.connectors = pd.concat( [ stitched_n.connectors, nB.connectors ], ignore_index=True )
+        stitched_n.tags.update( nB.tags )
+
+    #Reset temporary attributes of our final neuron
+    stitched_n._clear_temp_attr()
+
+    return stitched_n
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

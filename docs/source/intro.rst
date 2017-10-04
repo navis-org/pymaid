@@ -9,14 +9,14 @@ Quickstart Guide
 At the beginning of each session, you have to initialise a :class:`pymaid.pymaid.CatmaidInstance` that holds your credentials for the Catmaid server. In most examples, this instance is assigned to a variable called ``remote_instance`` or just ``rm``. Here we are requesting a list of two neurons from the server:
 
 >>> import pymaid
->>> #HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
+>>> # HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
 ... #http authentification
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> neuron_list = pymaid.get_neuron ( ['12345','67890'] )
->>> #To access individual neurons, use neuron_list like a normal list object
+>>> # To access individual neurons, use neuron_list like a normal list object
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
 neuron_name                PN glomerulus DA1 27296 BH
@@ -31,8 +31,8 @@ annotations                                     False
 igraph                                          False
 tags                                             True
 dtype: object
->>> #Note how some entries are False? These are still empty. 
->>> #They will be retrieved/computed on-demand upon first *explicit* request
+>>> # Note how some entries are False? These are still empty. 
+>>> # They will be retrieved/computed on-demand upon first *explicit* request
 
 ``neuron_list`` is an instance of the :class:`pymaid.core.CatmaidNeuronList` class and holds two neurons, both of which are of the :class:`pymaid.core.CatmaidNeuron` class. Check out their documentation for methods and attributes.
 

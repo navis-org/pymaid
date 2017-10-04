@@ -50,7 +50,9 @@ Selection of class methods:
 
 - :func:`pymaid.core.CatmaidNeuron.plot3d`: create 3D plot of neuron(s)
 - :func:`pymaid.core.CatmaidNeuron.plot2d`: create 2D plot of neuron(s)
-- :func:`pymaid.core.CatmaidNeuron.prune_by_strahler`: prune neuron ends
+- :func:`pymaid.core.CatmaidNeuron.plot_dendrogram`: plot dendogram of neuron
+- :func:`pymaid.core.CatmaidNeuron.prune_by_strahler`: prune neuron by strahler index
+- :func:`pymaid.core.CatmaidNeuron.prune_by_volume`: prune neuron in- or outside of a volume
 - :func:`pymaid.core.CatmaidNeuron.prune_distal_to`: cut off nodes distal to a given treenode
 - :func:`pymaid.core.CatmaidNeuron.prune_proximal_to`: cut off nodes proximal to a given treenode
 - :func:`pymaid.core.CatmaidNeuron.reroot`: reroot neuron to given node
@@ -75,6 +77,7 @@ Functions to retrieve data from server:
 - :func:`pymaid.pymaid.add_annotations`: use to add annotation(s) to neuron(s)
 - :func:`pymaid.pymaid.add_tags`: add tags of treenodes or connectors
 - :func:`pymaid.pymaid.delete_tags`: delete tags of treenodes or connectors
+- :func:`pymaid.pymaid.delete_neuron`: delete entire neurons
 - :func:`pymaid.pymaid.get_arbor`: similar to get_neuron but more detailed information on connectors
 - :func:`pymaid.pymaid.get_annotations`: get annotations of a set of neurons (annotation only)
 - :func:`pymaid.pymaid.get_annotation_details`: get detailed annotations for a set of neurons (includes user and timestamp)
@@ -128,9 +131,10 @@ Functions for clustering:
 - :func:`pymaid.cluster.cluster_xyz`: cluster points (synapses, nodes) based on eucledian distance
 - :func:`pymaid.cluster.cluster_by_synapse_placement`: hierarchical clustering of neurons based on synapse placement
 
-Functions for clustering:
+Functions for morphological analyses:
 
 - :func:`pymaid.morpho.calc_cable`: calculate cable length of given neuron
+- :func:`pymaid.morpho.cable_within_distance`: calculate cable between pairs of neurons that is within given distance
 - :func:`pymaid.morpho.calc_strahler_index`: calculate strahler index for each node
 - :func:`pymaid.morpho.classify_nodes`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
 - :func:`pymaid.morpho.cut_neuron`: cut neuron at a node or node tag

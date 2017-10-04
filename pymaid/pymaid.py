@@ -75,7 +75,7 @@ __all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
             'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
-            'get_segments']
+            'get_segments','delete_neuron','get_connectors_between']
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -311,7 +311,7 @@ class CatmaidInstance:
 
     def _get_intersects(self, vol_id, x, y, z):
         """ Use to test if point intersects with volume. """
-        return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(vol_id) + "/intersect") + '?%s' % urllib.parse.urlencode({'skids': x, 'y': y, 'z': z})
+        return self.djangourl("/" + str(self.project_id) + "/volumes/" + str(vol_id) + "/intersect") + '?%s' % urllib.parse.urlencode({'x': x, 'y': y, 'z': z})
 
     def _get_volumes(self):
         """ Get list of all volumes in project. """
@@ -372,6 +372,18 @@ class CatmaidInstance:
     def _treenode_add_tag_url(self, treenode_id):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
         return self.djangourl("/" + str(self.project_id) + "/label/treenode/" + str(treenode_id) + "/update")
+
+    def _delete_neuron_url(self, neuron_id):
+        """ Use to parse url for deleting a single neurons"""
+        return self.djangourl("/" + str(self.project_id) + "/neuron/" + str(neuron_id) + "/delete")
+
+    def _delete_treenode_url(self):
+        """ Use to parse url for deleting treenodes"""
+        return self.djangourl("/" + str(self.project_id) + "/treenode/delete")
+
+    def _delete_connector_url(self):
+        """ Use to parse url for deleting connectors"""
+        return self.djangourl("/" + str(self.project_id) + "/connector/delete")
 
     def _connector_add_tag_url(self, treenode_id):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
@@ -825,7 +837,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
         names[str(x[i])],
         str(x[i]),
         pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
-                                    'creator_id', 'skids', 'y', 'z', 'radius', 'confidence']),
+                                    'creator_id', 'x', 'y', 'z', 'radius', 'confidence']),
         pd.DataFrame(n[1], columns=['treenode_1', 'link_confidence', 'connector_id',
                                     'link_confidence', 'treenode_2', 'other_skeleton_id', 'relation_1', 'relation_2']),
         n[2]]
@@ -914,7 +926,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
     # Find out which connectors are in the volume of interest
     iv = morpho.in_volume(
-        cn_data[['skids', 'y', 'z']], volume, remote_instance, approximate=approximate)
+        cn_data[['x', 'y', 'z']], volume, remote_instance, approximate=approximate)
 
     # Get the subset of connectors within the volume
     cn_in_volume = cn_data[iv].copy()
@@ -981,10 +993,10 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         synapses with the query neurons:
 
         >>> df
-        ...   neuron_name  skeleton_id    num_nodes    relation    skid1  skid2 ....
-        ... 0   name1         skid1      node_count1  upstream     n_syn  n_syn ...
-        ... 1   name2         skid2      node_count2  downstream   n_syn  n_syn ..   
-        ... 2   name3         skid3      node_count3  gapjunction  n_syn  n_syn .            
+        ...   neuron_name  skeleton_id    num_nodes    relation   total skid1  skid2 ..
+        ... 0   name1         skid1      node_count1  upstream    n_syn  n_syn ...
+        ... 1   name2         skid2      node_count2  downstream  n_syn  n_syn ..   
+        ... 2   name3         skid3      node_count3  gapjunction n_syn  n_syn .            
         ... ...
 
         ``relation`` can be ``upstream`` (incoming), ``downstream`` (outgoing) 
@@ -1102,6 +1114,10 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         )
 
         df = pd.concat([df, df_temp], axis=0)
+
+    df['total'] = df[ x ].sum(axis=1).values
+
+    df.sort_values('total', inplace=True, ascending=False)
 
     if filt:
         if not isinstance(filt, (list, np.ndarray)):
@@ -1274,10 +1290,7 @@ def get_treenode_table(x, remote_instance=None):
 
     remote_instance = _eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
+    x = eval_skids(x, remote_instance=remote_instance)    
 
     module_logger.info(
         'Retrieving %i treenode table(s)...' % len(x))
@@ -1306,7 +1319,7 @@ def get_treenode_table(x, remote_instance=None):
 
     tn_table = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for nl in node_list for n in nl[0]],
                             columns=['skeleton_id', 'treenode_id', 'parent_node_id', 'confidence',
-                                     'skids', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
+                                     'x', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
                             dtype=object
                             )
 
@@ -1315,7 +1328,7 @@ def get_treenode_table(x, remote_instance=None):
 
     # Replace timestamp with datetime object
     tn_table['last_edited'] = [datetime.datetime.fromtimestamp(
-        int(t)) for t in tn_table['last_edited']]
+        t, tz=datetime.timezone.utc) for t in tn_table['last_edited']]
 
     return tn_table
 
@@ -1417,6 +1430,13 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     DataFrame in which each row represents a link (connector <-> treenode)! 
     Connectors may thus show up in multiple rows. Use e.g. 
     ``df.connector_id.unique()`` to get a set of unique connector IDs.
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_connector_details`
+        If you need details about the connectivity of a connector
+    :func:`pymaid.pymaid.get_connectors_between`
+        If you need to find the connectors between sets of neurons.
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1466,7 +1486,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
                         for e in remote_instance.fetch(remote_get_connectors_url)['links']]
 
     df = pd.DataFrame(cn_data,
-                      columns=['skeleton_id', 'connector_id', 'skids', 'y', 'z', 'confidence',
+                      columns=['skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence',
                                'creator_id', 'treenode_id', 'creation_time', 'edition_time', 'type'],
                       dtype=object
                       )
@@ -1477,12 +1497,12 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     return df
 
 
-def get_connector_details(connector_ids, remote_instance=None):
+def get_connector_details(x, remote_instance=None):
     """ Wrapper to retrieve details on sets of connectors 
 
     Parameters
     ----------
-    connector_ids :     list of connector ids 
+    x :                 {CatmaidNeuron/List, list of connector ids}
                         Can be found e.g. in compact skeletons (get_neuron)
     remote_instance :   CATMAID instance 
                         Either pass directly to function or define globally as 
@@ -1503,9 +1523,16 @@ def get_connector_details(connector_ids, remote_instance=None):
         ... 0
         ... 1
         ... 2    
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_connectors`
+        If you just need the connector table (ID, x, y, z, creator, etc.)
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
+
+    connector_ids = eval_node_ids( x, connectors=True, treenodes=False )    
 
     remote_get_connectors_url = remote_instance._get_connector_details_url()
 
@@ -1534,6 +1561,74 @@ def get_connector_details(connector_ids, remote_instance=None):
 
     return df
 
+def get_connectors_between(a, b, directional=False, remote_instance=None ):
+    """ Wrapper to retrieve connectors between sets of neurons.   
+
+    Parameters
+    ----------
+    a,b             
+                        Neurons for which to retrieve connectors. Can be either:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    directional :       bool, optional
+                        If True, only connectors a->b are returned, otherwise
+                        it is a<->b.
+    remote_instance :   CATMAID instance, optional
+                        Either pass directly to function or define 
+                        globally as 'remote_instance'
+
+    Returns
+    ------- 
+    pandas.DataFrame
+        DataFrame in which each row represents a connector
+
+        >>> df    
+        ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node
+        ... 0
+        ... 1
+        ... 2
+        ...
+        ... postsynaptic_to_node
+        ... 0
+        ... 1
+        ... 2    
+
+    See Also
+    --------
+    :func:`pymaid.pymaid.get_edges`
+        If you just need the number of synapses betweem neurons this is much
+        faster.
+    """
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        a = get_neuron( a, remote_instance=remote_instance )
+
+    if not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        b = get_neuron( b, remote_instance=remote_instance )
+
+    cn_details = get_connector_details(a+b, remote_instance=remote_instance)
+
+    a = eval_skids(a)
+    a = [int(s) for s in a]
+
+    b = eval_skids(b)
+    b = [int(s) for s in b]
+
+    if directional:
+        cn_details = cn_details[ cn_details.presynaptic_to.isin( a ) ]
+        cn_details = cn_details[ [  True in [ skid in a for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
+    else:
+        cn_details = cn_details[ cn_details.presynaptic_to.isin( a + b ) ]
+        cn_details = cn_details[ [  True in [ skid in a+b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
+
+    module_logger.info('%i shared connectors remaining after filtering' % len(cn_details) )
+
+    return cn_details.reset_index(drop=True)
 
 def get_review(x, remote_instance=None):
     """ Wrapper to retrieve review status for a set of neurons
@@ -1583,7 +1678,7 @@ def get_review(x, remote_instance=None):
     names = {}
     review_status = {}
     for j in tqdm(range(0,len(x),500), desc='Rev. status'):
-        for i in range(j,j+500):
+        for i in range(j,min(j+500, len(x))):
             key = 'skeleton_ids[%i]' % i
             get_review_postdata[key] = str(x[i])
 
@@ -2084,7 +2179,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     return df.sort_values(['name']).reset_index(drop=True)
 
 
-def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=False):
+def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=False, intersect=False):
     """ Wrapper to retrieve the all neurons annotated with given annotation(s)
 
     Parameters
@@ -2096,6 +2191,8 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
                             as 'remote_instance'
     allow_partial :         bool, optional
                             If True, allow partial match of annotation
+    intersect :             bool, optional
+                            If True, neurons must have ALL provided annotations.
 
     Returns
     -------
@@ -2107,6 +2204,20 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
     module_logger.info(
         'Looking for Annotation(s): ' + str(annotations))
+
+    if intersect and isinstance(annotations, (list, np.ndarray)):
+        current_level = module_logger.level
+        module_logger.setLevel('WARNING')
+        skids = set.intersection( *[ set( get_skids_by_annotation( a, 
+                                                                  remote_instance=remote_instance, 
+                                                                  allow_partial=allow_partial,
+                                                                  intersect=False ) )
+                                     for a in annotations ] )        
+        module_logger.setLevel(current_level)
+        module_logger.info(
+        'Found %i skeletons with matching annotation(s)' % len(skids))
+        return list (skids )
+    
     annotation_ids = get_annotation_id(
         annotations, remote_instance,  allow_partial=allow_partial)
 
@@ -2127,7 +2238,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
     annotated_skids = []
     module_logger.debug(
-        'Retrieving x for annotationed neurons...')
+        'Retrieving skids for annotationed neurons...')
     for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
         annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
@@ -2186,13 +2297,14 @@ def neuron_exists(x, remote_instance=None):
         return True
 
 
-def get_treenode_info(treenode_ids, remote_instance=None):
+def get_treenode_info(x, remote_instance=None):
     """ This wrapper will retrieve info for a set of treenodes.
 
     Parameters
     ----------
-    treenode_ids
-                        single or list of treenode IDs
+    x                   {core.CatmaidNeuron/List, list of treenode IDs}
+                        Single or list of treenode IDs. If CatmaidNeuron/List,
+                        details for all it's treenodes are requested.
     remote_instance :   CATMAID instance 
                         Either pass directly to function or define  
                         globally as ``remote_instance``
@@ -2211,14 +2323,11 @@ def get_treenode_info(treenode_ids, remote_instance=None):
 
     remote_instance = _eval_remote_instance(remote_instance)
 
-    if not isinstance(treenode_ids, (list, np.ndarray)):
-        treenode_ids = [treenode_ids]
+    treenode_ids = eval_node_ids( x, connectors=False, treenodes=True )
 
-    urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]
-    post_data = [{'None': 0} for tn in treenode_ids]
+    urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]    
 
-    data = _get_urls_threaded(urls, remote_instance,
-                              post_data=post_data, desc='info')
+    data = _get_urls_threaded(urls, remote_instance, desc='info')
 
     df = pd.DataFrame([[treenode_ids[i]] + list(n.values()) for i, n in enumerate(data)],
                       columns=['treenode_id'] + list(data[0].keys())
@@ -2275,6 +2384,56 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     post_data = {key: ','.join([str(tn) for tn in node_ids])}
 
     return remote_instance.fetch(url, post=post_data)
+
+def delete_neuron(x, no_prompt=False, remote_instance=None):
+    """ Wrapper to completely delete neurons. Use this with EXTREME caution
+    as this is not reversible!
+
+    Deletes a neuron if and only if two things are the case: 
+    1. The user owns all treenodes of the skeleton modeling the neuron in 
+    question and
+    2. The neuron is not annotated by other users.
+
+    Parameters
+    ----------
+    x
+                        Neurons to check if they exist in Catmaid. Can be either:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    no_prompt :         bool, optional
+                        By default, you will be prompted to confirm before
+                        deleting the neuron(s). Set this to True to skip that
+                        step.
+    remote_instance :   CATMAID instance, optional  
+                        Either pass directly to function or define  
+                        globally as 'remote_instance'              
+    """
+
+    remote_instance = _eval_remote_instance(remote_instance)
+    
+    x = eval_skids(x, remote_instance=remote_instance)
+
+    if isinstance(x, (list, np.ndarray)):
+        return {n: delete_neuron(n, remote_instance=remote_instance) for n in x}
+
+    #Need to get the neuron ID
+    remote_get_neuron_name = remote_instance._get_single_neuronname_url(x)
+    neuronid = remote_instance.fetch(remote_get_neuron_name)['neuronid']
+
+    if not no_prompt:
+        answer = ""
+        while answer not in ["y", "n"]:
+            answer = input("Please confirm deletion [Y/N] ").lower()
+
+        if answer != 'y':
+            return
+
+    url = remote_instance._delete_neuron_url(neuronid)
+
+    return remote_instance.fetch(url)    
 
 
 def delete_tags(node_list, tags, node_type, remote_instance=None):
@@ -3160,15 +3319,15 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
 
     node_list = remote_instance.fetch(remote_nodes_list, node_list_postdata)
 
-    data = {'treenodes': pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], datetime.datetime.fromtimestamp(int(i[8])), i[9], ]
+    data = {'treenodes': pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], i[5], i[6], i[7], datetime.datetime.fromtimestamp(int(i[8]), tz=datetime.timezone.utc), i[9], ]
                                        for i in node_list[0]],
-                                      columns=['treenode_id', 'parent_id', 'skids', 'y', 'z', 'confidence',
+                                      columns=['treenode_id', 'parent_id', 'x', 'y', 'z', 'confidence',
                                                'radius', 'skeleton_id', 'edition_time', 'user_id'],
                                       dtype=object),
-            'connectors':  pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], datetime.datetime.fromtimestamp(int(i[5])), i[6], i[7]]
+            'connectors':  pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], datetime.datetime.fromtimestamp(int(i[5]), tz=datetime.timezone.utc), i[6], i[7]]
                                          for i in node_list[1]],
                                         columns=[
-                                            'connector_id', 'skids', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
+                                            'connector_id', 'x', 'y', 'z', 'confidence', 'edition_time', 'user_id', 'partners'],
                                         dtype=object),
             'labels':      node_list[3],
             'node_limit_reached': node_list[4],
@@ -3272,7 +3431,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
     """ Retrieves neurons with processes within a defined volume. Because the 
     API returns only a limited number of neurons at a time, the defined volume 
     has to be chopped into smaller pieces for crowded areas - may thus take 
-    some time! UThis function will retrieve ALL neurons within the box - not 
+    some time! This function will retrieve ALL neurons within the box - not 
     just the once entering/exiting.
 
     Parameters
@@ -3854,4 +4013,72 @@ def eval_skids(x, remote_instance=None):
     else:
         module_logger.error(
             'Unable to extract x from type %s' % str(type(x)))
-        raise TypeError('Unable to extract x from type %s' % str(type(x)))
+        raise TypeError('Unable to extract skids from type %s' % str(type(x)))
+
+def eval_node_ids(x, connectors=True, treenodes=True):
+    """ Wrapper to extract treenode or connector IDs. 
+
+    Parameters
+    ----------
+    x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
+                    Your options are either::
+                    1. int or list of ints will be assumed to be node IDs
+                    2. str or list of str will be checked if convertible to int
+                    3. For CatmaidNeuron/List or pandas.DataFrames will try
+                       to extract node IDs
+    connectors :    bool, optional
+                    If True will return connector IDs from neuron objects
+    treenodes :     bool, optional
+                    If True will return treenode IDs from neuron objects
+
+    Returns
+    -------
+    list of str
+                    list containing node as strings
+    """
+
+    if isinstance(x, (int, np.int64, np.int32, np.int)):
+        return [ x ]
+    elif isinstance(x, (str, np.str)):
+        try:            
+            return [ int(x) ]
+        except:
+            raise TypeError('Unable to extract node ID from string <%s>' % str(x))
+    elif isinstance(x, (list, np.ndarray)):
+        ids = []
+        for e in x:
+            temp = eval_node_ids(e, connectors=True, 
+                                 treenodes=True)
+            if isinstance(temp, (list, np.ndarray)):
+                ids += temp
+            else:
+                ids.append(temp)
+        return sorted(set(ids), key=ids.index)
+    elif isinstance(x, core.CatmaidNeuron):
+        to_return = []
+        if treenodes:
+            to_return += x.nodes.treenode_id.tolist()
+        if connectors:
+            to_return += x.connectors.connector_id.tolist()
+        return to_return
+    elif isinstance(x, core.CatmaidNeuronList):
+        to_return = []
+        for n in x:
+            if treenodes:
+                to_return += n.nodes.treenode_id.tolist()
+            if connectors:
+                to_return += n.connectors.connector_id.tolist()
+        return to_return
+    elif isinstance(x, ( pd.DataFrame, pd.Series) ):
+        to_return = []
+        if treenodes and 'treenode_id' in x:            
+            to_return += x.treenode_id.tolist()
+        if connectors and 'connector_id' in x:
+            to_return += x.connector_id.tolist()
+
+        if 'connector_id' not in x and 'treenode_id' not in x:
+            to_return = x.tolist()
+
+        return to_return
+    else:
+        raise TypeError('Unable to extract node IDs from type %s' % str(type(x)))

@@ -861,12 +861,15 @@ class clust_results:
                             Coloring threshold for dendrogram
         return_dendrogram : bool, optional
                             If true, dendrogram object is returned
-        labels :            list of str, optional
-                            Labels in order of original observation
+        labels :            list of str, dict
+                            Labels in order of original observation or
+                            dictionary with mapping original labels 
         """
 
         if not labels:
             labels = self.labels
+        elif isinstance(labels, dict):
+            labels = [ labels[l] for l in self.labels ]
 
         if not fig:
             fig = plt.figure()
