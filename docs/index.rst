@@ -17,7 +17,7 @@ Features
 * wrappers for CATMAID's API to fetch data 
 * custom neuron objects that perform on-demand data fetching
 * 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
-* virtual neuron surgery (cutting, pruning, rerooting)
+* virtual neuron surgery (cutting, stitching, pruning, rerooting)
 * R bindings (e.g. for libraries nat, nat.nblast and elmr)
 * interface with Blender 3D
 * and oh so much more...

@@ -83,6 +83,7 @@ Functions to retrieve data from server:
 - :func:`pymaid.pymaid.get_annotation_details`: get detailed annotations for a set of neurons (includes user and timestamp)
 - :func:`pymaid.pymaid.get_connectors`: get connectors (synapses, abutting and/or gap junctions) for set of neurons
 - :func:`pymaid.pymaid.get_connector_details`: get details for connector (i.e. all neurons connected to it)
+- :func:`pymaid.pymaid.get_connectors_between`: get connectors connecting two sets of neurons
 - :func:`pymaid.pymaid.get_contributor_statistics`: get contributors (nodes, synapses, etc) for a set of neurons
 - :func:`pymaid.pymaid.get_edges`: get edges (connections) between sets of neurons
 - :func:`pymaid.pymaid.get_history`: retrieve project history similar to the project statistics widget
@@ -138,6 +139,7 @@ Functions for morphological analyses:
 - :func:`pymaid.morpho.calc_strahler_index`: calculate strahler index for each node
 - :func:`pymaid.morpho.classify_nodes`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
 - :func:`pymaid.morpho.cut_neuron`: cut neuron at a node or node tag
+- :func:`pymaid.morpho.stich_neurons`: stitch neurons back together
 - :func:`pymaid.morpho.downsample_neuron`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - :func:`pymaid.morpho.in_volume`: test if points are within given CATMAID volume
 - :func:`pymaid.morpho.longest_neurite`: prunes neuron to its longest neurite
