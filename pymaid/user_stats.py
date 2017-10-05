@@ -52,7 +52,7 @@ Examples
 >>> plotly.offline.plot(fig) 
 """
 
-from pymaid.pymaid import get_neuron, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids
+from pymaid.pymaid import get_neuron, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids, _eval_remote_instance
 from pymaid import core
 import logging
 import pandas as pd
@@ -115,16 +115,7 @@ def get_user_contributions(x, remote_instance=None):
                            such as total reconstruction/review time.
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            module_logger.error(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            raise Exception(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+    remote_instance = _eval_remote_instance(remote_instance)
 
     skids = eval_skids(x, remote_instance)
 
@@ -152,9 +143,9 @@ def get_user_contributions(x, remote_instance=None):
     return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
-def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=10, treenodes=True, connectors=True, timeseries=False):
+def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM'):
     """ Takes a list of skeleton IDs and calculates the time each user has 
-    spent working on this set of neurons.
+    spent working on this set of neurons in minutes.
 
     Parameters
     ----------
@@ -166,42 +157,44 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=10, t
                        4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :  Catmaid Instance, optional
                        Either pass explicitly or define globally.
-    interval :         int, optional          
-                       Size of the bins in minutes. Default = 1 minute.
     minimum_actions :  int, optional
-                       Minimum number of actions per bin to be counted as 
+                       Minimum number of actions per minute to be counted as 
                        active.
     treenodes :        bool, optional
                        If False, treenodes will not be taken into account
     connectors :       bool, optional
                        If False, connectors will not be taken into account
-    timeseries :       bool, optional
-                       If True, instead of time invested per user, will
-                       return time invested per day. Returns only total time
-                       invested (creation+edition+review)
+    mode :             {'SUM','OVER_TIME','ACTIONS'}, optional
+                       'SUM' will return total time invested (in minutes) per 
+                       user. 'OVER_TIME' will return minutes invested/day over 
+                       time. 'ACTIONS' will return actions/day over time.
 
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a user. 
+        If mode=='SUM', values represent minutes invested.
 
         >>> df
-        ...   user  total  creation  edition  review
-        ... 0
-        ... 1
+        ...       total  creation  edition  review
+        ... user1
+        ... user2
 
-        or if timeseries = True, DataFrame in which each row is timeseries
-        of TOTAL time invested.
+        If mode=='OVER_TIME' or mode=='ACTIONS': 
+
         >>> df
         ...       date date date ...
         ... user1
-        ... user2        
+        ... user2
+
+        For OVER_TIME, values respresent minutes invested on that day. For 
+        ACTIONS, values represent actions (creation, edition, review) on that 
+        day.
 
 
     Important
     ---------
-    Values represent minutes. Creation/Edition/Review can overlap! This is why 
-    total time spent is != creation + edition + review.
+    Creation/Edition/Review can overlap! This is why total time spent 
+    is != creation + edition + review.
 
     Please note that this does currently not take placement of postsynaptic 
     nodes into account!
@@ -227,11 +220,27 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=10, t
     >>> fig = { "data" : [ { "values" : stats.total.tolist(), 
     ...         "labels" : stats.user.tolist(), "type" : "pie" } ] } 
     >>> plotly.offline.plot(fig)    
+
+    Plot reconstruction efforts over time
+    >>> stats = pymaid.get_time_invested( skids, mode='OVER_TIME' )    
+    >>> # Plot time invested over time
+    >>> stats.T.plot()
+    >>> # Plot cumulative time invested over time
+    >>> stats.T.cumsum(axis=0).plot()
+    >>> # Filter for major contributors
+    >>> stats[ stats.sum(axis=1) > 20 ].T.cumsum(axis=0).plot()
+
     """
+
+    if mode not in ['SUM','OVER_TIME','ACTIONS']:
+        raise ValueError('Unknown mode %s' % str(mode))    
+
+    remote_instance = _eval_remote_instance(remote_instance)
 
     skids = eval_skids(x, remote_instance)
 
     # Need this later for pandas TimeGrouper
+    interval = 1
     bin_width = '%iMin' % interval
 
     user_list = get_user_list(remote_instance).set_index('id')
@@ -273,9 +282,11 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=10, t
 
     # Merge all timestamps
     all_timestamps = pd.concat(
-        [creation_timestamps, edition_timestamps, review_timestamps], axis=0)
+        [creation_timestamps, edition_timestamps, review_timestamps], axis=0)    
 
-    if not timeseries:
+    all_timestamps.sort_values('timestamp', inplace=True)
+
+    if mode == 'SUM':
         stats = {
             'total': {u: 0 for u in all_timestamps.user.unique()},
             'creation': {u: 0 for u in all_timestamps.user.unique()},
@@ -303,10 +314,43 @@ def get_time_invested(x, remote_instance=None, interval=1, minimum_actions=10, t
         module_logger.info(
             'Done! Use e.g. plotly to generate a plot: \n stats = get_time_invested( skids, remote_instance ) \n fig = { "data" : [ { "values" : stats.total.tolist(), "labels" : stats.user.tolist(), "type" : "pie" } ] } \n plotly.offline.plot(fig) ')
 
-        return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True)
+        return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
 
-    else:
+    elif mode == 'ACTIONS':
+        all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq='1d')).count().to_frame()
+        all_ts.columns = ['all_users'] 
+        all_ts = all_ts.T
         # Get total time spent
         for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
-            stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+            this_ts = all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq='1d')).count().to_frame()
+            this_ts.columns=[ user_list.ix[u].login ]
+
+            all_ts = pd.concat( [all_ts, this_ts.T] )
+
+        return all_ts.fillna(0)
+
+    elif mode == 'OVER_TIME':
+        #First count all minutes with minimum number of actions
+        minutes_counting = ( all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq=bin_width)).count().to_frame() > minimum_actions )
+        #Then remove the minutes that have less
+        minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
+        #Now group by hour
+        all_ts = minutes_counting.groupby(pd.TimeGrouper(freq='1d')).count()       
+        all_ts.columns = ['all_users']
+        all_ts = all_ts.T
+        # Get total time spent        
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):            
+            minutes_counting = ( all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq=bin_width)).count().to_frame() > minimum_actions )
+            minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
+            this_ts = minutes_counting.groupby(pd.TimeGrouper(freq='1d')).count()
+
+            this_ts.columns=[ user_list.ix[u].login ]
+
+            all_ts = pd.concat( [all_ts, this_ts.T] )
+
+        all_ts.fillna(0, inplace=True)
+
+        return all_ts
+
+
+
