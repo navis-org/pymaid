@@ -1620,15 +1620,21 @@ def get_connectors_between(a, b, directional=False, remote_instance=None ):
     b = [int(s) for s in b]
 
     if directional:
-        cn_details = cn_details[ cn_details.presynaptic_to.isin( a ) ]
-        cn_details = cn_details[ [  True in [ skid in a for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
+        selection = cn_details.presynaptic_to.isin(a) & np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] )
+        #cn_details = cn_details[ cn_details.presynaptic_to.isin( a ) ]
+        #cn_details = cn_details[ [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
     else:
-        cn_details = cn_details[ cn_details.presynaptic_to.isin( a + b ) ]
-        cn_details = cn_details[ [  True in [ skid in a+b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
+        selection = ( cn_details.presynaptic_to.isin(a) &  \
+                      np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ) ) | \
+                    ( cn_details.presynaptic_to.isin(b) &  \
+                      np.array( [  True in [ skid in a for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ) )
 
-    module_logger.info('%i shared connectors remaining after filtering' % len(cn_details) )
+        #cn_details = cn_details[ cn_details.presynaptic_to.isin( a + b ) ]
+        #cn_details = cn_details[ [  True in [ skid in a+b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
 
-    return cn_details.reset_index(drop=True)
+    module_logger.info('%i shared connectors remaining after filtering' % len(cn_details[ selection ]) )
+
+    return cn_details[ selection ].reset_index(drop=True)
 
 def get_review(x, remote_instance=None):
     """ Wrapper to retrieve review status for a set of neurons
