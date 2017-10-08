@@ -47,7 +47,7 @@ if len( module_logger.handlers ) == 0:
 __all__ = [ 'calc_cable','calc_strahler_index','classify_nodes','cut_neuron',
             'downsample_neuron','in_volume','longest_neurite',
             'prune_by_strahler','reroot_neuron','synapse_root_distances',
-            'cable_within_distance','stitch_neurons']
+            'cable_within_distance','stitch_neurons','arbor_confidence']
 
 def generate_list_of_childs(skdata):
     """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -992,6 +992,70 @@ def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], pos
 
     return pre_node_distances, post_node_distances
 
+def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
+    """ Calculates confidence for each treenode by walking from root to leafs
+    starting with a confidence of 1. Each time a low confidence edge is 
+    encountered the downstream confidence is reduced (see value parameter).
+
+    Parameters
+    ----------
+    x :                 {CatmaidNeuron, CatmaidNeuronList}       
+                        Neuron(s) to calculate confidence for.
+    confidences :       list of five floats, optional
+                        Values by which the confidence of the downstream
+                        branche is reduced upon encounter of a 5/4/3/2/1-
+                        confidence edge.
+    inplace :           bool, optional
+                        If False, a copy of the neuron is returned.
+
+    Returns
+    -------
+    Adds "arbor_confidence" column in neuron.nodes.
+    """
+
+    def walk_to_leafs( this_node, this_confidence=1 ):
+        pbar.update(1)                
+        while True:                    
+            this_confidence *= confidences[ 5 - x.nodes.loc[ this_node ].confidence ]
+            x.nodes.loc[ this_node,'arbor_confidence'] = this_confidence            
+
+            if len(loc[this_node]) > 1:
+                for c in loc[this_node]:
+                    walk_to_leafs( c, this_confidence )
+                break
+            elif len(loc[this_node]) == 0:
+                break
+
+            this_node = loc[this_node][0]
+
+    if not isinstance(x, ( core.CatmaidNeuron, core.CatmaidNeuronList )):
+        raise TypeError('Unable to process data of type %s' % str(type(x)))
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if not inplace:
+            res = [ arbor_confidence(n, confidence=confidence, inplace=inplace) for n in x ]
+        else:
+            return core.CatmaidNeuronList( [ arbor_confidence(n, confidence=confidence, inplace=inplace) for n in x ] )
+
+    if not inplace:
+        x = x.copy()
+
+    loc = generate_list_of_childs(x)   
+
+    x.nodes['arbor_confidence'] = [None] * x.nodes.shape[0] 
+
+    root = x.root
+    x.nodes.set_index('treenode_id', inplace=True, drop=True)
+    x.nodes.loc[root,'arbor_confidence'] = 1
+
+    with tqdm(total=len(x.slabs),desc='Calc confidence' ) as pbar:
+        for c in loc[root]:
+            walk_to_leafs(c)
+
+    x.nodes.reset_index(inplace=True, drop=False)
+
+    if not inplace:
+        return x
 
 def _calc_dist(v1, v2):
     return math.sqrt(sum(((a - b)**2 for a, b in zip(v1, v2))))
