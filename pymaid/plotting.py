@@ -608,8 +608,9 @@ def plot3d(x, *args, **kwargs):
     connectors :      bool, default=False
                       Plot synapses and gap junctions.
     by_strahler :     bool, default=False
-                      Will render the neuron by strahler index.
-                      Does currently only work when backend = 'plotly'
+                      Will shade neuron(s) by strahler index.
+    by_confidence :   bool, default=False
+                      Will shade neuron(s) by arbor confidence                      
     cn_mesh_colors :  bool, default=False
                       Plot connectors using mesh colors.
     limits :          dict, optional
@@ -729,23 +730,22 @@ def plot3d(x, *args, **kwargs):
             try:
                 neuron_color = colormap[str(neuron.skeleton_id)]
             except:
-                neuron_color = (10, 10, 10)
+                neuron_color = (0, 0, 0)
 
             if max(neuron_color) > 1:
-                neuron_color = np.array(neuron_color) / 255
+                neuron_color = np.array(neuron_color) / 255            
 
             # Get root node indices (may be more than one if neuron has
             # been cut weirdly)
             root_ix = neuron.nodes[
-                neuron.nodes.parent_id.isnull()].index.tolist()
-            neuron.nodes.set_index('treenode_id', inplace=True)
+                neuron.nodes.parent_id.isnull()].index.tolist()            
 
-            if not connectors_only:                
+            if not connectors_only:
 
                 # Extract treenode_coordinates and their parent's coordinates                
                 tn_coords = neuron.nodes[['x', 'y', 'z']].apply(
                     pd.to_numeric).as_matrix()
-                parent_coords = neuron.nodes.ix[neuron.nodes.parent_id.tolist(
+                parent_coords = neuron.nodes.set_index('treenode_id').loc[neuron.nodes.parent_id.tolist(
                 )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
 
                 # Pop root from coordinate lists
@@ -756,16 +756,48 @@ def plot3d(x, *args, **kwargs):
                 segments = [item for sublist in zip(
                     tn_coords, parent_coords) for item in sublist]
 
+                # Add alpha to color based on strahler
+                if by_strahler or by_confidence:                    
+                    if by_strahler:                            
+                        if 'strahler_index' not in neuron.nodes:
+                            morpho.calc_strahler_index(neuron)                        
+
+                        # Generate list of alpha values
+                        alpha = neuron.nodes['strahler_index'].as_matrix()
+
+                    if by_confidence:
+                        if 'arbor_confidence' not in neuron.nodes:
+                            morpho.arbor_confidence(neuron)
+
+                        # Generate list of alpha values
+                        alpha = neuron.nodes['arbor_confidence'].as_matrix()
+
+                    # Pop root from coordinate lists
+                    alpha = np.delete(alpha, root_ix, axis=0)
+
+                    alpha = alpha / (max(alpha)+1)                    
+                    # Duplicate values (start and end of each segment!)
+                    alpha = np.array([ v for l in zip(alpha,alpha) for v in l ])
+
+                    # Turn color into array (need 2 colors per segment for beginnng and end)
+                    neuron_color = np.array( [ neuron_color ] * (tn_coords.shape[0] * 2), dtype=float )
+
+                    neuron_color = np.insert(neuron_color, 3, alpha, axis=1)
+
                 if segments:
                     # Create line plot from segments. Note that we divide coords by
                     # a scale factor
                     t = scene.visuals.Line(pos=np.array(segments) * vispy_scale_factor,
-                                           color=neuron_color,
+                                           color=list(neuron_color),
                                            width=2,
                                            connect='segments',
                                            antialias=False,
                                            method='gl') #method can also be 'agg'
                     view.add(t)
+
+                if by_strahler or by_confidence:
+                    #Convert array back to a single color without alpha
+                    neuron_color=neuron_color[0][:3]
 
                 # Extract and plot soma
                 soma = neuron.nodes[neuron.nodes.radius > 1]
@@ -774,7 +806,9 @@ def plot3d(x, *args, **kwargs):
                         soma.ix[soma.index[0]].radius * vispy_scale_factor, 10)
                     sp = create_sphere(5, 5, radius=radius)
                     s = scene.visuals.Mesh(vertices=sp.get_vertices() + soma.ix[soma.index[0]][
-                                           ['x', 'y', 'z']].as_matrix() * vispy_scale_factor, faces=sp.get_faces(), color=neuron_color)
+                                           ['x', 'y', 'z']].as_matrix() * vispy_scale_factor, 
+                                           faces=sp.get_faces(), 
+                                           color=neuron_color)
                     view.add(s)
 
             if connectors or connectors_only:
@@ -817,9 +851,7 @@ def plot3d(x, *args, **kwargs):
                                                connect='segments',
                                                antialias=False,
                                                method='gl') #method can also be 'agg'
-                        view.add(t)
-
-            neuron.nodes.reset_index(inplace=True)
+                        view.add(t)            
 
         for neuron in dotprops.itertuples():
             try:
@@ -1226,6 +1258,7 @@ def plot3d(x, *args, **kwargs):
     downsampling = kwargs.get('downsampling', 1)
     connectors = kwargs.get('connectors', False)
     by_strahler = kwargs.get('by_strahler', False)
+    by_confidence = kwargs.get('by_confidence', False)
     cn_mesh_colors = kwargs.get('cn_mesh_colors', False)
     connectors_only = kwargs.get('connectors_only', False)    
 
