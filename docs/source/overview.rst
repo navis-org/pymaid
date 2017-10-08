@@ -134,6 +134,7 @@ Functions for clustering:
 
 Functions for morphological analyses:
 
+- :func:`pymaid.morpho.arbor_confidence`: calculates confidence along the arbor
 - :func:`pymaid.morpho.calc_cable`: calculate cable length of given neuron
 - :func:`pymaid.morpho.cable_within_distance`: calculate cable between pairs of neurons that is within given distance
 - :func:`pymaid.morpho.calc_strahler_index`: calculate strahler index for each node
