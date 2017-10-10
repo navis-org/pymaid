@@ -790,7 +790,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     if isinstance(reference, str):
         reference = robjects.r(reference)
     rn = nat_templatebrains.xform_brain(
-        nat.neuronlist(rn), sample='FAFB13', reference=reference)
+        nat.neuronlist(rn), sample='FAFB14', reference=reference)
 
     # Mirror neuron
     if mirror:
