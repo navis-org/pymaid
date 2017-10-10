@@ -75,7 +75,7 @@ __all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
             'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
-            'get_segments','delete_neuron','get_connectors_between']
+            'get_segments','delete_neuron','get_connectors_between','url_to_coordinates']
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -266,32 +266,7 @@ class CatmaidInstance:
         GET request: 
         Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id, link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id, link2_confidence, creator_id ]
         """
-        return self.djangourl("/" + str(self.project_id) + "/connector/list/")
-
-    def _url_to_coordinates(self, coords, stack_id=0, tool='tracingtool', active_skeleton_id=None, active_node_id=None):
-        """ Use to generate URL to a location
-
-        Parameters
-        ----------
-        coords :    list of integers
-                    (x, y, z)
-
-        """
-        GET_data = {'pid': self.project_id,
-                    'xp': coords[0],
-                    'yp': coords[1],
-                    'zp': coords[2],
-                    'tool': tool,
-                    'sid0': stack_id,
-                    's0': 0
-                    }
-
-        if active_skeleton_id:
-            GET_data['active_skeleton_id'] = active_skeleton_id
-        if active_node_id:
-            GET_data['active_node_id'] = active_node_id
-
-        return(self.djangourl('?%s' % urllib.parse.urlencode(GET_data)))
+        return self.djangourl("/" + str(self.project_id) + "/connector/list/")    
 
     def _get_user_list_url(self):
         """ Get user list for project. """
@@ -1255,7 +1230,7 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
     return df
 
 
-def get_treenode_table(x, remote_instance=None):
+def get_treenode_table(x, include_details=True, remote_instance=None):
     """ Wrapper to retrieve treenode table(s) for a list of neurons
 
     Parameters
@@ -1266,6 +1241,10 @@ def get_treenode_table(x, remote_instance=None):
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
+    include_details :   bool, optional
+                        If True, tags and reviewer are included in the table.
+                        For larger lists, it is recommended to set this to
+                        False to improve performance.
     remote_instance :   CATMAID instance 
                         Either pass directly to function or define  
                         globally as ``remote_instance``
@@ -1292,6 +1271,9 @@ def get_treenode_table(x, remote_instance=None):
 
     x = eval_skids(x, remote_instance=remote_instance)    
 
+    if not isinstance(x, (list, np.ndarray)):
+        x = [x]
+
     module_logger.info(
         'Retrieving %i treenode table(s)...' % len(x))
 
@@ -1301,27 +1283,64 @@ def get_treenode_table(x, remote_instance=None):
 
     # Generate URLs to retrieve
     urls = []
-    for i, skeleton_id in enumerate(list(set(x))):
-        remote_nodes_list_url = remote_instance._get_skeleton_nodes_url(
-            skeleton_id)
+    for skid in x:
+        remote_nodes_list_url = remote_instance._get_skeleton_nodes_url(skid)
         urls.append(remote_nodes_list_url)
 
-    node_list = _get_urls_threaded(urls, remote_instance, desc='tn tables')
+    node_list = _get_urls_threaded(urls, remote_instance, desc='tn tables')    
 
+    module_logger.info(
+        '%i treenodes retrieved. Creating table...' % sum( [len( nl[0] ) for nl in node_list] ) )
+
+    all_tables = []
+
+    for i,nl in enumerate( tqdm(node_list, desc='Creating table') ):
+        if include_details:
+            tag_dict = {n[0]: [] for n in nl[0]}
+            reviewer_dict = {n[0]: [] for n in nl[0]} 
+            [tag_dict[n[0]].append(n[1]) for n in nl[2]]
+            [reviewer_dict[n[0]].append(user_list[user_list.id == n[1]]['login'].values[
+                                        0]) for n in nl[1]]
+
+            this_df = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for n in nl[0]],
+                                columns=['skeleton_id', 'treenode_id', 'parent_node_id', 'confidence',
+                                         'x', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
+                                dtype=object
+                                )            
+        else:
+            this_df = pd.DataFrame([[x[i]] + n for n in nl[0]],
+                                columns=['skeleton_id', 'treenode_id', 'parent_node_id', 'confidence',
+                                         'x', 'y', 'z', 'radius', 'creator', 'last_edited'],
+                                dtype=object
+                                )
+
+        # Replace creator_id with their login
+        this_df['creator'] = [user_dict[u]['login'] for u in this_df['creator']]
+
+        # Replace timestamp with datetime object
+        this_df['last_edited'] = [datetime.datetime.fromtimestamp(
+            t, tz=datetime.timezone.utc) for t in this_df['last_edited']]
+
+        all_tables.append(this_df)
+    
+    tn_table = pd.concat(all_tables, axis=0)
+
+    """
     # Format of node_list: treenode_id, parent_node_id, confidence, x, y, z,
     # radius, creator, last_edited
     tag_dict = {n[0]: [] for nl in node_list for n in nl[0]}
-    [tag_dict[n[0]].append(n[1]) for nl in node_list for n in nl[2]]
+    reviewer_dict = {n[0]: [] for nl in node_list for n in nl[0]} 
+    for nl in tqdm(node_list, desc='Creating table'):    
+        [tag_dict[n[0]].append(n[1]) for n in nl[2]]
+        [reviewer_dict[n[0]].append(user_list[user_list.id == n[1]]['login'].values[
+                                    0]) for n in nl[1]]
 
-    reviewer_dict = {n[0]: [] for nl in node_list for n in nl[0]}
-    [reviewer_dict[n[0]].append(user_list[user_list.id == n[1]]['login'].values[
-                                0]) for nl in node_list for n in nl[1]]
-
-    tn_table = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for nl in node_list for n in nl[0]],
+    tn_table = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for i,nl in enumerate( node_list ) for n in nl[0]],
                             columns=['skeleton_id', 'treenode_id', 'parent_node_id', 'confidence',
                                      'x', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
                             dtype=object
                             )
+
 
     # Replace creator_id with their login
     tn_table['creator'] = [user_dict[u]['login'] for u in tn_table['creator']]
@@ -1329,7 +1348,7 @@ def get_treenode_table(x, remote_instance=None):
     # Replace timestamp with datetime object
     tn_table['last_edited'] = [datetime.datetime.fromtimestamp(
         t, tz=datetime.timezone.utc) for t in tn_table['last_edited']]
-
+    """
     return tn_table
 
 
@@ -4088,3 +4107,76 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         return to_return
     else:
         raise TypeError('Unable to extract node IDs from type %s' % str(type(x)))
+
+
+def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_id=None, remote_instance=None, tool='tracingtool'):
+    """ Use to generate URL to a location
+
+    Parameters
+    ----------
+    coords :                {list, np.ndarray, pandas.DataFrame}
+                            x,y,z coordinates
+    stack_id :              {int, list/array of ints}
+                            ID of the image stack you want to link to
+    active_skeleton_id :    {int, list/array of ints}, optional
+                            Skeleton ID of the neuron that should be selected.
+    active_node_id :        {int, list/array of ints}, optional
+                            Treenode/Connector ID of the node that should be
+                            active.
+    tool :                  str, optional
+
+    Returns
+    -------
+    {str or list of str}
+                Url(s) to original coordinates
+    """
+
+    def gen_url(c, stid, nid, sid ):
+        """ This function generates the actual urls
+        """
+        GET_data = {'pid': remote_instance.project_id,
+                'xp': int(c[0]),
+                'yp': int(c[1]),
+                'zp': int(c[2]),
+                'tool': tool,
+                'sid0': stid,
+                's0': 0
+                }
+
+        if sid:
+            GET_data['active_skeleton_id'] = sid
+        if nid:
+            GET_data['active_node_id'] = nid
+
+        return(remote_instance.djangourl('?%s' % urllib.parse.urlencode(GET_data)))
+
+    def list_helper(x):
+        """ Helper function to turn variables into lists matching length of coordinates
+        """
+        if not isinstance(x, (list, np.ndarray)):
+            return [ x ] * len( coords )
+        elif len( x ) != len( coords ):
+            raise ValueError('Parameters must be the same shape as coords.')
+        else:
+            return x
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    if isinstance(coords, (pd.DataFrame, pd.Series)):
+        try:
+            coords = coords[['x','y','z']].as_matrix()
+        except:
+            raise ValueError('Pandas DataFrames/Series must have "x","y","z" columns.')
+    elif isinstance(coords, list):
+        coords = np.array(coords)
+
+    if isinstance(coords, np.ndarray) and coords.ndim > 1:
+        stack_id = list_helper(stack_id)
+        active_skeleton_id = list_helper(active_skeleton_id)
+        active_node_id = list_helper(active_node_id)
+
+        return [ gen_url( c, stid, nid, sid ) for c, stid, nid, sid in zip(coords, stack_id, active_node_id, active_skeleton_id ) ]
+    else:
+        return gen_url( coords, stack_id, active_node_id, active_skeleton_id )
+
+    

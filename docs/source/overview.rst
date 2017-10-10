@@ -106,6 +106,7 @@ Functions to retrieve data from server:
 - :func:`pymaid.pymaid.get_user_annotations`: get list of annotations used by given user(s)
 - :func:`pymaid.pymaid.get_user_list`: get list of users in the project
 - :func:`pymaid.pymaid.get_volume`: get volume (verts + faces) of CATMAID volumes
+- :func:`pymaid.pymaid.url_to_coordinates`: generate urls to coordinates
 
 Wrappers to use igraph:
 
