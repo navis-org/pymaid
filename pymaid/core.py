@@ -543,15 +543,20 @@ class CatmaidNeuron:
         self._clear_temp_attr()        
 
     def prune_distal_to(self, node):
-        """Cut off nodes distal to given node. 
+        """Cut off nodes distal to given nodes.
 
         Parameters
         ----------
         node :      {treenode_id, node_tag}
-                    Provide either a treenode ID or a (unique) tag
+                    Provide either treenode ID(s) or a unique tag(s)
         """
-        dist, prox = morpho.cut_neuron(self, node)
-        self.__init__(prox, self._remote_instance, self._meta_data)
+
+        if not isinstance( node, (list, np.ndarray) ):                
+            node = [node]
+
+        for n in node:
+            dist, prox = morpho.cut_neuron(self, n)
+            self.__init__(prox, self._remote_instance, self._meta_data)
 
         # Clear temporary attributes
         self._clear_temp_attr()
