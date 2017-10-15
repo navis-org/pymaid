@@ -26,26 +26,26 @@ Examples
 >>> import pymaid
 >>> import matplotlib.pyplot as plt
 >>> from rpy2.robjects.packages import importr
->>> #Load nat as module
+>>> # Load nat as module
 >>> nat = importr('nat')
->>> #Initialise Catmaid instance
+>>> # Initialise Catmaid instance
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
->>> #Fetch a neuron in Python CATMAID
+>>> # Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
 >>> n = pymaid.get_neuron( skeleton_id, rm )
->>> #Initialize R's rcatmaid 
+>>> # Initialize R's rcatmaid 
 >>> rcatmaid = pymaid.init_rcatmaid( rm )
->>> #Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
+>>> # Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
 >>> n_r = pymaid.neuron2r( n.ix[0] )
->>> #Use nat to prune the neuron
+>>> # Use nat to prune the neuron
 >>> n_pruned = nat.prune_strahler( n_r )
->>> #Convert back to pymaid object
+>>> # Convert back to pymaid object
 >>> n_py = pymaid.neuron2py( n_pruned, rm )
->>> #Nblast pruned neuron (assumes FlyCircuit database is saved locally)
+>>> # Nblast pruned neuron (assumes FlyCircuit database is saved locally)
 >>> results = pymaid.nblast( n_pruned )
->>> #Sort results by mu score
+>>> # Sort results by mu score
 >>> results.sort('mu_score')
->>> #Plot top hits
+>>> # Plot top hits
 >>> results.plot( hits = 3 )
 """
 
@@ -571,11 +571,11 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     --------
     >>> import pymaid
     >>> import matplotlib.pyplot as plt
-    >>> #Initialize connection to Catmaid server
+    >>> # Initialize connection to Catmaid server
     >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
-    >>> #Get a bunch of neurons
+    >>> # Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
-    >>> #Blast against each other
+    >>> # Blast against each other
     >>> res = pymaid.nblast_allbyall( nl )
     >>> # Cluster and create simple dendrogram
     >>> res.cluster(method='ward')
@@ -708,17 +708,17 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     Examples
     --------
     >>> import pymaid
-    >>> #Initialize connection to Catmaid server
+    >>> # Initialize connection to Catmaid server
     >>> rm = CatmaidInstance( url, http_user, http_pw, token )
-    >>> #Blast a neuron against default (FlyCircuit) database
+    >>> # Blast a neuron against default (FlyCircuit) database
     >>> nbl = pymaid.nblast( skid = 16, remote_instance = rm  )
-    >>> #See contents of nblast_res object
+    >>> # See contents of nblast_res object
     >>> help(nbl)
-    >>> #Get results as Pandas Dataframe
+    >>> # Get results as Pandas Dataframe
     >>> nbl.results
-    >>> #Plot histogram of results
+    >>> # Plot histogram of results
     >>> nbl.plot.hist(alpha=.5)
-    >>> #Sort and plot the first hits
+    >>> # Sort and plot the first hits
     >>> nbl.sort('mu_score')
     >>> nbl.plot(hits = 4)
     """
