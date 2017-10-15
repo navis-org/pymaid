@@ -172,6 +172,9 @@ class CatmaidNeuron:
         # Soma tag - set to None if no tag needed
         self.soma_detection_tag = 'soma'
 
+        #Default color is yellow
+        self.color = (255, 255, 0)
+
         if isinstance(x, CatmaidNeuron) or isinstance(x, pd.Series):
             self.skeleton_id = copy(x.skeleton_id)
 
@@ -1627,7 +1630,7 @@ class CatmaidNeuronList:
         """
 
         data = [dict(skeleton_id=int(n.skeleton_id),
-                     color="#%02x%02x%02x" % (255, 255, 0),
+                     color="#%02x%02x%02x" % n.color,
                      opacity=1
                      ) for n in self.neurons]
 
