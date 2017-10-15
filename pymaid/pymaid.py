@@ -2498,7 +2498,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     >>> # Load neuron
     >>> n = pymaid.get_neuron( 16 )
     >>> # Get non-end nodes 
-    >>> non_leaf_nodes = n.nodes[ n.nodes.type != 'leaf' ]
+    >>> non_leaf_nodes = n.nodes[ n.nodes.type != 'end' ]
     >>> # Define which tags to remove
     >>> tags_to_remove = ['ends','uncertain end','uncertain continuation','TODO']
     >>> # Remove tags
@@ -4033,8 +4033,8 @@ def eval_skids(x, remote_instance=None):
         return list(x.skeleton_id)
     elif isinstance(x, pd.DataFrame):
         return x.skeleton_id.tolist()
-    elif isinstance(x, pd.Series):
-        return [x.skeleton_id]
+    elif isinstance(x, pd.Series) and x.name == 'skeleton_id':
+        return x.tolist()        
     else:
         module_logger.error(
             'Unable to extract x from type %s' % str(type(x)))
@@ -4109,7 +4109,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         raise TypeError('Unable to extract node IDs from type %s' % str(type(x)))
 
 
-def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_id=None, remote_instance=None, tool='tracingtool'):
+def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_id=None, remote_instance=None, zoom=0, tool='tracingtool'):
     """ Use to generate URL to a location
 
     Parameters
@@ -4117,18 +4117,21 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
     coords :                {list, np.ndarray, pandas.DataFrame}
                             x,y,z coordinates
     stack_id :              {int, list/array of ints}
-                            ID of the image stack you want to link to
+                            ID of the image stack you want to link to. 
+                            Depending on your setup this parameter might be
+                            overriden by local user settings.
     active_skeleton_id :    {int, list/array of ints}, optional
                             Skeleton ID of the neuron that should be selected.
     active_node_id :        {int, list/array of ints}, optional
                             Treenode/Connector ID of the node that should be
                             active.
+    zoom :                  int, optional
     tool :                  str, optional
 
     Returns
     -------
     {str or list of str}
-                Url(s) to original coordinates
+                URL(s) to original coordinates
     """
 
     def gen_url(c, stid, nid, sid ):
@@ -4140,7 +4143,7 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
                 'zp': int(c[2]),
                 'tool': tool,
                 'sid0': stid,
-                's0': 0
+                's0': zoom
                 }
 
         if sid:
