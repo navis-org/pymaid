@@ -213,23 +213,25 @@ def _generate_slabs(x, append=True):
     return slabs
 
 
-def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_treenodes=True):
+def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_treenodes=True, preserve_tag_treenodes=False):
     """ Downsamples neuron(s) by a given factor. Preserves root, leafs, 
     branchpoints by default. Preservation of treenodes with synapses can
     be toggled.
 
     Parameters
     ----------
-    skdata :                {CatmaidNeuron,CatmaidNeuronList} 
-                            Neuron(s) to downsample
-    resampling_factor :     int 
-                            Factor by which to reduce the node count
-    inplace :               bool, optional   
-                            If True, will modify original neuron. If False, a 
-                            downsampled copy is returned.
-    preserve_cn_treenodes : bool, optional
-                            If True, treenodes that have connectors are 
-                            preserved.
+    skdata :                 {CatmaidNeuron,CatmaidNeuronList} 
+                             Neuron(s) to downsample
+    resampling_factor :      int 
+                             Factor by which to reduce the node count
+    inplace :                bool, optional   
+                             If True, will modify original neuron. If False, a 
+                             downsampled copy is returned.
+    preserve_cn_treenodes :  bool, optional
+                             If True, treenodes that have connectors are 
+                             preserved.
+    preserve_tag_treenodes : bool, optional
+                             If True, treenodes with tags are preserved.    
 
     Returns
     -------
@@ -269,11 +271,16 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     if 'type' not in df.nodes:
         classify_nodes(df)
 
+    selection = df.nodes.type != 'slab'    
+
     if preserve_cn_treenodes:
-        fix_points = df.nodes[(df.nodes.type != 'slab') | (
-            df.nodes.has_connectors == True)].treenode_id.values
-    else:
-        fix_points = df.nodes[ df.nodes.type != 'slab' ].treenode_id.values
+        selection = selection | df.nodes.has_connectors == True    
+
+    if preserve_tag_treenodes:
+        with_tags = [ t for l in df.tags.values() for t in l ]
+        selection = selection | df.nodes.treenode_id.isin( with_tags )    
+
+    fix_points = df.nodes[ selection ].treenode_id.values    
 
     # Walk from all fix points to the root - jump N nodes on the way
     new_parents = {}
@@ -422,6 +429,9 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     pandas.Series or CatmaidNeuron object
                Containing the rerooted neuron
     """
+
+    if new_root == None:
+        raise ValueError('New root can not be <None>')
 
     if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
@@ -1062,7 +1072,7 @@ def _calc_dist(v1, v2):
 
 
 def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
-    """ Calculates cable length in micro meter (um) of a given neuron     
+    """ Calculates cable length in micrometer (um) of a given neuron     
 
     Parameters
     ----------
