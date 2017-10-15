@@ -20,36 +20,43 @@ if len( module_logger.handlers ) == 0:
 try:
     from pymaid.pymaid import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.pymaid:\n' + str(error))
 
 try:
     from pymaid.cluster import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.cluster:\n' + str(error))
 
 try:
     from pymaid.morpho import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.morpho:\n' + str(error))
 
 try:
     from pymaid.plotting import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.plotting:\n' + str(error))
 
 try:
     from pymaid.user_stats import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.user_stats:\n' + str(error))
 
 try:
     from pymaid.core import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.core:\n' + str(error))
 
 try:
     from pymaid.igraph_catmaid import *
 except Exception as error:
+    module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.igraph_catmaid:\n' + str(error))  
 
 try:
