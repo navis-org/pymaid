@@ -90,8 +90,8 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     >>> neurons = pymaid.get_neurons('annotation:test')
     >>> mat = pymaid.adjacency_matrix( neurons )
     >>> g = sns.heatmap(adj_mat, square=True)
-    >>> g.set_yticklabels(g.get_yticklabels(), rotation = 0, fontsize = 8)
-    >>> g.set_xticklabels(g.get_xticklabels(), rotation = 90, fontsize = 6)
+    >>> g.set_yticklabels(g.get_yticklabels(), rotation = 0, fontsize = 7)
+    >>> g.set_xticklabels(g.get_xticklabels(), rotation = 90, fontsize = 7)
     >>> plt.show()
 
     """
@@ -303,6 +303,20 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     :func:`pymaid.cluster.clust_results`
                          Holds distance matrix and contains wrappers to plot
                          dendograms.
+
+    Examples
+    --------
+    >>> import pymaid
+    >>> import matplotlib.pyplot as plt
+    >>> # Initialise CatmaidInstance
+    >>> rm = pymaid.CatmaidInstance( 'url','user','pw','token' )
+    >>> # Cluster a set of neurons by their inputs (ignore small fragments)
+    >>> res = pymaid.cluster_by_connectivity('annotation:PBG6 P-EN right', upstream=True, downstream=False, threshold=1, min_nodes=500)
+    >>> # Get the adjacency matrix
+    >>> print(res.mat)
+    >>> # Plot a dendrogram
+    >>> fig = res.plot_dendrogram()
+    >>> plt.show()
     """
 
     if remote_instance is None:
@@ -793,14 +807,14 @@ class clust_results:
     >>> import pymaid
     >>> import matplotlib.pyplot as plt
     >>> rm = pymaid.CatmaidInstance('server_url','user','password','token')    
-    >>> #Get a bunch of neurons
+    >>> # Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
-    >>> #Perform all-by-all nblast
+    >>> # Perform all-by-all nblast
     >>> res = pymaid.nblast_allbyall( nl )
-    >>> #res is a clust_results object
+    >>> # res is a clust_results object
     >>> res.plot_matrix()
     >>> plt.show()
-    >>> #Extract 5 clusters
+    >>> # Extract 5 clusters
     >>> res.get_clusters( 5, criterion = 'maxclust' )
 
     """
