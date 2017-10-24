@@ -113,7 +113,7 @@ class CatmaidInstance:
                     If set to None, time-out will be max([ 30, len(requests) ])
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
-                    adding it as module 'remote_instance' to sys.modules.
+                    adding it as module 'remote_instance' to sys.modules
 
     Notes
     -----
@@ -406,8 +406,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=N
     urls :              list of str
                         Urls to retrieve.
     remote_instance :   CATMAID instance
-                        Either pass directly to function or define globally 
-                        as 'remote_instance'       
+                        If not passed directly, will try using global.      
     post_data :         list of dicts, optional
                         Needs to be the same size as urls
     desc :              str, optional
@@ -526,8 +525,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define globally 
-                        as 'remote_instance'
+                        If not passed directly, will try using global.
     connector_flag :    {0/False,1/True}, optional
                         Set if connector data should be retrieved.                         
                         Note: the CATMAID API endpoint does currently not
@@ -559,7 +557,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         If True, a ``pandas.DataFrame`` instead of 
                         ``CatmaidNeuron``/``CatmaidNeuronList`` is returned.
     **kwargs           
-                        Above boolean parameters can also be passed as dict.
+                        Above BOOLEAN parameters can also be passed as dict.
                         This is then used in CatmaidNeuron objects to
                         override implicitly set parameters!
 
@@ -755,8 +753,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
     connector_flag :    {0,1}, optional
                         Set if connector data should be retrieved. 
     tag_flag :          {0,1}, optional
@@ -848,8 +845,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                         {'vertices':[],'faces':[]} as returned by e.g. 
                         :func:`pymaid.pymaid.get_volume()`
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``                        
+                        If not passed directly, will try using global.                     
     threshold :         int, optional
                         Does not seem to have any effect on CATMAID API and is 
                         therefore filtered afterwards. This threshold is 
@@ -946,8 +942,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
     threshold :         int, optional
                         Does not seem to have any effect on CATMAID API and is 
                         therefore filtered afterwards. This threshold is 
@@ -990,11 +985,11 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
     --------
     >>> example_skids = [16,201,150,20] 
     >>> cn = pymaid.get_partners( example_skids, remote_instance )
-    >>> #Get only upstream partners
+    >>> # Get only upstream partners
     >>> subset = cn[ cn.relation == 'upstream' ]
-    >>> #Get partners with more than e.g. 5 synapses across all neurons
+    >>> # Get partners with more than e.g. 5 synapses across all neurons
     >>> subset2 = cn[ cn[ example_skids ].sum(axis=1) > 5 ]
-    >>> #Combine above conditions (watch parentheses!)
+    >>> # Combine above conditions (watch parentheses!)
     >>> subset3 = cn[ (cn.relation=='upstream') & 
     ... (cn[example_skids].sum(axis=1) > 5) ]
 
@@ -1162,8 +1157,7 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
     treenode_ids :      list
                         list of treenode ids (can also be connector ids!)
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define globally as 
-                        ``remote_instance``
+                        If not passed directly, will try using global.
     chunk_size :        int, optional
                         Querying large number of nodes will result in server 
                         errors. We will thus query them in amenable bouts.
@@ -1246,8 +1240,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
                         For larger lists, it is recommended to set this to
                         False to improve performance.
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -1325,32 +1318,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
     
     tn_table = pd.concat(all_tables, axis=0)
 
-    """
-    # Format of node_list: treenode_id, parent_node_id, confidence, x, y, z,
-    # radius, creator, last_edited
-    tag_dict = {n[0]: [] for nl in node_list for n in nl[0]}
-    reviewer_dict = {n[0]: [] for nl in node_list for n in nl[0]} 
-    for nl in tqdm(node_list, desc='Creating table'):    
-        [tag_dict[n[0]].append(n[1]) for n in nl[2]]
-        [reviewer_dict[n[0]].append(user_list[user_list.id == n[1]]['login'].values[
-                                    0]) for n in nl[1]]
-
-    tn_table = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for i,nl in enumerate( node_list ) for n in nl[0]],
-                            columns=['skeleton_id', 'treenode_id', 'parent_node_id', 'confidence',
-                                     'x', 'y', 'z', 'radius', 'creator', 'last_edited', 'reviewers', 'tags'],
-                            dtype=object
-                            )
-
-
-    # Replace creator_id with their login
-    tn_table['creator'] = [user_dict[u]['login'] for u in tn_table['creator']]
-
-    # Replace timestamp with datetime object
-    tn_table['last_edited'] = [datetime.datetime.fromtimestamp(
-        t, tz=datetime.timezone.utc) for t in tn_table['last_edited']]
-    """
     return tn_table
-
 
 def get_edges(x, remote_instance=None):
     """ Wrapper to retrieve edges (synaptic connections) between sets of neurons
@@ -1365,8 +1333,7 @@ def get_edges(x, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -1419,8 +1386,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define 
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
     incoming_synapses : bool, optional
                         if True, incoming synapses will be retrieved
     outgoing_synapses : bool, optional
@@ -1524,8 +1490,7 @@ def get_connector_details(x, remote_instance=None):
     x :                 {CatmaidNeuron/List, list of connector ids}
                         Can be found e.g. in compact skeletons (get_neuron)
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define globally as 
-                        'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -1551,21 +1516,28 @@ def get_connector_details(x, remote_instance=None):
 
     remote_instance = _eval_remote_instance(remote_instance)
 
-    connector_ids = eval_node_ids( x, connectors=True, treenodes=False )    
+    connector_ids = eval_node_ids( x, connectors=True, treenodes=False )   
+
+    connector_ids = list(set(connector_ids)) 
 
     remote_get_connectors_url = remote_instance._get_connector_details_url()
 
     # Depending on DATA_UPLOAD_MAX_NUMBER_FIELDS of your CATMAID server
-    # (default = 1000), we have to cut requests into batches < 1000
+    # (default = 1000), we have to cut requests into batches smaller than that
+    DATA_UPLOAD_MAX_NUMBER_FIELDS = 50000       
+    
     connectors = []
-    # for b in range( 0, len( connector_ids ), 999 ):
-    get_connectors_postdata = {}
-    for i, s in enumerate(connector_ids):
-        key = 'connector_ids[%i]' % i
-        get_connectors_postdata[key] = s  # connector_ids[i]
+    with tqdm(total=len(connector_ids), desc='Cn details', disable=module_logger.getEffectiveLevel()>=40) as pbar:                            
+        for b in range( 0, len( connector_ids ), DATA_UPLOAD_MAX_NUMBER_FIELDS):
+            get_connectors_postdata = {}
+            for i, s in enumerate(connector_ids[b:b+DATA_UPLOAD_MAX_NUMBER_FIELDS]):
+                key = 'connector_ids[%i]' % i
+                get_connectors_postdata[key] = s  # connector_ids[i]
 
-    connectors += remote_instance.fetch(remote_get_connectors_url,
-                                        get_connectors_postdata)
+            connectors += remote_instance.fetch(remote_get_connectors_url,
+                                                get_connectors_postdata)
+
+            pbar.update(DATA_UPLOAD_MAX_NUMBER_FIELDS)
 
     module_logger.info('Data for %i of %i unique connector IDs retrieved' % (
         len(connectors), len(set(connector_ids))))
@@ -1596,8 +1568,7 @@ def get_connectors_between(a, b, directional=False, remote_instance=None ):
                         If True, only connectors a->b are returned, otherwise
                         it is a<->b.
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define 
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -1639,17 +1610,13 @@ def get_connectors_between(a, b, directional=False, remote_instance=None ):
     b = [int(s) for s in b]
 
     if directional:
-        selection = cn_details.presynaptic_to.isin(a) & np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] )
-        #cn_details = cn_details[ cn_details.presynaptic_to.isin( a ) ]
-        #cn_details = cn_details[ [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
+        selection = cn_details.presynaptic_to.isin(a) & np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] )        
     else:
         selection = ( cn_details.presynaptic_to.isin(a) &  \
                       np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ) ) | \
                     ( cn_details.presynaptic_to.isin(b) &  \
                       np.array( [  True in [ skid in a for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ) )
 
-        #cn_details = cn_details[ cn_details.presynaptic_to.isin( a + b ) ]
-        #cn_details = cn_details[ [  True in [ skid in a+b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ]
 
     module_logger.info('%i shared connectors remaining after filtering' % len(cn_details[ selection ]) )
 
@@ -1668,8 +1635,7 @@ def get_review(x, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -1743,8 +1709,7 @@ def add_annotations(x, annotations, remote_instance=None):
     annotations :       list
                         Annotation(s) to add to neurons provided
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -1791,8 +1756,7 @@ def get_user_annotations(x, remote_instance=None):
                         2. single or list of user login names
 
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -1866,13 +1830,12 @@ def get_annotation_details(x, remote_instance=None):
     x                  
                         Neurons to get annotation details for. Can be either:
 
-                        1. list of skeleton ID(s) (int or str)
-                        2. list of neuron name(s) (str, exact match)
-                        3. an annotation: e.g. 'annotation:PN right'
+                        1. List of skeleton ID(s) (int or str)
+                        2. List of neuron name(s) (str, exact match)
+                        3. An annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object                        
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -1957,8 +1920,7 @@ def get_annotations(x, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2019,8 +1981,7 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
     annotations :       {str,list}
                         Single annotations or list of multiple annotations
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
     allow_partial :     bool
                         If True, will allow partial matches
 
@@ -2091,8 +2052,7 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
     tag :               {str, None}, optional
                         Tag we expect the soma to have. Set to ``None`` if
                         not applicable.
@@ -2156,8 +2116,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     allow_partial :     bool, optional
                         If True, partial matches are returned too    
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define globally as 
-                        'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2210,10 +2169,9 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
     Parameters
     ----------
     annotations :           {str,list}
-                            single annotation or list of multiple annotations    
+                            Single annotation or list of multiple annotations    
     remote_instance :       CATMAID instance, optional
-                            Either pass directly to function or define globally 
-                            as 'remote_instance'
+                            If not passed directly, will try using global.
     allow_partial :         bool, optional
                             If True, allow partial match of annotation
     intersect :             bool, optional
@@ -2295,8 +2253,7 @@ def neuron_exists(x, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2331,8 +2288,7 @@ def get_treenode_info(x, remote_instance=None):
                         Single or list of treenode IDs. If CatmaidNeuron/List,
                         details for all it's treenodes are requested.
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2370,10 +2326,9 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
                         single or list of treenode or connector IDs
     node_type :         {'TREENODE','CONNECTOR'}
                         Set which node type of IDs you have provided as they use
-                        different API endpoints!      
+                        different API endpoints!  
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2414,10 +2369,9 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     """ Wrapper to completely delete neurons. Use this with EXTREME caution
     as this is not reversible!
 
-    Deletes a neuron if and only if two things are the case: 
-    1. The user owns all treenodes of the skeleton modeling the neuron in 
-    question and
-    2. The neuron is not annotated by other users.
+    Deletes a neuron if (and only if!) two things are the case: 
+    1. You own all treenodes of the skeleton making up the neuron in question
+    2. The neuron is not annotated by other users
 
     Parameters
     ----------
@@ -2433,8 +2387,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
                         deleting the neuron(s). Set this to True to skip that
                         step.
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'              
+                        If not passed directly, will try using global.           
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2464,7 +2417,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 def delete_tags(node_list, tags, node_type, remote_instance=None):
     """ Wrapper to remove tag(s) for a list of treenode(s) or connector(s).
     Works by getting existing tags, removing given tag(s) and then using 
-    pymaid.add_tags() to push updated tags back to CATMAID.    
+    pymaid.add_tags() to push updated tags back to CATMAID.
 
     Parameters
     ----------
@@ -2478,8 +2431,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
                         Set which node type of IDs you have provided as they use
                         different API endpoints!
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2563,8 +2515,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
                         Otherwise, your tags (even if empty) will not override
                         existing tags.
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     ------- 
@@ -2625,8 +2576,7 @@ def get_segments(x, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2676,8 +2626,7 @@ def get_review_details(x, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2738,8 +2687,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
     Parameters
     ----------    
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
     operations :        list of str, optional
                         If empty, all operations will be queried from server
                         possible operations: 'join_skeleton', 
@@ -2847,8 +2795,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'
+                        If not passed directly, will try using global.
     separate :          bool, optional
                         If true, stats are given per neuron
     _split :            int, optional
@@ -2974,8 +2921,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     Parameters
     ----------
     remote_instance :   CatmaidInstance, optional                        
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'.
+                        If not passed directly, will try using global.
     user :              {int, str, list}, optional
                         User ID(s) (int) or login(s) (str).
     minimum_cont :      int, optional
@@ -3109,8 +3055,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     Parameters
     ----------
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define globally as 
-                        'remote_instance'                             
+                        If not passed directly, will try using global.                             
     start_date :        {datetime, str, tuple}, optional, default=last week
                         dates can be either::
                             - datetime.date
@@ -3279,8 +3224,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
                             Coordinates defining the volume 
                             Can be given in nm or pixels+slices.  
     remote_instance :       CATMAID instance, optional
-                            Either pass directly to function or define 
-                            globally as 'remote_instance'
+                            If not passed directly, will try using global.
     coord_format :          str, optional
                             Define whether provided coordinates are in 
                             nanometer ('NM') or in pixels/slices ('PIXEL')
@@ -3377,8 +3321,7 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
     volumes :               {str, core.Volume, list thereof}
                             Single or list of CATMAID volumes.
     remote_instance :       CATMAID instance 
-                            Either pass directly to function or define 
-                            globally as 'remote_instance'
+                            If not passed directly, will try using global
     intersect :             bool, optional
                             if multiple volumes are provided, this parameter
                             determines if neurons have to be in all of the
@@ -3389,7 +3332,7 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
                             if True, only neurons with a soma will be returned
 
     Returns
-    --------
+    -------
     list                  
                             ``[ skeleton_id, skeleton_id, ... ]``
 
@@ -3475,8 +3418,7 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
                             'z_res' as **kwargs to override this.
 
     remote_instance :       CATMAID instance 
-                            Either pass directly to function or define 
-                            globally as 'remote_instance'
+                            If not passed directly, will try using global.
 
     Returns
     --------
@@ -3643,8 +3585,7 @@ def get_user_list(remote_instance=None):
     Parameters
     ----------    
     remote_instance :   CATMAID instance 
-                        Either pass directly to function or define globally 
-                        as ``remote_instance``
+                        If not passed directly, will try using global.
 
     Returns
     ------
@@ -3707,8 +3648,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
                         4. CatmaidNeuron or CatmaidNeuronList object
 
     remote_instance :   CATMAID instance, optional  
-                        Either pass directly to function or define  
-                        globally as 'remote_instance'.
+                        If not passed directly, will try using global.
     n_hops :            int, optional
                         Number of hops allowed between sources and targets.
     min_synapses :      int, optional
@@ -3807,8 +3747,7 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
                         Name(s) of the volume to import - must be EXACT! 
                         If volume = None, will return list of available volumes.
     remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        If not passed directly, will try using global.
     color :             tuple, optional
                         R,G,B,alpha values used by :func:`pymaid.plotting.plot3d`
     combine_vols :      bool, optional
@@ -3826,6 +3765,15 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
                             [ (x,y,z), (x,y,z), .... ]
             faces :         list of tuples
                             [ ( vertex_ix, vertex_ix, vertex_ix ), ... ]
+
+    Examples
+    --------
+    >>> import pymaid
+    >>> rm = CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
+    >>> # Retrieve volume
+    >>> vol = pymaid.get_volume('LH_R')
+    >>> # Plot volume
+    >>> vol.plot3d()
 
     """
 
@@ -3937,6 +3885,7 @@ def get_annotation_list(remote_instance=None):
     Parameters
     ----------
     remote_instance : CatmaidInstance, optional
+                      If not passed directly, will try using global.
 
     Returns
     -------
@@ -3987,15 +3936,17 @@ def eval_skids(x, remote_instance=None):
     ----------
     x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
                     Your options are either::
-                    1. int or list of ints will be assumed to be skeleton IDs
+                    1. int or list of ints: 
+                        - will be assumed to be skeleton IDs
                     2. str or list of str:
                         - if convertible to int, will be interpreted as x
                         - elif start with 'annotation:' will be assumed to be 
                           annotations
                         - else, will be assumed to be neuron names
-                    3. For CatmaidNeuron/List or pandas.DataFrames will try
-                       to extract skeleton_id parameter
+                    3. For CatmaidNeuron/List or pandas.DataFrames/Series: 
+                        - will look for ``skeleton_id`` attribute
     remote_instance : CatmaidInstance, optional
+                      If not passed directly, will try using global.
 
     Returns
     -------
@@ -4127,11 +4078,14 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
                             active.
     zoom :                  int, optional
     tool :                  str, optional
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
 
     Returns
     -------
     {str or list of str}
-                URL(s) to original coordinates
+                URL(s) to the coordinates provided
     """
 
     def gen_url(c, stid, nid, sid ):
