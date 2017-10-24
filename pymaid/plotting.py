@@ -37,6 +37,7 @@ from vispy.geometry import create_sphere
 from vispy.gloo.util import _screenshot
 
 try:
+    # Try setting vispy backend to PyQt5 
     vispy.use(app='PyQt5')
 except:
     pass
@@ -52,8 +53,6 @@ from colorsys import hsv_to_rgb
 from pymaid import morpho, igraph_catmaid, core, pymaid
 from pymaid import cluster as clustmaid
 
-# If plotneuron is not run as module, make sure module_logger has a at
-# least a StreamHandler
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
 if len( module_logger.handlers ) == 0:

@@ -25,18 +25,15 @@ Examples
 ...                                           'password', 
 ...                                           'token' 
 ...                                         )
->>> #Example skid
->>> skid = '12345'
->>> #Retrieve 3D skeleton data for neuron of interest
->>> skdata = pymaid.get_neuron ( [ example_skid ], 
-...                              remote_instance, 
-...                              connector_flag = 1, 
-...                              tag_flag = 0 )
->>> #Cluster synapses - generates plot and returns clustering for nodes with synapses
+>>> # Example skid
+>>> example_skid = '12345'
+>>> # Retrieve 3D skeleton data for neuron of interest
+>>> skdata = pymaid.get_neuron ( example_skid )
+>>> # Cluster synapses - generates plot and returns clustering for nodes with synapses
 >>> syn_linkage = pymaid.cluster_nodes_w_synapses( skdata, plot_graph = True )
->>> #Find the last two clusters (= the two biggest):
+>>> # Find the last two clusters (= the two biggest):
 >>> clusters = syn_linkage.get_clusters( 2, criterion='maxclust')
->>> #Print summary
+>>> # Print summary
 >>> print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters), 
 ... len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
 
@@ -65,7 +62,6 @@ if len( module_logger.handlers ) == 0:
                 '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
-
 
 __all__ = ['network2graph','neuron2graph','matrix2graph','cluster_nodes_w_synapses','dist_from_root']
 
@@ -182,7 +178,7 @@ def matrix2graph(adj_matrix, **kwargs):
     >>> neurons = pymaid.get_skids_by_annotation( 'right_pns' ,remote_instance)
     >>> mat = pymaid.matrix2graph(neurons,neurons,remote_instance)
     >>> g = pymaid.matrix2graph ( mat )
-    >>> #Use fruchterman-Reingold algorithm
+    >>> # Use Fruchterman-Reingold algorithm for layout
     >>> layout = g.layout('fr')
     >>> gplot( g, layout = layout )
     """

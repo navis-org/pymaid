@@ -899,7 +899,7 @@ def _cut_neuron(skdata, cut_node):
     return neuron_dist, neuron_prox
 
 
-def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], post_skid_filter=[]):
+def synapse_root_distances(skdata, pre_skid_filter=[], post_skid_filter=[], remote_instance=None):
     """ Calculates geodesic (along the arbor) distance of synapses to root 
     (i.e. soma)
 
@@ -910,9 +910,11 @@ def synapse_root_distances(skdata, remote_instance=None, pre_skid_filter=[], pos
     pre_skid_filter :   list of int, optional
                         If provided, only synapses from these neurons will be 
                         processed.
-    post_skid_filter : list of int, optional 
+    post_skid_filter :  list of int, optional 
                         If provided, only synapses to these neurons will be 
                         processed.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -1014,7 +1016,7 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
     confidences :       list of five floats, optional
                         Values by which the confidence of the downstream
                         branche is reduced upon encounter of a 5/4/3/2/1-
-                        confidence edge.
+                        confidence edges.
     inplace :           bool, optional
                         If False, a copy of the neuron is returned.
 
@@ -1083,7 +1085,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
                         Use to smooth neuron by downsampling. 
                         Default = 1 (no smoothing)                  
     remote_instance :   CATMAID instance, optional
-                        Pass if skdata is a skeleton ID
+                        Pass if skdata is a skeleton ID.
     return_skdata :     bool, optional
                         If True: instead of the final cable length, a dataframe 
                         containing the distance to each treenode's parent.                         

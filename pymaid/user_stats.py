@@ -25,8 +25,7 @@ Examples
 ...                                      'HTTP_PASSWORD', 
 ...                                      'TOKEN' )
 >>> skeleton_ids = pymaid.get_skids_by_annotation('Hugin')
->>> cont = user_stats.get_user_contributions( skeleton_ids, 
-...                                           remote_instance = myInstance)
+>>> cont = pymaid.get_user_contributions( skeleton_ids )
 >>> cont
              user  nodes  presynapses  postsynapses
 0        Schlegel  47221          470          1408
@@ -155,7 +154,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
                        2. neuron name (str, must be exact match)
                        3. annotation: e.g. 'annotation:PN right'
                        4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :  Catmaid Instance, optional
+    remote_instance :  CatmaidInstance, optional
                        Either pass explicitly or define globally.
     minimum_actions :  int, optional
                        Minimum number of actions per minute to be counted as 
@@ -215,8 +214,9 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     Plot pie chart of contributions per user using Plotly. This example 
     assumes that you have already imported and set up pymaid.
 
-    >>> import plotly
-    >>> stats = pymaid.get_time_invested( skids, remote_instance )     
+    >>> import plotly    
+    >>> stats = pymaid.get_time_invested( skids, remote_instance )
+    >>> # Use plotly to generate pie chart
     >>> fig = { "data" : [ { "values" : stats.total.tolist(), 
     ...         "labels" : stats.user.tolist(), "type" : "pie" } ] } 
     >>> plotly.offline.plot(fig)    
@@ -239,7 +239,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
     skids = eval_skids(x, remote_instance)
 
-    # Need this later for pandas TimeGrouper
+    # Need this later for pandas.TimeGrouper()
     interval = 1
     bin_width = '%iMin' % interval
 
