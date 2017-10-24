@@ -14,7 +14,7 @@
 #    along
 
 """ This module contains neuron and neuronlist classes returned and accepted
-by many low-level functions within pymaid.
+by many functions within pymaid.
 """
 
 import datetime
@@ -51,8 +51,8 @@ if len( module_logger.handlers ) == 0:
 
 
 class CatmaidNeuron:
-    """ 
-    Catmaid neuron object holding neuron data: nodes, connectors, name, etc.
+    """ Catmaid neuron object holding neuron data: nodes, connectors, name, 
+    etc.
 
     Notes
     -----
@@ -84,6 +84,7 @@ class CatmaidNeuron:
                         assigned to the neuron object to prevent 
                         backpropagation of subsequent changes to the data. 
                         Default = True
+
 
     Attributes
     ----------
@@ -119,6 +120,7 @@ class CatmaidNeuron:
     soma :              treenode_id of soma
                         Returns None if no soma or 'NA' if data not available
     root :              treenode_id of root
+
 
     Examples
     --------
@@ -720,29 +722,17 @@ class CatmaidNeuron:
         """
 
         # Look up these values without requesting them
-        neuron_name = self.__dict__.get('neuron_name', 'NA')
-        igraph = self.__dict__.get('igraph', 'NA')
-        tags = self.__dict__.get('tags', 'NA')
-        review_status = self.__dict__.get('review_status', 'NA')
-        annotations = self.__dict__.get('annotations', 'NA')
+        neuron_name = self.__dict__.get('neuron_name', 'NA')                
+        review_status = self.__dict__.get('review_status', 'NA')        
 
         if 'nodes' in self.__dict__:
             soma_temp = self.soma
         else:
             soma_temp = 'NA'
 
-        if tags != 'NA':
-            tags = True
-
-        if igraph != 'NA':
-            igraph = True
-
-        if annotations != 'NA':
-            annotations = True
-
-        return pd.Series([type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, self.n_open_ends, self.cable_length, review_status, soma_temp, annotations, igraph, tags, self._remote_instance != None],
+        return pd.Series([type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, self.n_open_ends, self.cable_length, review_status, soma_temp ],
                          index=['type', 'neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes',
-                                'n_open_ends', 'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'tags', 'remote_instance']
+                                'n_open_ends', 'cable_length', 'review_status', 'soma']
                          )
 
     @classmethod
@@ -841,7 +831,7 @@ class CatmaidNeuronList:
     review_status :     list of int
                         Neurons' review status
     n_branch_nodes :    list of int
-                        Number of branch nodes  for each neuron
+                        Number of branch nodes for each neuron
     n_end_nodes :       list of int
                         Number of end nodes for each neuron
     n_open_ends :       int
@@ -854,7 +844,10 @@ class CatmaidNeuronList:
     soma :              list of soma nodes
     root :              list of root nodes
     n_cores :           int
-                        Number of cores to use. Default is os.cpu_count() -1
+                        Number of cores to use. Default is os.cpu_count()-1
+    _use_parallel :     bool (default=False)
+                        If True, will use parallel processing. Faster but uses
+                        lots of memory. Do not use for large lists!
 
     Examples
     --------
@@ -865,15 +858,15 @@ class CatmaidNeuronList:
     >>> nl.set_remote_instance( rm )
     >>> # Retrieve review status from server on-demand
     >>> nl.review_status
-    ... array([ 90, 10 ])
+    ... array([ 90, 23 ])
     >>> # Initialize with skeleton data
-    >>> nl = pymaid.get_neuron( [ 123456, 45677 ], remote_instance = rm )
+    >>> nl = pymaid.get_neuron( [ 123456, 45677 ] )
     >>> # Get annotations from server
     >>> nl.annotations
     ... [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
     >>> Index using node count
     >>> subset = nl [ nl.n_nodes > 6000 ]
-    >>> # Index by skeleton ID 
+    >>> # Index by skeleton ID
     >>> subset = nl [ '123456' ]
     >>> # Index by neuron name
     >>> subset = nl [ 'name1' ]
@@ -994,20 +987,8 @@ class CatmaidNeuronList:
         """
         d = []
         for n in self.neurons[:n]:
-            neuron_name = n.__dict__.get('neuron_name', 'NA')
-            igraph = n.__dict__.get('igraph', 'NA')
-            tags = n.__dict__.get('tags', 'NA')
+            neuron_name = n.__dict__.get('neuron_name', 'NA')            
             review_status = n.__dict__.get('review_status', 'NA')
-            annotations = n.__dict__.get('annotations', 'NA')
-
-            if tags != 'NA':
-                tags = True
-
-            if igraph != 'NA':
-                igraph = True
-
-            if annotations != 'NA':
-                annotations = True
 
             if 'nodes' in n.__dict__:
                 soma_temp = n.soma != None
@@ -1015,11 +996,11 @@ class CatmaidNeuronList:
                 soma_temp = 'NA'
 
             d.append([neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes, n.n_open_ends,
-                      n.cable_length, review_status, soma_temp, annotations, igraph, tags, n._remote_instance != None])
+                      n.cable_length, review_status, soma_temp ])
 
         return pd.DataFrame(data=d,
                             columns=['neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes', 'open_ends',
-                                     'cable_length', 'review_status', 'soma', 'annotations', 'igraph', 'node_tags', 'remote_instance']
+                                     'cable_length', 'review_status', 'soma' ]
                             )
     def __str__(self):
         return self.__repr__()
@@ -1218,7 +1199,7 @@ class CatmaidNeuronList:
                                 If True, treenodes that have connectors are 
                                 preserved.
         inplace :               bool, optional
-                                If True, a downsampled copy of this 
+                                If False, a downsampled COPY of this 
                                 CatmaidNeuronList is returned
         """                
 
@@ -1630,7 +1611,7 @@ class CatmaidNeuronList:
         """
 
         data = [dict(skeleton_id=int(n.skeleton_id),
-                     color="#%02x%02x%02x" % n.color,
+                     color="#{:02x}{:02x}{:02x}".format( n.color[0],n.color[1],n.color[2] ),
                      opacity=1
                      ) for n in self.neurons]
 
