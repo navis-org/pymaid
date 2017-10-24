@@ -885,7 +885,7 @@ class clust_results:
 
         # Second, convert into condensed distance matrix - otherwise clustering
         # thinks we are passing observations instead of final scores
-        self.condensed_dist_mat = scipy.spatial.distance.squareform( self.dist_mat )
+        self.condensed_dist_mat = scipy.spatial.distance.squareform( self.dist_mat, checks=False )
 
         self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat, method=method)
 
