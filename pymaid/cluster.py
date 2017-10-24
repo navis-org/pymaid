@@ -27,6 +27,8 @@ from tqdm import tqdm
 import itertools
 import sys
 import multiprocessing as mp
+import os
+import json
 
 from pymaid import pymaid, core, plotting
 
@@ -124,7 +126,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     neuron_names = pymaid.get_names(neurons, remote_instance)
 
-    module_logger.info('Retrieving and filtering connectivity')
+    module_logger.info('Retrieving and filtering connectivity...')
 
     edges = pymaid.get_edges(neurons, remote_instance=remote_instance)
 
@@ -183,7 +185,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
             matrix.loc[ nA, nB ] = e
 
-    module_logger.info('Finished')
+    module_logger.info('Finished!')
 
     return matrix
 
@@ -662,7 +664,7 @@ def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=
     score = sum(all_values)/len(all_values)
 
     if mu_score:
-        return ( score +  _calc_synapse_similarity(neuronB, neuronA, sigma=sigma, omega=sigma, mu_score=False))/2
+        return ( score +  _calc_synapse_similarity(neuronB, neuronA, sigma=sigma, omega=omega, mu_score=False))/2
     else:
         return score
 
@@ -716,18 +718,18 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
                     'Please either pass a CATMAID instance or define globally as "remote_instance" ')
         neurons = pymaid.get_neuron(x, remote_instance=remote_instance)
     else:
-        neurons = x  
+        neurons = x
 
     dist_matrix = pd.DataFrame(
-        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, columns=neurons.skeleton_id)    
+        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, columns=neurons.skeleton_id)
 
     pool = mp.Pool()
-    combinations = [ (nA,nB,sigma,omega,mu_score) for nA in neurons for nB in neurons ]   
+    combinations = [ (nA,nB,sigma,omega,mu_score) for nA in neurons for nB in neurons ]
 
     scores = list(tqdm( pool.imap( _unpack_synapse_helper, combinations, chunksize=10 ), total=len(combinations), desc='Processing', disable=module_logger.getEffectiveLevel()>=40 ))
 
     pool.close()
-    pool.join()    
+    pool.join()
 
     for i,v in enumerate(combinations):
         dist_matrix.loc[ v[0].skeleton_id,v[1].skeleton_id ] = scores[i]
@@ -781,12 +783,12 @@ def cluster_xyz(x, labels=None):
     condensed_dist_mat = scipy.spatial.distance.pdist(s, 'euclidean')
     squared_dist_mat = scipy.spatial.distance.squareform(condensed_dist_mat)
 
-    return clust_results(squared_dist_mat, labels=labels)
+    return clust_results(squared_dist_mat, labels=labels, mat_type='distance')
 
 
 class clust_results:
-    """ Class to handle, analyze and plot distance matrices. Contains thin
-    wrappers for scipy.cluster
+    """ Class to handle, analyze and plot similarity/distance matrices. 
+    Contains thin wrappers for scipy.cluster
 
     Parameters
     ----------
@@ -794,10 +796,15 @@ class clust_results:
                 Distance matrix
     labels :    list, optional
                 labels for matrix
+    mat_type :  {'distance','similarity'}
+                Sets the type of matrix we are dealing with. Similarity means
+                high values are more similar, distance matrix the reverse. 
+                Similarity matrices are automatically converted to distance
+                matrices before clustering.
 
     Attributes
     ----------
-    mat :       Distance matrix
+    mat :       Similarity matrix (0=dissimilar, 1=similar)
     linkage :   Hierarchical clustering. Run :func:`pymaid.cluster.clust_results.cluster`
                 to generate linkage.res. By default, WARD's algorithm is used.
     leafs :     list of skids
@@ -819,9 +826,15 @@ class clust_results:
 
     """
 
-    def __init__(self, mat, labels=None):
+    _PERM_MAT_TYPES = ['similarity', 'distance']
+
+    def __init__(self, mat, labels=None, mat_type='similarity'):
+        if mat_type not in clust_results._PERM_MAT_TYPES:
+            raise ValueError('Matrix type "{0}" unkown.'.format(mat_type) )
+
         self.mat = mat
         self.labels = labels
+        self.mat_type = mat_type
 
         if not labels and isinstance(self.mat, pd.DataFrame):
             self.labels = self.mat.columns.tolist()
@@ -853,7 +866,7 @@ class clust_results:
             return scipy.cluster.hierarchy.leaves_list(self.linkage)
 
 
-    def cluster(self, method='ward'):
+    def cluster(self, method='average'):
         """ Cluster distance matrix. This will automatically be called when
         attribute linkage is requested for the first time.
 
@@ -864,7 +877,22 @@ class clust_results:
                     for reference)
         """
 
-        self.linkage = scipy.cluster.hierarchy.linkage(self.mat, method=method)
+        # First, convert similarity matrix to distance matrix
+        if self.mat_type != 'distance':
+            self.dist_mat = ( self.mat.as_matrix() - self.mat.max().max() ) * -1
+        else:
+            self.dist_mat = self.mat.as_matrix()
+
+        # Second, convert into condensed distance matrix - otherwise clustering
+        # thinks we are passing observations instead of final scores
+        self.condensed_dist_mat = scipy.spatial.distance.squareform( self.dist_mat )
+
+        self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat, method=method)
+
+        # Save method in case we want to look it up later
+        self.method = method
+
+        module_logger.info('Clustering done using method "{0}"'.format(method) )
 
     def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None):
         """ Plot dendrogram using matplotlib
@@ -874,7 +902,7 @@ class clust_results:
         color_threshold :   {int,float}, optional
                             Coloring threshold for dendrogram
         return_dendrogram : bool, optional
-                            If true, dendrogram object is returned
+                            If True, dendrogram object is returned
         labels :            list of str, dict
                             Labels in order of original observation or
                             dictionary with mapping original labels 
@@ -901,9 +929,16 @@ class clust_results:
         else:
             return fig
 
-    def plot_matrix2(self):
+    def plot_matrix2(self, labels=None, **kwargs):
         """ Plot distance matrix and dendrogram using seaborn. This package
         needs to be installed manually.
+
+        Parameters
+        ----------
+        kwargs      dict
+                    Keyword arguments to be passed to seaborn.clustermap. See 
+                    http://seaborn.pydata.org/generated/seaborn.clustermap.html
+
 
         Returns
         -------
@@ -916,11 +951,15 @@ class clust_results:
             raise ImportError('Need seaborn package installed.')
 
         cg = sns.clustermap(
-            self.mat, row_linkage=self.linkage, col_linkage=self.linkage)
+            self.mat, row_linkage=self.linkage, col_linkage=self.linkage, **kwargs)
 
         # Rotate labels
         plt.setp(cg.ax_heatmap.xaxis.get_majorticklabels(), rotation=90)
         plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), rotation=0)
+
+        # Make labels smaller
+        plt.setp(cg.ax_heatmap.xaxis.get_majorticklabels(), fontsize=4)
+        plt.setp(cg.ax_heatmap.yaxis.get_majorticklabels(), fontsize=4)
 
         # Increase padding
         cg.fig.subplots_adjust(right=.8, top=.95, bottom=.2)
@@ -1008,6 +1047,43 @@ class clust_results:
         kwargs.update({'color': cmap})
 
         return plotting.plot3d(self.neurons, **kwargs)
+
+    def to_json(self, fname='cluster.json', k=5, criterion='maxclust'):
+        """ Convert clustered neurons into json file that can be loaded into 
+        CATMAID selection table.
+
+        Parameters
+        ----------
+        fname :     str, optional
+                    Filename to save selection to
+        k :         {int, float}
+        criterion : str, optional
+                    Either 'maxclust' or 'distance'. If maxclust, k clusters
+                    will be formed. If distance, clusters will be created at
+                    threshold k.   
+
+        See Also
+        --------
+        :func:`pymaid.plot.plot3d` 
+                    Function called to generate 3d plot                  
+        """        
+
+        cmap = self.get_colormap(k=k, criterion=criterion)
+
+        # Convert to 0-255
+        cmap = { n : [ int(v*255) for v in cmap[n] ] for n in cmap }  
+
+        data = [ dict(skeleton_id=int(n),
+                     color="#{:02x}{:02x}{:02x}".format( cmap[n][0],cmap[n][1],cmap[n][2] ),
+                     opacity=1
+                     ) for n in cmap ]
+
+        with open(fname, 'w') as outfile:
+            json.dump(data, outfile)
+
+        module_logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))    
+
+        return 
 
     def get_colormap(self, k=5, criterion='maxclust'):
         """Generate colormap based on clustering
