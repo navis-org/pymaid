@@ -6,7 +6,7 @@ This section should give you an impression of how to access and compute morpholo
 Basic properties
 ================
 
-Many basic parameters are readily accessible through attributes of :class:`pymaid.core.CatmaidNeuron` or :class:`pymaid.core.CatmaidNeuronList`
+Many basic parameters are readily accessible through attributes of :class:`~pymaid.core.CatmaidNeuron` or :class:`~pymaid.core.CatmaidNeuronList`
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance('server_url','user','pw','token')
@@ -21,7 +21,7 @@ Many basic parameters are readily accessible through attributes of :class:`pymai
 Cutting, pruning, pasting
 =========================
 
-The :mod:`pymaid.morpho` module let's you perform (virtual) surgery on neurons. :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList` have also some thin wrappers for :mod:`pymaid.morpho` functions (e.g. :func:`pymaid.core.CatmaidNeuron.prune_by_strahler` is a wrapper for :func:`pymaid.morpho.prune_by_strahler`).
+The :mod:`pymaid.morpho` module let's you perform (virtual) surgery on neurons. :class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.CatmaidNeuronList` have also some thin wrappers for :mod:`pymaid.morpho` functions (e.g. :func:`~pymaid.core.CatmaidNeuron.prune_by_strahler` is a wrapper for :func:`~pymaid.morpho.prune_by_strahler`).
 
 Some examples continuing with above neuronlist ``nl``:
 

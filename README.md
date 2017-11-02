@@ -1,27 +1,26 @@
 pymaid
 ====== 
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
-Tested with CATMAID latest release version 2017.05.17 - if you are working with older versions you may experience incompatibilities due to 
-API changes.
+Tested with CATMAID latest release version 2017.10.02 - if you are working with older versions you may experience incompatibilities due to API changes.
 
 ## Documentation
 PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 ## Features
 
-* collection of functions to fetch data via CATMAID's API
+* large set of functions to fetch data via CATMAID's API
 * custom neuron classes that perform on-demand data fetching
 * 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
 * virtual neuron surgery (cutting, pruning, rerooting)
 * clustering methods (e.g. by connectivity or synapse placement)
-* R bindings (e.g. for libraries ([nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) ) )
-* interface with iGraph 
-* tools to analyse user stats (e.g. time invested)
+* R bindings (e.g. for libraries [nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) )
+* interface with iGraph
+* tools to analyse user stats (e.g. time-invested, project history)
 * interface with Blender 3D
 * and oh so much more...
 
 ## Installation
-See [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed instructions. For the impatient:
+See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed instructions. For the impatient:
 
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
 First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in terminal:  
@@ -52,7 +51,7 @@ Must have:
 
 Optional: 
 
-- [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
+- [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually
 - [pyoctree](https://pypi.python.org/pypi/pyoctree/) 
 
 
@@ -62,73 +61,72 @@ Optional:
 ```python
 import pymaid
 
-#Initialize Catmaid instance 
+# Initialize Catmaid instance 
 myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 
-#Initialise a single neuron with just its skeleton ID
+# Initialize a single neuron with just its skeleton ID
 n = pymaid.CatmaidNeuron( '12345', remote_instance = myInstance )
 
-#Retrieve a list of skeletons using an annotation
+# Retrieve a list of skeletons using an annotation
 nl = pymaid.get_neuron ( 'annotation:example_neurons' , myInstance )
 
-#nl is a CatmaidNeuronList object that manages data:
-#Notice that some entries show as 'NA' because that data has not yet been retrieved/calculated
+# nl is a CatmaidNeuronList object that manages data:
+# Notice that some entries show as 'NA' because that data has not yet been retrieved/calculated
 print(nl)
 
-#You can subset the neurons based on their properties
+# You can subset the neurons based on their properties
 only_large = nl[ nl.n_nodes > 2000 ]
 only_reviewed = nl [ nl.review_status == 100 ]
 name_subset = nl[ ['name1','name2'] ]
 skid_subset = nl[ [ 12345, 67890 ] ]
 
-#To get more data, e.g. annotations, simply request that attribute explicitedly
+# To get more data, e.g. annotations, simply request that attribute explicitedly
 nl[0].annotations
 
-#To force an update of annotations
+# To force an update of annotations
 nl[0].get_annotations()
 
-#Access treenodes of the first neuron
+# Access treenodes of the first neuron
 nodes = nl[0].nodes
 
-#Get coordinates of all connectors
+# Get coordinates of all connectors
 coords = nl[0].connectors[ ['x','y','z'] ].as_matrix()
 
-#Get all branch oints:
+# Get all branch oints:
 branch_points = nl[0].nodes[ nl[0].nodes.type == 'branch' ].treenode_id
 
-#Plot neuron -> see help(pymaid.plot.plot3d) for accepted kwargs
+# Plot neuron -> see help(pymaid.plot.plot3d) for accepted kwargs
 nl.plot3d()
 
-#Clear 3D viewer
+# Clear 3D viewer
 plot.clear3d()
 ```
 
 ### Cluster synapses based on distance along the arbor using iGraph
 ```python
 import pymaid
-from scipy import cluster
 import matplotlib.pyplot as plt
 
-#Initiate Catmaid instance
+# Initialize Catmaid instance
 remote_instance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 
-#Retrieve 3D skeleton data for neuron of interest
-nl = pymaid.get_neuron ( [ '12345' ], remote_instance, connector_flag = 1, tag_flag = 0 )
+# Retrieve 3D skeleton data for neuron of interest
+nl = pymaid.get_neuron ( [ '12345' ] )
 
-#(Optional) Consider downsampling for large neurons (preverses branch points, end points, synapses, etc.)
+# Optional: downsampling for large neurons (preverses branch points, end points, synapses, etc.)
 nl.downsample( factor = 4 )
 
-#Cluster by synapse synapse placement
+# Cluster by synapse synapse placement
 clust_res = pymaid.cluster_by_synapse_placement( ds_neuron )
 
-#Plot dendrogram
+# Plot dendrogram
 clust_res.plot_dendrogram()
 plt.show()
 
-#Find the last two clusters (= the two largest clusters):
+# Find the last two clusters (= the two largest clusters):
 clusters = clust_res.get_clusters( k=2, criterion='maxclust')
 
-#Print summary
+# Print summary
 print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
 ```
 
