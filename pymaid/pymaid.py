@@ -75,7 +75,8 @@ __all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
             'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
-            'get_segments','delete_neuron','get_connectors_between','url_to_coordinates']
+            'get_segments','delete_neuron','get_connectors_between','url_to_coordinates',
+            'rename_neurons','get_label_list']
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -397,8 +398,16 @@ class CatmaidInstance:
         """ Use to get user history. """
         return self.djangourl("/" + str(self.project_id) + "/stats/user-history")
 
+    def _rename_neuron_url(self, neuron_id):
+        """ Use to rename a single neuron. Does need postdata."""
+        return self.djangourl("/" + str(self.project_id) + "/neurons/" + str(neuron_id) + '/rename')
 
-def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=None):
+    def _get_label_list_url(self):
+        """ Use to rename a single neuron. Does need postdata."""
+        return self.djangourl("/" + str(self.project_id) + "/labels/stats")
+
+
+def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Fetching', external_pbar=None, disable_pbar=False):
     """ Wrapper to retrieve a list of urls in parallel using threads
 
     Parameters
@@ -410,7 +419,12 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=N
     post_data :         list of dicts, optional
                         Needs to be the same size as urls
     desc :              str, optional
-                        Description to show on status bar    
+                        Description to show on status bar
+    external_pbar :     tqdm.tqdm, optional
+                        External progressbar. If provided, will use and update
+                        this one.
+    disable_pbar :      bool, optional
+                        Force disabling of progressbar.
     Returns
     -------
     data               
@@ -444,7 +458,16 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=N
     start = cur_time = time.time()
     joined = 0
 
-    with tqdm(total=len(threads), desc='Fetching %s' % desc, disable=module_logger.getEffectiveLevel()>=40 ) as pbar:
+    if isinstance( external_pbar, tqdm ):
+        pbar = external_pbar
+    else:
+        pbar = tqdm(total=len(threads), desc=desc, disable=module_logger.getEffectiveLevel()>=40 or disable_pbar)
+
+    # Save start value of pbar (in case we have an external pbar)
+    pbar_start = pbar.n
+
+    # Try statement makes sure that we can close the pbar even if fetching fails
+    try:          
         while cur_time <= (start + time_out) and len([d for d in data if d is not None]) != len(threads):
             for t in threads:
                 if t in threads_closed:
@@ -455,10 +478,19 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='data', split=N
                     threads_closed.append(t)
             time.sleep(1)
             cur_time = time.time()
-            pbar.update(len(threads_closed))
+
+            #Update progress bar
+            p_delta = len(threads_closed) - (pbar.n - pbar_start)
+            pbar.update( p_delta  )
 
             module_logger.debug('Closing Threads: %i ( %is until time out )' % (
                 len(threads_closed), round(time_out - (cur_time - start))))
+    except:
+        raise
+    finally:
+        # Close pbar if it is not an external pbar
+        if not external_pbar:
+            pbar.close()
 
     if cur_time > (start + time_out):
         module_logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % (
@@ -595,6 +627,30 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     x = eval_skids(x, remote_instance=remote_instance)
 
+    if not isinstance(x, (list, np.ndarray)):
+        x = [x]    
+
+    # Update from kwargs if available
+    tag_flag = kwargs.get('tag_flag', tag_flag)
+    connector_flag = kwargs.get('connector_flag', connector_flag)
+    get_history = kwargs.get('get_history', get_history)
+    get_merge_history = kwargs.get('get_merge_history', get_merge_history)
+    get_abutting = kwargs.get('get_abutting', get_abutting)
+    return_df = kwargs.get('return_df', return_df)
+
+    # Convert tag_flag, connector_tag, get_history and get_merge_history to
+    # bool if necessary
+    if isinstance(tag_flag, int):
+        tag_flag = tag_flag == 1
+    if isinstance(connector_flag, int):
+        connector_flag = connector_flag == 1
+    if isinstance(get_history, int):
+        get_history = get_history == 1
+    if isinstance(get_merge_history, int):
+        get_merge_history = get_merge_history == 1
+
+    """
+
     if len(x) > 100:
         module_logger.warning(
             'Large list of neurons requested. Retrieving %i neurons in %i bouts.' % (len(x), math.ceil(len(x)/100)) )
@@ -618,106 +674,97 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         else:
             return df
 
-    if not isinstance(x, (list, np.ndarray)):
-        to_retrieve = [x]
-    else:
-        to_retrieve = x
+    """
 
-    # Update from kwargs if available
-    tag_flag = kwargs.get('tag_flag', tag_flag)
-    connector_flag = kwargs.get('connector_flag', connector_flag)
-    get_history = kwargs.get('get_history', get_history)
-    get_merge_history = kwargs.get('get_merge_history', get_merge_history)
-    get_abutting = kwargs.get('get_abutting', get_abutting)
-    return_df = kwargs.get('return_df', return_df)
+    # Start a progress bar
+    with tqdm(total=len(x), desc='Fetching neurons', disable=module_logger.getEffectiveLevel()>=40) as pbar:      
+        collection = []
+        # Go over requested neurons in batches of 100s
+        for ix in range(0, len(x), 100 ):
+            to_retrieve = x[ix:ix+100]           
 
-    # Convert tag_flag, connector_tag, get_history and get_merge_history to
-    # bool if necessary
-    if isinstance(tag_flag, int):
-        tag_flag = tag_flag == 1
-    if isinstance(connector_flag, int):
-        connector_flag = connector_flag == 1
-    if isinstance(get_history, int):
-        get_history = get_history == 1
-    if isinstance(get_merge_history, int):
-        get_merge_history = get_merge_history == 1
+            # Generate URLs to retrieve
+            urls = []
+            for i, skeleton_id in enumerate(to_retrieve):
+                # Create URL for retrieving skeleton data from server with history
+                # details
+                remote_compact_skeleton_url = remote_instance._get_compact_details_url(
+                    skeleton_id)
+                # For compact-details, parameters have to passed as GET
+                remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode({'with_history': str(get_history).lower(),
+                                                                               'with_tags': str(tag_flag).lower(),
+                                                                               'with_connectors': str(connector_flag).lower(),
+                                                                               'with_merge_history': str(get_merge_history).lower()})
+                # 'True'/'False' needs to be lower case
+                urls.append(remote_compact_skeleton_url)
 
-    # Generate URLs to retrieve
-    urls = []
-    for i, skeleton_id in enumerate(to_retrieve):
-        # Create URL for retrieving skeleton data from server with history
-        # details
-        remote_compact_skeleton_url = remote_instance._get_compact_details_url(
-            skeleton_id)
-        # For compact-details, parameters have to passed as GET
-        remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode({'with_history': str(get_history).lower(),
-                                                                       'with_tags': str(tag_flag).lower(),
-                                                                       'with_connectors': str(connector_flag).lower(),
-                                                                       'with_merge_history': str(get_merge_history).lower()})
-        # 'True'/'False' needs to be lower case
-        urls.append(remote_compact_skeleton_url)
+            skdata = _get_urls_threaded(urls, remote_instance, external_pbar=pbar)
 
-    skdata = _get_urls_threaded(urls, remote_instance, desc='neurons')
+            # Retrieve abutting
+            if get_abutting:
+                module_logger.debug(
+                    'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
+                urls = []
 
-    # Retrieve abutting
-    if get_abutting:
-        module_logger.debug(
-            'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
-        urls = []
+                for s in to_retrieve:
+                    get_connectors_GET_data = {'skeleton_ids[0]': str(s),
+                                               'relation_type': 'abutting'}
+                    urls.append(remote_instance._get_connectors_url() + '?%s' %
+                                urllib.parse.urlencode(get_connectors_GET_data))
 
-        for s in to_retrieve:
-            get_connectors_GET_data = {'skeleton_ids[0]': str(s),
-                                       'relation_type': 'abutting'}
-            urls.append(remote_instance._get_connectors_url() + '?%s' %
-                        urllib.parse.urlencode(get_connectors_GET_data))
+                cn_data = _get_urls_threaded(urls, remote_instance, disable_pb=True)
 
-        cn_data = _get_urls_threaded(urls, remote_instance, desc='abutting')
+                # Add abutting to other connectors in skdata with type == 2
+                for i, cn in enumerate(cn_data):
+                    if not get_history:
+                        skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
+                                         for c in cn['links']]
+                    else:
+                        skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4], c[8], None]
+                                         for c in cn['links']]
 
-        # Add abutting to other connectors in skdata with type == 2
-        for i, cn in enumerate(cn_data):
+            # Get neuron names
+            names = get_names(to_retrieve, remote_instance)
+
             if not get_history:
-                skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
-                                 for c in cn['links']]
+                df = pd.DataFrame([[
+                    names[str(to_retrieve[i])],
+                    str(to_retrieve[i]),
+                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id',
+                                                'x', 'y', 'z', 'radius', 'confidence'], dtype=object),
+                    pd.DataFrame(n[1], columns=['treenode_id', 'connector_id',
+                                                'relation', 'x', 'y', 'z'], dtype=object),
+                    n[2]]
+                    for i, n in enumerate(skdata)
+                ],
+                    columns=['neuron_name', 'skeleton_id',
+                             'nodes', 'connectors', 'tags'],
+                    dtype=object
+                )
             else:
-                skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4], c[8], None]
-                                 for c in cn['links']]
+                df = pd.DataFrame([[
+                    names[str(to_retrieve[i])],
+                    str(to_retrieve[i]),
+                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y',
+                                                'z', 'radius', 'confidence', 'last_modified', 'creation_date'], dtype=object),
+                    pd.DataFrame(n[1], columns=['treenode_id', 'connector_id', 'relation',
+                                                'x', 'y', 'z', 'last_modified', 'creation_date'], dtype=object),
+                    n[2]]
+                    for i, n in enumerate(skdata)
+                ],
+                    columns=['neuron_name', 'skeleton_id',
+                             'nodes', 'connectors', 'tags'],
+                    dtype=object
+                )
 
-    # Get neuron names
-    names = get_names(to_retrieve, remote_instance)
+            # Placeholder for igraph representations of neurons
+            df['igraph'] = None
 
-    if not get_history:
-        df = pd.DataFrame([[
-            names[str(to_retrieve[i])],
-            str(to_retrieve[i]),
-            pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id',
-                                        'x', 'y', 'z', 'radius', 'confidence'], dtype=object),
-            pd.DataFrame(n[1], columns=['treenode_id', 'connector_id',
-                                        'relation', 'x', 'y', 'z'], dtype=object),
-            n[2]]
-            for i, n in enumerate(skdata)
-        ],
-            columns=['neuron_name', 'skeleton_id',
-                     'nodes', 'connectors', 'tags'],
-            dtype=object
-        )
-    else:
-        df = pd.DataFrame([[
-            names[str(to_retrieve[i])],
-            str(to_retrieve[i]),
-            pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y',
-                                        'z', 'radius', 'confidence', 'last_modified', 'creation_date'], dtype=object),
-            pd.DataFrame(n[1], columns=['treenode_id', 'connector_id', 'relation',
-                                        'x', 'y', 'z', 'last_modified', 'creation_date'], dtype=object),
-            n[2]]
-            for i, n in enumerate(skdata)
-        ],
-            columns=['neuron_name', 'skeleton_id',
-                     'nodes', 'connectors', 'tags'],
-            dtype=object
-        )
+            # Collect this batch
+            collection.append(df)            
 
-    # Placeholder for igraph representations of neurons
-    df['igraph'] = None
+        # Combine batches into a single DataFrame
+        df = pd.concat(collection, ignore_index=True ) 
 
     if return_df:
         return df
@@ -1280,7 +1327,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
         remote_nodes_list_url = remote_instance._get_skeleton_nodes_url(skid)
         urls.append(remote_nodes_list_url)
 
-    node_list = _get_urls_threaded(urls, remote_instance, desc='tn tables')    
+    node_list = _get_urls_threaded(urls, remote_instance, desc='Fetching tables')    
 
     module_logger.info(
         '%i treenodes retrieved. Creating table...' % sum( [len( nl[0] ) for nl in node_list] ) )
@@ -1435,7 +1482,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
 
     cn_data = []
 
-    # There seems to be some cap regarding how many x you can send to the
+    # There seems to be some cap regarding how many skids you can send to the
     # server, so we have to chop it into pieces
     for a in range(0, len(x), 50):
         for i, s in enumerate(x[a:a + 50]):
@@ -1797,7 +1844,7 @@ def get_user_annotations(x, remote_instance=None):
 
     # Get data
     annotations = [e['aaData'] for e in _get_urls_threaded(
-        url_list, remote_instance, post_data=postdata, desc='annotations')]
+        url_list, remote_instance, post_data=postdata, desc='Fetching annotations')]
 
     # Add user login
     for i, u in enumerate(ids):
@@ -1843,7 +1890,7 @@ def get_annotation_details(x, remote_instance=None):
         DataFrame in which each row represents a single annotation
 
         >>> df
-        ...   annotation skeleton_id time_annotated unknown user_id annotation_id user
+        ...   annotation skeleton_id time_annotated user_id annotation_id user
         ... 0
         ... 1    
 
@@ -1851,6 +1898,18 @@ def get_annotation_details(x, remote_instance=None):
     --------
     :func:`pymaid.pymaid.get_annotations`
                         Gives you annotations for a list of neurons (faster)
+
+    Examples
+    --------
+    >>> # Get annotations for a set of neurons
+    >>> an = pymaid.get_annotation_details([ 12, 57003 ])
+    >>> # Get those for a single neuron
+    >>> an[ an.skeleton_id == '57003' ]
+    >>> # Get annotations given by set of users
+    >>> an[ an.user.isin( ['schlegelp', 'lif'] )]
+    >>> # Get most recent annotations
+    >>> import datetime
+    >>> an[ an.time_annotated > datetime.date(2017,6,1) ]
 
     """
 
@@ -1875,7 +1934,7 @@ def get_annotation_details(x, remote_instance=None):
 
     # Get data
     annotations = [e['aaData'] for e in _get_urls_threaded(
-        url_list, remote_instance, post_data=postdata, desc='annotations')]
+        url_list, remote_instance, post_data=postdata, desc='Fetching annotations')]
 
     # Get user list
     user_list = get_user_list(remote_instance).set_index('id')
@@ -1884,7 +1943,7 @@ def get_annotation_details(x, remote_instance=None):
     for i, s in enumerate(skids):
         for an in annotations[i]:
             an.insert(1, s)
-            an.append(user_list.ix[an[3]].login)
+            an.append(user_list.ix[an[4]].login)
 
     # Now flatten the list of lists
     annotations = [an for sublist in annotations for an in sublist]
@@ -1892,9 +1951,12 @@ def get_annotation_details(x, remote_instance=None):
     # Create dataframe
     df = pd.DataFrame(annotations,
                       columns=['annotation', 'skeleton_id', 'time_annotated',
-                               'unknown', 'user_id', 'annotation_id', 'user'],
+                               'times_used', 'user_id', 'annotation_id', 'user'],
                       dtype=object
                       )
+
+    # Times used appears to not be working (always shows "1") - remove it
+    df.drop('times_used', inplace=True, axis=1)
 
     df['time_annotated'] = [datetime.datetime.strptime(
         d[:16], '%Y-%m-%dT%H:%M') for d in df['time_annotated'].tolist()]
@@ -2146,7 +2208,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                          )
 
     results = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='names')
+        urls, remote_instance, post_data=post_data, desc='Fetching names')
 
     match = []
     for i, r in enumerate(results):
@@ -2308,7 +2370,7 @@ def get_treenode_info(x, remote_instance=None):
 
     urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]    
 
-    data = _get_urls_threaded(urls, remote_instance, desc='info')
+    data = _get_urls_threaded(urls, remote_instance, desc='Fetching info')
 
     df = pd.DataFrame([[treenode_ids[i]] + list(n.values()) for i, n in enumerate(data)],
                       columns=['treenode_id'] + list(data[0].keys())
@@ -2559,7 +2621,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
             {'tags': ','.join(tags), 'delete_existing': override_existing} for n in node_list]
 
     d = _get_urls_threaded(add_tags_urls, remote_instance,
-                           post_data=post_data, desc='tags')
+                           post_data=post_data, desc='Modifying tags')
 
     return d
 
@@ -2604,7 +2666,7 @@ def get_segments(x, remote_instance=None):
         post_data.append({'placeholder': 0})
 
     rdata = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='segments')
+        urls, remote_instance, post_data=post_data, desc='Fetching segments')
 
     if len(x) > 1:
         return { x[i] : [ [ tn['id'] for tn in arb['sequence']  ] for arb in rdata[i] ] for i in range(len(x)) }
@@ -2658,7 +2720,7 @@ def get_review_details(x, remote_instance=None):
         post_data.append({'placeholder': 0})
 
     rdata = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='review')
+        urls, remote_instance, post_data=post_data, desc='Fetching review stats')
 
     for i, neuron in enumerate(rdata):
         # There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
@@ -2778,6 +2840,9 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
                                'x', 'y', 'z', 'explanation']
                       )
 
+    df['timestamp'] = [datetime.datetime.strptime(
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['timestamp'].tolist()]
+
     return df
 
 
@@ -2890,7 +2955,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
             remote_instance._get_contributions_url() for s in x]
 
         stats = _get_urls_threaded(
-            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='Contributions')
+            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='Fetching contributions')
 
         df = pd.DataFrame([[
             s,
@@ -4135,5 +4200,123 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
         return [ gen_url( c, stid, nid, sid ) for c, stid, nid, sid in zip(coords, stack_id, active_node_id, active_skeleton_id ) ]
     else:
         return gen_url( coords, stack_id, active_node_id, active_skeleton_id )
+
+
+def rename_neurons( x, new_names, remote_instance=None, no_prompt=False ):
+    """ Wrapper to rename neuron(s)
+
+    Parameters
+    ----------
+    x                  
+                        Neuron(s) to rename. Can be either:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    new_names :         list, dict
+                        New name(s). If renaming multiple neurons this
+                        needs to be a dict mapping skeleton IDs to new
+                        names or a list of the same size as provided skeleton
+                        IDs.
+    no_prompt :         bool, optional
+                        By default, you will be prompted to confirm before
+                        renaming neuron(s). Set this to True to skip that step.
+    remote_instance :   CATMAID instance, optional  
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Nothing
+    """
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    x = eval_skids(x, remote_instance=remote_instance)
+
+    if not isinstance(x, (list, np.ndarray)):
+        x = [x]
+
+    if isinstance(new_names, dict):
+        # First make sure that dictionary maps strings
+        _ = { str(n) : new_names[n] for n in new_names }
+        # Generate a list from the dict
+        new_names = [ _[n] for n in x if n in _ ]
+    elif not isinstance(new_names, (list, np.ndarray)):
+        new_names = [ new_names ]
+
+    if len(x) != len(new_names):
+        raise ValueError('Need a name for every single neuron to rename.')      
+
+    if not no_prompt:
+        old_names = get_names( x )
+        df = pd.DataFrame(  data = [ [ old_names[n], new_names[i], n ]  for i, n in enumerate(x) ],
+                            columns = ['Current name','New name','Skeleton ID']
+                          )
+        print(df)
+        answer = ""
+        while answer not in ["y", "n"]:
+            answer = input("Please confirm above renaming [Y/N] ").lower()
+
+        if answer != 'y':
+            return
+    
+    url_list = []
+    postdata = []
+    for skid, name in zip( x, new_names ): 
+        # Renaming works with neuron ID, which we can get via this API endpoint        
+        remote_get_neuron_name = remote_instance._get_single_neuronname_url(skid)
+        neuron_id = remote_instance.fetch(remote_get_neuron_name)['neuronid']
+        url_list.append( remote_instance._rename_neuron_url(neuron_id) )
+        postdata.append( { 'name':name } )
+
+    # Get data
+    responses = [ r for r in _get_urls_threaded(
+        url_list, remote_instance, post_data=postdata, desc='Renaming')]
+
+    if False not in [ r['success'] for r in responses ]:
+        module_logger.info('All neurons successfully renamed.')
+    else:
+        failed = [ n for i, n in enumerate(x) if responses[i]['success'] == False ]
+        module_logger.error('Error renaming neuron(s): {0}'.format( ','.join(failed) ))
+
+    return
+
+def get_label_list(remote_instance=None):
+    """ Retrieves all labels (treenode tags) in a project
+
+    Parameters
+    ----------
+    remote_instance :   CatmaidInstance, optional
+                        If not provided, will search for globally defined
+                        remote instance.
+
+    Returns
+    -------
+    pd.DataFrame
+                label_id  tag  skeleton_id  treenode_id
+            0
+            1
+            2
+
+    Examples
+    --------
+    >>> # Get all labels 
+    >>> labels = pymaid.get_label_list()
+    >>> # Get all nodes with a given tag
+    >>> treenodes = labels[ labels.tag == 'my_label' ].treenode_id
+    >>> # Get neuron that have at least a single node with a given tag
+    >>> neurons = labels[ labels.tag == 'my_label' ].skeleton_id.unique()
+
+    """
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    labels = remote_instance.fetch( remote_instance._get_label_list_url() )
+
+    return pd.DataFrame(labels, columns= ['label_id','tag','skeleton_id','treenode_id'])
+
+
+
+
 
     
