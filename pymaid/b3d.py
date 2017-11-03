@@ -42,6 +42,8 @@ import pandas as pd
 from pymaid import core, pymaid
 import logging
 import colorsys
+import json
+import os
 
 try:
     import bpy
@@ -174,8 +176,8 @@ class handler:
         if isinstance(x, core.CatmaidNeuron):
             self._create_neuron(x, neurites=neurites,
                                 soma=soma, connectors=connectors)
-        elif isinstance(x, core.CatmaidNeuronList):
-            for n in x:
+        elif isinstance(x, core.CatmaidNeuronList):            
+            for i,n in enumerate(x):
                 self._create_neuron(n, neurites=neurites,
                                     soma=soma, connectors=connectors)
                 if redraw:
@@ -257,7 +259,7 @@ class handler:
                                                            l for l in bpy.context.scene.layers]
                                                        )
         bpy.ops.object.shade_smooth()
-        bpy.context.active_object.name = 'Soma of ' + x.neuron_name
+        bpy.context.active_object.name = 'Soma of #{0}'.format( x.skeleton_id )
         bpy.context.active_object['type'] = 'SOMA'
         bpy.context.active_object['catmaid_object'] = True
         bpy.context.active_object['skeleton_id'] = x.skeleton_id
@@ -353,7 +355,6 @@ class handler:
 
         bpy.ops.object.shade_smooth()
 
-
     def select(self, x, *args):
         """ Select given neurons
 
@@ -377,6 +378,9 @@ class handler:
         """
 
         skids = pymaid.eval_skids(x)
+
+        if not skids:
+            module_logger.error('No skids found.')
 
         names = []
 
@@ -484,7 +488,7 @@ class object_list:
     Examples
     --------
     >>> import pymaid
-    >>> #b3d module has to be import explicitly
+    >>> # b3d module has to be import explicitly
     >>> from pymaid import b3d
     >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )    
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
@@ -645,4 +649,30 @@ class object_list:
         """Delete neurons in the selection"""
         self.select(unselect_others=True)
         bpy.ops.object.delete()
+
+    def to_json(self, fname='selection.json'):
+        """ Saves neuron selection as json file which can be loaded
+        in CATMAID selection table.
+
+        Parameters
+        ----------
+        fname :     str, optional
+                    Filename to save selection to
+        """                
+
+        neuron_objects = [ n for n in bpy.data.objects if n.name in self.object_names and n['type'] == 'NEURON']
+
+        data = [dict(skeleton_id=int(n['skeleton_id']),
+                     color="#{:02x}{:02x}{:02x}".format( int(255*n.active_material.diffuse_color[0]),
+                                                         int(255*n.active_material.diffuse_color[1]),
+                                                         int(255*n.active_material.diffuse_color[2]) ),
+                     opacity=1
+                     ) for n in neuron_objects ]
+
+        with open(fname, 'w') as outfile:
+            json.dump(data, outfile)
+
+        module_logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
+        print('Selection saved as {0} in {1}'.format( fname, os.getcwd() ) )
+
 
