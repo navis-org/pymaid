@@ -12,8 +12,8 @@ You can import them explicitly...
 >>> from pymaid import cluster
 >>> results = cluster.cluster_by_synapse_placement(some_neurons)
 
-but for the most part you will just import the whole package. This, conveniently, flattens the namespace 
-and (almost) all functions are then available from the base level (i.e. ``pymaid.function``).
+ ... but for the most part you will just import the whole package. This, conveniently, flattens the namespace 
+and (almost) all functions are then available from the base level (i.e. ``pymaid.function()``).
 
 >>> import pymaid
 >>> results = pymaid.cluster_by_synapes_placement(some_neurons)
@@ -64,6 +64,7 @@ Selection of class methods:
 - :func:`~pymaid.core.CatmaidNeuron.from_swc`: creates CatmaidNeuron from swc file
 - :func:`~pymaid.core.CatmaidNeuronList.to_json`: saves neuronlist as json that can be opend in CATMAID's selection widget
 
+See :class:`~pymaid.core.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complete list.
 
 List of PyMaid functions
 ------------------------
@@ -138,17 +139,19 @@ Functions for morphological analyses:
 - :func:`~pymaid.morpho.arbor_confidence`: calculates confidence along the arbor
 - :func:`~pymaid.morpho.cable_within_distance`: calculate cable between pairs of neurons that is within given distance
 - :func:`~pymaid.morpho.calc_cable`: calculate cable length of given neuron
+- :func:`~pymaid.morpho.calc_segregation_index`: calculate segregation index (polarity) based on Schneider-Mizell et al., 2016
 - :func:`~pymaid.morpho.calc_strahler_index`: calculate strahler index for each node
+- :func:`~pymaid.morpho.calc_bending_flow`: variation of synapse flow centrality
 - :func:`~pymaid.morpho.calc_flow_centrality`: implementation of synapse flow centrality algorithm by Schneider-Mizell et al., 2016
 - :func:`~pymaid.morpho.classify_nodes`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
 - :func:`~pymaid.morpho.cut_neuron`: cut neuron at a node or node tag
 - :func:`~pymaid.morpho.distal_to`: use this to check spatial relation of nodes within a neuron
 - :func:`~pymaid.morpho.downsample_neuron`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
-- :func:`~pymaid.morpho.flow_centrality_split`: split neuron into axon, dendrite and primary neurite based on synapse flow centrality
 - :func:`~pymaid.morpho.in_volume`: test if points are within given CATMAID volume
 - :func:`~pymaid.morpho.longest_neurite`: prunes neuron to its longest neurite
 - :func:`~pymaid.morpho.prune_by_strahler`: prunes the neuron by strahler index
 - :func:`~pymaid.morpho.reroot_neuron`: reroot neuron to a specific node
+- :func:`~pymaid.morpho.split_axon_dendrite`: split neuron into axon, dendrite and primary neurite based on synapse flow centrality
 - :func:`~pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.dist_from_root` but does not use iGraph
 - :func:`~pymaid.morpho.stitch_neurons`: stitch neurons back together
 

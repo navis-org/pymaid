@@ -1,7 +1,7 @@
 Plotting
 ********
 
-Pymaid contains functions for 2 and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plotting` module and represent wrappers for `matplotlib <http://www.matplotlib.org>`_ for 2D, `vispy <http://www.vispy.org>`_ and `plotly <http://plot.ly>`_ for 3D.
+Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plotting` module and represent wrappers for `matplotlib <http://www.matplotlib.org>`_ for 2D, `vispy <http://www.vispy.org>`_ and `plotly <http://plot.ly>`_ for 3D.
 
 .. note::
    If you are experiencing issues when using vispy
@@ -13,7 +13,7 @@ Pymaid contains functions for 2 and 3D plotting of neurons, synapses and network
 Plotting Neurons
 ================
 
-Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`) as well as nblast results (:class:`pymaid.rmaid.nbl_results`) have built-in modules that call :func:`pymaid.plotting.plot3d` or :func:`pymaid.plotting.plot2d`.
+Neuron classes ( :class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.CatmaidNeuronList`) as well as nblast results (:class:`~pymaid.rmaid.nbl_results`) have built-in modules that call :func:`~pymaid.plotting.plot3d` or :func:`~pymaid.plotting.plot2d`.
 
 2D Plotting
 -----------
@@ -33,7 +33,7 @@ Neuron classes ( :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.Catm
 Adding volumes
 ++++++++++++++
 
-:func:`pymaid.plotting.plot2d` has some built-in outlines for the **adult Drosophila** brain project: ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
+:func:`~pymaid.plotting.plot2d` has some built-in outlines for the **adult Drosophila** brain project: ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
 
 >>> fig, ax = nl.plot2d( brain = (.8,.8,.8), 
 ...                      MB = (.3,.9,.3) )
@@ -53,7 +53,7 @@ Adding volumes
 >>> # Save screenshot
 >>> pymaid.screenshot('screenshot.png', alpha = True)
 
-The canvas persistent and survives simply closing the window. Calling :func:`pymaid.plotting.plot3d` again will add objects to the canvas and open it again.
+The canvas persistent and survives simply closing the window. Calling :func:`~pymaid.plotting.plot3d` again will add objects to the canvas and open it again.
 
 >>> # Add another set of neurons
 >>> nl2 = pymaid.CatmaidNeuronList([987675,543210], remote_instance = rm)
@@ -65,7 +65,7 @@ The canvas persistent and survives simply closing the window. Calling :func:`pym
 >>> # To wipe canvas from memory
 >>> pymaid.close3d()
 
-By default, calling :func:`pymaid.plotting.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
+By default, calling :func:`~pymaid.plotting.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
 
 >>> fig = nl.plot3d( backend = 'plotly', connectors = True )
 2017-07-18 21:22:27,192 - pymaid.plotting - INFO - Generating traces...
@@ -93,7 +93,7 @@ Navigating the 3D viewer
 Adding volumes
 ++++++++++++++
 
-:func:`pymaid.plotting.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
+:func:`~pymaid.plotting.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
@@ -121,7 +121,7 @@ You can also pass your own custom volumes as dictionarys:
 Plotting Networks
 =================
 
-:func:`pymaid.plotting.plot_network` is a wrapper to plot networks using plotly. It's rather slow for large-ish graphs though
+:func:`~pymaid.plotting.plot_network` is a wrapper to plot networks using plotly. It's rather slow for large-ish graphs though
 
 >>> import pymaid
 >>> import plotly.offline as poff

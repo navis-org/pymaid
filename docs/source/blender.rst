@@ -19,8 +19,8 @@ There are several ways to install additional packages for Blender's built-in Pyt
 1. Download `PIPs <https://pip.pypa.io/en/stable/installing/>`_ get-pip.py and save e.g. in your downloads directory
 2. run get-pip.py from Blender Python console:
 
->>>	with open('/Users/YOURNAME/Downloads/get-pip.py') as source_file:
-... 	exec(source_file.read())
+>>> with open('/Users/YOURNAME/Downloads/get-pip.py') as source_file:
+...     exec(source_file.read())
 
 3. Then use pip to install any given package. Here, we install as Scipy an example:
 

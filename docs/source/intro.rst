@@ -6,7 +6,7 @@ This section will teach you the basics of how to use PyMaid. If you are impatien
 
 Quickstart Guide
 ================
-At the beginning of each session, you have to initialise a :class:`~pymaid.pymaid.CatmaidInstance` that holds your credentials for the Catmaid server. In most examples, this instance is assigned to a variable called ``remote_instance`` or just ``rm``. Here we are requesting a list of two neurons from the server:
+At the beginning of each session, you have to initialise a :class:`~pymaid.pymaid.CatmaidInstance` that holds the url and your credentials for the CATMAID server. In most examples, this instance is assigned to a variable called ``remote_instance`` or just ``rm``. Here we are requesting a list of two neurons from the server:
 
 >>> import pymaid
 >>> # HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
@@ -31,16 +31,18 @@ annotations                                     False
 igraph                                          False
 tags                                             True
 dtype: object
->>> # Note how some entries are False? These are still empty. 
+>>> # Note how some entries are "False" or "NA"? These are still empty. 
 >>> # They will be retrieved/computed on-demand upon first *explicit* request
+>>> neuron_list[0].review_status
+57
 
-``neuron_list`` is an instance of the :class:`~pymaid.core.CatmaidNeuronList` class and holds two neurons, both of which are of the :class:`~pymaid.core.CatmaidNeuron` class. Check out their documentation for methods and attributes.
+Here, ``neuron_list`` is an instance of the :class:`~pymaid.core.CatmaidNeuronList` class and holds two neurons, both of which are of the :class:`~pymaid.core.CatmaidNeuron` class. Check out their documentation for methods and attributes!
 
 Plotting is easy and straight forward:
 
 >>> neuron_list.plot3d()
 
-This method simply calls :func:`~pymaid.plotting.plot3d` - check out the docs for which parameters you can pass along.
+This method simply calls :func:`pymaid.plotting.plot3d` - check out the docs for which parameters you can pass along.
 
 The Basics
 ==========
@@ -90,14 +92,14 @@ Advanced Stuff
 
 Connection to the server: CatmaidInstance 
 -----------------------------------------
-As you instanciate :class:`~pymaid.pymaid.CatmaidInstance`, it is made the default remote instance and you don't need to pass it on to any function explicitly.
+As you instanciate :class:`~pymaid.pymaid.CatmaidInstance`, it is made the default remote instance and you don't need to worry about it anymore.
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token')
 2017-08-24 19:31:22,663 - pymaid.pymaid - INFO - Global CATMAID instance set.
 >>> partners = pymaid.get_partners( [12345,67890] )
 
-However, if you pass a :class:`~pymaid.pymaid.CatmaidInstance` explicitly to a function, any globally defined remote instance is overruled:
+However, if you - for example - are working with two separate servers or projects, you can pass a :class:`~pymaid.pymaid.CatmaidInstance` explicitly to a function. This will overule any globally defined remote instance:
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token', set_global=False )
@@ -107,9 +109,11 @@ You can manually make a remote instance the global one:
 
 >>> rm.set_global()
 
-The project ID is part of the CatmaidInstance and defaults to 1. You can change this either when initialising or later on-the-go:
+The project ID is part of the CatmaidInstance and defaults to 1. You can change this either when initialising or later on-the-fly:
 
+>>> # Initialise with project_id 2 (default = 1)
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token', project_id = 2 )
+>>> # Change project_id on-the-fly
 >>> rm.project_id = 1
 
 :class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.CatmaidNeuronList` objects will store a CatmaidInstance and use it to pull data from the server on-demand:
@@ -119,7 +123,7 @@ The project ID is part of the CatmaidInstance and defaults to 1. You can change 
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
->>> # Initialise with a CatmaidInstance
+>>> # Initialise explicitely with a CatmaidInstance
 >>> nl = pymaid.CatmaidNeuronList( [12345,67890], remote_instance = rm )
 >>> # Initialise without and add later
 >>> nl = pymaid.CatmaidNeuronList( [12345,67890] )
@@ -197,6 +201,8 @@ Indexing CatmaidNeuronLists
 >>> subset = nl [ 'name1' ]
 >>> # Index by list of skeleton IDs
 >>> subset = nl.skid [ [ '12345', '67890' ] ]
+>>> # Index by annotation
+>>> subset = nl.has_annotation( ['AN1', 'AN2'], intersect=False )
 >>> # Concatenate lists
 >>> nl += pymaid.get_neuron( [ 912345 ], remote_instance = rm )
 >>> # Remove item(s)
