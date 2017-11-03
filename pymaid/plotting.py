@@ -268,9 +268,7 @@ def plot2d(x, *args, **kwargs):
     elif isinstance(color, dict):
         colormap = {n: tuple(color[n]) for n in color}
     elif isinstance(color,(list,tuple)):        
-        colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}
-        print(color)
-        print(colormap)
+        colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}        
     elif isinstance(color,str):
         color = tuple( [ int(c *255) for c in mcl.to_rgb(color) ] )
         colormap = {n: color for n in skdata.skeleton_id.tolist()}
@@ -626,6 +624,9 @@ def plot3d(x, *args, **kwargs):
                       Use single tuple (r,g,b) to give all neurons the same
                       color. Use dict to give individual colors to neurons:
                       ``{ skid : (r,g,b), ... }``. R/G/B must be 0-255
+    use_neuron_color : bool, default=False
+                      If True, will try using the ``.color`` attribute of 
+                      CatmaidNeurons.
     width :           int, default=600
     height :          int, default=600
                       Use to define figure/window size.
@@ -810,7 +811,7 @@ def plot3d(x, *args, **kwargs):
                                            color=neuron_color)
                     view.add(s)
 
-            if connectors or connectors_only:
+            if connectors or connectors_only:             
                 for j in [0, 1, 2]:
                     if cn_mesh_colors:
                         color = neuron_color
@@ -821,7 +822,7 @@ def plot3d(x, *args, **kwargs):
                         color = np.array(color) / 255
 
                     this_cn = neuron.connectors[
-                        neuron.connectors.relation == j]
+                        neuron.connectors.relation == j]                    
 
                     if this_cn.empty:
                         continue
@@ -837,12 +838,12 @@ def plot3d(x, *args, **kwargs):
 
                         view.add(con)
 
-                    elif syn_lay['display'] == 'lines':
-                        tn_coords = neuron.nodes.ix[this_cn.treenode_id.tolist(
+                    elif syn_lay['display'] == 'lines':                        
+                        tn_coords = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.tolist(
                         )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
 
                         segments = [item for sublist in zip(
-                            pos, tn_coords) for item in sublist]
+                            pos, tn_coords) for item in sublist]                        
 
                         t = scene.visuals.Line(pos=np.array(segments) * vispy_scale_factor,
                                                color=color,
@@ -850,7 +851,7 @@ def plot3d(x, *args, **kwargs):
                                                connect='segments',
                                                antialias=False,
                                                method='gl') #method can also be 'agg'
-                        view.add(t)            
+                        view.add(t)
 
         for neuron in dotprops.itertuples():
             try:
@@ -910,7 +911,7 @@ def plot3d(x, *args, **kwargs):
         canvas.show()
 
         module_logger.info(
-            'Use plot.clear3d() to clear canvas and plot.close3d() to close canvas.')
+            'Use pymaid.clear3d() to clear canvas and pymaid.close3d() to close canvas.')
 
         return canvas, view
 
@@ -1259,7 +1260,8 @@ def plot3d(x, *args, **kwargs):
     by_strahler = kwargs.get('by_strahler', False)
     by_confidence = kwargs.get('by_confidence', False)
     cn_mesh_colors = kwargs.get('cn_mesh_colors', False)
-    connectors_only = kwargs.get('connectors_only', False)    
+    connectors_only = kwargs.get('connectors_only', False)
+    use_neuron_color = kwargs.get('use_neuron_color', False)
 
     syn_lay_new = kwargs.get('synapse_layout',  {})
     syn_lay = {0: {
@@ -1274,7 +1276,7 @@ def plot3d(x, *args, **kwargs):
         'name': 'Gap junctions',
         'color': (0, 255, 0)
     },
-        'display': 'lines'#'mpatches.Circles'
+        'display': 'lines' #'mpatches.Circles' 
     }
     syn_lay.update(syn_lay_new)
 
@@ -1328,7 +1330,9 @@ def plot3d(x, *args, **kwargs):
                 {str(n): cm[i] for i, n in enumerate(skdata.skeleton_id.tolist())})            
         if not dotprops.empty:
             colormap.update({str(n): cm[i + skdata.shape[0]]
-                             for i, n in enumerate(dotprops.gene_name.tolist())})            
+                             for i, n in enumerate(dotprops.gene_name.tolist())})       
+        if use_neuron_color:
+            colormap.update( { n.skeleton_id : n.color for n in skdata } )     
     elif isinstance(color, dict):
         colormap = {n: tuple(color[n]) for n in color}
     elif isinstance(color,(list,tuple)):
