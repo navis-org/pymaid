@@ -96,7 +96,7 @@ def generate_list_of_childs(skdata):
 
 def classify_nodes(skdata, inplace=True):
     """ Takes list of nodes and classifies them as end nodes, branches, slabs
-    and root
+    and root.
 
     Parameters
     ----------
@@ -350,7 +350,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
 def longest_neurite(skdata, reroot_to_soma=False, inplace=False):
     """ Returns a neuron consisting only of the longest neurite (based on 
-    geodesic distance)
+    geodesic distance).
 
     Parameters
     ----------
@@ -766,7 +766,7 @@ def cut_neuron(skdata, cut_node, g=None):
 
 def _cut_neuron(skdata, cut_node):
     """ DEPRECATED! Cuts a neuron at given point and returns two new neurons. 
-    Does not use igraph (slower)
+    Does not use igraph (slower).
 
     Parameters
     ----------
@@ -916,7 +916,7 @@ def _cut_neuron(skdata, cut_node):
 
 def synapse_root_distances(skdata, pre_skid_filter=[], post_skid_filter=[], remote_instance=None):
     """ Calculates geodesic (along the arbor) distance of synapses to root 
-    (i.e. soma)
+    (i.e. soma).
 
     Parameters
     ----------  
@@ -1814,9 +1814,19 @@ def calc_segregation_index(x, centrality_method='centrifugal'):
 
                         Will try using stored centrality, if possible.
 
+    Notes
+    -----
+    From Schneider-Mizell et al. (2016): "Note that even a modest amount of 
+    mixture (e.g. axo-axonic inputs) corresponds to values near H = 0.5–0.6 
+    (Figure 7—figure supplement 1). We consider an unsegregated neuron 
+    (H ¡ 0.05) to be purely dendritic due to their anatomical similarity with 
+    the dendritic domains of those segregated neurons that have dendritic 
+    outputs."
+    
     Returns
     -------
-    Segregation Index (SI)
+    H :                 float
+                        Segregation Index (SI)
     """
 
     if not isinstance(x, (core.CatmaidNeuron,core.CatmaidNeuronList)):

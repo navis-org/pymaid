@@ -52,7 +52,7 @@ if len( module_logger.handlers ) == 0:
 
 class CatmaidNeuron:
     """ Catmaid neuron object holding neuron data (nodes, connectors, name, 
-    etc) and providing quick access to various PymMid functions.
+    etc) and providing quick access to various PyMaid functions.
 
     Notes
     -----
@@ -110,7 +110,7 @@ class CatmaidNeuron:
                         Total number of synapses
     n_presynapses :     int
                         Total number of presynaptic sites
-    n_postsynapses :     int
+    n_postsynapses :    int
                         Total number of presynaptic sites
     n_branch_nodes :    int
                         Number of branch nodes
@@ -597,7 +597,7 @@ class CatmaidNeuron:
 
         if not isinstance( node, (list, np.ndarray) ):                
             node = [node]
-
+        
         for n in node:
             dist, prox = morpho.cut_neuron(self, n)
             self.__init__(prox, self._remote_instance, self._meta_data)
@@ -876,9 +876,27 @@ class CatmaidNeuronList:
 
     Attributes
     ----------
-    A CatmaidNeuronList has essentially the same attributes as an individual
-    :class:`~pymaid.core.CatmaidNeuron`. Requesting 
-
+    skeleton_id :       np.array of str                        
+    neuron_name :       np.array of str                        
+    nodes :             ``pandas.DataFrame``
+                        Merged treenode table
+    connectors :        ``pandas.DataFrame``
+                        Merged connector table    
+    tags :              np.array of dict
+                        Treenode tags
+    annotations :       np.array of list                        
+    igraph :            np.array of ``iGraph`` objects                        
+    review_status :     np.array of int                        
+    n_connectors :      np.array of int                        
+    n_presynapses :     np.array of int                        
+    n_postsynapses :    np.array of int                        
+    n_branch_nodes :    np.array of int                        
+    n_end_nodes :       np.array of int                        
+    n_open_ends :       np.array of int                        
+    cable_length :      np.array of float 
+                        Cable lengths in micrometers [um]    
+    soma :              np.array of treenode_ids                        
+    root :              np.array of treenode_ids
     n_cores :           int
                         Number of cores to use. Default is os.cpu_count()-1
     _use_parallel :     bool (default=False)
@@ -1057,8 +1075,8 @@ class CatmaidNeuronList:
         if key == 'shape':
             return (self.__len__(),)
         elif key in ['n_nodes','n_connectors','n_presynapses','n_postsynapses',
-                     'n_open_ends','n_open_ends','cable_length','tags','igraph',
-                     'soma','root','slabs']:
+                     'n_open_ends','n_end_nodes','cable_length','tags','igraph',
+                     'soma','root','slabs', 'igraph','n_branch_nodes']:
             self.get_skeletons(skip_existing=True)
             return np.array([ getattr(n,key) for n in self.neurons ])
         elif key == 'neuron_name':

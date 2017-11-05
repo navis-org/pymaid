@@ -50,7 +50,7 @@ __all__ = ['adjacency_matrix','cluster_by_connectivity','cluster_by_synapse_plac
 
 def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
     """ Wrapper to generate a matrix for synaptic connections between neuronsA
-    -> neuronsB (unidirectional!)
+    -> neuronsB (unidirectional!).
 
     Parameters
     ----------
@@ -595,7 +595,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     return similarity_indices   
 
 def _unpack_synapse_helper(x):
-    """Helper function to unpack values from pool"""    
+    """Helper function to unpack values from pool."""    
     return _calc_synapse_similarity( x[0], x[1], x[2], x[3], x[4] )
 
 def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=True):
@@ -788,7 +788,7 @@ def cluster_xyz(x, labels=None):
 
 class clust_results:
     """ Class to handle, analyze and plot similarity/distance matrices. 
-    Contains thin wrappers for scipy.cluster
+    Contains thin wrappers for ``scipy.cluster``.
 
     Parameters
     ----------
@@ -895,7 +895,7 @@ class clust_results:
         module_logger.info('Clustering done using method "{0}"'.format(method) )
 
     def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None):
-        """ Plot dendrogram using matplotlib
+        """ Plot dendrogram using matplotlib.
 
         Parameters
         ----------
@@ -1086,7 +1086,7 @@ class clust_results:
         return 
 
     def get_colormap(self, k=5, criterion='maxclust'):
-        """Generate colormap based on clustering
+        """Generate colormap based on clustering.
 
         Parameters
         ----------
@@ -1147,6 +1147,11 @@ class clust_results:
     def to_tree(self):
         """ Turns linkage to ete3 tree. 
 
+        See Also
+        --------
+        http://etetoolkit.org/
+            Ete3 homepage
+
         Returns
         -------
         ete 3 tree
@@ -1154,7 +1159,7 @@ class clust_results:
         try:
             import ete3
         except:
-            raise ImportError('Please install ete3 package to sue this function.')
+            raise ImportError('Please install ete3 package to use this function.')
 
         max_dist = self.linkage[-1][2]
         n_original_obs = self.mat.shape[0] 

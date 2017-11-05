@@ -101,7 +101,7 @@ __all__ = ['neuron2r', 'neuron2py', 'init_rcatmaid',
 
 def init_rcatmaid(**kwargs):
     """ This function initializes the R catmaid package from Jefferis 
-    (https://github.com/jefferis/rcatmaid) and returns an instance of it
+    (https://github.com/jefferis/rcatmaid).
 
     Parameters
     ----------
@@ -176,8 +176,8 @@ def init_rcatmaid(**kwargs):
 
 
 def data2py(data, **kwargs):
-    """ Takes data object from rcatmaid (e.g. 'catmaidneuron' from 
-    read.neuron.catmaid) and converts into Python Data. 
+    """ Takes data object from rcatmaid (e.g. ``catmaidneuron`` from 
+    ``read.neuron.catmaid``) and converts into Python Data. 
 
     Notes
     -----
@@ -986,7 +986,7 @@ class nbl_results:
 
     def get_dps(self, entries):
         """ Wrapper to retrieve dotproducts from DPS database (neuronlistfh) 
-        as neuronslist
+        as neuronslist.
 
         Parameters
         ----------
