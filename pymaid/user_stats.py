@@ -142,31 +142,36 @@ def get_user_contributions(x, remote_instance=None):
     return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
-def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM'):
+def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM', max_inactive_time=3):
     """ Takes a list of skeleton IDs and calculates the time each user has 
     spent working on this set of neurons in minutes.
 
     Parameters
     ----------
     x
-                       Which neurons to check. Can be either:
-                       1. skeleton IDs (int or str)
-                       2. neuron name (str, must be exact match)
-                       3. annotation: e.g. 'annotation:PN right'
-                       4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :  CatmaidInstance, optional
-                       Either pass explicitly or define globally.
-    minimum_actions :  int, optional
-                       Minimum number of actions per minute to be counted as 
-                       active.
-    treenodes :        bool, optional
-                       If False, treenodes will not be taken into account
-    connectors :       bool, optional
-                       If False, connectors will not be taken into account
-    mode :             {'SUM','OVER_TIME','ACTIONS'}, optional
-                       'SUM' will return total time invested (in minutes) per 
-                       user. 'OVER_TIME' will return minutes invested/day over 
-                       time. 'ACTIONS' will return actions/day over time.
+                           Which neurons to check. Can be either:
+                           1. skeleton IDs (int or str)
+                           2. neuron name (str, must be exact match)
+                           3. annotation: e.g. 'annotation:PN right'
+                           4. CatmaidNeuron or CatmaidNeuronList object
+    remote_instance :   CatmaidInstance, optional
+                        Either pass explicitly or define globally.
+    minimum_actions :   int, optional
+                        Minimum number of actions per minute to be counted as 
+                        active.
+    treenodes :         bool, optional
+                        If False, treenodes will not be taken into account
+    connectors :        bool, optional
+                        If False, connectors will not be taken into account
+    mode :              {'SUM','OVER_TIME','ACTIONS'}, optional
+                        (1) 'SUM' will return total time invested (in minutes) 
+                            per user. 
+                        (2) 'OVER_TIME' will return minutes invested/day over 
+                            time. 
+                        (3) 'ACTIONS' will return actions 
+                            (node/connectors placed/edited) per day.
+    max_inactive_time : int, optional
+                        Maximal time inactive in minutes. 
 
     Returns
     -------
@@ -201,8 +206,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     Be aware of the ``minimum_actions`` parameter: at low settings even 
     a single actions (e.g. connecting a node) will add considerably to time 
     invested. To keep total reconstruction time comparable to what Catmaid
-    calculates, you should consider about 15 actions/minute (= a click every
-    4 seconds).
+    calculates, you should consider about 10 actions/minute (= a click every
+    6 seconds) and maximum inactive time of 3 mins.
 
     CATMAID gives reconstruction time across all users. Here we calculate
     the time spent tracing for individuals. This may lead to a discrepancy
@@ -239,9 +244,13 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
     skids = eval_skids(x, remote_instance)
 
-    # Need this later for pandas.TimeGrouper()
-    interval = 1
+    # Maximal inactive time is simply translated into binning
+    # We need this later for pandas.TimeGrouper() anyway
+    interval = max_inactive_time
     bin_width = '%iMin' % interval
+
+    # Update minimum_actions to reflect actions/interval instead of actions/minute
+    minimum_actions *= interval
 
     user_list = get_user_list(remote_instance).set_index('id')
 
