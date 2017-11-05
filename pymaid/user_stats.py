@@ -143,17 +143,17 @@ def get_user_contributions(x, remote_instance=None):
 
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM', max_inactive_time=3):
-    """ Takes a list of skeleton IDs and calculates the time each user has 
-    spent working on this set of neurons in minutes.
+    """ Takes a list of skeleton IDs and calculates the time individual users 
+    have spent working on this set of neurons.
 
     Parameters
     ----------
     x
-                           Which neurons to check. Can be either:
-                           1. skeleton IDs (int or str)
-                           2. neuron name (str, must be exact match)
-                           3. annotation: e.g. 'annotation:PN right'
-                           4. CatmaidNeuron or CatmaidNeuronList object
+                        Which neurons to check. Can be either:
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, must be exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
     minimum_actions :   int, optional
@@ -190,26 +190,26 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         ... user1
         ... user2
 
-        For OVER_TIME, values respresent minutes invested on that day. For 
-        ACTIONS, values represent actions (creation, edition, review) on that 
+        For `OVER_TIME`, values respresent minutes invested on that day. For 
+        `ACTIONS`, values represent actions (creation, edition, review) on that 
         day.
 
 
     Important
     ---------
-    Creation/Edition/Review can overlap! This is why total time spent 
-    is != creation + edition + review.
+    Creation/Edition/Review times can overlap! This is why total time spent 
+    is not just creation + edition + review.
 
     Please note that this does currently not take placement of postsynaptic 
-    nodes into account!
+    nodes or creation of connector links into account!
 
     Be aware of the ``minimum_actions`` parameter: at low settings even 
     a single actions (e.g. connecting a node) will add considerably to time 
     invested. To keep total reconstruction time comparable to what Catmaid
     calculates, you should consider about 10 actions/minute (= a click every
-    6 seconds) and maximum inactive time of 3 mins.
+    6 seconds) and ``max_inactive_time`` of 3 mins.
 
-    CATMAID gives reconstruction time across all users. Here we calculate
+    CATMAID gives reconstruction time across all users. Here, we calculate
     the time spent tracing for individuals. This may lead to a discrepancy
     between sum of time invested over of all users from this function vs.
     CATMAID's reconstruction time.
@@ -227,6 +227,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     >>> plotly.offline.plot(fig)    
 
     Plot reconstruction efforts over time
+
     >>> stats = pymaid.get_time_invested( skids, mode='OVER_TIME' )    
     >>> # Plot time invested over time
     >>> stats.T.plot()
