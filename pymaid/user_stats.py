@@ -74,7 +74,6 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = ['get_user_contributions','get_time_invested',]
 
-
 def get_user_contributions(x, remote_instance=None):
     """ Takes a list of skeleton IDs and returns nodes and synapses contributed 
     by each user.
@@ -90,10 +89,10 @@ def get_user_contributions(x, remote_instance=None):
     ----------
     x
                         Which neurons to check. Can be either:
-                        1. skeleton IDs (int or str)
-                        2. neuron name (str, must be exact match)
-                        3. annotation: e.g. 'annotation:PN right'
-                        4. CatmaidNeuron or CatmaidNeuronList object
+                            1. skeleton IDs (int or str)
+                            2. neuron name (str, must be exact match)
+                            3. annotation: e.g. 'annotation:PN right'
+                            4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   Catmaid Instance, optional
                         Either pass explicitly or define globally.
 
@@ -119,7 +118,7 @@ def get_user_contributions(x, remote_instance=None):
     skids = eval_skids(x, remote_instance)
 
     user_list = get_user_list(remote_instance).set_index('id')
-
+    
     cont = get_contributor_statistics(
         skids, remote_instance, separate=False).ix[0]
 
@@ -137,7 +136,7 @@ def get_user_contributions(x, remote_instance=None):
     for u in cont.pre_contributors:
         stats['presynapses'][u] = cont.pre_contributors[u]
     for u in cont.post_contributors:
-        stats['postsynapses'][u] = cont.post_contributors[u]
+        stats['postsynapses'][u] = cont.post_contributors[u]    
 
     return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
@@ -150,10 +149,15 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     ----------
     x
                         Which neurons to check. Can be either:
-                        1. skeleton IDs (int or str)
-                        2. neuron name (str, must be exact match)
-                        3. annotation: e.g. 'annotation:PN right'
-                        4. CatmaidNeuron or CatmaidNeuronList object
+                            1. skeleton IDs (int or str)
+                            2. neuron name (str, must be exact match)
+                            3. annotation: e.g. 'annotation:PN right'
+                            4. CatmaidNeuron or CatmaidNeuronList object
+                        If you pass skeleton data (i.e. CatmaidNeurons), this
+                        data is used to calculate time invested. You can 
+                        exploit this to get time invested into a given 
+                        compartment of a neurons, e.g. by pruning it to a 
+                        corresponding volume.
     remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
     minimum_actions :   int, optional
