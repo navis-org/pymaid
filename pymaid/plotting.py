@@ -64,7 +64,7 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['screenshot','plot2d','plot3d','plot_network','clear3d','close3d']
+__all__ = ['plot3d','plot2d','plot_network','clear3d','close3d','screenshot',]
 
 
 def screenshot(file='screenshot.png', alpha=True):
@@ -638,14 +638,14 @@ def plot3d(x, *args, **kwargs):
 
     Returns
     --------
-    If ``backend == 'vispy'``
+    If ``backend='vispy'``
 
        Opens a 3D window and returns:
 
             - ``canvas`` - Vispy canvas object 
             - ``view`` - Vispy view object -> use to manipulate camera, add object, etc.
 
-    If ``backend == 'plotly'``
+    If ``backend='plotly'``
 
        ``fig`` - dictionary to generate plotly 3D figure:
 
@@ -1417,22 +1417,23 @@ def plot_network(x, *args, **kwargs):
     ----------
     x
                       Neurons as single or list of either:
+
                       1. skeleton IDs (int or str)
                       2. neuron name (str, exact match)
-                      3. annotation: e.g. 'annotation:PN right'
+                      3. annotation: e.g. ``'annotation:PN right'``
                       4. CatmaidNeuron or CatmaidNeuronList object
                       5. pandas.DataFrame containing an adjacency matrix., 
-                         e.g. from ``cluster.create_adjacency_matrix()``
+                         e.g. from :funct:`~pymaid.cluster.create_adjacency_matrix`
                       6. iGraph representation of the network    
     remote_instance : CATMAID Instance, optional
-                      Need to pass this too if you are providing only skids
+                      Need to pass this too if you are providing only skids.
     layout :          string, default = 'fr' -> Fruchterman-Reingold
                       See http://igraph.org/python/doc/tutorial/tutorial.html
-                      for available layouts
+                      for available layouts.
     syn_cutoff :      int, default=False
-                      If provided, connections will be maxed at this value
+                      If provided, connections will be maxed at this value.
     syn_threshold :   int, default=0
-                      Edges with less connections are ignored
+                      Edges with less connections are ignored.
     groups :          dict
                       Use to group neurons. Format:
                       ``{ 'Group A' : [skid1, skid2, ..], }``
@@ -1443,17 +1444,17 @@ def plot_network(x, *args, **kwargs):
                 | Use dict to assign rgb colors to individual neurons:
                 | e.g. ``{ neuron1 : (200,200,0), .. }``
     label_nodes :     bool, default=True
-                      Plot neuron labels
+                      Plot neuron labels.
     label_edges :     bool, default=True
-                      Plot edge labels
+                      Plot edge labels.
     width :           int, default=800
     height :          int, default=800
-                      Figure width and height
+                      Figure width and height.
     node_hover_text : dict
                       Provide custom hover text for neurons:
                       ``{ neuron1 : 'hover text', .. }``
     node_size :       {int, dict}
-                      | Use int to set node size once
+                      | Use int to set node size once.
                       | Use dict to set size for individual nodes:
                       | ``{ neuron1 : 20, neuron2 : 5,  .. }``
 

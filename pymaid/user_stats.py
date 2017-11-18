@@ -89,10 +89,11 @@ def get_user_contributions(x, remote_instance=None):
     ----------
     x
                         Which neurons to check. Can be either:
-                            (1) skeleton IDs (int or str)
-                            (2) neuron name (str, must be exact match)
-                            (3) annotation: e.g. 'annotation:PN right'
-                            (4) CatmaidNeuron or CatmaidNeuronList object
+
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, must be exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   Catmaid Instance, optional
                         Either pass explicitly or define globally.
 
@@ -149,10 +150,12 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     ----------
     x
                         Which neurons to check. Can be either:
-                            (1) skeleton IDs (int or str)
-                            (2) neuron name (str, must be exact match)
-                            (3) annotation: e.g. 'annotation:PN right'
-                            (4) CatmaidNeuron or CatmaidNeuronList object
+
+                        1. skeleton IDs (int or str)
+                        2. neuron name (str, must be exact match)
+                        3. annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+
                         If you pass skeleton data (i.e. CatmaidNeurons), this
                         data is used to calculate time invested. You can 
                         exploit this to get time invested into a given 
@@ -180,14 +183,14 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     Returns
     -------
     pandas.DataFrame
-        If mode=='SUM', values represent minutes invested.
+        If ``mode='SUM'``, values represent minutes invested.
 
         >>> df
         ...       total  creation  edition  review
         ... user1
         ... user2
 
-        If mode=='OVER_TIME' or mode=='ACTIONS': 
+        If ``mode='OVER_TIME'`` or ``mode='ACTIONS'``: 
 
         >>> df
         ...       date date date ...

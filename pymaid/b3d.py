@@ -74,11 +74,11 @@ class handler:
     Notes
     -----
 
-    1. The handler adds neurons and keeps track of them in the scene.
-    2. If you request a list of objects via its attributes (e.g. `handler.neurons`) 
-    or via :func:`pymaid.b3d.handler.select`, a :class:`pymaid.b3d.object_list`
-    is returned. This class lets you change basic parameters of your selected
-    neurons.    
+        (1) The handler adds neurons and keeps track of them in the scene.
+        (2) If you request a list of objects via its attributes (e.g. ``handler.neurons``) 
+        or via :func:`~pymaid.b3d.handler.select`, a :class:`~pymaid.b3d.object_list`
+        is returned. This class lets you change basic parameters of your selected
+        neurons.
 
     Attributes
     ----------

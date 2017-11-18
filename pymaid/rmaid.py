@@ -95,8 +95,8 @@ except:
     module_logger.error(
         'R library "nat" not found! Please install from within R.')
 
-__all__ = ['neuron2r', 'neuron2py', 'init_rcatmaid',
-           'data2py', 'nbl_results', 'nblast', 'nblast_allbyall']
+__all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid',
+           'data2py', 'nbl_results', 'nblast', 'nblast_allbyall'])
 
 
 def init_rcatmaid(**kwargs):
@@ -267,8 +267,8 @@ def data2py(data, **kwargs):
 
 
 def neuron2py(neuron, remote_instance=None):
-    """ Converts an rcatmaid neuron or neuronlist object to a standard PyMaid 
-    CatmaidNeuronList.
+    """ Converts an rcatmaid ``neuron`` or ``neuronlist`` object to a PyMaid 
+    :class:`~pymaid.core.CatmaidNeuron`/:class:`~pymaid.core.CatmaidNeuronList`.
 
     Notes
     -----
@@ -507,7 +507,7 @@ def dotprops2py(dp, subset=None):
     dp :        {dotprops neuronlist,  neuronlistfh}
                 Dotprops object to convert
     subset :    {list of str, list of indices }, optional
-                Neuron names or indices. Default = None.
+                Neuron names or indices.
 
     Returns
     -------
@@ -558,7 +558,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
                     Number of cores to use for nblasting. Default is os.cpu_count()
     UseAlpha :      bool, optional
                     Emphasises neurons' straight parts (backbone) over parts 
-                    that have lots of branches. Default = False
+                    that have lots of branches.
 
     Returns
     -------
@@ -682,7 +682,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
                     'flycircuit.datadir'.
     n_cores :       int, optional
                     Number of cores to use for nblasting. Default is 
-                    os.cpu_count().
+                    ``os.cpu_count()``.
     reverse :       bool, optional
                     If True, treats the neuron as NBLAST target rather than 
                     neurons of database. Makes sense for partial 
@@ -694,7 +694,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
                     Whether to mirror the neuron or not b/c FlyCircuit neurons 
                     are on fly's right.
     normalised :    bool, optional
-                    Whether to return normalised NBLAST scores. Default = True
+                    Whether to return normalised NBLAST scores.
     reference :     {string, R file object}, optional
                     Default = 'nat.flybrains::FCWB'
 
@@ -918,30 +918,28 @@ class nbl_results:
         hits :  {int, list of int, str, list of str}, optional
                 nblast hits to plot (default = 5). Can be: 
 
-                1. int: e.g. hits = 5 for top 5 hits 
-                2 .list of ints: e.g. hits = [2,5] to plot hits 2 and 5 
-                3. string: e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
-                4. list of strings: e.g. ['THMARCM-198F_seg1',
-                   npfMARCM-'F000003_seg002'] to plot multiple neurons by 
-                   their gene name
+                1. int: e.g. ``hits=5`` for top 5 hits 
+                2 .list of ints: e.g. ``hits=[2,5]`` to plot hits 2 and 5 
+                3. string: e.g. ``hits='THMARCM-198F_seg1'`` to plot this neuron
+                4. list of strings: e.g. ``['THMARCM-198F_seg1', npfMARCM-'F000003_seg002']`` to plot multiple neurons by their gene name
 
         plot_neuron :   bool 
-                        If True, the nblast query neuron will be plotted. 
+                        If ``True``, the nblast query neuron will be plotted. 
         plot_brain :    bool 
-                        If True, the reference brain will be plotted.
+                        If ``True``, the reference brain will be plotted.
         **kwargs    
-                        Parameters passed to `plotting.plot3d`. 
-                        See `help(pymaid.plotting.plot3d)` for details.
+                        Parameters passed to :func:`~pymaid.plotting.plot3d`.
+                        See ``help(pymaid.plot3d)`` for details.
 
         Returns
         -------
-        Depending on the backends used by `pymaid.plotting.plot3d()`:
+        Depending on the backends used by ``pymaid.plot3d()``:
 
         vispy (default) : canvas, view
         plotly : matplotlib figure
 
-        You can specify the backend by using e.g. `backend = 'plotly'` in 
-        **kwargs. See `help(pymaid.plotting.plot3d)` for details.
+        You can specify the backend by using e.g. ``backend='plotly'`` in 
+        **kwargs. See ``help(pymaid.plot3d)`` for details.
         """
 
         nl = self.get_dps(hits)
@@ -992,12 +990,12 @@ class nbl_results:
         ----------
         entries :   {int, str, list of int, list of str}, optional
                     Neurons to extract from DPS database. Can be:
-                    1. int: e.g. hits = 5 for top 5 hits 
-                    2 .list of ints: e.g. hits = [2,5] to plot hits 2 and 5 
-                    3. string: 
-                       e.g. hits = 'THMARCM-198F_seg1' to plot this neuron
+
+                    1. int: e.g. ``hits=5`` for top 5 hits 
+                    2 .list of ints: e.g. ``hits=[2,5]`` to plot hits 2 and 5 
+                    3. string: e.g. ``hits = 'THMARCM-198F_seg1'`` to plot this neuron
                     4. list of strings: 
-                       e.g. ['THMARCM-198F_seg1', npfMARCM-'F000003_seg002'] 
+                       e.g. ``['THMARCM-198F_seg1', npfMARCM-'F000003_seg002']`` 
                        to plot multiple neurons by their gene name
 
         Returns
