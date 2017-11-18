@@ -80,19 +80,19 @@ def get_user_contributions(x, remote_instance=None):
 
     Notes
     -----
-    This is essentially a wrapper for pymaid.get_contributor_statistics() - if 
-    you are also interested in e.g. construction time, review time, etc. you 
-    may want to consider using :func:`pymaid.pymaid.get_contributor_statistics` 
+    This is essentially a wrapper for ``pymaid.get_contributor_statistics()``
+    - if you are also interested in e.g. construction time, review time, etc. 
+    you may want to consider using :func:`~pymaid.pymaid.get_contributor_statistics` 
     instead.
 
     Parameters
     ----------
     x
                         Which neurons to check. Can be either:
-                        (1) skeleton IDs (int or str)
-                        (2) neuron name (str, must be exact match)
-                        (3) annotation: e.g. 'annotation:PN right'
-                        (4) CatmaidNeuron or CatmaidNeuronList object
+                            (1) skeleton IDs (int or str)
+                            (2) neuron name (str, must be exact match)
+                            (3) annotation: e.g. 'annotation:PN right'
+                            (4) CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   Catmaid Instance, optional
                         Either pass explicitly or define globally.
 
@@ -108,7 +108,7 @@ def get_user_contributions(x, remote_instance=None):
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_contributor_statistics`
+    :func:`~pymaid.pymaid.get_contributor_statistics`
                            Gives you more basic info on neurons of interest 
                            such as total reconstruction/review time.
     """
@@ -149,10 +149,10 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     ----------
     x
                         Which neurons to check. Can be either:
-                        (1) skeleton IDs (int or str)
-                        (2) neuron name (str, must be exact match)
-                        (3) annotation: e.g. 'annotation:PN right'
-                        (4) CatmaidNeuron or CatmaidNeuronList object
+                            (1) skeleton IDs (int or str)
+                            (2) neuron name (str, must be exact match)
+                            (3) annotation: e.g. 'annotation:PN right'
+                            (4) CatmaidNeuron or CatmaidNeuronList object
                         If you pass skeleton data (i.e. CatmaidNeurons), this
                         data is used to calculate time invested. You can 
                         exploit this to get time invested into a given 
