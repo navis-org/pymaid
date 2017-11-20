@@ -106,7 +106,7 @@ def init_rcatmaid(**kwargs):
     Parameters
     ----------
     remote_instance :   CATMAID instance 
-                        From pymaid.pymaid.CatmaidInstance(). This is used to 
+                        From pymaid.CatmaidInstance(). This is used to 
                         extract credentials. Overrides other credentials provided!
     server :            str, optional
                         Use this to set server URL if no remote_instance is 
@@ -268,7 +268,7 @@ def data2py(data, **kwargs):
 
 def neuron2py(neuron, remote_instance=None):
     """ Converts an rcatmaid ``neuron`` or ``neuronlist`` object to a PyMaid 
-    :class:`~pymaid.core.CatmaidNeuron`/:class:`~pymaid.core.CatmaidNeuronList`.
+    :class:`~pymaid.CatmaidNeuron`/:class:`~pymaid.CatmaidNeuronList`.
 
     Notes
     -----
@@ -548,7 +548,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     x             
                     Neurons to blast. This can be either:
                     1. A list of skeleton IDs
-                    2. PyMaid neurons from e.g. pymaid.pymaid.get_neuron()
+                    2. PyMaid neurons from e.g. pymaid.get_neuron()
                     3. RCatmaid neuron objects
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
@@ -563,7 +563,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     Returns
     -------
     nblast_results
-        Instance of :class:`pymaid.cluster.cluster_res` that holds distance 
+        Instance of :class:`pymaid.cluster_res` that holds distance 
         matrix and contains wrappers to cluster and plot data. Please use 
         help(nblast_results) to learn more and see example below.
 
@@ -665,7 +665,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     x               
                     Neuron to nblast. This can be either:
                     1. A single skeleton ID
-                    2. PyMaid neuron from e.g. pymaid.pymaid.get_neuron()
+                    2. PyMaid neuron from e.g. pymaid.get_neuron()
                     3. RCatmaid neuron object
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only a SKID is provided
@@ -928,7 +928,7 @@ class nbl_results:
         plot_brain :    bool 
                         If ``True``, the reference brain will be plotted.
         **kwargs    
-                        Parameters passed to :func:`~pymaid.plotting.plot3d`.
+                        Parameters passed to :func:`~pymaid.plot3d`.
                         See ``help(pymaid.plot3d)`` for details.
 
         Returns

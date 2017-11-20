@@ -156,7 +156,7 @@ def matrix2graph(adj_matrix, **kwargs):
     Parameters
     ----------
     adj_matrix :      pandas.Dataframe
-                      Adjacency matrix - e.g. from :func:`pymaid.cluster.create_adjacency_matrix`   
+                      Adjacency matrix - e.g. from :func:`pymaid.create_adjacency_matrix`   
     syn_threshold :   int, optional     
                       Edges with less connections will be ignored
     syn_cutoff :      int, optional
@@ -405,21 +405,21 @@ def cluster_nodes_w_synapses(data, plot_graph=False):
     distance_matrix_syn = np.delete(distance_matrix_syn, not_synapse_nodes, 1)
 
     module_logger.info('Clustering nodes with synapses...')
-    Y_syn = scipy.cluster.hierarchy.ward(distance_matrix_syn)
+    Y_syn = scipy.hierarchy.ward(distance_matrix_syn)
 
     if plot_graph:
         module_logger.debug('Plotting graph')
         # Compute and plot first dendrogram for all nodes.
         fig = pylab.figure(figsize=(8, 8))
         ax1 = fig.add_axes([0.09, 0.1, 0.2, 0.6])
-        Y_all = scipy.cluster.hierarchy.ward(distance_matrix)
-        Z1 = scipy.cluster.hierarchy.dendrogram(Y_all, orientation='left')
+        Y_all = scipy.hierarchy.ward(distance_matrix)
+        Z1 = scipy.hierarchy.dendrogram(Y_all, orientation='left')
         ax1.set_xticks([])
         ax1.set_yticks([])
 
         # Compute and plot second dendrogram for synapse nodes only.
         ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
-        Z2 = scipy.cluster.hierarchy.dendrogram(Y_syn)
+        Z2 = scipy.hierarchy.dendrogram(Y_syn)
         ax2.set_xticks([])
         ax2.set_yticks([])
 

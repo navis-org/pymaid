@@ -1423,7 +1423,7 @@ def plot_network(x, *args, **kwargs):
                       3. annotation: e.g. ``'annotation:PN right'``
                       4. CatmaidNeuron or CatmaidNeuronList object
                       5. pandas.DataFrame containing an adjacency matrix., 
-                         e.g. from :funct:`~pymaid.cluster.create_adjacency_matrix`
+                         e.g. from :funct:`~pymaid.create_adjacency_matrix`
                       6. iGraph representation of the network    
     remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids.

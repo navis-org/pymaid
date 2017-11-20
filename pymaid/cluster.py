@@ -47,7 +47,7 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = sorted([  'adjacency_matrix','cluster_by_connectivity',
                     'cluster_by_synapse_placement','cluster_xyz',
-                    'group_matrix'])
+                    'group_matrix', 'clust_results'])
 
 
 def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
@@ -316,12 +316,12 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                          similarity
     connectivity_table : pd.DataFrame, optional
                          Connectivity table, e.g. from 
-                         :func:`~pymaid.pymaid.get_partners`. Filters still 
+                         :func:`~pymaid.get_partners`. Filters still 
                          apply!
 
     Returns
     -------
-    :func:`pymaid.cluster.clust_results`
+    :func:`pymaid.clust_results`
                          Holds distance matrix and contains wrappers to plot
                          dendograms.
 
@@ -726,7 +726,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
 
     Returns
     -------
-    :class:`~pymaid.cluster.clust_results`
+    :class:`~pymaid.clust_results`
                 Class that contains distance matrix and methods to plot 
                 dendrograms.
     """         
@@ -779,7 +779,7 @@ def cluster_xyz(x, labels=None):
 
     Returns
     -------
-    :class:`pymaid.cluster.clust_results`
+    :class:`pymaid.clust_results`
                       Contains distance matrix and methods to generate plots.
 
     Examples
@@ -829,7 +829,7 @@ class clust_results:
     Attributes
     ----------
     mat :       Similarity matrix (0=dissimilar, 1=similar)
-    linkage :   Hierarchical clustering. Run :func:`pymaid.cluster.clust_results.cluster`
+    linkage :   Hierarchical clustering. Run :func:`pymaid.clust_results.cluster`
                 to generate linkage.res. By default, WARD's algorithm is used.
     leafs :     list of skids
 
@@ -887,11 +887,11 @@ class clust_results:
 
         if isinstance(self.mat, pd.DataFrame):
             if use_labels:
-                return [self.labels[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
+                return [self.labels[i] for i in scipy.hierarchy.leaves_list(self.linkage)]
             else:
-                return [self.mat.columns.tolist()[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
+                return [self.mat.columns.tolist()[i] for i in scipy.hierarchy.leaves_list(self.linkage)]
         else:
-            return scipy.cluster.hierarchy.leaves_list(self.linkage)    
+            return scipy.hierarchy.leaves_list(self.linkage)    
 
     def calc_cophenet(self):
         """ Returns Cophenetic Correlation coefficient of your clustering.
@@ -901,7 +901,7 @@ class clust_results:
         preserves the original distances,
         """        
 
-        return scipy.cluster.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
+        return scipy.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
 
     def calc_agg_coeff(self):
         """ Returns the agglomerative coefficient, measuring the clustering
@@ -936,7 +936,7 @@ class clust_results:
         Parameters
         ----------
         method :    str, optional
-                    Clustering method (see scipy.cluster.hierarchy.linkage 
+                    Clustering method (see scipy.hierarchy.linkage 
                     for reference)
         """
 
@@ -956,7 +956,7 @@ class clust_results:
         # thinks we are passing observations instead of final scores
         self.condensed_dist_mat = scipy.spatial.distance.squareform( self.dist_mat, checks=False )
 
-        self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat, method=method)
+        self.linkage = scipy.hierarchy.linkage(self.condensed_dist_mat, method=method)
 
         # Save method in case we want to look it up later
         self.method = method
@@ -976,7 +976,7 @@ class clust_results:
                             Labels in order of original observation or
                             dictionary with mapping original labels
         kwargs             
-                            Passed to `scipy.cluster.hierarchy.dendrogram()`
+                            Passed to `scipy.hierarchy.dendrogram()`
         """
 
         if not labels:
@@ -987,7 +987,7 @@ class clust_results:
         if not fig:
             fig = plt.figure()
 
-        dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
+        dn = scipy.hierarchy.dendrogram(self.linkage,
                                           color_threshold=color_threshold,
                                           labels=labels,
                                           leaf_rotation=90,
@@ -1052,14 +1052,14 @@ class clust_results:
         # Compute and plot first dendrogram for all nodes.
         fig = pylab.figure(figsize=(8, 8))
         ax1 = fig.add_axes([0.09, 0.1, 0.2, 0.6])
-        Z1 = scipy.cluster.hierarchy.dendrogram(
+        Z1 = scipy.hierarchy.dendrogram(
             self.linkage, orientation='left', labels=self.labels)
         ax1.set_xticks([])
         ax1.set_yticks([])
 
         # Compute and plot second dendrogram.
         ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
-        Z2 = scipy.cluster.hierarchy.dendrogram(self.linkage, labels=self.labels)
+        Z2 = scipy.hierarchy.dendrogram(self.linkage, labels=self.labels)
         ax2.set_xticks([])
         ax2.set_yticks([])
 
@@ -1201,7 +1201,7 @@ class clust_results:
                     list of clusters [ [leaf1, leaf5], [leaf2, ...], ... ]
         """
 
-        cl = scipy.cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
+        cl = scipy.hierarchy.fcluster(self.linkage, k, criterion=criterion)
 
         if self.labels and return_type.lower()=='labels':
             return [[self.labels[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
@@ -1255,5 +1255,46 @@ class clust_results:
             treenodes[ e[1] ] = treenodes[k].add_child(dist=dist_to_parent[e[1]], name=names.get(e[1],None) )
 
         return tree
+
+def _calc_sparseness(x, mode='activity_ratio'):
+    """ Calculates sparseness for a set of neurons.
+
+    Parameters
+    ----------
+    x :         Adjacency matrix
+                Pandas DataFrame or numpy array in which rows are sources and
+                columns are targets. Sparseness is calculated for targets.
+    mode :      str, optional
+                Sparseness comes in three different flavours:
+                    (1) "activity_ratio" after Rolls and Tovee is used to 
+                        describes distributions with heavy tails
+                    (2) "lifetime_sparseness" after XY
+                    (3) "kurtosis"
+    """
+
+    if mode not in ['activity_ratio','lifetime_sparseness','kurtosis']:
+        raise ValueError('Unknown mode: {0}'.format(mode))
+
+    if isinstance(x, pandas.DataFrame):
+        mat = x.as_matrix()
+        names = x.columns.tolist()
+    elif isinstance(x, np.ndarray):
+        mat = x
+        names = list(range(x.shape[1]))
+    else:
+        raise TypeError('Unable to process data of type {0}'.format(type(x)))
+
+    for i in range( mat.shape[1] ):
+        this_col = mat[:,i].T
+        this_col = this_col[ this_col > 0 ]
+
+        if mode == 'activity_ratio':
+            a = ( sum(this_col) / len(this_col) ) **2 / ( sum(this_col ** 2) / len(this_col) )
+            S = 1-a
+
+
+
+
+
 
 

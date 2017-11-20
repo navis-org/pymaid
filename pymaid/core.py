@@ -49,7 +49,7 @@ Examples
 >>> # Attributes can also be accessed for the entire neuronslist
 >>> nl.skeleton_id
 
-:class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.CatmaidNeuronList`
+:class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList`
 also allow quick access to other PyMaid functions:
 
 >>> # This ...
@@ -108,7 +108,7 @@ class CatmaidNeuron:
     annotations, etc.) will then be retrieved from the server 'on-demand'.
 
     The easiest way to construct a CatmaidNeuron is by using
-    :func:`~pymaid.pymaid.get_neuron`. 
+    :func:`~pymaid.get_neuron`. 
 
     Manually, a complete CatmaidNeuron can be constructed from a pandas 
     DataFrame (df) containing: df.nodes, df.connectors, df.skeleton_id, 
@@ -374,7 +374,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.pymaid.get_neuron` 
+        :func:`~pymaid.get_neuron` 
                     Function called to get skeleton information
         """
         if not remote_instance and not self._remote_instance:
@@ -508,11 +508,11 @@ class CatmaidNeuron:
         ----------     
         **kwargs         
                 Will be passed to plot2d() 
-                See help(pymaid.plotting.plot3d) for a list of keywords  
+                See help(pymaid.plot3d) for a list of keywords  
 
         See Also
         --------
-        :func:`pymaid.plotting.plot2d` 
+        :func:`pymaid.plot2d` 
                     Function called to generate 2d plot
         """
         if 'nodes' not in self.__dict__:
@@ -526,11 +526,11 @@ class CatmaidNeuron:
         ----------      
         **kwargs
                 Will be passed to plot3d() 
-                See help(pymaid.plotting.plot3d) for a list of keywords      
+                See help(pymaid.plot3d) for a list of keywords      
 
         See Also
         --------
-        :func:`pymaid.plotting.plot3d` 
+        :func:`pymaid.plot3d` 
                     Function called to generate 3d plot   
 
         Examples
@@ -553,13 +553,13 @@ class CatmaidNeuron:
         Parameters
         ----------
         linkage_kwargs :    dict
-                            Will be passed to scipy.cluster.hierarchy.linkage
+                            Will be passed to scipy.hierarchy.linkage
         dend_kwargs :       dict
-                            Will be passed to scipy.cluster.hierarchy.dendrogram
+                            Will be passed to scipy.hierarchy.dendrogram
 
         Returns
         -------
-        scipy.cluster.hierarchy.dendrogram
+        scipy.hierarchy.dendrogram
         """             
 
         # First get the all by all distances
@@ -573,10 +573,10 @@ class CatmaidNeuron:
         ends_mat = np.delete(ends_mat, non_leaf_ix, 1)        
 
         #Cluster
-        linkage = scipy.cluster.hierarchy.linkage( ends_mat, **linkage_kwargs )
+        linkage = scipy.hierarchy.linkage( ends_mat, **linkage_kwargs )
 
         #Plot
-        return scipy.cluster.hierarchy.dendrogram(linkage, **dend_kwargs)
+        return scipy.hierarchy.dendrogram(linkage, **dend_kwargs)
 
 
     def get_name(self, remote_instance=None):
@@ -624,7 +624,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.morpho.reroot_neuron`
+        :func:`~pymaid.reroot_neuron`
             Base function. See for details and examples.
 
         """
@@ -643,7 +643,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.morpho.cut_neuron`
+        :func:`~pymaid.cut_neuron`
             Base function. See for details and examples.
         """
 
@@ -667,7 +667,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.morpho.cut_neuron`
+        :func:`~pymaid.cut_neuron`
             Base function. See for details and examples.
 
         """
@@ -683,7 +683,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.morpho.prune_by_strahler` 
+        :func:`~pymaid.prune_by_strahler` 
             This is the base function. See for details and examples.
 
         Parameters
@@ -714,7 +714,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.morpho.longest_neurite`
+        :func:`~pymaid.longest_neurite`
             This is the base function. See for details and examples.
 
         """        
@@ -730,14 +730,14 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        v :     {str, pymaid.core.Volume, list of either}
+        v :     {str, pymaid.Volume, list of either}
                 Volume(s) to check for intersection
         mode :  {'IN','OUT'}, optional
                 If 'IN', parts of the neuron inside the volume are kept.
 
         See Also
         --------
-        :func:`~pymaid.morpho.in_volume`
+        :func:`~pymaid.in_volume`
             Base function. See for details and examples.
         """ 
         if not isinstance(v, Volume):            
@@ -890,7 +890,7 @@ class CatmaidNeuron:
         return CatmaidNeuron(df)
 
 class CatmaidNeuronList:
-    """ Compilations of :class:`~pymaid.core.CatmaidNeuron` that allow quick 
+    """ Compilations of :class:`~pymaid.CatmaidNeuron` that allow quick 
     access to neurons' attributes/functions. They are designed to work in many 
     ways much like a pandas.DataFrames by, for example, supporting ``.ix[ ]``, 
     ``.itertuples()``, ``.empty`` or ``.copy()``.  
@@ -902,7 +902,7 @@ class CatmaidNeuronList:
     will then be retrieved from the server 'on-demand'. 
 
     The easiest way to get a CatmaidNeuronList is by using 
-    :func:`~pymaid.pymaid.get_neuron` (see examples).
+    :func:`~pymaid.get_neuron` (see examples).
 
     Manually, a CatmaidNeuronList can constructed from a pandas DataFrame (df)
     containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
@@ -1264,7 +1264,7 @@ class CatmaidNeuronList:
 
         See Also
         --------
-        :func:`~pymaid.morpho.downsample_neuron`
+        :func:`~pymaid.downsample_neuron`
                 Base function - see for details.
         """                
 
@@ -1304,7 +1304,7 @@ class CatmaidNeuronList:
 
         See Also
         --------
-        :func:`~pymaid.morpho.reroot_neuron`
+        :func:`~pymaid.reroot_neuron`
                     Base function. See for details and more examples.
 
         Examples
@@ -1418,7 +1418,7 @@ class CatmaidNeuronList:
 
         See Also
         --------
-        :func:`pymaid.morpho.prune_by_strahler`
+        :func:`pymaid.prune_by_strahler`
                     Basefunction - see for details and examples. 
 
         """
@@ -1454,7 +1454,7 @@ class CatmaidNeuronList:
 
         See Also
         --------
-        :func:`pymaid.morpho.prune_by_strahler`
+        :func:`pymaid.prune_by_strahler`
                         Basefunction - see for details and examples.
 
         """
@@ -1484,14 +1484,14 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        v :     {str, pymaid.core.Volume, list of either}
+        v :     {str, pymaid.Volume, list of either}
                 Volume(s) to check for intersection
         mode :  {'IN','OUT'}, optional
                 If 'IN', part of the neuron inside the volume(s) is kept.
 
         See Also
         --------
-        :func:`~pymaid.morpho.in_volume`
+        :func:`~pymaid.in_volume`
                 Basefunction - see for details and examples.
         """ 
         
@@ -1660,7 +1660,7 @@ class CatmaidNeuronList:
 
         See Also
         --------
-        :func:`~pymaid.plotting.plot3d` 
+        :func:`~pymaid.plot3d` 
                 Base function called to generate 3d plot.               
         """
 
@@ -1681,7 +1681,7 @@ class CatmaidNeuronList:
 
         See Also
         --------
-        :func:`~pymaid.plotting.plot2d` 
+        :func:`~pymaid.plot2d` 
                 Base function called to generate 2d plot                      
         """
         self.get_skeletons(skip_existing=True)
@@ -1699,7 +1699,7 @@ class CatmaidNeuronList:
 
         Returns
         -------
-        :class:`pymaid.core.CatmaidNeuronList`
+        :class:`pymaid.CatmaidNeuronList`
                     Neurons that have given annotation(s).                  
         """ 
 
@@ -1855,8 +1855,8 @@ class Volume(dict):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_volume`
-        Retrieves volumes from CATMAID and returns :class:`pymaid.core.Volume`
+    :func:`~pymaid.get_volume`
+        Retrieves volumes from CATMAID and returns :class:`pymaid.Volume`
 
     Notes
     -----
@@ -1944,11 +1944,11 @@ class Volume(dict):
         ----------      
         **kwargs
                 Will be passed to plot3d() 
-                See help(pymaid.plotting.plot3d) for a list of keywords      
+                See help(pymaid.plot3d) for a list of keywords      
 
         See Also
         --------
-        :func:`pymaid.plotting.plot3d` 
+        :func:`pymaid.plot3d` 
                     Function called to generate 3d plot   
 
         Examples

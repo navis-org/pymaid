@@ -82,7 +82,7 @@ def get_user_contributions(x, remote_instance=None):
     -----
     This is essentially a wrapper for ``pymaid.get_contributor_statistics()``
     - if you are also interested in e.g. construction time, review time, etc. 
-    you may want to consider using :func:`~pymaid.pymaid.get_contributor_statistics` 
+    you may want to consider using :func:`~pymaid.get_contributor_statistics` 
     instead.
 
     Parameters
@@ -109,7 +109,7 @@ def get_user_contributions(x, remote_instance=None):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_contributor_statistics`
+    :func:`~pymaid.get_contributor_statistics`
                            Gives you more basic info on neurons of interest 
                            such as total reconstruction/review time.
     """

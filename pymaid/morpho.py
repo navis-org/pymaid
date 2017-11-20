@@ -438,7 +438,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
 
     See Also
     --------
-    :func:`~pymaid.core.CatmaidNeuron.reroot`
+    :func:`~pymaid.CatmaidNeuron.reroot`
                 Quick access to reroot directly from CatmaidNeuron/List objects
     """
 
@@ -602,8 +602,8 @@ def cut_neuron(skdata, cut_node, g=None):
 
     See Also
     --------
-    :func:`~pymaid.core.CatmaidNeuron.prune_distal_to`
-    :func:`~pymaid.core.CatmaidNeuron.prune_proximal_to`
+    :func:`~pymaid.CatmaidNeuron.prune_distal_to`
+    :func:`~pymaid.CatmaidNeuron.prune_proximal_to`
 
     """
     start_time = time.time()
@@ -1249,7 +1249,7 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
     Parameters
     ----------
     skdata :      {CatmaidNeuron, CatmaidNeuronList}       
-                  E.g. from  ``pymaid.pymaid.get_neuron()``.
+                  E.g. from  ``pymaid.get_neuron()``.
     inplace :     bool, optional
                   If False, a copy of original skdata is returned.
     method :      {'standard','greedy'}, optional
@@ -1551,7 +1551,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     volume :          {str, list of str, core.Volume} 
                       Name of the CATMAID volume to test OR core.Volume dict
-                      as returned by e.g. :func:`~pymaid.pymaid.get_volume()`    
+                      as returned by e.g. :func:`~pymaid.get_volume()`    
     inplace :         bool, optional
                       If False, a copy of the original DataFrames/Neuron is 
                       returned. Does only apply to CatmaidNeuron or 
@@ -1721,7 +1721,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     neurite. The result is highly depending on the method and on your 
     neuron's morphology and works best for "typical" neurons, i.e. those where
     the primary neurite branches into axon and dendrites. 
-    See :func:`~pymaid.morpho.calc_flow_centrality` for details on the flow
+    See :func:`~pymaid.calc_flow_centrality` for details on the flow
     centrality algorithm.
 
     Parameters
@@ -1731,8 +1731,8 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     method :            {'centrifugal','centripetal','sum', 'bending'}, optional
                         Type of flow centrality to use to split the neuron. 
                         There are four flavors: the first three refer to
-                        :func:`~pymaid.morpho.calc_flow_centrality`, the last 
-                        refers to :func:`~pymaid.morpho.calc_bending_flow`.
+                        :func:`~pymaid.calc_flow_centrality`, the last 
+                        refers to :func:`~pymaid.calc_bending_flow`.
 
                         Will try using stored centrality, if possible.
     primary_neurite :   bool, optional
@@ -1755,7 +1755,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     >>> x = pymaid.get_neuron(123456)
     >>> split = pymaid.split_axon_dendrite(x, method='centrifugal', reroot_soma=True)
     >>> split    
-    <class 'pymaid.core.CatmaidNeuronList'> of 3 neurons 
+    <class 'pymaid.CatmaidNeuronList'> of 3 neurons 
                           neuron_name skeleton_id  n_nodes  n_connectors  
     0  neuron 123457_primary_neurite          16      148             0   
     1             neuron 123457_axon          16     9682          1766   
@@ -1852,8 +1852,8 @@ def calc_segregation_index(x, centrality_method='centrifugal'):
     centrality_method : {'centrifugal','centripetal','sum', 'bending'}, optional
                         Type of flow centrality to use to split the neuron. 
                         There are four flavors: the first three refer to
-                        :func:`~pymaid.morpho.calc_flow_centrality`, the last 
-                        refers to :func:`~pymaid.morpho.calc_bending_flow`.
+                        :func:`~pymaid.calc_flow_centrality`, the last 
+                        refers to :func:`~pymaid.calc_bending_flow`.
 
                         Will try using stored centrality, if possible.
 
@@ -1941,11 +1941,11 @@ def calc_bending_flow(x, polypre=False):
 
     See Also
     --------    
-    :func:`~pymaid.morpho.calc_flow_centrality`
+    :func:`~pymaid.calc_flow_centrality`
             Calculate synapse flow centrality after Schneider-Mizell et al
-    :func:`~pymaid.morpho.segregation_score`
+    :func:`~pymaid.segregation_score`
             Uses flow centrality to calculate segregation score (polarity)
-    :func:`~pymaid.morpho.split_axon_dendrite`
+    :func:`~pymaid.split_axon_dendrite`
             Split the neuron into axon, dendrite and primary neurite.
 
     Returns
@@ -2058,12 +2058,10 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
     x :         {CatmaidNeuron, CatmaidNeuronList}
                 Neuron(s) to calculate flow centrality for
     mode :      {'centrifugal','centripetal','sum'}, optional
-                Type of flow centrality to calculate. There are three flavors:    
-                (1) centrifugal, which counts paths from proximal inputs to 
-                    distal outputs;
-                (2) centripetal, which counts paths from distal inputs to 
-                    proximal outputs;
-                (3) the sum of both.
+                Type of flow centrality to calculate. There are three flavors::
+                (1) centrifugal, which counts paths from proximal inputs to distal outputs
+                (2) centripetal, which counts paths from distal inputs to proximal outputs
+                (3) the sum of both
     polypre :   bool, optional
                 Whether to consider the number of presynapses as a multiple of
                 the numbers of connections each makes. Attention: this works
@@ -2090,11 +2088,11 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
 
     See Also
     --------
-    :func:`~pymaid.morpho.calc_bending_flow`
+    :func:`~pymaid.calc_bending_flow`
             Variation of flow centrality: calculates bending flow.
-    :func:`~pymaid.morpho.segregation_score`
+    :func:`~pymaid.calc_segregation_index`
             Calculates segregation score (polarity) of a neuron
-    :func:`~pymaid.morpho.flow_centrality_split`
+    :func:`~pymaid.flow_centrality_split`
             Tries splitting a neuron into axon, dendrite and primary neurite.
 
 
@@ -2354,8 +2352,8 @@ def distal_to(x, a=None, b=None):
     Parameters
     ----------
     x :     CatmaidNeuron
-    a,b :   {single treenodeID, list of treenodeIDs, None}, optional
-            If no treenodeIDs are provided, will consider all treenodes.
+    a,b :   {single treenode ID, list of treenode IDs, None}, optional
+            If no treenode IDs are provided, will consider all treenodes.
 
     Returns
     -------
@@ -2435,12 +2433,10 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
 
     Parameter
     ---------
-    x :                 Connectivity
-                        Data to filter. Currently accepts either:
-                         (1) Connectivity table from 
-                                :func:`~pymaid.pymaid.get_partners`
-                         (2) Adjacency matrix from 
-                             :func:`~pymaid.morpho.adjacency_matrix`
+    x :                 Connectivity object
+                        Currently accepts either::                        
+                         (1) Connectivity table from :func:`~pymaid.get_partners`
+                         (2) Adjacency matrix from :func:`~pymaid.adjacency_matrix`
     restrict_to :       {str, pymaid.Volume, pymaid.CatmaidNeuronList}
                         Volume or neurons to restrict connectivity to. Strings
                         will be interpreted as volumes.
