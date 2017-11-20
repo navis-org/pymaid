@@ -63,7 +63,7 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['network2graph','neuron2graph','matrix2graph','cluster_nodes_w_synapses','dist_from_root']
+__all__ = sorted(['network2graph','neuron2graph','matrix2graph','cluster_nodes_w_synapses','dist_from_root'])
 
 
 def network2graph(x, remote_instance=None, threshold=1):
@@ -134,9 +134,9 @@ def network2graph(x, remote_instance=None, threshold=1):
         skids = list(set( x.columns.tolist() + x.index.tolist() ))
         neuron_names = skids
 
-        edges = [ [i,j] for i in x.index.tolist() for j in x.columns.tolist() if x.ix[i][j] >= threshold ]       
+        edges = [ [i,j] for i in x.index.tolist() for j in x.columns.tolist() if x.loc[i,j] >= threshold ]       
         edges_by_index = [ [ skids.index(e[0]), skids.index(e[1]) ] for e in edges ] 
-        weight = [ x.ix[i][j] for i in range( x.shape[0] ) for j in range( x.shape[1]) if x.ix[i][j] >= threshold ]
+        weight = [ x.loc[i,j] for i in range( x.shape[0] ) for j in range( x.shape[1]) if x.loc[i,j] >= threshold ]
 
     # Generate graph and assign custom properties
     g = Graph(directed=True)
@@ -244,7 +244,7 @@ def neuron2graph(skdata, append=True):
 
     """
     if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        return [neuron2graph(skdata.ix[i]) for i in range(skdata.shape[0])]
+        return [neuron2graph(skdata.loc[i]) for i in range(skdata.shape[0])]
     elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
 
@@ -257,9 +257,9 @@ def neuron2graph(skdata, append=True):
     tn_index_with_parent = df.nodes[
         ~df.nodes.parent_id.isnull()].index.tolist()
     parent_ids = df.nodes[~df.nodes.parent_id.isnull()].parent_id.tolist()
-    df.nodes['temp_index'] = df.nodes.index  # add temporary column
-    parent_index = df.nodes.set_index('treenode_id').ix[parent_ids][
-        'temp_index'].tolist()
+    df.nodes['temp_index'] = df.nodes.index  # add temporary index column
+    parent_index = df.nodes.set_index('treenode_id').loc[parent_ids,
+        'temp_index'].values.astype(int).tolist()
     # remove temporary column
     df.nodes.drop('temp_index', axis=1, inplace=True)
 
@@ -285,9 +285,9 @@ def neuron2graph(skdata, append=True):
         n in nodes_w_synapses for n in df.nodes.treenode_id.tolist()]
 
     # Generate weights by calculating edge lengths = distance between nodes
-    tn_coords = df.nodes.ix[[e[0]
+    tn_coords = df.nodes.loc[[e[0]
                              for e in elist]][['x', 'y', 'z']].reset_index()
-    parent_coords = df.nodes.ix[[e[1]
+    parent_coords = df.nodes.loc[[e[1]
                                  for e in elist]][['x', 'y', 'z']].reset_index()
     w = np.sqrt(np.sum(
         (tn_coords[['x', 'y', 'z']] - parent_coords[['x', 'y', 'z']]) ** 2, axis=1)).tolist()
@@ -310,7 +310,7 @@ def dist_from_root(data, synapses_only=False):
                       If True, only distances for nodes with synapses will be 
                       returned (only makes sense if input is a Graph).
 
-    Returns:
+    Returns
     -------     
     dict             
                       Only if ``data`` is a graph object. 
@@ -325,7 +325,7 @@ def dist_from_root(data, synapses_only=False):
     if isinstance(data, Graph):
         g = data
     elif isinstance(data, pd.DataFrame) or isinstance(data, core.CatmaidNeuronList):
-        return [dist_from_root(data.ix[i]) for i in range(data.shape[0])]
+        return [dist_from_root(data.loc[i]) for i in range(data.shape[0])]
     elif isinstance(data, pd.Series) or isinstance(data, core.CatmaidNeuron):
         g = data.igraph
         if g is None:
@@ -383,7 +383,7 @@ def cluster_nodes_w_synapses(data, plot_graph=False):
         g = data
     elif isinstance(data, pd.DataFrame) or isinstance(data, core.CatmaidNeuronList):
         if data.shape[0] == 1:
-            g = data.ix[0].igraph
+            g = data.loc[0].igraph
         else:
             raise Exception('Please provide a SINGLE neuron.')
     elif isinstance(data, pd.Series) or isinstance(data, core.CatmaidNeuron):
