@@ -26,6 +26,7 @@ Examples
 ...                                      'HTTP_USER' , 
 ...                                      'HTTP_PASSWORD', 
 ...                                      'TOKEN' )
+>>> # Get skeletal data for two neurons
 >>> neuron_list = pymaid.get_neuron ( ['12345','67890'] , myInstance )
 >>> neuron_list[0]
 type              <class 'pymaid.core.CatmaidNeuron'>
@@ -41,6 +42,8 @@ annotations                                     False
 igraph                                          False
 tags                                             True
 dtype: object
+>>> # Get skeleton IDs of all neurons above a given size
+>>> 
 
 Notes
 -----
@@ -61,22 +64,25 @@ import numpy as np
 import datetime
 from tqdm import tqdm, trange
 import sys
+import os
 import math
+import warnings
+#warnings.simplefilter('default') #Make warnings be shown by default
 
 from pymaid import core, morpho, igraph_catmaid
 
-__all__ = [ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_skeleton',
+__all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_skeleton',
             'get_3D_skeletons','get_annotation_details','get_annotation_id',
             'get_annotation_list','get_annotations','get_arbor',
             'get_connector_details','get_connectors','get_contributor_statistics',
             'get_edges','get_history','get_logs','get_names','get_neuron','get_neuron_list',
-            'get_neurons','get_neurons_in_box','get_neurons_in_volume','get_node_tags',
+            'get_neurons','get_neurons_in_bbox','get_neurons_in_volume','get_node_tags',
             'get_node_user_details','get_nodes_in_volume','get_partners','get_partners_in_volume',
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
             'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
             'get_segments','delete_neuron','get_connectors_between','url_to_coordinates',
-            'rename_neurons','get_label_list']
+            'rename_neurons','get_label_list','find_neurons', 'get_skid_from_treenode'])
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -107,14 +113,14 @@ class CatmaidInstance:
     project_id :    int, optional
                     ID of your project. Default = 1
     logger_level :  {'DEBUG','INFO','WARNING','ERROR'}, optional
-                    Sets logger level (module-wide)
+                    Sets logger level (module-wide).
     time_out :      {int, None}
                     Time in seconds after which fetching data will time-out 
                     (so as to not block the system).
-                    If set to None, time-out will be max([ 30, len(requests) ])
+                    If set to None, time-out will be max([ 30, len(requests) ]).
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
-                    adding it as module 'remote_instance' to sys.modules
+                    adding it as module 'remote_instance' to sys.modules.
 
     Notes
     -----
@@ -127,8 +133,8 @@ class CatmaidInstance:
     Examples
     --------
     Ordinarily, you would use one of the wrapper functions in 
-    :mod:`pymaid.pymaid` but if you feel like getting your hands on the raw
-    data, here is how it goes:
+    :mod:`pymaid.pymaid` but if you want to get the raw data, 
+    here is how it goes:
 
     >>> # 1.) Fetch raw skeleton data for a single neuron
     >>> import pymaid
@@ -175,14 +181,14 @@ class CatmaidInstance:
 
     def auth(self, request):
         if self.authname:
-            base64str = base64.encodestring(
+            base64str = base64.encodebytes(
                 ('%s:%s' % (self.authname, self.authpassword)).encode()).decode().replace('\n', '')
             request.add_header("Authorization", "Basic %s" % base64str)
         if self.authtoken:
             request.add_header("X-Authorization",
                                "Token {}".format(self.authtoken))
 
-    def fetch(self, url, post=None):
+    def fetch(self, url, post=None, method=None):
         """ Requires the url to connect to and the variables for POST, if any, in a dictionary. """
         if post:
             # Convert bools into lower case str
@@ -195,6 +201,8 @@ class CatmaidInstance:
             module_logger.debug('Encoded postdata: %s' % data)
             # headers = {'Content-Type': 'application/json', 'Accept':'application/json'}
             request = urllib.request.Request(url, data=data)
+        elif method:
+            request = urllib.request.Request(url, method=method)
         else:
             request = urllib.request.Request(url)
 
@@ -242,9 +250,14 @@ class CatmaidInstance:
 
     def _get_connectors_url(self):
         """ Use to retrieve list of connectors either pre- or postsynaptic a set of neurons - GET request
-        Format: { 'links': [ skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ] }
+        Format: { 'links': [ skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ], 'tags':[] }
         """
         return self.djangourl("/" + str(self.project_id) + "/connectors/")
+
+    def _get_connectors_between_url(self):
+        """ Use to retrieve list of connectors linking sets of neurons
+        """
+        return self.djangourl("/" + str(self.project_id) + "/connector/list/many_to_many")        
 
     def _get_connector_details_url(self):
         """ Use to parse url for retrieving info connectors (does need post data). """
@@ -255,7 +268,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/skeleton/neuronnames")
 
     def _get_list_skeletons_url(self):
-        """ Use to parse url for names for a list of skeleton ids (does need post data: self.project_id, skid). """
+        """ Use to parse url for names for a list of skeleton ids. GET request. """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/")
 
     def _get_graph_dps_url(self):
@@ -408,7 +421,7 @@ class CatmaidInstance:
 
 
 def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Fetching', external_pbar=None, disable_pbar=False):
-    """ Wrapper to retrieve a list of urls in parallel using threads
+    """ Wrapper to retrieve a list of urls in parallel using threads.
 
     Parameters
     ----------
@@ -417,9 +430,9 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Fetching', ext
     remote_instance :   CATMAID instance
                         If not passed directly, will try using global.      
     post_data :         list of dicts, optional
-                        Needs to be the same size as urls
+                        Needs to be the same size as urls.
     desc :              str, optional
-                        Description to show on status bar
+                        Description to show on status bar.
     external_pbar :     tqdm.tqdm, optional
                         External progressbar. If provided, will use and update
                         this one.
@@ -545,7 +558,7 @@ class _retrieveUrlThreaded(threading.Thread):
 
 
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_history=False, get_merge_history=False, get_abutting=False, return_df=False, kwargs={}):
-    """ Wrapper to retrieve the skeleton data for a list of skeleton ids
+    """ Wrapper to retrieve 3D skeleton data.
 
     Parameters
     ----------
@@ -565,8 +578,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         Please use <get_abutting = True> to set an additional 
                         flag.
     tag_flag :          {0/False,1/True}, optional
-                        Set if tags should be retrieved. 
-                        Possible values = 0/False or 1/True                             
+                        Set if tags should be retrieved.                                                   
     get_history:        bool, optional
                         If True, the returned skeleton data will contain 
                         creation date ([8]) and last modified ([9]) for each 
@@ -595,10 +607,12 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     Returns
     -------
-    :class:`pymaid.core.CatmaidNeuron`
-                        For single neurons        
-    :class:`pymaid.core.CatmaidNeuronList`
-                        For a list of neurons
+    :class:`~pymaid.core.CatmaidNeuron`
+                        For single neurons.
+    :class:`~pymaid.core.CatmaidNeuronList`
+                        For a list of neurons.
+    pandas.DataFrame
+                        If ``return_df=True``
 
     Notes
     -----    
@@ -611,8 +625,8 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         tags :                  dict containing the treenode tags: 
                                 { 'tag' : [ treenode_id, treenode_id, ... ] }        
 
-    Dataframe column titles for ``nodes`` and ``connectors`` should be self 
-    explanatory with the exception of ``connectors['relation']``::
+    Dataframe column titles for ``nodes`` and ``connectors`` should be 
+    self-explanatory with the exception of ``connectors['relation']``::
 
         connectors['relation']     
 
@@ -647,34 +661,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     if isinstance(get_history, int):
         get_history = get_history == 1
     if isinstance(get_merge_history, int):
-        get_merge_history = get_merge_history == 1
-
-    """
-
-    if len(x) > 100:
-        module_logger.warning(
-            'Large list of neurons requested. Retrieving %i neurons in %i bouts.' % (len(x), math.ceil(len(x)/100)) )
-        
-        df = []
-        for i in trange(0, len(x), 100, desc='Bouts', disable=module_logger.getEffectiveLevel()>=40):
-            df.append( get_neuron(x[i:i + 100],
-                             remote_instance=remote_instance,
-                             connector_flag=connector_flag,
-                             tag_flag=tag_flag,
-                             get_history=get_history,
-                             get_merge_history=get_merge_history,
-                             get_abutting=get_abutting,
-                             return_df=True,
-                             **kwargs)
-                     )
-        df = pd.concat(df, ignore_index=True )
-               
-        if not return_df:
-            return core.CatmaidNeuronList(df, remote_instance=remote_instance)
-        else:
-            return df
-
-    """
+        get_merge_history = get_merge_history == 1    
 
     # Start a progress bar
     with tqdm(total=len(x), desc='Fetching neurons', disable=module_logger.getEffectiveLevel()>=40) as pbar:      
@@ -772,7 +759,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     if df.shape[0] > 1:
         return core.CatmaidNeuronList(df, remote_instance=remote_instance,)
     else:
-        return core.CatmaidNeuron(df.ix[0], remote_instance=remote_instance,)
+        return core.CatmaidNeuron(df.loc[0], remote_instance=remote_instance,)
 
 
 # This is for legacy reasons -> will remove eventually
@@ -810,7 +797,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a neuron
+        DataFrame in which each row represents a neuron:
 
         >>> df
         ...  neuron_name   skeleton_id   nodes      connectors   tags
@@ -868,15 +855,14 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     return df
 
 
-def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_size=2, approximate=False):
+def _get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_size=2):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest **within** a given CATMAID Volume. 
 
     Important
     ---------
-    Connecivity (total number of connections) returned is not restricted to 
-    that volume. It just means that at least a single connection is made
-    within queried volume.
+    Connecivity (total number of connections) returned is restricted to 
+    that volume.
 
     Parameters
     ----------
@@ -890,7 +876,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     volume :            {str, list of str, core.Volume } 
                         Name of the CATMAID volume to test OR volume dict with 
                         {'vertices':[],'faces':[]} as returned by e.g. 
-                        :func:`pymaid.pymaid.get_volume()`
+                        :func:`~pymaid.pymaid.get_volume()`
     remote_instance :   CATMAID instance 
                         If not passed directly, will try using global.                     
     threshold :         int, optional
@@ -900,10 +886,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                         neurons!  
     min_size :          int, optional
                         Minimum node count of partner
-                        (default = 2 -> hide single-node partner)
-    approximate :       bool, optional
-                        If True, bounding box around the volume is used. Will
-                        speed up calculations a lot!
+                        (default = 2 -> hide single-node partner)    
 
     Returns
     ------- 
@@ -923,8 +906,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_neurons_in_volume`
-                            Get neurons within given volume
+    :func:`~pymaid.pymaid.get_neurons_in_volume`
+            Get all neurons within given volume
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -937,47 +920,104 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     # First, get list of connectors
     cn_data = get_connectors(x, remote_instance=remote_instance,
                              incoming_synapses=True, outgoing_synapses=True,
-                             abutting=False, gap_junctions=True, )
-
-    module_logger.info(
-        '%i connectors retrieved - now checking for intersection with volume...' % cn_data.shape[0])
+                             abutting=False, gap_junctions=True, )    
 
     # Find out which connectors are in the volume of interest
     iv = morpho.in_volume(
-        cn_data[['x', 'y', 'z']], volume, remote_instance, approximate=approximate)
+        cn_data[['x', 'y', 'z']], volume, remote_instance )
 
     # Get the subset of connectors within the volume
     cn_in_volume = cn_data[iv].copy()
 
     module_logger.info(
-        '%i connectors in volume - retrieving connected neurons...' % cn_in_volume.shape[0])
+        '%i unique connectors in volume. Reconstructing connectivity...' % len( cn_in_volume.connector_id.unique() ) )
 
-    # Get details and extract connected x
+    # Get details for connectors in volume
     cn_details = get_connector_details(
-        cn_in_volume.connector_id.unique().tolist(), remote_instance=remote_instance,)
-    skids_in_volume = list(set(cn_details.presynaptic_to.tolist(
-    ) + [n for l in cn_details.postsynaptic_to.tolist() for n in l]))
+        cn_in_volume.connector_id.unique().tolist(), remote_instance=remote_instance )
 
-    skids_in_volume = [str(s) for s in skids_in_volume]
+    # Filter those connectors that don't have a presynaptic node
+    cn_details = cn_details[ ~cn_details.presynaptic_to.isnull() ]
 
-    # Get all connectivity
-    connectivity = get_partners(x, remote_instance=remote_instance,
-                                threshold=threshold,
-                                min_size=min_size)
+    # Now reconstruct connectivity table from connector details
+    
+    # Some connectors may be connected to the same neuron multiple times 
+    # In those cases there will be more treenode IDs in "postsynaptic_to_node"
+    # than there are skeleton IDs in "postsynaptic_to". Then we need to map
+    # treenode IDs to neurons
+    mismatch = cn_details[  cn_details.postsynaptic_to.apply(len) < cn_details.postsynaptic_to_node.apply(len) ]
+    match = cn_details[  cn_details.postsynaptic_to.apply(len) >= cn_details.postsynaptic_to_node.apply(len) ]
 
-    # Filter and return connectivity
-    filtered_connectivity = connectivity[
-        connectivity.skeleton_id.isin(skids_in_volume)].copy().reset_index()
+    if not mismatch.empty:
+        module_logger.info('Retrieving additional details for {0} connectors'.format(mismatch.shape[0]))
+        tn_to_skid = get_skid_from_treenode( [ tn for l in mismatch.postsynaptic_to_node.tolist() for tn in l ],
+                                        remote_instance=remote_instance )
+    else:
+        tn_to_skid = []
+    
+    # Now collect edges
+    edges = [ [ cn.presynaptic_to, skid  ] for cn in match.itertuples() for skid in cn.postsynaptic_to ]
+    edges += [ [ cn.presynaptic_to, tn_to_skid[tn] ] for cn in mismatch.itertuples() for tn in cn.postsynaptic_to_node ]   
 
-    module_logger.info('%i unique partners left after filtering (%i of %i connectors in given volume)' % (
-        len(filtered_connectivity.skeleton_id.unique()), cn_in_volume.shape[0], cn_data.shape[0]))
+    # Turn edges into synaptic connections
+    unique_edges, counts = np.unique( edges, return_counts=True, axis=0 )
+    unique_skids = np.unique(edges).astype(str)
+    unique_edges=unique_edges.astype(str)    
 
-    return filtered_connectivity
+    # Create empty adj_mat
+    adj_mat = pd.DataFrame( np.zeros(( len(unique_skids), len(unique_skids) )),
+                            columns=unique_skids, index=unique_skids )
+
+    for i, e in enumerate(tqdm(unique_edges, disable=module_logger.getEffectiveLevel()>=40, desc='Adj. matrix')):
+        # using df.at here speeds things up tremendously!
+        adj_mat.loc[ str(e[0]), str(e[1]) ] = counts[i]
+
+    # There is a chance that our original neurons haven't made it through filtering 
+    # (i.e. they don't have partners in the volume ). We will simply add these
+    # rows and columns and set them to 0
+    missing = [ n for n in x if n not in adj_mat.columns ]
+    for n in missing:
+        adj_mat[n] = 0
+        
+    missing = [ n for n in x if n not in adj_mat.index ]
+    for n in missing:
+        adj_mat.loc[n] = [ 0 for i in range( adj_mat.shape[1] )]
+
+    # Generate connectivity table
+    all_upstream = adj_mat.T[ adj_mat.T[ x ].sum(axis=1) > 0 ][ x ]
+    all_upstream['skeleton_id'] = all_upstream.index
+    all_upstream['relation'] = 'upstream'
+
+    all_downstream = adj_mat[ adj_mat[ x ].sum(axis=1) > 0 ][ x ]
+    all_downstream['skeleton_id'] = all_downstream.index
+    all_downstream['relation'] = 'downstream'    
+
+    # Merge tables
+    df = pd.concat( [all_upstream,all_downstream], axis=0, ignore_index=True )    
+
+    # We will use this to get name and size of neurons
+    module_logger.info('Collecting additional info for {0} neurons'.format(len(df.skeleton_id.unique())))
+    review = get_review( df.skeleton_id.unique(),
+                       remote_instance=remote_instance ).set_index('skeleton_id')
+
+    df['neuron_name'] = [ review.ix[ str(s) ].neuron_name for s in df.skeleton_id.tolist() ]
+    df['num_nodes'] = [ review.ix[ str(s) ].total_node_count for s in df.skeleton_id.tolist() ]
+    df['total'] = df[x].sum(axis=1)
+
+    # Filter for min size
+    df = df[ df.num_nodes >= min_size ]
+
+    # Reorder columns
+    df = df[[ 'neuron_name', 'skeleton_id', 'num_nodes', 'relation','total'] + x ]
+
+    df.sort_values(['relation','total'], inplace=True, ascending=False)    
+
+    return df.reset_index(drop=True)
 
 
 def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], directions=['incoming', 'outgoing']):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
-    of interest
+    of interest.
 
     Parameters
     ----------
@@ -996,12 +1036,12 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
                         applied to the total number of synapses. 
     min_size :          int, optional
                         Minimum node count of partner
-                        (default = 2 -> hides single-node partners!)
-    filt :              list of str, optional, default = []
+                        (default=2 to hide single-node partners).
+    filt :              list of str, optional
                         Filters partners for neuron names (must be exact) or
-                        skeleton_ids
+                        skeleton_ids.
     directions :        list of str, optional
-                        Use to restrict to either up- or downstream partners
+                        Use to restrict to either up- or downstream partners.
 
     Returns
     ------- 
@@ -1016,8 +1056,8 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         ... 2   name3         skid3      node_count3  gapjunction n_syn  n_syn .            
         ... ...
 
-        ``relation`` can be ``upstream`` (incoming), ``downstream`` (outgoing) 
-        or ``gapjunction`` (gap junction)
+        ``relation`` can be ``'upstream'`` (incoming), ``'downstream'`` (outgoing) 
+        or ``'gapjunction'`` (gap junction)
 
     Warning
     -------
@@ -1042,10 +1082,10 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
 
     See Also
     --------
-    :func:`pymaid.cluster.create_adjacency_matrix`
+    :func:`~pymaid.cluster.create_adjacency_matrix`
                         Use if you need an adjacency matrix instead of a table
-    :func:`pymaid.pymaid.get_partners_in_volume`
-                        Use if you only want partners within a given volume
+    :func:`~pymaid.pymaid.get_partners_in_volume`
+                        Use if you only want connectivity within a given volume
     """
 
     def _constructor_helper(entry, skid):
@@ -1144,12 +1184,16 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
 
         df = df[df.skeleton_id.isin(filt) | df.neuron_name.isin(filt)]
 
+    df.datatype = 'connectivity_table'
+
     # Return reindexed concatenated dataframe
-    return df.reset_index(drop=True)
+    df.reset_index(drop=True, inplace=True)
+
+    return df
 
 
 def get_names(x, remote_instance=None):
-    """ Wrapper to retrieve neurons names for a list of skeleton ids
+    """ Wrapper to retrieve neurons names for a list of skeleton ids.
 
     Parameters
     ----------
@@ -1162,12 +1206,12 @@ def get_names(x, remote_instance=None):
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance 
                         Either pass directly to function or define  
-                        globally as ``remote_instance``
+                        globally as ``remote_instance``.
 
     Returns
     ------- 
     dict            
-                        ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
+                    ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1197,12 +1241,12 @@ def get_names(x, remote_instance=None):
 
 
 def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
-    """ Wrapper to retrieve user info for a list of treenode and/or connectors
+    """ Wrapper to retrieve user info for a list of treenode and/or connectors.
 
     Parameters
     ----------
     treenode_ids :      list
-                        list of treenode ids (can also be connector ids!)
+                        List of treenode ids (can also be connector ids!).
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     chunk_size :        int, optional
@@ -1213,7 +1257,7 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a treenode
+        DataFrame in which each row represents a treenode:
 
         >>> df
         ...   treenode_id  creation_time  user  edition_time
@@ -1250,7 +1294,7 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
                 remote_nodes_details_url, get_node_details_postdata
                                             )
                         )
-            pbar.update( (ix+1) * chunk_size) 
+            pbar.update( chunk_size ) 
 
     data_columns = ['creation_time', 'user',  'edition_time',
                     'editor', 'reviewers', 'review_times']
@@ -1270,9 +1314,46 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
 
     return df
 
+def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
+    """ Retrieves skeleton IDs from a list of nodes.
+
+    Parameters
+    ----------
+    treenode_ids :       {int, list of int}
+                        Treenode ID(s) to retrieve skeleton IDs for.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+    chunk_size :        int, optional
+                        Querying large number of nodes will result in server 
+                        errors. We will thus query them in amenable bouts.
+
+    Returns
+    -------
+    dict
+            ``{ treenode_ID : skeleton_ID, .... }``
+
+    """ 
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    treenode_ids = eval_node_ids(treenode_ids, connectors=False, treenodes=True)
+
+    if not isinstance(treenode_ids, (list, np.ndarray)):
+        treenode_ids = [treenode_ids]    
+
+    data = []
+
+    with tqdm(total=len(treenode_ids), disable=module_logger.getEffectiveLevel()>=40, desc='Nodes') as pbar:
+        for ix in range(0, len(treenode_ids), chunk_size):
+            urls = [ remote_instance._get_skid_from_tnid( tn ) for tn in treenode_ids[ix:ix + chunk_size] ]           
+
+            data += _get_urls_threaded(urls, remote_instance=remote_instance, external_pbar = pbar)    
+
+    return { treenode_ids[i]  : d['skeleton_id'] for i,d in enumerate(data) }
+
 
 def get_treenode_table(x, include_details=True, remote_instance=None):
-    """ Wrapper to retrieve treenode table(s) for a list of neurons
+    """ Retrieves treenode table(s) for a list of neurons.
 
     Parameters
     ----------
@@ -1286,13 +1367,13 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
                         If True, tags and reviewer are included in the table.
                         For larger lists, it is recommended to set this to
                         False to improve performance.
-    remote_instance :   CATMAID instance 
+    remote_instance :   CATMAID instance, optional 
                         If not passed directly, will try using global.
 
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a treenode::
+        DataFrame in which each row represents a treenode:
 
         >>> df
         ...   skeleton_id  treenode_id  parent_id  confidence  x  y  z /
@@ -1368,7 +1449,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
     return tn_table
 
 def get_edges(x, remote_instance=None):
-    """ Wrapper to retrieve edges (synaptic connections) between sets of neurons
+    """ Wrapper to retrieve edges (synaptic connections) between sets of neurons.
 
     Parameters
     ----------
@@ -1385,7 +1466,7 @@ def get_edges(x, remote_instance=None):
     Returns
     -------
     pandas.DataFrame 
-        DataFrame in which each row represents an edge::
+        DataFrame in which each row represents an edge:
 
         >>> df
         ...   source_skid     target_skid     weight 
@@ -1419,7 +1500,6 @@ def get_edges(x, remote_instance=None):
 
     return df
 
-
 def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_synapses=True, abutting=False, gap_junctions=False):
     """ Wrapper to retrieve connectors for a set of neurons.    
 
@@ -1435,18 +1515,18 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     incoming_synapses : bool, optional
-                        if True, incoming synapses will be retrieved
+                        If True, incoming synapses will be retrieved.
     outgoing_synapses : bool, optional
-                        if True, outgoing synapses will be retrieved
+                        If True, outgoing synapses will be retrieved.
     abutting :          bool, optional
-                        if True, abutting connectors will be retrieved
+                        If True, abutting connectors will be retrieved.
     gap_junctions :     bool, optional
-                        if True, gap junctions will be retrieved
+                        If True, gap junctions will be retrieved.
 
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a connector::
+        DataFrame in which each row represents a connector:
 
         >>> df
         ... skeleton_id  connector_id  x  y  z  confidence  creator_id  
@@ -1465,9 +1545,9 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_connector_details`
+    :func:`~pymaid.pymaid.get_connector_details`
         If you need details about the connectivity of a connector
-    :func:`pymaid.pymaid.get_connectors_between`
+    :func:`~pymaid.pymaid.get_connectors_between`
         If you need to find the connectors between sets of neurons.
     """
 
@@ -1478,50 +1558,67 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
 
-    get_connectors_GET_data = {'with_tags': 'false'}
-
     cn_data = []
+    tags = {}
 
-    # There seems to be some cap regarding how many skids you can send to the
-    # server, so we have to chop it into pieces
-    for a in range(0, len(x), 50):
-        for i, s in enumerate(x[a:a + 50]):
-            tag = 'skeleton_ids[%i]' % i
-            get_connectors_GET_data[tag] = str(s)
+    # There seems to be some hard cap regarding how many skids you can send to 
+    # the server, so we have to chop it into pieces
+    CHUNK_SIZE = 50
+    with tqdm(total=len(x), desc='Fetch. connectors', disable=module_logger.getEffectiveLevel()>=40) as pbar:                            
+        for a in range( 0, len( x ), CHUNK_SIZE):
+            get_connectors_GET_data = {'with_tags': 'true'}
+    
+            for i, s in enumerate(x[a:a + CHUNK_SIZE]):
+                tag = 'skeleton_ids[%i]' % i
+                get_connectors_GET_data[tag] = str(s)
 
-        if incoming_synapses is True:
-            get_connectors_GET_data['relation_type'] = 'presynaptic_to'
-            remote_get_connectors_url = remote_instance._get_connectors_url(
-            ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [e + ['presynaptic_to']
-                        for e in remote_instance.fetch(remote_get_connectors_url)['links']]
+            if incoming_synapses is True:
+                get_connectors_GET_data['relation_type'] = 'presynaptic_to'
+                remote_get_connectors_url = remote_instance._get_connectors_url(
+                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+                temp = remote_instance.fetch(remote_get_connectors_url)
+                cn_data += [e + ['presynaptic_to']
+                            for e in temp['links']]
+                tags.update(temp['tags'])
 
-        if outgoing_synapses is True:
-            get_connectors_GET_data['relation_type'] = 'postsynaptic_to'
-            remote_get_connectors_url = remote_instance._get_connectors_url(
-            ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [e + ['postsynaptic_to']
-                        for e in remote_instance.fetch(remote_get_connectors_url)['links']]
+            if outgoing_synapses is True:
+                get_connectors_GET_data['relation_type'] = 'postsynaptic_to'
+                remote_get_connectors_url = remote_instance._get_connectors_url(
+                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+                temp = remote_instance.fetch(remote_get_connectors_url)
+                cn_data += [e + ['postsynaptic_to']
+                            for e in temp['links']]
+                tags.update(temp['tags'])
 
-        if abutting is True:
-            get_connectors_GET_data['relation_type'] = 'abutting'
-            remote_get_connectors_url = remote_instance._get_connectors_url(
-            ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [e + ['abutting']
-                        for e in remote_instance.fetch(remote_get_connectors_url)['links']]
+            if abutting is True:
+                get_connectors_GET_data['relation_type'] = 'abutting'
+                remote_get_connectors_url = remote_instance._get_connectors_url(
+                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+                temp = remote_instance.fetch(remote_get_connectors_url)
+                cn_data += [e + ['abutting']
+                            for e in temp['links']]
+                tags.update(temp['tags'])
 
-        if gap_junctions is True:
-            get_connectors_GET_data['relation_type'] = 'gapjunction_with'
-            remote_get_connectors_url = remote_instance._get_connectors_url(
-            ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-            cn_data += [e + ['gap_junction']
-                        for e in remote_instance.fetch(remote_get_connectors_url)['links']]
+            if gap_junctions is True:
+                get_connectors_GET_data['relation_type'] = 'gapjunction_with'
+                remote_get_connectors_url = remote_instance._get_connectors_url(
+                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
+                temp = remote_instance.fetch(remote_get_connectors_url)
+                cn_data += [e + ['gap_junction']
+                            for e in temp['links']]
+                tags.update(temp['tags'])
+
+            pbar.update(CHUNK_SIZE)
 
     df = pd.DataFrame(cn_data,
                       columns=['skeleton_id', 'connector_id', 'x', 'y', 'z', 'confidence',
-                               'creator_id', 'treenode_id', 'creation_time', 'edition_time', 'type'],
+                               'creator_id', 'treenode_id', 'creation_time', 'edition_time', 'type' ],
                       dtype=object
                       )
+
+    df['tags'] = [ tags.get( str(cn_id), None) for cn_id in df.connector_id.tolist() ]
+
+    df.datatype = 'connector_table'
 
     module_logger.info(
         '%i connectors for %i neurons retrieved' % (df.shape[0], len(x)))
@@ -1530,19 +1627,19 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
 
 
 def get_connector_details(x, remote_instance=None):
-    """ Wrapper to retrieve details on sets of connectors 
+    """ Wrapper to retrieve details on sets of connectors.
 
     Parameters
     ----------
     x :                 {CatmaidNeuron/List, list of connector ids}
-                        Can be found e.g. in compact skeletons (get_neuron)
+                        Can be found e.g. in compact skeletons (get_neuron).
     remote_instance :   CATMAID instance 
                         If not passed directly, will try using global.
 
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a connector
+        DataFrame in which each row represents a connector:
 
         >>> df    
         ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node
@@ -1557,8 +1654,8 @@ def get_connector_details(x, remote_instance=None):
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_connectors`
-        If you just need the connector table (ID, x, y, z, creator, etc.)
+    :func:`~pymaid.pymaid.get_connectors`
+        If you just need the connector table (ID, x, y, z, creator, etc).
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1574,7 +1671,7 @@ def get_connector_details(x, remote_instance=None):
     DATA_UPLOAD_MAX_NUMBER_FIELDS = 50000       
     
     connectors = []
-    with tqdm(total=len(connector_ids), desc='Cn details', disable=module_logger.getEffectiveLevel()>=40) as pbar:                            
+    with tqdm(total=len(connector_ids), desc='CN details', disable=module_logger.getEffectiveLevel()>=40) as pbar:                            
         for b in range( 0, len( connector_ids ), DATA_UPLOAD_MAX_NUMBER_FIELDS):
             get_connectors_postdata = {}
             for i, s in enumerate(connector_ids[b:b+DATA_UPLOAD_MAX_NUMBER_FIELDS]):
@@ -1599,8 +1696,18 @@ def get_connector_details(x, remote_instance=None):
 
     return df
 
-def get_connectors_between(a, b, directional=False, remote_instance=None ):
+def get_connectors_between(a, b, directional=True, remote_instance=None ):
     """ Wrapper to retrieve connectors between sets of neurons.   
+
+    Important
+    ---------
+    This function does currently *not* return gap junctions between neurons.
+
+    Notes
+    -----
+    Connectors can show up multiple times if it is connecting to more than one
+    treenodes of the same neuron.
+
 
     Parameters
     ----------
@@ -1612,62 +1719,78 @@ def get_connectors_between(a, b, directional=False, remote_instance=None ):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     directional :       bool, optional
-                        If True, only connectors a->b are returned, otherwise
-                        it is a<->b.
+                        If True, only connectors a -> b are listed, 
+                        otherwise it is a <-> b.    
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a connector
+        DataFrame in which each row represents a connector:
 
         >>> df    
-        ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node
+        ...   connector_id  connector_loc  treenode1_id  source_neuron  
         ... 0
         ... 1
         ... 2
         ...
-        ... postsynaptic_to_node
+        ...   confidence1  creator1 treenode1_loc treenode2_id  target_neuron  
         ... 0
         ... 1
-        ... 2    
+        ... 2 
+        ...
+        ...  confidence2  creator2  treenode2_loc
+        ... 0
+        ... 1
+        ... 2
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_edges`
-        If you just need the number of synapses betweem neurons this is much
+    :func:`~pymaid.pymaid.get_edges`
+        If you just need the number of synapses between neurons, this is much
         faster.
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = _eval_remote_instance(remote_instance)    
 
-    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        a = get_neuron( a, remote_instance=remote_instance )
+    a = eval_skids(a, remote_instance=remote_instance)
+    b = eval_skids(b, remote_instance=remote_instance)
 
-    if not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        b = get_neuron( b, remote_instance=remote_instance )
+    if not isinstance(a, (list, np.ndarray)):
+        a = [a]
+    if not isinstance(b, (list, np.ndarray)):
+        b = [b]
 
-    cn_details = get_connector_details(a+b, remote_instance=remote_instance)
+    if len(a) == 0:
+        raise ValueError('No source neurons provided')
 
-    a = eval_skids(a)
-    a = [int(s) for s in a]
+    if len(b) == 0:
+        raise ValueError('No target neurons provided')
 
-    b = eval_skids(b)
-    b = [int(s) for s in b]
+    post = { 'relation' : 'presynaptic_to' }
+    post.update ( { 'skids1[{0}]'.format(i) : s for i,s in enumerate(a) } )
+    post.update ( { 'skids2[{0}]'.format(i) : s for i,s in enumerate(b) } )
 
-    if directional:
-        selection = cn_details.presynaptic_to.isin(a) & np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] )        
-    else:
-        selection = ( cn_details.presynaptic_to.isin(a) &  \
-                      np.array( [  True in [ skid in b for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ) ) | \
-                    ( cn_details.presynaptic_to.isin(b) &  \
-                      np.array( [  True in [ skid in a for skid in n.postsynaptic_to ] for n in cn_details.itertuples() ] ) )
+    url = remote_instance._get_connectors_between_url()
 
+    data = remote_instance.fetch( url, post=post )
 
-    module_logger.info('%i shared connectors remaining after filtering' % len(cn_details[ selection ]) )
+    if not directional:
+        post['relation'] = 'postsynaptic_to'
+        data += remote_instance.fetch( url, post=post )    
 
-    return cn_details[ selection ].reset_index(drop=True)
+    df = pd.DataFrame( data,
+                       columns = [ 'connector_id', 'connector_loc',  'treenode1_id', 'source_neuron', 
+                                   'confidence1', 'creator1', 'treenode1_loc', 'treenode2_id',  'target_neuron',  
+                                   'confidence2',  'creator2', 'treenode2_loc'] )
+
+    # Get user list and replace IDs with logins
+    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+    df['creator1'] = [ user_list.ix[u].login for u in df.creator1.tolist() ]
+    df['creator2'] = [ user_list.ix[u].login for u in df.creator2.tolist() ]
+   
+    return df
 
 def get_review(x, remote_instance=None):
     """ Wrapper to retrieve review status for a set of neurons
@@ -1687,7 +1810,7 @@ def get_review(x, remote_instance=None):
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a neuron
+        DataFrame in which each row represents a neuron:
 
         >>> df
            skeleton_id neuron_name total_node_count nodes_reviewed percent_reviewed
@@ -1697,8 +1820,8 @@ def get_review(x, remote_instance=None):
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_review_details`
-        Gives you review status for individual nodes of a given neuron   
+    :func:`~pymaid.pymaid.get_review_details`
+        Gives you review status for individual nodes of a given neuron.  
 
     """
 
@@ -1709,24 +1832,27 @@ def get_review(x, remote_instance=None):
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
 
-    remote_get_reviews_url = remote_instance._get_review_status_url()
-
-    get_review_postdata = {}
+    remote_get_reviews_url = remote_instance._get_review_status_url()    
 
     names = {}
     review_status = {}
-    for j in tqdm(range(0,len(x),500), desc='Rev. status'):
-        for i in range(j,min(j+500, len(x))):
-            key = 'skeleton_ids[%i]' % i
-            get_review_postdata[key] = str(x[i])
 
-        temp_names = get_names(x, remote_instance)
+    CHUNK_SIZE = 1000    
 
-        temp_review_status = remote_instance.fetch(
-            remote_get_reviews_url, get_review_postdata)
+    with tqdm(total=len(x), disable=module_logger.getEffectiveLevel()>=40, desc='Rev. status') as pbar:
+        for j in range(0,len(x),CHUNK_SIZE):
+            get_review_postdata = {}
 
-        names.update(temp_names)
-        review_status.update(temp_review_status)
+            for i in range(j,min(j+CHUNK_SIZE, len(x))):
+                key = 'skeleton_ids[%i]' % i
+                get_review_postdata[key] = str(x[i])        
+
+            names.update(get_names(x[j:j+CHUNK_SIZE], remote_instance))
+
+            review_status.update( remote_instance.fetch(
+                remote_get_reviews_url, get_review_postdata) )
+
+            pbar.update( CHUNK_SIZE )
 
     df = pd.DataFrame([[s,
                         names[str(s)],
@@ -1754,7 +1880,7 @@ def add_annotations(x, annotations, remote_instance=None):
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     annotations :       list
-                        Annotation(s) to add to neurons provided
+                        Annotation(s) to add to neurons provided.
     remote_instance :   CATMAID instance, optional  
                         If not passed directly, will try using global.
 
@@ -1808,7 +1934,7 @@ def get_user_annotations(x, remote_instance=None):
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame (df) in which each row represents a single annotation
+        DataFrame (df) in which each row represents a single annotation:
 
         >>> df
            annotation annotated_on times_used user_id annotation_id user_login
@@ -1869,8 +1995,8 @@ def get_user_annotations(x, remote_instance=None):
 
 def get_annotation_details(x, remote_instance=None):
     """ Wrapper to retrieve annotations for a set of neuron. Returns more
-    details than :func:`pymaid.pymaid.get_annotations` but is slower:
-    Contains timestamps and user_id (same API as neuron navigator)
+    details than :func:`~pymaid.pymaid.get_annotations` but is slower.
+    Contains timestamps and user IDs (same API as neuron navigator).
 
     Parameters
     ----------
@@ -1887,7 +2013,7 @@ def get_annotation_details(x, remote_instance=None):
     Returns
     ------- 
     pandas.DataFrame
-        DataFrame in which each row represents a single annotation
+        DataFrame in which each row represents a single annotation:
 
         >>> df
         ...   annotation skeleton_id time_annotated user_id annotation_id user
@@ -1896,7 +2022,7 @@ def get_annotation_details(x, remote_instance=None):
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_annotations`
+    :func:`~pymaid.pymaid.get_annotations`
                         Gives you annotations for a list of neurons (faster)
 
     Examples
@@ -1991,7 +2117,7 @@ def get_annotations(x, remote_instance=None):
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_annotation_details`
+    :func:`~pymaid.pymaid.get_annotation_details`
                         Gives you more detailed information about annotations
                         of a set of neuron (includes timestamp and user) but 
                         is slower.
@@ -2036,16 +2162,16 @@ def get_annotations(x, remote_instance=None):
 
 
 def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
-    """ Wrapper to retrieve the annotation ID for single or list of annotation(s)
+    """ Wrapper to retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
     ----------
     annotations :       {str,list}
-                        Single annotations or list of multiple annotations
+                        Single annotations or list of multiple annotations.
     remote_instance :   CATMAID instance, optional  
                         If not passed directly, will try using global.
     allow_partial :     bool
-                        If True, will allow partial matches
+                        If True, will allow partial matches.
 
     Returns
     -------
@@ -2060,43 +2186,28 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
     remote_annotation_list_url = remote_instance._get_annotation_list()
     annotation_list = remote_instance.fetch(remote_annotation_list_url)
 
+    if not isinstance(annotations, (list, np.ndarray)):
+        annotations = [annotations]
+
     annotation_ids = {}
     annotations_matched = set()
+    
+    for d in annotation_list['annotations']:
+        if d['name'] in annotations and allow_partial is False:
+            annotation_ids[d['name']] = d['id']
+            annotations_matched.add(d['name'])
+            module_logger.debug(
+                'Found matching annotation: %s' % d['name'])
+        elif True in [a in d['name'] for a in annotations] and allow_partial is True:
+            annotation_ids[d['name']] = d['id']
+            annotations_matched |= set(
+                [a for a in annotations if a in d['name']])
+            module_logger.debug(
+                'Found matching annotation: %s' % d['name'])
 
-    if type(annotations) == type(str()):
-        for d in annotation_list['annotations']:
-            if d['name'] == annotations and allow_partial is False:
-                annotation_ids[d['name']] = d['id']
-                module_logger.debug(
-                    'Found matching annotation: %s' % d['name'])
-                annotations_matched.add(d['name'])
-                break
-            elif annotations in d['name'] and allow_partial is True:
-                annotation_ids[d['name']] = d['id']
-                module_logger.debug(
-                    'Found matching annotation: %s' % d['name'])
-
-        if not annotation_ids:
-            module_logger.warning(
-                'Could not retrieve annotation id for: ' + annotations)
-
-    elif type(annotations) == type(list()):
-        for d in annotation_list['annotations']:
-            if d['name'] in annotations and allow_partial is False:
-                annotation_ids[d['name']] = d['id']
-                annotations_matched.add(d['name'])
-                module_logger.debug(
-                    'Found matching annotation: %s' % d['name'])
-            elif True in [a in d['name'] for a in annotations] and allow_partial is True:
-                annotation_ids[d['name']] = d['id']
-                annotations_matched |= set(
-                    [a for a in annotations if a in d['name']])
-                module_logger.debug(
-                    'Found matching annotation: %s' % d['name'])
-
-        if len(annotations) != len(annotations_matched):
-            module_logger.warning('Could not retrieve annotation id(s) for: ' + str(
-                [a for a in annotations if a not in annotations_matched]))
+    if len(annotations) != len(annotations_matched):
+        module_logger.warning('Could not retrieve annotation id(s) for: ' + str(
+            [a for a in annotations if a not in annotations_matched]))
 
     return annotation_ids
 
@@ -2128,10 +2239,10 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
 
     Note
     ----
-    There is no short-cut for this information - we have to load the 3D 
+    There is no shortcut to get this information - we have to load the 3D 
     skeleton to get the soma. If you need the 3D skeletons anyway, it is more
-    sufficient to use :func:`pymaid.pymaid.get_neuron` to get a neuronlist
-    and then use the :attribute:`pymaid.core.CatmaidNeuronList.soma` 
+    efficient to use :func:`~pymaid.pymaid.get_neuron` to get a neuronlist
+    and then use the :attr:`~pymaid.core.CatmaidNeuronList.soma` 
     attribute.
     """
 
@@ -2142,7 +2253,8 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
 
-    skdata = get_neuron(x, remote_instance=remote_instance,
+    skdata = get_neuron(x, 
+                        remote_instance=remote_instance,
                         connector_flag=0, tag_flag=1,
                         get_history=False,
                         return_df = True # no need to make proper neurons
@@ -2169,21 +2281,21 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
 
 
 def get_skids_by_name(names, remote_instance=None, allow_partial=True):
-    """ Wrapper to retrieve the all neurons with matching name
+    """ Wrapper to retrieve the all neurons with matching name.
 
     Parameters
     ----------
     names :             {str, list of str}
-                        Name(s) to search for
+                        Name(s) to search for.
     allow_partial :     bool, optional
-                        If True, partial matches are returned too    
+                        If True, partial matches are returned too.  
     remote_instance :   CATMAID instance 
                         If not passed directly, will try using global.
 
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a neuron        
+        DataFrame in which each row represents a neuron:    
 
         >>> df
            name   skeleton_id
@@ -2192,6 +2304,11 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
         2
 
     """
+
+    warnings.warn(
+            "get_skids_by_name() is deprecated, use find_neurons() instead",
+            DeprecationWarning
+        )
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -2230,12 +2347,12 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
     Parameters
     ----------
-    annotations :           {str,list}
-                            Single annotation or list of multiple annotations    
+    annotations :           {str, list}
+                            Single annotation or list of multiple annotations.    
     remote_instance :       CATMAID instance, optional
                             If not passed directly, will try using global.
     allow_partial :         bool, optional
-                            If True, allow partial match of annotation
+                            If True, allow partial match of annotation.
     intersect :             bool, optional
                             If True, neurons must have ALL provided annotations.
 
@@ -2244,6 +2361,11 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
     list :
                             ``[skid1, skid2, skid3 ]``
     """
+
+    warnings.warn(
+            "get_skids_by_annotation() is deprecated, use find_neurons() instead",
+            DeprecationWarning
+        )
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -2484,7 +2606,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     Parameters
     ----------
     node_list :         list
-                        Treenode or connector IDs to delete tags from
+                        Treenode or connector IDs to delete tags from.
     tags :              list
                         Tags(s) to delete from provided treenodes/connectors.
                         Use ``tags=None`` and to remove all tags from a set of 
@@ -2497,12 +2619,12 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
     Returns
     -------
-    str :
+    str 
                         Confirmation from Catmaid server
 
     See Also
     --------
-    :func:`pymaid.pymaid.add_tags`
+    :func:`~pymaid.pymaid.add_tags`
             Function to add tags to nodes.
 
     Examples
@@ -2558,12 +2680,12 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
 
 def add_tags(node_list, tags, node_type, remote_instance=None, override_existing=False):
-    """ Wrapper to add or edit tag(s) for a list of treenode(s) or connector(s)    
+    """ Wrapper to add or edit tag(s) for a list of treenode(s) or connector(s).   
 
     Parameters
     ----------
     node_list :         list
-                        Treenode or connector IDs to edit
+                        Treenode or connector IDs to edit.
     tags :              {str, list, dict}
                         Tags(s) to add to provided treenode/connector ids. If 
                         a dictionary is provided `{node_id1: [tag1,tag2], ...}` 
@@ -2581,7 +2703,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
 
     Returns
     ------- 
-    str :
+    str 
                         Confirmation from Catmaid server
 
     Notes
@@ -2591,7 +2713,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
 
     See Also
     --------
-    :func:`pymaid.pymaid.delete_tags`
+    :func:`~pymaid.pymaid.delete_tags`
             Function to delete given tags from nodes.
 
     """
@@ -2744,7 +2866,7 @@ def get_review_details(x, remote_instance=None):
 
 
 def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, search=''):
-    """ Wrapper to retrieve logs (same data as in log widget)
+    """ Wrapper to retrieve logs (same data as in log widget).
 
     Parameters
     ----------    
@@ -2757,17 +2879,18 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
                         'create_skeleton', 'remove_neuron', 'split_skeleton', 
                         'reroot_skeleton', 'reset_reviews', 'move_skeleton'
     entries :           int, optional
-                        Number of entries to retrieve
+                        Number of entries to retrieve.
     display_start :     int, optional
-                        Sets range of entries: display_start -> display_start + entries
+                        Sets range of entries: 
+                        ``display_start`` -> ``display_start + entries``.
     search :            str, optional
                         Use to filter results for e.g. a specific skeleton ID
-                        or neuron name
+                        or neuron name.
 
     Returns
     -------
     pandas.DataFrame   
-        DataFrame in which each row represents a single operation
+        DataFrame in which each row represents a single operation:
 
         >>> df
             user   operation   timestamp   x   y   z   explanation 
@@ -3025,7 +3148,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
 
     """
 
-    def _contribution_helper(skids, users, minimum_cont, remote_instance):
+    def _contribution_helper(skids):
         """ Helper to test if users have contributed more than X nodes to 
         neuron.
 
@@ -3033,27 +3156,28 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         -------
         Filtered list of skeleton IDs
         """
-        try:
-            [int(u) for u in users]
-        except:
-            user_list = get_user_list(
-                remote_instance=remote_instance).set_index('login').id
-            users = [user_list.ix[u] for u in users]
+        nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
+        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
 
-        nl = get_neuron(skids, remote_instance=remote_instance)
-
-        return [n.skeleton_id for n in nl if n.nodes[n.nodes.creator_id.isin(users)].shape[0] > minimum_cont]
+    warnings.warn(
+            "get_neuron_list() is deprecated, use find_neurons() instead",
+            DeprecationWarning
+        )
 
     remote_instance = _eval_remote_instance(remote_instance)
 
     get_skeleton_list_GET_data = {'nodecount_gt': node_count}
 
+    if user:
+        user = eval_user_ids( user, user_list=None, remote_instance=remote_instance )
+    if reviewed_by:
+        reviewed_by = eval_user_ids( reviewed_by, user_list=None, remote_instance=remote_instance )
+
     if isinstance(user, str) or isinstance(reviewed_by, str):
         user_list = get_user_list(
             remote_instance=remote_instance).set_index('login').id
-
     if user:
-        if isinstance(user, (list, np.ndarray)):
+        if len(user) > 1:
             skid_list = list()
             for u in tqdm(user, desc='Fetching users', disable=module_logger.getEffectiveLevel()>=40):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
@@ -3066,21 +3190,27 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
 
             if minimum_cont:
                 skid_list = _contribution_helper(
-                    list(set(skid_list)), user, minimum_cont, remote_instance)
+                    list(set(skid_list)) )
+
+            return list(set(skid_list))
+        else:        
+            get_skeleton_list_GET_data['created_by'] = user[0]
+
+    if reviewed_by:
+        if len(reviewed_by) > 1:
+            skid_list = list()
+            for u in tqdm(reviewed_by, desc='Fetching reviewers', disable=module_logger.getEffectiveLevel()>=40):
+                skid_list += get_neuron_list(remote_instance=remote_instance,
+                                             user=user,
+                                             node_count=node_count,
+                                             start_date=start_date,
+                                             end_date=end_date,
+                                             reviewed_by=u,
+                                             minimum_cont=None)            
 
             return list(set(skid_list))
         else:
-            try:
-                get_skeleton_list_GET_data['created_by'] = int(user)
-            except:
-                get_skeleton_list_GET_data['created_by'] = user_list.ix[user]
-
-    if reviewed_by:
-        try:
-            get_skeleton_list_GET_data['reviewed_by'] = int(reviewed_by)
-        except:
-            get_skeleton_list_GET_data[
-                'reviewed_by'] = user_list.ix[reviewed_by]
+            get_skeleton_list_GET_data['reviewed_by'] = reviewed_by[0]
 
     if start_date and not end_date:
         today = datetime.date.today()
@@ -3104,18 +3234,18 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
 
     if minimum_cont and user:
         skid_list = _contribution_helper(
-            list(set(skid_list)), [user], minimum_cont, remote_instance)
+            list(set(skid_list)) )
 
     return list(set(skid_list))
 
 
 def get_history(remote_instance=None, start_date=(datetime.date.today() - datetime.timedelta(days=7)).isoformat(), end_date=datetime.date.today().isoformat(), split=True):
-    """ Wrapper to retrieves CATMAID project history
+    """ Wrapper to retrieves CATMAID project history.
 
     Notes
     -----
     If the time window is too large, the connection might time out which will 
-    result in an error! Make sure ``split = True`` to avoid that.
+    result in an error! Make sure ``split=True`` to avoid that.
 
     Parameters
     ----------
@@ -3132,7 +3262,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     split :             bool, optional
                         If True, history will be requested in bouts of 6 months.
                         Useful if you want to look at a very big time window 
-                        as this can lead to gateway timeout
+                        as this can lead to gateway timeout.
 
     Returns
     -------
@@ -3292,11 +3422,11 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
                             If not passed directly, will try using global.
     coord_format :          str, optional
                             Define whether provided coordinates are in 
-                            nanometer ('NM') or in pixels/slices ('PIXEL')
+                            nanometer ('NM') or in pixels/slices ('PIXEL').
     resolution :            tuple of floats, optional
                             x/y/z resolution in nm (default = ( 4, 4, 50 ) )
                             used to transform to nm if limits are given in 
-                            pixels    
+                            pixels.
 
     Returns
     -------
@@ -3369,32 +3499,318 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
 
     return data
 
+def find_neurons( names=None, annotations=None, volumes=None, users=None, 
+                  from_date=None, to_date=None, reviewed_by=None, 
+                  intersect=False, partial_match=False, only_soma=False, 
+                  min_size=1, minimum_cont=None, remote_instance=None):
+    """ Find neurons matching given search criteria. Returns a CatmaidNeuronList.
 
-def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_size=1, only_soma=False):
+    Warning  
+    -------
+    Depending on the parameters, this can take quite a while! Also: by default, 
+    will return single-node neurons! Use the ``min_size`` parameter to change 
+    that behaviour.
+
+    Parameters
+    ----------
+    names :             {str, list of str}
+                        Neuron name(s) to search for.
+    annotations :       {str, list of str}
+                        Annotation(s) to search for. 
+    volumes :           {str, core.Volume, list of either}
+                        CATMAID volume(s) to look into.
+    users :             {int, str, list of either}, optional
+                        User ID(s) (int) or login(s) (str).    
+    reviewed_by :       {int, str, list of either}, optional
+                        User ID(s) (int) or login(s) (str) of reviewer.
+    from_date :         {datetime, list of integers}, optional 
+                        Format: [year, month, day]. Return neurons created 
+                        after this date. This works ONLY if also querying by
+                        ``users`` or ``reviewed_by``!
+    to_date :           {datetime, list of integers}, optional                        
+                        Format: [year, month, day]. Return neurons created 
+                        before this date. This works ONLY if also querying by
+                        ``users`` or ``reviewed_by``!
+    intersect :         bool, optional
+                        If multiple search parameters are provided, this 
+                        parameter determines if neurons have to meet all of 
+                        them or just a single one in order to be returned. This
+                        applies between AND within search parameters!                      
+    partial_match :     bool, optional
+                        If True, partial *names* AND *annotations* matches are 
+                        returned.
+    minimum_cont :      int, optional
+                        If looking for specific ``users``: minimum contribution 
+                        (in nodes) to a neuron in order for it to be counted. 
+                        Only applicable if ``users`` is provided. If multiple 
+                        users are provided contribution is calculated across 
+                        all users. Minimum contribution does NOT take start 
+                        and end dates into account!            
+    min_size :          int, optional
+                        Minimum size (in nodes) for neurons to be returned. 
+                        The lower this value, the longer it will take to 
+                        filter.
+    only_soma :         bool, optional
+                        If True, only neurons with a soma are returned. This 
+                        is a very time-consuming step!
+    remote_instance :   CATMAID instance 
+                        If not passed directly, will try using globally 
+                        defined CatmaidInstance.
+    Returns
+    -------
+    :class:`~pymaid.core.CatmaidNeuronList`
+
+    Examples
+    --------    
+    >>> # Simple request for neurons with given annotations
+    >>> to_find = ['glomerulus DA1','glomerulus DL4']
+    >>> skids = pymaid.get_skids(annotations=to_find)
+    >>> # Get only neurons that have both annotations
+    >>> skids = pymaid.get_skids(annotations=to_find, intersect=True)
+    >>> # Get all neurons in project with more than 1000 nodes
+    >>> skids = pymaid.get_skids(min_size=500)
+    >>> # Get all neurons that have been traced recently by given user
+    >>> skids = pymaid.get_skids(users='schlegelp',
+    ...                          from_date=[2017,10,1])
+    >>> # Get all neurons traced by a given user within a certain volume
+    >>> skids = pymaid.get_skids(users='schlegelp',
+    ...                          minimum_cont=500,
+    ...                          volumes='LH_R')
+
+    """
+
+    def _contribution_helper(skids, nl):
+        """ Helper to test if users have contributed more than X nodes to 
+        neuron.
+
+        Returns
+        -------
+        Filtered list of skeleton IDs
+        """
+        nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
+        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    # Fist, we have to prepare a whole lot of parameters
+    if users:
+        users = eval_user_ids(users, remote_instance=remote_instance)
+    if reviewed_by:
+        reviewed_by = eval_user_ids(reviewed_by, remote_instance=remote_instance)
+    if annotations and not isinstance(annotations, (list, np.ndarray)):
+        annotations = [annotations]
+    if names and not isinstance(names, (list, np.ndarray)):
+        names = [names]
+    if volumes and not isinstance(volumes, (list, np.ndarray)):
+        volumes = [volumes]
+
+    # Bring dates into the correct format
+    if from_date and not to_date:
+        today = datetime.date.today()
+        to_date = (today.year, today.month, today.day)
+    elif to_date and not from_date:
+        from_date = (1900,1,1)
+
+    if isinstance(from_date, datetime.date):
+        from_date = [from_date.year, from_date.month, from_date.day]
+
+    if isinstance(to_date, datetime.date):
+        to_date = [to_date.year, to_date.month, to_date.day]
+
+    # Warn if from/to_date are used without also querying by user or reviewer
+    if from_date and not ( users or reviewed_by ):
+        module_logger.warning('Start/End dates can only be used in queries with <users> or <reviewed_by>')
+
+    # Now go over all parameters and get sets of skids
+    sets_of_skids = []
+
+    # Get skids by name
+    if names:
+        urls = [ remote_instance._get_annotated_url() for n in names ]
+        post_data = [ {'name': str(n), 'rangey_start': 0,
+                              'range_length': 500, 'with_annotations': False}
+                       for n in names ]        
+
+        results = _get_urls_threaded(
+            urls, remote_instance, post_data=post_data, desc='Fetching names')
+
+        this_name = []
+        for i, r in enumerate(results):
+            for e in r['entities']:
+                if partial_match and e['type'] == 'neuron' and names[i].lower() in e['name'].lower():
+                    this_name.append( e['skeleton_ids'][0] )
+                if not partial_match and e['type'] == 'neuron' and e['name'] == names[i]:
+                    this_name.append( e['skeleton_ids'][0] )
+
+        sets_of_skids.append( set(this_name) )
+
+    # Get skids by annotation
+    if annotations:
+        annotation_ids = get_annotation_id(
+            annotations, remote_instance, allow_partial=partial_match)
+
+        if not annotation_ids:
+            module_logger.error(
+                'No matching annotation(s) found! Returning None')
+            raise Exception('No matching annotation(s) found!')
+
+        if partial_match is True:
+            module_logger.debug(
+                'Found {0} id(s) (partial matches included)'.format(len(annotation_ids)))
+        else:
+            module_logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
+                str(annotation_ids), len(annotations) - len(annotation_ids)))        
+
+        module_logger.debug(
+            'Retrieving skids for annotationed neurons')
+
+        for an_id in tqdm(annotation_ids.values(), desc='Fetching annotations', disable=module_logger.getEffectiveLevel()>=40):            
+            annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
+                               'range_length': 500, 'with_annotations': False}
+            remote_annotated_url = remote_instance._get_annotated_url()
+            data = remote_instance.fetch(
+                remote_annotated_url, annotation_post)            
+            this_annotation = [ e['skeleton_ids'][0] for e in data['entities'] if e['type'] == 'neuron' ]            
+            sets_of_skids.append( set(this_annotation) )    
+
+    # Get skids by user
+    if users:        
+        for u in tqdm(users, desc='Fetching by users', disable=module_logger.getEffectiveLevel()>=40):
+            get_skeleton_list_GET_data = {'nodecount_gt': min_size}
+            get_skeleton_list_GET_data['created_by'] = u
+
+            if from_date and to_date:
+                get_skeleton_list_GET_data['from'] = ''.join(
+                    [str(d) for d in from_date])
+                get_skeleton_list_GET_data['to'] = ''.join(
+                    [str(d) for d in to_date])
+
+            remote_get_list_url = remote_instance._get_list_skeletons_url()
+            remote_get_list_url += '?%s' % urllib.parse.urlencode(
+                get_skeleton_list_GET_data)
+
+            print(remote_get_list_url)
+
+            this_user = set( remote_instance.fetch(remote_get_list_url) )
+
+            if minimum_cont:
+                this_user = _contribution_helper( this_user )
+
+            sets_of_skids.append( this_user )
+
+    # Get skids by reviewer
+    if reviewed_by:        
+        for u in tqdm(reviewed_by, desc='Fetching by reviewers', disable=module_logger.getEffectiveLevel()>=40):
+            get_skeleton_list_GET_data = {'nodecount_gt': min_size}
+            get_skeleton_list_GET_data['reviewed_by'] = u            
+
+            if from_date and to_date:
+                get_skeleton_list_GET_data['from'] = ''.join(
+                    [str(d) for d in from_date])
+                get_skeleton_list_GET_data['to'] = ''.join(
+                    [str(d) for d in to_date])
+
+            remote_get_list_url = remote_instance._get_list_skeletons_url()
+            remote_get_list_url += '?%s' % urllib.parse.urlencode(
+                get_skeleton_list_GET_data)
+            this_reviewer = set( remote_instance.fetch(remote_get_list_url) )
+
+            sets_of_skids.append( this_reviewer )    
+
+    # Get by volume
+    if volumes:
+        for v in tqdm(volumes, desc='Fetching by volumes', disable=module_logger.getEffectiveLevel()>=40):
+            if not isinstance(v, core.Volume):
+                vol = get_volume(v, remote_instance)
+            else:
+                vol = v            
+            
+            temp = get_neurons_in_bbox(vol.bbox, remote_instance=remote_instance)
+
+            sets_of_skids.append( set(temp) )
+
+    # Get neurons by size if only min_size and no other no parameters were provided    
+    if False not in [ isinstance(param,type(None)) for param in [ names, annotations, volumes, users, reviewed_by ] ]:
+        # Make sure people don't accidentally request ALL neurons in the dataset
+        if min_size <= 1:
+            answer = ""
+            while answer not in ["y", "n"]:
+                answer = input("Your search parameters will retrieve ALL neurons in the dataset. Proceed? [Y/N] ").lower()
+
+            if answer != 'y':
+                module_logger.info('Query cancelled')
+                return
+
+        module_logger.info('Fetching all neurons with at least {0} nodes'.format(min_size))
+        get_skeleton_list_GET_data = {'nodecount_gt': min_size}
+        remote_get_list_url = remote_instance._get_list_skeletons_url()
+        remote_get_list_url += '?%s' % urllib.parse.urlencode(
+            get_skeleton_list_GET_data)
+        these_neurons = set( remote_instance.fetch(remote_get_list_url) )
+
+        sets_of_skids.append( these_neurons )
+
+    # Now merge the different neurons that we have
+    if intersect:
+        module_logger.info('Intersecting by search parameters')
+        skids =  list( set.intersection( *sets_of_skids ) )
+    else:
+        skids =  list( set.union( *sets_of_skids ) )
+
+    # Filtering by size was already done for users and reviewed_by and dates
+    # If we queried by annotations, names or volumes we need to do this explicitly here
+    if min_size > 1 and ( volumes or annotations or names ):
+        module_logger.info('Filtering neurons for size')
+
+        get_skeleton_list_GET_data = {'nodecount_gt': min_size}
+        remote_get_list_url = remote_instance._get_list_skeletons_url()
+        remote_get_list_url += '?%s' % urllib.parse.urlencode(
+            get_skeleton_list_GET_data)
+        neurons_by_size = set( remote_instance.fetch(remote_get_list_url) )
+
+        skids = set.intersection( set(skids), neurons_by_size )    
+
+    nl = core.CatmaidNeuronList( list(skids), remote_instance=remote_instance )
+    nl.get_names()
+
+    if only_soma:
+        module_logger.info('Filtering neurons for somas...')
+        nl.get_skeletons(skip_existing=True)
+        nl = nl[ nl.soma != None ]        
+
+    if nl.empty:
+        module_logger.warning('No neurons matching the search parameters were found')
+    else:
+        module_logger.info('Found {0} neurons matching the search parameters'.format(len(nl)))    
+
+    return nl
+
+def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False, remote_instance=None):
     """ Retrieves neurons with processes within CATMAID volumes. This function
     uses the *BOUNDING BOX* around the volume as proxy and queries for neurons
-    that are within that volume.
+    that are within that volume. See examples on how to work around this.
 
     Warning  
     -------
     Depending on the number of nodes in that volume, this can take quite a 
-    while! Also: by default, will return also single-node neurons - use the
-    min_size parameter to change that behaviour.
+    while! Also: by default, will NOT return single-node neurons - use the
+    ``min_nodes`` parameter to change that behaviour.
 
     Parameters
     ----------
-    volumes :               {str, core.Volume, list thereof}
-                            Single or list of CATMAID volumes.
-    remote_instance :       CATMAID instance 
-                            If not passed directly, will try using global
+    volumes :               {str, core.Volume, list of either}
+                            Single or list of CATMAID volumes.    
     intersect :             bool, optional
-                            if multiple volumes are provided, this parameter
+                            If multiple volumes are provided, this parameter
                             determines if neurons have to be in all of the
-                            neuropils or just a single 
-    min_size :              int, optional
-                            minimum size (in nodes) for neurons to be returned
+                            neuropils or just a single.
+    min_nodes :             int, optional
+                            Minimum number of node these neurons need to have
+                            in given volumes.
     only_soma :             bool, optional
-                            if True, only neurons with a soma will be returned
+                            If True, only neurons with a soma will be returned.
+    remote_instance :       CATMAID instance 
+                            If not passed directly, will try using global.
 
     Returns
     -------
@@ -3403,65 +3819,72 @@ def get_neurons_in_volume(volumes, remote_instance=None, intersect=False, min_si
 
     See Also
     --------
-    :func:`pymaid.pymaid.get_partners_in_volume`
+    :func:`~pymaid.pymaid.get_partners_in_volume`
                             Get only partners that make connections within a
                             given volume
+
+    Examples
+    --------
+    >>> # Get a volume
+    >>> lh = pymaid.get_volume('LH_R')
+    >>> # Get neurons within the bounding box of a volume
+    >>> skids = pymaid.get_neurons_in_volume(lh, min_nodes = 10)
+    >>> # Retrieve 3D skeletons of these neurons
+    >>> lh_neurons = pymaid.get_neurons(skids)
+    >>> # Prune by volume
+    >>> lh_pruned = lh_neurons.copy()
+    >>> lh_pruned.prune_by_volume(lh)
+    >>> # Filter neurons with more than 100um of cable in the volume
+    >>> n = lh_neurons[ lh_pruned.cable_length > 100  ]
+
     """
+
+    warnings.warn(
+            "get_neurons_in_volume() is deprecated, use find_neurons() instead",
+            DeprecationWarning 
+        )
 
     remote_instance = _eval_remote_instance(remote_instance)
 
     if not isinstance(volumes, (list, np.ndarray)):
         volumes = [ volumes ]
 
+    for i, v in enumerate(volumes):
+        if not isinstance(v, core.Volume):
+            volumes[i] = get_volume(v)            
+
     neurons = []
 
     for v in volumes:
-        if not isinstance(v, core.Volume):
-            volume = get_volume(v, remote_instance)
-        else:
-            volume = v
-
-        verts = volume['vertices']
-
-        bbox = ((int(min([v[0] for v in verts])), int(max([v[0] for v in verts]))),
-                (int(min([v[1] for v in verts])),
-                 int(max([v[1] for v in verts]))),
-                (int(min([v[2] for v in verts])),
-                 int(max([v[2] for v in verts])))
-                )
-
-        module_logger.info('Retrieving nodes in volume: %s...' % v)
-        temp = get_neurons_in_box(bbox[0][0], bbox[0][1], bbox[1][0], bbox[1][1], bbox[
-                                  2][0], bbox[2][1], remote_instance=remote_instance)
+        module_logger.info('Retrieving nodes in volume {0}'.format(v['name']))
+        temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
+                                   remote_instance=remote_instance)
 
         if not intersect:
-            neurons += temp
+            neurons += list(temp)
         else:
-            neurons += [temp]
+            neurons += [ temp ]
 
     if intersect:
         # Filter for neurons that show up in all neuropils
         neurons = [n for l in neurons for n in l if False not in [
             n in v for v in neurons]]
 
-    if min_size > 1:
-        module_logger.info('Filtering neurons for size...')
-        rev = get_review(list(set(neurons)), remote_instance)
-        neurons = rev[rev.total_node_count > min_size].skeleton_id.tolist()
+    # Need to do this in case we have several volumes
+    neurons = list(set(neurons))
 
     if only_soma:
         module_logger.info('Filtering neurons for somas...')
-        soma = has_soma(list(set(neurons)), remote_instance)
-        neurons = [n for n in neurons if soma[n] is True]
+        soma = has_soma(neurons, remote_instance)
+        neurons = [n for n in neurons if soma[n] is True]    
 
-    module_logger.info('Done. %i unique neurons found in volume(s): %s' % (
-        len(set(neurons)), (',').join(volumes)))
+    module_logger.info('Done. {0} unique neurons found in volume(s) {1}'.format(
+        len(neurons), ','.join([v['name'] for v in volumes]) ) )
 
-    return list(set(neurons))
+    return neurons
 
-
-def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, unit='NM',  **kwargs):
-    """ Retrieves neurons with processes within a defined volume. Because the 
+def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kwargs):
+    """ Retrieves neurons with processes within a defined box volume. Because the 
     API returns only a limited number of neurons at a time, the defined volume 
     has to be chopped into smaller pieces for crowded areas - may thus take 
     some time! This function will retrieve ALL neurons within the box - not 
@@ -3469,19 +3892,20 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
 
     Parameters
     ----------
-    left :                  {int,float}
-    right :                 {int,float}
-    top :                   {int,float}
-    bottom :                {int,float}
-    z1 :                    {int,float}
-    z2 :                    {int,float}
+    bbox :                  {np.ndarray, list, dict}
+                            Coordinates of the bounding box. Can be either:
+
+                              (1) list/np.ndarray: [[left,right],[top,bottom],[z1,z2]]
+                              (2) dictionary with above entries
     unit :                  {'NM','PIXEL'}
                             Unit of your coordinates. Attention:
                             'PIXEL' will also assume that Z1/Z2 is in slices.                                 
                             By default, a X/Y resolution of 3.8nm and a Z
                             resolution of 35nm is assumed. Pass 'xy_res' and
                             'z_res' as **kwargs to override this.
-
+    min_nodes :             int, optional
+                            Minimum node count for a neuron within given box
+                            to be returned.
     remote_instance :       CATMAID instance 
                             If not passed directly, will try using global.
 
@@ -3489,38 +3913,201 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
     --------
     list
                             ``[ skeleton_id, skeleton_id, ... ]``
-    """
 
-    #Should think about chopping the volume into bits of size X even before recursively retrieving nodes-> might speed up things
+    """    
 
     remote_instance = _eval_remote_instance(remote_instance)
 
+    MAX_THREADS = 50
+
+    if remote_instance.time_out is None:
+        time_out = max([ MAX_THREADS, 30])
+    else:
+        time_out = remote_instance.time_out
+
     x_y_resolution = kwargs.get('xy_res', 3.8)
     z_resolution = kwargs.get('z_res', 35)
+    n_cores = max(1, os.cpu_count()-1)
+
+    if isinstance(bbox, dict):
+        bbox = np.array( [  [bbox['left'], bbox['right']],
+                            [bbox['top'], bbox['bottom']],
+                            [bbox['z1'], bbox['z2']]
+                        ]) 
+
+    if not isinstance(bbox, np.ndarray):
+        bbox = np.array(bbox)
 
     if unit == 'PIXEL':
-        left *= x_y_resolution
-        right *= x_y_resolution
-        top *= x_y_resolution
-        bottom *= x_y_resolution
-        z1 *= z_resolution
-        z2 *= z_resolution
+        bbox *= x_y_resolution        
 
-    def get_nodes(left, right, top, bottom, z1, z2, remote_instance, recursion):
+    # Subset the volume into boxes of 50**3 um^3 
+    boxes = _subset_volume( bbox, max_vol = 50**3 )
+    
+    node_list = []
+    with tqdm(desc='Retr. nodes in box volume', total=len(boxes)) as pbar:
+        while boxes.any():
+            pbar.total = len(boxes)        
+            new_boxes = np.empty((0,3,2))
+            for i in range(0,len(boxes),MAX_THREADS):
+                threads = [ _get_node_list_threaded(b,remote_instance) for b in boxes[i:i+MAX_THREADS] ]
+                for t in threads:
+                    t.start()
 
-        module_logger.debug('%i: Left %i, Right %i, Top %i, Bot %i, Z1 %i, Z2 %i' % (
-            recursion, left, right, top, bottom, z1, z2))
-        module_logger.debug('Recursion %i' % recursion)
+                start = cur_time = time.time()
 
-        remote_nodes_list = remote_instance._get_node_list_url()
+                # Wait until either timeout or all threads are done
+                while cur_time <= (start + time_out) and True in [ t.is_alive() for t in threads ]:
+                    time.sleep(1)
+                    cur_time = time.time()
 
-        node_list_postdata = {
-            'left': left,
-            'right': right,
-            'top': top,
-            'bottom': bottom,
-            'z1': z1,
-            'z2': z2,
+                if cur_time > (start + time_out):
+                    raise Exception('Timeout in thread.')
+
+                for t in threads:
+                    # Response has two entries: the first one is a boolean that 
+                    # signals if node limit was reached. Depending on this, the
+                    # second entry is either a new set of 8 boxes to query or all
+                    # the nodes in this volume.
+                    response = t.join()                
+                    if response[0]:
+                        node_list += response[1]
+                    else:
+                        new_boxes = np.append( new_boxes, response[1], axis=0 )
+
+                pbar.update(len(threads))
+
+            boxes = new_boxes    
+
+    # Collapse list into unique skeleton ids
+    unique, counts = np.unique( [ n[7] for n in node_list ], return_counts = True )
+    skeletons = unique[ counts >= min_nodes  ]
+
+    module_logger.info("Done: %i nodes from %i unique neurons retrieved." % (
+        len(node_list), len(skeletons)))
+
+    return skeletons
+
+def _subset_volume(bbox, max_vol=None):
+    """ Subdivide a bounding box into smaller subvolumes. Can provide a max
+    volume size.
+
+    Parameters
+    ----------
+    bbox :      dict
+                Must contain these entries: left, right, top, bottom, z1, z2.
+    max_vol :   int, optional
+                Maximum volume per subvolume in cubic microns [um^3].
+
+    Returns
+    -------
+    subvolumes :    np.ndarray 
+    """ 
+
+    # Unpack variables    
+    left = bbox[0][0]
+    right = bbox[0][1]
+    top = bbox[1][0]
+    bottom = bbox[1][1]
+    z1 = bbox[2][0]
+    z2 = bbox[2][1]
+
+    dim = bbox[:,1] - bbox[:,0]
+    half_dim = dim / 2
+
+    new_boxes = np.array( [ 
+        # Front left top
+        [  [ left,
+            left + half_dim[0] ],
+           [ top,
+            top + half_dim[1]],
+           [ z1,
+            z1 + half_dim[2]]],                                
+
+        # Front right top
+        [  [ left + half_dim[0],
+            right],
+           [ top,
+            top + half_dim[1]],
+           [ z1,
+            z1 + half_dim[2]]],                                
+
+        # Front left bottom
+        [  [ left,
+            left + half_dim[0]],
+           [ top + half_dim[1],
+            bottom],
+           [ z1,
+            z1 + half_dim[2]]],
+
+        # Front right bottom
+        [  [ left + half_dim[0],
+            right],
+           [ top + half_dim[1],
+            bottom],
+           [ z1,
+            z1 + half_dim[2] ]],             
+
+        # Back left top
+        [  [ left,
+            left + half_dim[0]],
+           [ top,
+            top + half_dim[1]],
+           [ z1 + half_dim[2],
+            z2]],             
+
+        # Back right top
+        [  [ left + half_dim[0],
+            right],
+           [ top,
+            top + half_dim[1]],
+           [ z1 + half_dim[2],
+            z2]],                    
+
+        # Back left bottom
+        [  [ left,
+            left + half_dim[0]],
+           [ top + half_dim[1],
+            bottom],
+           [ z1 + half_dim[2],
+            z2]],         
+
+        # Back right bottom
+        [  [ left + half_dim[0],
+            right],
+           [ top + half_dim[1],
+            bottom],
+           [ z1 + half_dim[2],
+            z2] ]
+            ]  )
+
+    if max_vol:
+        this_volume = ( new_boxes[0][:,1] - new_boxes[0][:,0] ).prod() / 1000**3
+        if this_volume > max_vol:            
+            new_boxes = np.array( [ b for box in new_boxes for b in _subset_volume(box, max_vol=max_vol) ] )
+
+    return new_boxes
+
+class _get_node_list_threaded(threading.Thread):
+    """ Helper function for get_neurons_in_bbox. 
+    """
+
+    def __init__(self, bbox, remote_instance):
+        # Unpack variables
+        self.remote_instance = remote_instance
+        self.bbox = bbox
+        threading.Thread.__init__(self)
+
+    def run(self):
+        # Get url and postdata
+        remote_nodes_list_url = self.remote_instance._get_node_list_url()
+        postdata = {
+            'left': self.bbox[0][0],
+            'right': self.bbox[0][1],
+            'top': self.bbox[1][0],
+            'bottom': self.bbox[1][1],
+            'z1': self.bbox[2][0],
+            'z2': self.bbox[2][1],
             # Atnid seems to be related to fetching the
             # active node too (will be ignored if atnid
             # = -1)
@@ -3533,119 +4120,32 @@ def get_neurons_in_box(left, right, top, bottom, z1, z2, remote_instance=None, u
             'limit': 1000000
         }
 
-        node_list = remote_instance.fetch(
-            remote_nodes_list, node_list_postdata)
+        # Fetch node list
+        node_list = self.remote_instance.fetch(
+            remote_nodes_list_url, postdata)
 
+        # Subdivide if too many nodes returned
         if node_list[3] is True:
-            module_logger.debug('Incursing...')
-            recursion += 8
-            node_list = list()
-            # Front left top
-            temp, recursion = get_nodes(left,
-                                        left + (right - left) / 2,
-                                        top,
-                                        top + (bottom - top) / 2,
-                                        z1,
-                                        z1 + (z2 - z1) / 2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Front right top
-            temp, recursion = get_nodes(left + (right - left) / 2,
-                                        right,
-                                        top,
-                                        top + (bottom - top) / 2,
-                                        z1,
-                                        z1 + (z2 - z1) / 2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Front left bottom
-            temp, recursion = get_nodes(left,
-                                        left + (right - left) / 2,
-                                        top + (bottom - top) / 2,
-                                        bottom,
-                                        z1,
-                                        z1 + (z2 - z1) / 2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Front right bottom
-            temp, recursion = get_nodes(left + (right - left) / 2,
-                                        right,
-                                        top + (bottom - top) / 2,
-                                        bottom,
-                                        z1,
-                                        z1 + (z2 - z1) / 2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Back left top
-            temp, recursion = get_nodes(left,
-                                        left + (right - left) / 2,
-                                        top,
-                                        top + (bottom - top) / 2,
-                                        z1 + (z2 - z1) / 2,
-                                        z2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Back right top
-            temp, recursion = get_nodes(left + (right - left) / 2,
-                                        right,
-                                        top,
-                                        top + (bottom - top) / 2,
-                                        z1 + (z2 - z1) / 2,
-                                        z2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Back left bottom
-            temp, recursion = get_nodes(left,
-                                        left + (right - left) / 2,
-                                        top + (bottom - top) / 2,
-                                        bottom,
-                                        z1 + (z2 - z1) / 2,
-                                        z2,
-                                        remote_instance, recursion)
-            node_list += temp
-
-            # Back right bottom
-            temp, recursion = get_nodes(left + (right - left) / 2,
-                                        right,
-                                        top + (bottom - top) / 2,
-                                        bottom,
-                                        z1 + (z2 - z1) / 2,
-                                        z2,
-                                        remote_instance, recursion)
-            node_list += temp
-
+            # Divided this box into 8 smaller boxes
+            new_boxes = _subset_volume( self.bbox )
+            # Return "False" flag and new boxes
+            self.response = ( False, new_boxes )
         else:
-            # If limit not reached, node list is still an array of 4
-            return node_list[0], recursion - 1
+            # If limit not reached, return node list 
+            self.response = ( True, node_list[0] )
 
-        module_logger.info(
-            "Recursion %i complete (%i nodes received)" % (recursion, len(node_list)))
-
-        return node_list, recursion
-
-    recursion = 1
-    node_list, recursion = get_nodes(
-        left, right, top, bottom, z1, z2, remote_instance, recursion)
-
-    # Collapse list into unique skeleton ids
-    skeletons = set()
-    for node in node_list:
-        skeletons.add(node[7])
-
-    module_logger.info("Done: %i nodes from %i unique neurons retrieved." % (
-        len(node_list), len(skeletons)))
-
-    return list(skeletons)
+    def join(self):
+        try:
+            threading.Thread.join(self)
+            return self.response
+        except:
+            module_logger.error(
+                'Failed to join thread.')
+            return None
 
 
 def get_user_list(remote_instance=None):
-    """ Get list of users for given CATMAID server (not project specific)
+    """ Get list of users for given CATMAID server (not project specific).
 
     Parameters
     ----------    
@@ -3655,7 +4155,7 @@ def get_user_list(remote_instance=None):
     Returns
     ------
     pandas.DataFrame        
-        DataFrame in which each row represents a user
+        DataFrame in which each row represents a user:
 
         >>> print(user_list)
           id   login   full_name   first_name   last_name   color
@@ -3721,18 +4221,18 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
 
     Returns
     -------
-    igraph.Graph
+    ``igraph.Graph``
                 iGraph object containing the neurons that connect 
                 sources and targets. Does only contain edges that 
                 connect sources and targets!
 
-    paths :     list
+    paths :     ``list``
                 List of skeleton IDs that constitute paths from
                 sources to targets::
 
                     [ [ source1, skid1, target1 ], [source2, skid2, target2 ], ...  ]
 
-    Attention
+    Important
     ---------
     The returned iGraph graph does **only** contain the edges that connnect
     sources and targets. Other edges have been removed.
@@ -3802,7 +4302,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     return g, [[g.vs[i]['node_id'] for i in p] for p in all_paths]
 
 
-def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), combine_vols=True):
+def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6), combine_vols=True):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of 
     vertices and faces.
 
@@ -3810,19 +4310,21 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
     ----------
     volume_name :       str, list of str
                         Name(s) of the volume to import - must be EXACT! 
-                        If volume = None, will return list of available volumes.
+                        If ``volume_name=None``, will return list of all
+                        available CATMAID volumes.
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     color :             tuple, optional
-                        R,G,B,alpha values used by :func:`pymaid.plotting.plot3d`
+                        R,G,B,alpha values used by :func:`~pymaid.plotting.plot3d`.
     combine_vols :      bool, optional
                         If True and multiple volumes are requested, the will 
                         be combined into a single volume. 
 
     Returns
     -------
-    core.Volume 
-        Essentially a dictionary containing name, vertices and faces::
+    :class:`~pymaid.core.Volume`
+        Essentially a dictionary containing name, vertices and faces plus some
+        useful methods::
 
             name :          str
             volume_id :     int
@@ -3830,6 +4332,9 @@ def get_volume(volume_name, remote_instance=None, color=(120, 120, 120, .6), com
                             [ (x,y,z), (x,y,z), .... ]
             faces :         list of tuples
                             [ ( vertex_ix, vertex_ix, vertex_ix ), ... ]
+            plot3d():       Plot volume
+            to_trimes():    Convert to trimesh
+            combine():      Merge multiple volumes (classmethod)
 
     Examples
     --------
@@ -3955,7 +4460,7 @@ def get_annotation_list(remote_instance=None):
     Returns
     -------
     pandas DataFrame
-            DataFrame in which each row represents an annotation
+            DataFrame in which each row represents an annotation:
 
             >>> print(user_list)
               annotation_id   annotation   users
@@ -4016,7 +4521,7 @@ def eval_skids(x, remote_instance=None):
     Returns
     -------
     list of str
-                    list containing skeleton IDs as strings
+                    List containing skeleton IDs as strings.
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -4056,6 +4561,64 @@ def eval_skids(x, remote_instance=None):
             'Unable to extract x from type %s' % str(type(x)))
         raise TypeError('Unable to extract skids from type %s' % str(type(x)))
 
+def eval_user_ids( x, user_list=None, remote_instance=None ):
+    """ Checks a list of users and turns them into user IDs. Always
+    returns a list! Will attempt converting in the following order:
+
+        (1) user ID
+        (2) login name
+        (3) last name
+        (4) full name
+        (5) first name
+
+    Important
+    ---------
+    Last, first and full names are case-sensitive!
+
+    Parameters
+    ----------
+    x :         {int, str, list of either}
+                Users to check.
+    user_list : pd.DataFrame, optional
+                User list from :func:`~pymaid.pymaid.get_user_list`. If you 
+                already have it, pass it along to save time.   
+
+    """
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    if x and not isinstance(x, (list, np.ndarray)):
+        x = [x]
+
+    try:
+        # Test if we have any non IDs (i.e. logins) in users
+        user_ids = [ int(u) for u in x ]
+    except:
+        # Get list of users if we don't already have it
+        if not user_list:
+            user_list = get_user_list(
+                remote_instance=remote_instance)
+
+        # Now convert individual entries to user IDs
+        user_ids = []
+        for u in x:
+            try:
+                user_ids.append( int( u ) )
+            except:
+                for col in ['login','last_name','full_name','first_name']:
+                    found = []
+                    if u in user_list[ col ].values:
+                        found = user_list[ user_list[ col ] == u ].id.tolist()
+                        break
+                if not found:
+                    module_logger.warning('User "{0}" not found. Skipping...'.format(u))
+                elif len(found) > 1:
+                    module_logger.warning('Multiple matching entries for "{0}" found. Skipping...'.format(u))
+                else:
+                    user_ids.append( int(found[0]) )
+
+    return user_ids
+
 def eval_node_ids(x, connectors=True, treenodes=True):
     """ Wrapper to extract treenode or connector IDs. 
 
@@ -4076,7 +4639,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
     -------
     list of str
                     list containing node as strings
-    """
+    """    
 
     if isinstance(x, (int, np.int64, np.int32, np.int)):
         return [ x ]
@@ -4085,16 +4648,19 @@ def eval_node_ids(x, connectors=True, treenodes=True):
             return [ int(x) ]
         except:
             raise TypeError('Unable to extract node ID from string <%s>' % str(x))
-    elif isinstance(x, (list, np.ndarray)):
-        ids = []
+    elif isinstance(x, (list, np.ndarray)):        
+        # Check non-integer entries
+        ids = [ ]
         for e in x:
-            temp = eval_node_ids(e, connectors=True, 
-                                 treenodes=True)
+            temp = eval_node_ids(e, connectors=connectors, 
+                                 treenodes=treenodes)
             if isinstance(temp, (list, np.ndarray)):
                 ids += temp
             else:
                 ids.append(temp)
-        return sorted(set(ids), key=ids.index)
+        # Preserving the order after making a set is super costly   
+        # return sorted(set(ids), key=ids.index)
+        return list(set(ids))
     elif isinstance(x, core.CatmaidNeuron):
         to_return = []
         if treenodes:
@@ -4131,7 +4697,7 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
     Parameters
     ----------
     coords :                {list, np.ndarray, pandas.DataFrame}
-                            x,y,z coordinates
+                            ``x``,``y``,``z`` coordinates.
     stack_id :              {int, list/array of ints}
                             ID of the image stack you want to link to. 
                             Depending on your setup this parameter might be
@@ -4150,7 +4716,7 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
     Returns
     -------
     {str or list of str}
-                URL(s) to the coordinates provided
+                URL(s) to the coordinates provided.
     """
 
     def gen_url(c, stid, nid, sid ):
@@ -4203,7 +4769,7 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
 
 
 def rename_neurons( x, new_names, remote_instance=None, no_prompt=False ):
-    """ Wrapper to rename neuron(s)
+    """ Wrapper to rename neuron(s).
 
     Parameters
     ----------
@@ -4283,7 +4849,7 @@ def rename_neurons( x, new_names, remote_instance=None, no_prompt=False ):
     return
 
 def get_label_list(remote_instance=None):
-    """ Retrieves all labels (treenode tags) in a project
+    """ Retrieves all labels (treenode tags) in a project.
 
     Parameters
     ----------
@@ -4293,7 +4859,10 @@ def get_label_list(remote_instance=None):
 
     Returns
     -------
-    pd.DataFrame
+    pandas.DataFrame
+            DataFrame in which each row represents a label:
+
+            >>> df
                 label_id  tag  skeleton_id  treenode_id
             0
             1
