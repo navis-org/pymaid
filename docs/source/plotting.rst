@@ -1,7 +1,7 @@
 Plotting
 ********
 
-Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networks. These functions are all part of the :mod:`pymaid.plotting` module and represent wrappers for `matplotlib <http://www.matplotlib.org>`_ for 2D, `vispy <http://www.vispy.org>`_ and `plotly <http://plot.ly>`_ for 3D.
+Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networks. These functions represent wrappers for `matplotlib <http://www.matplotlib.org>`_ for 2D, `vispy <http://www.vispy.org>`_ and `plotly <http://plot.ly>`_ for 3D.
 
 .. note::
    If you are experiencing issues when using vispy
@@ -13,7 +13,7 @@ Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networ
 Plotting Neurons
 ================
 
-Neuron classes ( :class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.CatmaidNeuronList`) as well as nblast results (:class:`~pymaid.rmaid.nbl_results`) have built-in modules that call :func:`~pymaid.plotting.plot3d` or :func:`~pymaid.plotting.plot2d`.
+Neuron classes ( :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList`) as well as nblast results (:class:`~pymaid.rmaid.nbl_results`) have built-in modules that call :func:`~pymaid.plot3d` or :func:`~pymaid.plot2d`.
 
 2D Plotting
 -----------
@@ -27,13 +27,13 @@ Neuron classes ( :class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.Ca
 >>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot using standard parameters
 >>> fig, ax = nl.plot2d()
-2017-07-25 14:56:08,701 - pymaid.plotting - INFO - Done. Use matplotlib.pyplot.show() to show plot.
+2017-07-25 14:56:08,701 - pymaid - INFO - Done. Use matplotlib.pyplot.show() to show plot.
 >>> plt.show()
 
 Adding volumes
 ++++++++++++++
 
-:func:`~pymaid.plotting.plot2d` has some built-in outlines for the **adult Drosophila** brain project: ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
+:func:`~pymaid.plot2d` has some built-in outlines for the **adult Drosophila** brain project: ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
 
 >>> fig, ax = nl.plot2d( brain = (.8,.8,.8), 
 ...                      MB = (.3,.9,.3) )
@@ -53,7 +53,7 @@ Adding volumes
 >>> # Save screenshot
 >>> pymaid.screenshot('screenshot.png', alpha = True)
 
-The canvas persistent and survives simply closing the window. Calling :func:`~pymaid.plotting.plot3d` again will add objects to the canvas and open it again.
+The canvas persistent and survives simply closing the window. Calling :func:`~pymaid.plot3d` again will add objects to the canvas and open it again.
 
 >>> # Add another set of neurons
 >>> nl2 = pymaid.CatmaidNeuronList([987675,543210], remote_instance = rm)
@@ -65,13 +65,13 @@ The canvas persistent and survives simply closing the window. Calling :func:`~py
 >>> # To wipe canvas from memory
 >>> pymaid.close3d()
 
-By default, calling :func:`~pymaid.plotting.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
+By default, calling :func:`~pymaid.plot3d` uses the vispy backend and does not plot connectors. By passing **kwargs, we can change that behavior:
 
 >>> fig = nl.plot3d( backend = 'plotly', connectors = True )
-2017-07-18 21:22:27,192 - pymaid.plotting - INFO - Generating traces...
-2017-07-18 21:22:45,504 - pymaid.plotting - INFO - Traced done.
-2017-07-18 21:22:45,505 - pymaid.plotting - INFO - Done. Plotted 4000 nodes and 320 connectors
-2017-07-18 21:22:45,505 - pymaid.plotting - INFO - Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.
+2017-07-18 21:22:27,192 - pymaid - INFO - Generating traces...
+2017-07-18 21:22:45,504 - pymaid - INFO - Traced done.
+2017-07-18 21:22:45,505 - pymaid - INFO - Done. Plotted 4000 nodes and 320 connectors
+2017-07-18 21:22:45,505 - pymaid - INFO - Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.
 >>> # Fig is a dictionary that plotly turns into a WebGL file
 >>> from plotly import offline as poff
 >>> poff.plot( fig )
@@ -93,7 +93,7 @@ Navigating the 3D viewer
 Adding volumes
 ++++++++++++++
 
-:func:`~pymaid.plotting.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
+:func:`~pymaid.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
@@ -121,7 +121,7 @@ You can also pass your own custom volumes as dictionarys:
 Plotting Networks
 =================
 
-:func:`~pymaid.plotting.plot_network` is a wrapper to plot networks using plotly. It's rather slow for large-ish graphs though
+:func:`~pymaid.plot_network` is a wrapper to plot networks using plotly. It's rather slow for large-ish graphs though
 
 >>> import pymaid
 >>> import plotly.offline as poff
@@ -134,3 +134,11 @@ Plotting Networks
 >>> all_skeleton_ids = pns + partners.skeleton_id.tolist()
 >>> fig = pymaid.plot_network( all_skeleton_ids, remote_instance = rm )
 >>> poff.plot(fig)
+
+Documentation
+-------------
+
+.. automodule:: pymaid
+    :members: plot3d, plot2d, plot_network, clear3d, close3d, screenshot
+    :undoc-members:
+    :show-inheritance:

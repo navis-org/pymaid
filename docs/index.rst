@@ -47,19 +47,13 @@ Table of Contents
    source/install
    source/intro   
    source/overview
-   source/rmaid_doc
+   source/fetching_data
    source/plotting
-   source/morpho_doc
-   source/blender
-   source/pymaid
-   source/core
-   source/cluster
-   source/igraph
-   source/morpho
-   source/plot
-   source/user_stats
-   source/rmaid
-   source/b3d
+   source/morph_analysis
+   source/connectivity_analysis
+   source/blender     
+   source/rmaid_doc   
+   source/user_stats   
    source/troubleshooting   
 
 

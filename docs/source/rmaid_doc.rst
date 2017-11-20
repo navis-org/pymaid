@@ -104,3 +104,12 @@ Nblasting
 >>> nbl.sort('mu_score')
 >>> nbl.plot(hits = 4)
 
+
+Documentation
+=============
+
+.. automodule:: pymaid.rmaid
+    :members:
+    :undoc-members:
+    :show-inheritance:
+

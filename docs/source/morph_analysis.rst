@@ -6,7 +6,7 @@ This section should give you an impression of how to access and compute morpholo
 Basic properties
 ================
 
-Many basic parameters are readily accessible through attributes of :class:`~pymaid.core.CatmaidNeuron` or :class:`~pymaid.core.CatmaidNeuronList`
+Many basic parameters are readily accessible through attributes of :class:`~pymaid.CatmaidNeuron` or :class:`~pymaid.CatmaidNeuronList`
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance('server_url','user','pw','token')
@@ -21,7 +21,7 @@ Many basic parameters are readily accessible through attributes of :class:`~pyma
 Cutting, pruning, pasting
 =========================
 
-The :mod:`pymaid.morpho` module let's you perform (virtual) surgery on neurons. :class:`~pymaid.core.CatmaidNeuron` and :class:`~pymaid.core.CatmaidNeuronList` have also some thin wrappers for :mod:`pymaid.morpho` functions (e.g. :func:`~pymaid.core.CatmaidNeuron.prune_by_strahler` is a wrapper for :func:`~pymaid.morpho.prune_by_strahler`).
+Pymaid let's you perform (virtual) surgery on neurons. :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` have also some thin wrappers for these functions (e.g. :func:`~pymaid.CatmaidNeuron.prune_by_strahler` is a wrapper for :func:`~pymaid.prune_by_strahler`).
 
 Some examples continuing with above neuronlist ``nl``:
 
@@ -45,3 +45,11 @@ Some examples continuing with above neuronlist ``nl``:
 >>> nl.plot3d(connectors=True,clear3d=True)
 
 For morphological comparisons using NBLAST, see * :ref:`_rmaid_link`.
+
+Documentation
+=============
+
+.. automodule:: pymaid
+    :members: arbor_confidence, cable_within_distance, calc_bending_flow, calc_cable, calc_flow_centrality, calc_segregation_index, calc_strahler_index, classify_nodes, cut_neuron, distal_to, downsample_neuron, filter_connectivity, in_volume, longest_neurite, prune_by_strahler, reroot_neuron, split_axon_dendrite, stitch_neurons, synapse_root_distances
+    :undoc-members:
+    :show-inheritance:
