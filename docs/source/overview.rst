@@ -63,6 +63,7 @@ Selection of class methods:
 - :func:`~pymaid.core.CatmaidNeuron.copy`: returns deep copy of the object
 - :func:`~pymaid.core.CatmaidNeuron.from_swc`: creates CatmaidNeuron from swc file
 - :func:`~pymaid.core.CatmaidNeuronList.to_json`: saves neuronlist as json that can be opend in CATMAID's selection widget
+- :func:`~pymaid.core.CatmaidNeuronList.from_json`: create a neuronlist from a CATMAID json selection
 
 See :class:`~pymaid.core.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complete list.
 
@@ -76,6 +77,7 @@ Functions to retrieve data from server:
 - :func:`~pymaid.pymaid.add_tags`: add tags of treenodes or connectors
 - :func:`~pymaid.pymaid.delete_tags`: delete tags of treenodes or connectors
 - :func:`~pymaid.pymaid.delete_neuron`: delete entire neurons
+- :func:`~pymaid.pymaid.find_neurons`: search for neurons based on a variety of parameters
 - :func:`~pymaid.pymaid.get_arbor`: similar to get_neuron but more detailed information on connectors
 - :func:`~pymaid.pymaid.get_annotations`: get annotations of a set of neurons (annotation only)
 - :func:`~pymaid.pymaid.get_annotation_details`: get detailed annotations for a set of neurons (includes user and timestamp)
@@ -99,6 +101,7 @@ Functions to retrieve data from server:
 - :func:`~pymaid.pymaid.get_review_details`: get review status (reviewer + timestamp) for each individual node
 - :func:`~pymaid.pymaid.get_skids_by_annotation`: get skeleton IDs that are annotated with a given annotation
 - :func:`~pymaid.pymaid.get_skids_by_name`: get skeleton IDs of neurons with given names
+- :func:`~pymaid.pymaid.get_skid_from_treenode`: get the skeleton which a treenode belongs to
 - :func:`~pymaid.pymaid.get_node_tags`: get tags of a set of treenodes or connectors
 - :func:`~pymaid.pymaid.get_treenode_info`: retrieve info (i.e. skeleton ID) for a set of treenodes
 - :func:`~pymaid.pymaid.get_treenode_table`: retrieve treenode table for given neurons
@@ -147,6 +150,7 @@ Functions for morphological analyses:
 - :func:`~pymaid.morpho.cut_neuron`: cut neuron at a node or node tag
 - :func:`~pymaid.morpho.distal_to`: use this to check spatial relation of nodes within a neuron
 - :func:`~pymaid.morpho.downsample_neuron`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
+- :func:`~pymaid.morpho.filter_connectivity`: filter connectivity based on volumes or pruned neurons
 - :func:`~pymaid.morpho.in_volume`: test if points are within given CATMAID volume
 - :func:`~pymaid.morpho.longest_neurite`: prunes neuron to its longest neurite
 - :func:`~pymaid.morpho.prune_by_strahler`: prunes the neuron by strahler index
@@ -154,7 +158,6 @@ Functions for morphological analyses:
 - :func:`~pymaid.morpho.split_axon_dendrite`: split neuron into axon, dendrite and primary neurite based on synapse flow centrality
 - :func:`~pymaid.morpho.synapse_root_distances`: similar to :func:`pymaid.igraph_catmaid.dist_from_root` but does not use iGraph
 - :func:`~pymaid.morpho.stitch_neurons`: stitch neurons back together
-
 
 Interface with R (nat, rcatmaid, etc.):
 
