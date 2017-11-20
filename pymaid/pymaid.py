@@ -29,7 +29,7 @@ Examples
 >>> # Get skeletal data for two neurons
 >>> neuron_list = pymaid.get_neuron ( ['12345','67890'] , myInstance )
 >>> neuron_list[0]
-type              <class 'pymaid.core.CatmaidNeuron'>
+type              <class 'pymaid.CatmaidNeuron'>
 neuron_name                       Example neuron name
 skeleton_id                                     12345
 n_nodes                                          9924
@@ -248,11 +248,21 @@ class CatmaidInstance:
         """ Use to parse url for retrieving connectivity (does need post data). """
         return self.djangourl("/" + str(self.project_id) + "/skeletons/connectivity")
 
-    def _get_connectors_url(self):
+    def _get_connector_links_url(self):
         """ Use to retrieve list of connectors either pre- or postsynaptic a set of neurons - GET request
         Format: { 'links': [ skeleton_id, connector_id, x,y,z, S(?), confidence, creator, treenode_id, creation_date ], 'tags':[] }
         """
+        return self.djangourl("/" + str(self.project_id) + "/connectors/links")
+
+    def _get_connectors_url(self):
+        """ Use to retrieve list of connectors - POST request        
+        """
         return self.djangourl("/" + str(self.project_id) + "/connectors/")
+
+    def _get_connector_types_url(self):
+        """ Use to retrieve dictionary of connector types in the project      
+        """
+        return self.djangourl("/" + str(self.project_id) + "/connectors/types")
 
     def _get_connectors_between_url(self):
         """ Use to retrieve list of connectors linking sets of neurons
@@ -607,9 +617,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     Returns
     -------
-    :class:`~pymaid.core.CatmaidNeuron`
+    :class:`~pymaid.CatmaidNeuron`
                         For single neurons.
-    :class:`~pymaid.core.CatmaidNeuronList`
+    :class:`~pymaid.CatmaidNeuronList`
                         For a list of neurons.
     pandas.DataFrame
                         If ``return_df=True``
@@ -691,7 +701,6 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
             if get_abutting:
                 module_logger.debug(
                     'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
-                urls = []
 
                 for s in to_retrieve:
                     get_connectors_GET_data = {'skeleton_ids[0]': str(s),
@@ -701,7 +710,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
                 cn_data = _get_urls_threaded(urls, remote_instance, disable_pb=True)
 
-                # Add abutting to other connectors in skdata with type == 2
+                # Add abutting to other connectors in skdata with type == 3
                 for i, cn in enumerate(cn_data):
                     if not get_history:
                         skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
@@ -768,7 +777,7 @@ get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
 
 def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1):
     """ Wrapper to retrieve the skeleton data for a list of skeleton ids.    
-    Similar to :func:`pymaid.pymaid.get_neuron` but the connector data includes 
+    Similar to :func:`pymaid.get_neuron` but the connector data includes 
     the whole chain::
 
         treenode1 -> (link_confidence) -> connector -> (link_confidence)
@@ -855,7 +864,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     return df
 
 
-def _get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_size=2):
+def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_size=2):
     """ Wrapper to retrieve the synaptic/gap junction partners of neurons 
     of interest **within** a given CATMAID Volume. 
 
@@ -876,7 +885,7 @@ def _get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_si
     volume :            {str, list of str, core.Volume } 
                         Name of the CATMAID volume to test OR volume dict with 
                         {'vertices':[],'faces':[]} as returned by e.g. 
-                        :func:`~pymaid.pymaid.get_volume()`
+                        :func:`~pymaid.get_volume()`
     remote_instance :   CATMAID instance 
                         If not passed directly, will try using global.                     
     threshold :         int, optional
@@ -906,7 +915,7 @@ def _get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_si
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_neurons_in_volume`
+    :func:`~pymaid.get_neurons_in_volume`
             Get all neurons within given volume
     """
 
@@ -1082,9 +1091,9 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
 
     See Also
     --------
-    :func:`~pymaid.cluster.create_adjacency_matrix`
+    :func:`~pymaid.create_adjacency_matrix`
                         Use if you need an adjacency matrix instead of a table
-    :func:`~pymaid.pymaid.get_partners_in_volume`
+    :func:`~pymaid.get_partners_in_volume`
                         Use if you only want connectivity within a given volume
     """
 
@@ -1500,8 +1509,8 @@ def get_edges(x, remote_instance=None):
 
     return df
 
-def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_synapses=True, abutting=False, gap_junctions=False):
-    """ Wrapper to retrieve connectors for a set of neurons.    
+def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
+    """ Wrapper to retrieve connectors based on a set of filters.
 
     Parameters
     ----------
@@ -1512,16 +1521,12 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
+                        5. None if you want all fetch connectors that match other criteria                        
+    relation_type :     {'presynaptic_to','postsynaptic_to','gapjunction_with','abutting','attached_to'}, optional
+                        If provided, will filter for these connection types.
+    tags :              {str, list of str}, optional
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
-    incoming_synapses : bool, optional
-                        If True, incoming synapses will be retrieved.
-    outgoing_synapses : bool, optional
-                        If True, outgoing synapses will be retrieved.
-    abutting :          bool, optional
-                        If True, abutting connectors will be retrieved.
-    gap_junctions :     bool, optional
-                        If True, gap junctions will be retrieved.
 
     Returns
     ------- 
@@ -1529,83 +1534,117 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
         DataFrame in which each row represents a connector:
 
         >>> df
-        ... skeleton_id  connector_id  x  y  z  confidence  creator_id  
+        ...   connector_id  x  y  z  confidence  creator_id, 
         ... 0
         ... 1
         ...        
-        ... treenode_id  creation_time  edition_time type
+        ... editor_id  creation_time  edition_time
         ... 0
-        ... 1        
-
-    Notes
-    -----
-    DataFrame in which each row represents a link (connector <-> treenode)! 
-    Connectors may thus show up in multiple rows. Use e.g. 
-    ``df.connector_id.unique()`` to get a set of unique connector IDs.
+        ... 1
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_connector_details`
+    :func:`~pymaid.get_connector_details`
         If you need details about the connectivity of a connector
-    :func:`~pymaid.pymaid.get_connectors_between`
+    :func:`~pymaid.get_connectors_between`
         If you need to find the connectors between sets of neurons.
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    if not isinstance(x, type(None)):
+        x = eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
+        if not isinstance(x, (list, np.ndarray)):
+            x = [x]
 
-    cn_data = []
-    tags = {}
+    remote_get_connectors_url = remote_instance._get_connectors_url()
 
+    postdata = { 'with_tags' :'true', 'with_partners': 'true'}
+
+    # Add skeleton IDs filter (if applicable)
+    if not isinstance(x, type(None)):
+        postdata.update( { 'skeleton_ids[{0}]'.format(i) : s for i,s in enumerate(x) } )
+
+    # Add tags filter (if applicable)
+    if not isinstance(tags, type(None)):
+        if not isinstance(tags, (list, np.ndarray)):
+            tags = [tags]
+        postdata.update( {'tags[{0}]'.format(i) : str(t) for i,t in enumerate(tags)} )
+
+    # Add relation_type filter (if applicable)
+    allowed_relations = ['presynaptic_to','postsynaptic_to','gapjunction_with','abutting','attached_to']
+    if not isinstance(relation_type, type(None)):
+        if relation_type not in allowed_relations:
+            raise ValueError('Unknown relation type "{0}". Must be in {1}'.format(relation_type, allowed_relations))        
+        postdata.update( {'relation_type' : relation_type } )
+
+    data = remote_instance.fetch( remote_get_connectors_url, post=postdata )
+
+    df = pd.DataFrame(data = data['connectors'],
+                     columns = ['connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'editor_id', 'creation_time', 'edition_time'] )
+
+    # Add tags
+    df['tags'] = [ data['tags'].get( str(cn_id), None) for cn_id in df.connector_id.tolist() ]
+
+    # Hard-wired relation IDs
+    rel_ids ={  8: {'relation': 'postsynaptic_to', 'type': 'synaptic'},
+                14: {'relation': 'presynaptic_to', 'type': 'synaptic'},
+                54650: {'relation': 'abutting', 'type': 'abutting'},
+                686364: {'relation': 'gapjunction_with', 'type': 'gap_junction'}, 
+                5989640: {'relation': 'attached_to', 'type': 'attachment'} # ATTENTION: apparently "attachment" can be part of any connector type
+            }
+
+    df['type'] = [ rel_ids[ data['partners'].get( str(cn_id), [['unknown',0]])[0][-2] ]['type'] for cn_id in df.connector_id.tolist()  ]
+
+    df['creation_time'] = df['creation_time'].apply( datetime.datetime.fromtimestamp)
+    df['edition_time'] = df['edition_time'].apply( datetime.datetime.fromtimestamp)
+
+    df.datatype = 'connector_table'
+
+    """
     # There seems to be some hard cap regarding how many skids you can send to 
     # the server, so we have to chop it into pieces
     CHUNK_SIZE = 50
     with tqdm(total=len(x), desc='Fetch. connectors', disable=module_logger.getEffectiveLevel()>=40) as pbar:                            
         for a in range( 0, len( x ), CHUNK_SIZE):
-            get_connectors_GET_data = {'with_tags': 'true'}
+            get_connectors_POST_data = {'with_tags': 'true'}
     
             for i, s in enumerate(x[a:a + CHUNK_SIZE]):
                 tag = 'skeleton_ids[%i]' % i
-                get_connectors_GET_data[tag] = str(s)
+                get_connectors_POST_data[tag] = str(s)
 
             if incoming_synapses is True:
-                get_connectors_GET_data['relation_type'] = 'presynaptic_to'
-                remote_get_connectors_url = remote_instance._get_connectors_url(
-                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-                temp = remote_instance.fetch(remote_get_connectors_url)
+                get_connectors_POST_data['relation_type'] = 'presynaptic_to'                
+                temp = remote_instance.fetch(remote_get_connectors_url,
+                                             post = get_connectors_POST_data)
                 cn_data += [e + ['presynaptic_to']
-                            for e in temp['links']]
+                            for e in temp['connectors']]
                 tags.update(temp['tags'])
 
             if outgoing_synapses is True:
-                get_connectors_GET_data['relation_type'] = 'postsynaptic_to'
-                remote_get_connectors_url = remote_instance._get_connectors_url(
-                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-                temp = remote_instance.fetch(remote_get_connectors_url)
+                get_connectors_POST_data['relation_type'] = 'postsynaptic_to'
+                temp = remote_instance.fetch(remote_get_connectors_url,
+                                             post = get_connectors_POST_data)
                 cn_data += [e + ['postsynaptic_to']
-                            for e in temp['links']]
+                            for e in temp['connectors']]
                 tags.update(temp['tags'])
 
             if abutting is True:
-                get_connectors_GET_data['relation_type'] = 'abutting'
-                remote_get_connectors_url = remote_instance._get_connectors_url(
-                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-                temp = remote_instance.fetch(remote_get_connectors_url)
+                get_connectors_POST_data['relation_type'] = 'abutting'
+                temp = remote_instance.fetch(remote_get_connectors_url,
+                                             post = get_connectors_POST_data)
                 cn_data += [e + ['abutting']
-                            for e in temp['links']]
+                            for e in temp['connectors']]
                 tags.update(temp['tags'])
 
             if gap_junctions is True:
-                get_connectors_GET_data['relation_type'] = 'gapjunction_with'
-                remote_get_connectors_url = remote_instance._get_connectors_url(
-                ) + '?%s' % urllib.parse.urlencode(get_connectors_GET_data)
-                temp = remote_instance.fetch(remote_get_connectors_url)
+                get_connectors_POST_data['relation_type'] = 'gapjunction_with'
+                temp = remote_instance.fetch(remote_get_connectors_url,
+                                             post = get_connectors_POST_data)
                 cn_data += [e + ['gap_junction']
-                            for e in temp['links']]
+                            for e in temp['connectors']]
                 tags.update(temp['tags'])
 
             pbar.update(CHUNK_SIZE)
@@ -1622,7 +1661,7 @@ def get_connectors(x, remote_instance=None, incoming_synapses=True, outgoing_syn
 
     module_logger.info(
         '%i connectors for %i neurons retrieved' % (df.shape[0], len(x)))
-
+    """
     return df
 
 
@@ -1654,7 +1693,7 @@ def get_connector_details(x, remote_instance=None):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_connectors`
+    :func:`~pymaid.get_connectors`
         If you just need the connector table (ID, x, y, z, creator, etc).
     """
 
@@ -1747,7 +1786,7 @@ def get_connectors_between(a, b, directional=True, remote_instance=None ):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_edges`
+    :func:`~pymaid.get_edges`
         If you just need the number of synapses between neurons, this is much
         faster.
     """
@@ -1820,7 +1859,7 @@ def get_review(x, remote_instance=None):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_review_details`
+    :func:`~pymaid.get_review_details`
         Gives you review status for individual nodes of a given neuron.  
 
     """
@@ -1995,7 +2034,7 @@ def get_user_annotations(x, remote_instance=None):
 
 def get_annotation_details(x, remote_instance=None):
     """ Wrapper to retrieve annotations for a set of neuron. Returns more
-    details than :func:`~pymaid.pymaid.get_annotations` but is slower.
+    details than :func:`~pymaid.get_annotations` but is slower.
     Contains timestamps and user IDs (same API as neuron navigator).
 
     Parameters
@@ -2022,7 +2061,7 @@ def get_annotation_details(x, remote_instance=None):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_annotations`
+    :func:`~pymaid.get_annotations`
                         Gives you annotations for a list of neurons (faster)
 
     Examples
@@ -2117,7 +2156,7 @@ def get_annotations(x, remote_instance=None):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_annotation_details`
+    :func:`~pymaid.get_annotation_details`
                         Gives you more detailed information about annotations
                         of a set of neuron (includes timestamp and user) but 
                         is slower.
@@ -2241,8 +2280,8 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     ----
     There is no shortcut to get this information - we have to load the 3D 
     skeleton to get the soma. If you need the 3D skeletons anyway, it is more
-    efficient to use :func:`~pymaid.pymaid.get_neuron` to get a neuronlist
-    and then use the :attr:`~pymaid.core.CatmaidNeuronList.soma` 
+    efficient to use :func:`~pymaid.get_neuron` to get a neuronlist
+    and then use the :attr:`~pymaid.CatmaidNeuronList.soma` 
     attribute.
     """
 
@@ -2624,7 +2663,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
     See Also
     --------
-    :func:`~pymaid.pymaid.add_tags`
+    :func:`~pymaid.add_tags`
             Function to add tags to nodes.
 
     Examples
@@ -2713,7 +2752,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
 
     See Also
     --------
-    :func:`~pymaid.pymaid.delete_tags`
+    :func:`~pymaid.delete_tags`
             Function to delete given tags from nodes.
 
     """
@@ -3558,7 +3597,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
                         defined CatmaidInstance.
     Returns
     -------
-    :class:`~pymaid.core.CatmaidNeuronList`
+    :class:`~pymaid.CatmaidNeuronList`
 
     Examples
     --------    
@@ -3819,7 +3858,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
 
     See Also
     --------
-    :func:`~pymaid.pymaid.get_partners_in_volume`
+    :func:`~pymaid.get_partners_in_volume`
                             Get only partners that make connections within a
                             given volume
 
@@ -4315,14 +4354,14 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     color :             tuple, optional
-                        R,G,B,alpha values used by :func:`~pymaid.plotting.plot3d`.
+                        R,G,B,alpha values used by :func:`~pymaid.plot3d`.
     combine_vols :      bool, optional
                         If True and multiple volumes are requested, the will 
                         be combined into a single volume. 
 
     Returns
     -------
-    :class:`~pymaid.core.Volume`
+    :class:`~pymaid.Volume`
         Essentially a dictionary containing name, vertices and faces plus some
         useful methods::
 
@@ -4580,7 +4619,7 @@ def eval_user_ids( x, user_list=None, remote_instance=None ):
     x :         {int, str, list of either}
                 Users to check.
     user_list : pd.DataFrame, optional
-                User list from :func:`~pymaid.pymaid.get_user_list`. If you 
+                User list from :func:`~pymaid.get_user_list`. If you 
                 already have it, pass it along to save time.   
 
     """
