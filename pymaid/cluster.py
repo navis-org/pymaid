@@ -45,7 +45,9 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['adjacency_matrix','cluster_by_connectivity','cluster_by_synapse_placement','cluster_xyz','group_matrix']
+__all__ = sorted([  'adjacency_matrix','cluster_by_connectivity',
+                    'cluster_by_synapse_placement','cluster_xyz',
+                    'group_matrix'])
 
 
 def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
@@ -56,12 +58,14 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     ----------
     n_a           
                         Source neurons as single or list of either:
+
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     n_b                 optional
                         Target neurons as single or list of either:
+
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
@@ -80,11 +84,12 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     Returns
     -------
-    matrix :          pandas.Dataframe
+    matrix :          ``pandas.Dataframe``
 
     Examples
     --------
     Generate and plot a adjacency matrix
+
     >>> import seaborn as sns
     >>> import matplotlib.pyplot as plt
     >>> import pymaid
@@ -115,8 +120,13 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     neuronsA = pymaid.eval_skids(n_a, remote_instance=remote_instance)
     neuronsB = pymaid.eval_skids(n_b, remote_instance=remote_instance)
 
+    if not isinstance(neuronsA, list):
+        neuronsA = [neuronsA]
+    if not isinstance(neuronsB, list):
+        neuronsB = [neuronsB]
+
     # Make sure neurons are strings, not integers
-    neurons = list(set([str(n) for n in list(set(neuronsA + neuronsB))]))
+    neurons = list(set([str(n) for n in (neuronsA + neuronsB)]))
     neuronsA = [str(n) for n in neuronsA]
     neuronsB = [str(n) for n in neuronsB]
 
@@ -186,6 +196,8 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
             matrix.loc[ nA, nB ] = e
 
     module_logger.info('Finished!')
+
+    matrix.datatype = 'adjacency_matrix'
 
     return matrix
 
@@ -264,7 +276,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
     return new_mat
 
 
-def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True, threshold=1, include_skids=[], exclude_skids=[], min_nodes=2, similarity='vertex_normalized'):
+def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True, 
+                            threshold=1, include_skids=[], exclude_skids=[], min_nodes=2, 
+                            similarity='vertex_normalized', connectivity_table=None):
     """ Wrapper to calculate connectivity similarity and creates a distance
     matrix for a set of neurons. 
 
@@ -272,6 +286,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     ----------
     x
                          Neurons as single or list of either:
+
                          1. skeleton IDs (int or str)
                          2. neuron name (str, exact match)
                          3. annotation: e.g. 'annotation:PN right'
@@ -298,7 +313,11 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                          calculating similarity score
     exclude_skids :      {see x}, optional
                          Neurons to exclude from calculation of connectivity
-                         similarity  
+                         similarity
+    connectivity_table : pd.DataFrame, optional
+                         Connectivity table, e.g. from 
+                         :func:`~pymaid.pymaid.get_partners`. Filters still 
+                         apply!
 
     Returns
     -------
@@ -344,9 +363,13 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     if downstream is True:
         directions.append('downstream')    
 
-    # Retrieve connectivity and apply filters
-    connectivity = pymaid.get_partners(
-        neurons, remote_instance, min_size=min_nodes, threshold=threshold)
+    if isinstance(connectivity_table, type(None)):
+        # Retrieve connectivity and apply filters
+        connectivity = pymaid.get_partners(
+            neurons, remote_instance, min_size=min_nodes, threshold=threshold)
+    else:
+        connectivity = connectivity_table[ ( connectivity_table.num_nodes >= min_nodes ) & 
+                                           ( connectivity_table.total >= threshold ) ]
 
     # Filter direction
     # connectivity = connectivity[ connectivity.relation.isin(directions) ]
@@ -414,7 +437,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     # To compensate, the ratio of upstream to downstream partners (after applying filters!) is considered!
     # Ratio is applied to neuronA of A-B comparison -> will be reversed at B-A
     # comparison
-    module_logger.info('Calculating average scores')
+    module_logger.info('Finalizing scores')
     dist_matrix = pd.DataFrame(
         np.zeros((len(neurons), len(neurons))), index=neurons, columns=neurons)
     for neuronA in neurons:
@@ -683,6 +706,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
     ----------
     x
                         Neurons as single or list of either:
+
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
@@ -702,7 +726,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
 
     Returns
     -------
-    :class:`pymaid.cluster.clust_results'
+    :class:`~pymaid.cluster.clust_results`
                 Class that contains distance matrix and methods to plot 
                 dendrograms.
     """         
@@ -748,7 +772,7 @@ def cluster_xyz(x, labels=None):
     Parameters
     ----------
     x :             pandas.DataFrame
-                    Must contain x,y,z columns
+                    Must contain ``x``,``y``,``z`` columns
     labels :        list of str, optional
                     Labels for each leaf of the dendrogram
                     (e.g. connector ids).
@@ -845,6 +869,10 @@ class clust_results:
             return self.linkage
         elif key in ['leafs', 'leaves']:
             return self.get_leafs()
+        elif key == 'cophenet':
+             return self.calc_cophenet()
+        elif key == 'agg_coeff':
+            return self.calc_agg_coeff()
 
     def get_leafs(self, use_labels=False):
         """ Use to retrieve labels.
@@ -863,8 +891,43 @@ class clust_results:
             else:
                 return [self.mat.columns.tolist()[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
         else:
-            return scipy.cluster.hierarchy.leaves_list(self.linkage)
+            return scipy.cluster.hierarchy.leaves_list(self.linkage)    
 
+    def calc_cophenet(self):
+        """ Returns Cophenetic Correlation coefficient of your clustering.
+        This (very very briefly) compares (correlates) the actual pairwise 
+        distances of all your samples to those implied by the hierarchical 
+        clustering. The closer the value is to 1, the better the clustering 
+        preserves the original distances,
+        """        
+
+        return scipy.cluster.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
+
+    def calc_agg_coeff(self):
+        """ Returns the agglomerative coefficient, measuring the clustering
+        structure of the linkage matrix. Because it grows with the number of 
+        observations, this measure should not be used to compare datasets of 
+        very different sizes.
+
+        For each observation i, denote by m(i) its dissimilarity to the first 
+        cluster it is merged with, divided by the dissimilarity of the merger 
+        in the final step of the algorithm. The agglomerative coefficient is 
+        the average of all 1 - m(i).
+        """
+
+        # Turn into pandas DataFrame for fancy indexing
+        Z = pd.DataFrame(self.linkage, columns = ['obs1','obs2','dist','n_org'] )
+
+        # Get all distances at which an original observation is merged 
+        all_dist = Z[ ( Z.obs1.isin(self.leafs) ) | (Z.obs2.isin(self.leafs) ) ].dist.values
+
+        # Divide all distances by last merger
+        all_dist /= self.linkage[-1][2]
+
+        # Calc final coefficient
+        coeff = np.mean( 1 - all_dist )
+
+        return coeff
 
     def cluster(self, method='average'):
         """ Cluster distance matrix. This will automatically be called when
@@ -878,10 +941,16 @@ class clust_results:
         """
 
         # First, convert similarity matrix to distance matrix
-        if self.mat_type != 'distance':
-            self.dist_mat = ( self.mat.as_matrix() - self.mat.max().max() ) * -1
+        if self.mat_type != 'distance':            
+            if isinstance( self.mat, pd.DataFrame ):                
+                self.dist_mat = ( self.mat.as_matrix() - self.mat.max().max() ) * -1
+            else:
+                self.dist_mat = ( self.mat - self.mat.max() ) * -1
         else:
-            self.dist_mat = self.mat.as_matrix()
+            if isinstance( self.mat, pd.DataFrame ):
+                self.dist_mat = self.mat.as_matrix()
+            else:
+                self.dist_mat = self.mat
 
         # Second, convert into condensed distance matrix - otherwise clustering
         # thinks we are passing observations instead of final scores
@@ -894,7 +963,7 @@ class clust_results:
 
         module_logger.info('Clustering done using method "{0}"'.format(method) )
 
-    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None):
+    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None, *kwargs):
         """ Plot dendrogram using matplotlib.
 
         Parameters
@@ -905,7 +974,9 @@ class clust_results:
                             If True, dendrogram object is returned
         labels :            list of str, dict
                             Labels in order of original observation or
-                            dictionary with mapping original labels 
+                            dictionary with mapping original labels
+        kwargs             
+                            Passed to `scipy.cluster.hierarchy.dendrogram()`
         """
 
         if not labels:
@@ -919,7 +990,8 @@ class clust_results:
         dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
                                           color_threshold=color_threshold,
                                           labels=labels,
-                                          leaf_rotation=90)
+                                          leaf_rotation=90,
+                                          *kwargs)
         plt.tight_layout()
         module_logger.info(
             'Use matplotlib.pyplot.show() to render dendrogram.')
@@ -1023,10 +1095,9 @@ class clust_results:
         Parameters
         ----------
         k :         {int, float}
-        criterion : str, optional
-                    Either 'maxclust' or 'distance'. If maxclust, k clusters
-                    will be formed. If distance, clusters will be created at
-                    threshold k.
+        criterion : {'maxclust','distance'}, optional
+                    If `maxclust`, `k` clusters will be formed. If `distance`, 
+                    clusters will be created at threshold `k`.
         **kwargs
                 will be passed to plot.plot3d() 
                 see help(plot.plot3d) for a list of keywords      
@@ -1057,10 +1128,9 @@ class clust_results:
         fname :     str, optional
                     Filename to save selection to
         k :         {int, float}
-        criterion : str, optional
-                    Either 'maxclust' or 'distance'. If maxclust, k clusters
-                    will be formed. If distance, clusters will be created at
-                    threshold k.   
+        criterion : {'maxclust','distance'}, optional
+                    If `maxclust`, `k` clusters will be formed. If `distance`, 
+                    clusters will be created at threshold `k`.
 
         See Also
         --------
@@ -1091,10 +1161,9 @@ class clust_results:
         Parameters
         ----------
         k :         {int, float}
-        criterion : str, optional
-                    Either 'maxclust' or 'distance'. If maxclust, k clusters
-                    will be formed. If distance, clusters will be created at
-                    threshold k.  
+        criterion : {'maxclust','distance'}, optional
+                    If `maxclust`, `k` clusters will be formed. If `distance`, 
+                    clusters will be created at threshold `k`.
         
         Returns
         -------
@@ -1117,10 +1186,9 @@ class clust_results:
         Parameters
         ----------
         k :             {int, float}
-        criterion :     str, optional
-                        Either 'maxclust' or 'distance'. If maxclust, k 
-                        clusters will be formed. If distance, clusters will be 
-                        created at threshold k.
+        criterion :     {'maxclust','distance'}, optional
+                        If `maxclust`, `k` clusters will be formed. If 
+                        `distance`, clusters will be created at threshold `k`.
         return_type :   {'labels','indices','columns','rows'}
                         Determines what to construct the clusters of. 'labels'
                         only works if labels are provided. 'indices' refers
