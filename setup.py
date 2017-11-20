@@ -48,7 +48,7 @@ setup(
         "numpy>=1.12.1",
         "matplotlib>=2.0.0",
         "plotly>=2.0.6",
-        "pandas>=0.18.1",        
+        "pandas>=0.20.1",        
         "vispy>=0.4.0",
         "tqdm>=4.14.0",
         "pyqt5",
