@@ -51,12 +51,12 @@ try:
 except:
     module_logger.warning("Module pyoctree not found. Falling back to scipy's ConvexHull for intersection calculations.")
 
-__all__ = [ 'calc_cable','calc_strahler_index','classify_nodes','cut_neuron',
+__all__ = sorted([ 'calc_cable','calc_strahler_index','classify_nodes','cut_neuron',
             'downsample_neuron','in_volume','longest_neurite',
             'prune_by_strahler','reroot_neuron','synapse_root_distances',
             'cable_within_distance','stitch_neurons','arbor_confidence',
             'split_axon_dendrite', 'distal_to', 'calc_bending_flow', 'calc_flow_centrality',
-            'calc_segregation_index' ]
+            'calc_segregation_index', 'filter_connectivity' ])
 
 def generate_list_of_childs(skdata):
     """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -64,7 +64,7 @@ def generate_list_of_childs(skdata):
     Parameters
     ----------
     skdata :   {CatmaidNeuron,CatmaidNeuronList} 
-               Must contain a SINGLE neuron
+               Must contain a SINGLE neuron.
 
     Returns
     -------
@@ -78,7 +78,7 @@ def generate_list_of_childs(skdata):
         nodes = skdata.nodes
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            nodes = skdata.ix[0].nodes
+            nodes = skdata.loc[0].nodes
         else:
             module_logger.error('Please pass a SINGLE neuron.')
             raise Exception('Please pass a SINGLE neuron.')
@@ -104,13 +104,13 @@ def classify_nodes(skdata, inplace=True):
                 Neuron(s) to classify nodes for.
     inplace :   bool, optional 
                 If False, nodes will be classified on a copy which is then 
-                returned
+                returned.
 
     Returns
     -------
     skdata 
-               Only if inplace=False. Added columns 'type' and 'has_connectors'
-               to skdata.nodes
+               Only if ``inplace=False``. Added columns 'type' and 
+               'has_connectors' to skdata.nodes.
 
     """
 
@@ -122,7 +122,7 @@ def classify_nodes(skdata, inplace=True):
     # If more than one neuron
     if isinstance(skdata, (pd.DataFrame, core.CatmaidNeuronList)):
         for i in trange(skdata.shape[0], 'Classifying'):
-            classify_nodes(skdata.ix[i], inplace=True)
+            classify_nodes(skdata.loc[i], inplace=True)
     elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         list_of_childs = generate_list_of_childs(skdata)
         
@@ -159,18 +159,18 @@ def _generate_slabs(x, append=True):
     Parameters
     ----------
     x :         {CatmaidNeuron,CatmaidNeuronList} 
-                May contain multiple neurons
+                May contain multiple neurons.
     append :    bool, optional 
-                If true slabs will be appended to neuron
+                If true slabs will be appended to neuron.
 
     Returns
     -------
     list      
-                Slabs as list of lists containing treenode ids
+                Slabs as list of lists containing treenode ids.
     """
 
     if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
-        return [_generate_slabs(x.ix[i], append=append) for i in range(x.shape[0])]
+        return [_generate_slabs(x.loc[i], append=append) for i in range(x.shape[0])]
     elif isinstance(x, pd.Series):
         if x.igraph is None:
             x.igraph = igraph_catmaid.neuron2graph(x)
@@ -230,9 +230,9 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     Parameters
     ----------
     skdata :                 {CatmaidNeuron,CatmaidNeuronList} 
-                             Neuron(s) to downsample
+                             Neuron(s) to downsample.
     resampling_factor :      int 
-                             Factor by which to reduce the node count
+                             Factor by which to reduce the node count.
     inplace :                bool, optional   
                              If True, will modify original neuron. If False, a 
                              downsampled copy is returned.
@@ -249,9 +249,9 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     """
 
     if isinstance(skdata, pd.DataFrame):
-        return pd.DataFrame([downsample_neuron(skdata.ix[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
+        return pd.DataFrame([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
     elif isinstance(skdata, core.CatmaidNeuronList):
-        return core.CatmaidNeuronList([downsample_neuron(skdata.ix[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
+        return core.CatmaidNeuronList([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
     elif isinstance(skdata, pd.Series):
         if not inplace:
             df = skdata.copy()
@@ -348,14 +348,14 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
         return df
 
 
-def longest_neurite(skdata, reroot_to_soma=False, inplace=False):
+def longest_neurite(x, reroot_to_soma=False, inplace=False):
     """ Returns a neuron consisting only of the longest neurite (based on 
     geodesic distance).
 
     Parameters
     ----------
-    skdata :            {CatmaidNeuron,CatmaidNeuronList} 
-                        May contain multiple neurons
+    x :                 {CatmaidNeuron,CatmaidNeuronList} 
+                        May contain multiple neurons.
     reroot_to_soma :    bool, optional
                         If True, neuron will be rerooted to soma. Soma is the 
                         node with >1000 radius.
@@ -369,56 +369,54 @@ def longest_neurite(skdata, reroot_to_soma=False, inplace=False):
                    Contains only node data of the longest neurite
     """
 
-    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
-        df = skdata
-    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        if skdata.shape[0] == 1:
-            df = skdata.ix[0]
+    if isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
+        x = x
+    elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
+        if x.shape[0] == 1:
+            x = x.loc[0]
         else:
             module_logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
+                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception
 
     if not inplace:
-        df = df.copy()
+        x = x.copy()
 
-    if reroot_to_soma:
-        soma = df.nodes[df.nodes.radius > 1000].reset_index()
-        if soma.shape[0] != 1:
-            module_logger.error(
-                'Unable to reroot: None or multiple soma found for neuron %s ' % df.neuron_name)
-            raise Exception
-        if soma.ix[0].parent_id != None:
-            df = reroot_neuron(df, soma.ix[0].treenode_id)
+    if reroot_to_soma and x.soma:
+        x.reroot( x.soma )       
 
     #First collect leafs and root
-    leaf_nodes = df.nodes[df.nodes.type=='end'].treenode_id.tolist()
-    root_nodes = df.nodes[df.nodes.type=='root'].treenode_id.tolist()
+    leaf_nodes = x.nodes[x.nodes.type=='end'].treenode_id.tolist()
+    root_nodes = x.nodes[x.nodes.type=='root'].treenode_id.tolist()
 
     #Convert to igraph vertex indices
-    leaf_ix = [ v.index for v in df.igraph.vs if v['node_id'] in leaf_nodes ]
-    root_ix = [ v.index for v in df.igraph.vs if v['node_id'] in root_nodes ]
+    leaf_ix = [ v.index for v in x.igraph.vs if v['node_id'] in leaf_nodes ]
+    root_ix = [ v.index for v in x.igraph.vs if v['node_id'] in root_nodes ]
 
     #Now get paths from all tips to the root
-    paths = df.igraph.get_shortest_paths( root_ix[0], leaf_ix, mode='ALL' )
+    paths = x.igraph.get_shortest_paths( root_ix[0], leaf_ix, mode='ALL' )
 
     #Translate indices back into treenode ids
-    paths_tn = [ [ df.igraph.vs[i]['node_id'] for i in p ] for p in paths ]    
+    paths_tn = [ [ x.igraph.vs[i]['node_id'] for i in p ] for p in paths ]    
 
     #Generate DataFrame with all the info
-    path_df = pd.DataFrame( [ [p, df.nodes.set_index('treenode_id').ix[p].reset_index() ] for p in paths_tn ],
+    path_df = pd.DataFrame( [ [p, x.nodes.set_index('treenode_id').loc[p].reset_index() ] for p in paths_tn ],
                             columns=['path','nodes']  )
 
     #Now calculate cable of each of the paths
-    path_df['cable'] = [ calc_cable(path_df.ix[i], return_skdata=False, smoothing=1) for i in range(path_df.shape[0])]    
+    path_df['cable'] = [ calc_cable(path_df.loc[i], return_skdata=False, smoothing=1) for i in range(path_df.shape[0])]    
 
-    tn_to_preverse = path_df.sort_values('cable', ascending=False).reset_index().ix[0].path
+    tn_to_preverse = path_df.sort_values('cable', ascending=False).reset_index().loc[0].path
     
-    df.nodes = df.nodes[df.nodes.treenode_id.isin(
+    x.nodes = x.nodes[x.nodes.treenode_id.isin(
         tn_to_preverse)].reset_index(drop=True)
 
+    # Reset indices of node and connector tables (important for igraph!)
+    x.nodes.reset_index(inplace=True,drop=True)
+    x.connectors.reset_index(inplace=True,drop=True)
+
     if not inplace:
-        return df
+        return x
 
 
 def reroot_neuron(skdata, new_root, g=None, inplace=False):
@@ -427,16 +425,21 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     Parameters
     ----------
     skdata :   {CatmaidNeuron, CatmaidNeuronList} 
-               Must contain a SINGLE neuron
+               Must contain a SINGLE neuron.
     new_root : {int, str}
-               Node ID or tag of the node to reroot to 
+               Node ID or tag of the node to reroot to.
     inplace :  bool, optional
-               If True the input neuron will be rerooted. Default = False 
+               If True the input neuron will be rerooted.
 
     Returns
     -------
     pandas.Series or CatmaidNeuron object
-               Containing the rerooted neuron
+               Containing the rerooted neuron.
+
+    See Also
+    --------
+    :func:`~pymaid.core.CatmaidNeuron.reroot`
+                Quick access to reroot directly from CatmaidNeuron/List objects
     """
 
     if new_root == None:
@@ -446,7 +449,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
         df = skdata
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            df = skdata.ix[0]
+            df = skdata.loc[0]
         else:
             module_logger.error(
                 '#%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
@@ -473,7 +476,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
         else:
             new_root = df.tags[new_root][0]
 
-    if df.nodes.set_index('treenode_id').ix[new_root].parent_id == None:
+    if df.nodes.set_index('treenode_id').loc[new_root].parent_id == None:
         module_logger.info('New root == old root! No need to reroot.')
         if not inplace:
             return df
@@ -519,9 +522,9 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
 
     # We need to make sure that the current root node is not a leaf node itself.
     # If it is, we have to add it too:
-    old_root = df.nodes.set_index('parent_id').ix[None].treenode_id
+    old_root = df.nodes.set_index('parent_id').loc[None, 'treenode_id']
     if df.nodes[df.nodes.parent_id==old_root].shape[0] < 2:
-        leaf_nodes.append( old_root )     
+        leaf_nodes.append( old_root )
 
     leaf_indices = [v.index for v in g.vs if v['node_id'] in leaf_nodes]
 
@@ -575,16 +578,16 @@ def cut_neuron(skdata, cut_node, g=None):
     Parameters
     ----------
     skdata :   {CatmaidNeuron, CatmaidNeuronList} 
-               Must contain a SINGLE neuron
+               Must be a single neuron.
     cut_node : {int, str}
-               Node ID or a tag of the node to cut   
+               Node ID or a tag of the node to cut. 
 
     Returns
     -------
     neuron_dist 
-                Part of the neuron distal to the cut
+                Part of the neuron distal to the cut.
     neuron_prox 
-                Part of the neuron proximal to the cut
+                Part of the neuron proximal to the cut.
 
     Examples
     --------
@@ -596,6 +599,12 @@ def cut_neuron(skdata, cut_node, g=None):
     >>> nA, nB = cut_neuron2( skeleton_data, cut_node1 )
     >>> # Second cut
     >>> nD, nE = cut_neuron2( nA, cut_node2 )  
+
+    See Also
+    --------
+    :func:`~pymaid.core.CatmaidNeuron.prune_distal_to`
+    :func:`~pymaid.core.CatmaidNeuron.prune_proximal_to`
+
     """
     start_time = time.time()
 
@@ -605,7 +614,7 @@ def cut_neuron(skdata, cut_node, g=None):
         df = skdata.copy()
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            df = skdata.ix[0].copy()
+            df = skdata.loc[0].copy()
         else:
             module_logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
@@ -696,7 +705,7 @@ def cut_neuron(skdata, cut_node, g=None):
     neuron_dist = pd.DataFrame([[
         df.neuron_name + '_dist',
         df.skeleton_id,
-        df.nodes.ix[dist_partition_ids],
+        df.nodes.loc[dist_partition_ids],
         df.connectors[
             [c.treenode_id in dist_partition_ids for c in df.connectors.itertuples()]].reset_index(),
         df.tags,
@@ -705,14 +714,14 @@ def cut_neuron(skdata, cut_node, g=None):
         columns=['neuron_name', 'skeleton_id',
                  'nodes', 'connectors', 'tags', 'igraph'],
         dtype=object
-    ).ix[0]
+    ).loc[0]
 
     neuron_dist.nodes.loc[cut_node, 'parent_id'] = None
 
     neuron_prox = pd.DataFrame([[
         df.neuron_name + '_prox',
         df.skeleton_id,
-        df.nodes.ix[prox_partition_ids],
+        df.nodes.loc[prox_partition_ids],
         df.connectors[
             [c.treenode_id not in dist_partition_ids for c in df.connectors.itertuples()]].reset_index(),
         df.tags,
@@ -721,14 +730,14 @@ def cut_neuron(skdata, cut_node, g=None):
         columns=['neuron_name', 'skeleton_id',
                  'nodes', 'connectors', 'tags', 'igraph'],
         dtype=object
-    ).ix[0]
+    ).loc[0]
 
     # Reclassify cut node in distal as 'root' and its parent in proximal as
     # 'end' (unless cut was made at the root node)
     if 'type' in df.nodes:
         neuron_dist.nodes.loc[cut_node, 'type'] = 'root'
         if cut_node != df.nodes[df.nodes.parent_id.isnull()].index[0]:
-            neuron_prox.nodes.loc[df.nodes.ix[cut_node].parent_id, 'type'] = 'end'
+            neuron_prox.nodes.loc[df.nodes.loc[cut_node,'parent_id'], 'type'] = 'end'
         else:            
             neuron_prox.nodes = pd.concat( [ neuron_prox.nodes, neuron_dist.nodes.loc[ [cut_node] ] ] )
 
@@ -771,16 +780,16 @@ def _cut_neuron(skdata, cut_node):
     Parameters
     ----------
     skdata :   {CatmaidNeuron, CatmaidNeuronList} 
-               Must contain a SINGLE neuron
+               Must contain a SINGLE neuron.
     cut_node : {int, str}    
-               Node ID or a tag of the node to cut
+               Node ID or a tag of the node to cut.
 
     Returns
     -------
     neuron_dist
-               Neuron object distal to the cut
+               Neuron object distal to the cut.
     neuron_prox
-               Neuron object proximal to the cut
+               Neuron object proximal to the cut.
     """
     start_time = time.time()
 
@@ -790,7 +799,7 @@ def _cut_neuron(skdata, cut_node):
         df = skdata.copy()
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            df = skdata.ix[0].copy()
+            df = skdata.loc[0].copy()
         else:
             module_logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
@@ -872,32 +881,32 @@ def _cut_neuron(skdata, cut_node):
     neuron_dist = pd.DataFrame([[
         df.neuron_name + '_dist',
         df.skeleton_id,
-        df.nodes.ix[distal_nodes],
+        df.nodes.loc[distal_nodes],
         df.connectors[
             [c.treenode_id in distal_nodes for c in df.connectors.itertuples()]].reset_index(),
         df.tags
     ]],
         columns=['neuron_name', 'skeleton_id', 'nodes', 'connectors', 'tags'],
         dtype=object
-    ).ix[0]
+    ).loc[0]
 
-    neuron_dist.nodes.ix[cut_node].parent_id = None
-    neuron_dist.nodes.ix[cut_node].type = 'root'
+    neuron_dist.nodes.loc[cut_node,'parent_id'] = None
+    neuron_dist.nodes.loc[cut_node,'type'] = 'root'
 
     neuron_prox = pd.DataFrame([[
         df.neuron_name + '_prox',
         df.skeleton_id,
-        df.nodes.ix[proximal_nodes],
+        df.nodes.loc[proximal_nodes],
         df.connectors[
             [c.treenode_id not in distal_nodes for c in df.connectors.itertuples()]].reset_index(),
         df.tags
     ]],
         columns=['neuron_name', 'skeleton_id', 'nodes', 'connectors', 'tags'],
         dtype=object
-    ).ix[0]
+    ).loc[0]
 
     # Reclassify cut node in proximal neuron as end node
-    neuron_prox.nodes.ix[cut_node].type = 'end'
+    neuron_prox.nodes.loc[cut_node,'type'] = 'end'
 
     # Now reindex dataframes
     neuron_dist.nodes.reset_index(inplace=True)
@@ -921,7 +930,7 @@ def synapse_root_distances(skdata, pre_skid_filter=[], post_skid_filter=[], remo
     Parameters
     ----------  
     skdata :            {CatmaidNeuron, CatmaidNeuronList} 
-                        Must contain a SINGLE neuron
+                        Must contain a SINGLE neuron.
     pre_skid_filter :   list of int, optional
                         If provided, only synapses from these neurons will be 
                         processed.
@@ -956,7 +965,7 @@ def synapse_root_distances(skdata, pre_skid_filter=[], post_skid_filter=[], remo
         df = skdata
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            df = skdata.ix[0]
+            df = skdata.loc[0]
         else:
             module_logger.error(
                 '%i neurons provided. Currently, only a single neuron is supported!' % skdata.shape[0])
@@ -969,7 +978,7 @@ def synapse_root_distances(skdata, pre_skid_filter=[], post_skid_filter=[], remo
 
     # Calculate distance to parent for each node
     tn_coords = skdata.nodes[['x', 'y', 'z']].reset_index()
-    parent_coords = skdata.nodes.ix[skdata.nodes.parent_id.tolist()][
+    parent_coords = skdata.nodes.loc[skdata.nodes.parent_id.tolist(),
         ['x', 'y', 'z']].reset_index()
     w = np.sqrt(np.sum(
         (tn_coords[['x', 'y', 'z']] - parent_coords[['x', 'y', 'z']]) ** 2, axis=1)).tolist()
@@ -1037,7 +1046,7 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
 
     Returns
     -------
-    Adds "arbor_confidence" column in neuron.nodes.
+    Adds ``arbor_confidence`` column in neuron.nodes.
     """
 
     def walk_to_leafs( this_node, this_confidence=1 ):
@@ -1075,7 +1084,7 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
     x.nodes.set_index('treenode_id', inplace=True, drop=True)
     x.nodes.loc[root,'arbor_confidence'] = 1
 
-    with tqdm(total=len(x.slabs),desc='Calc confidence' ) as pbar:
+    with tqdm(total=len(x.slabs),desc='Calc confidence', disable=module_logger.getEffectiveLevel()>=40 ) as pbar:
         for c in loc[root]:
             walk_to_leafs(c)
 
@@ -1095,10 +1104,10 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
     ----------
     skdata :            {int, str, CatmaidNeuron, CatmaidNeuronList}       
                         If skeleton ID (str or in), 3D skeleton data will be 
-                        pulled from CATMAID server
+                        pulled from CATMAID server.
     smoothing :         int, optional
                         Use to smooth neuron by downsampling. 
-                        Default = 1 (no smoothing)                  
+                        Default = 1 (no smoothing) .                 
     remote_instance :   CATMAID instance, optional
                         Pass if skdata is a skeleton ID.
     return_skdata :     bool, optional
@@ -1112,7 +1121,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     skdata      
                 If return_skdata = True. Neuron object with 
-                ``nodes.parent_dist`` containing the distances to parent
+                ``nodes.parent_dist`` containing the distances to parent.
     """
 
     if remote_instance is None:
@@ -1122,22 +1131,30 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
             remote_instance = globals()['remote_instance']
 
     if isinstance(skdata, int) or isinstance(skdata, str):
-        skdata = pymaid.get_neuron([skdata], remote_instance).ix[0]
+        skdata = pymaid.get_neuron([skdata], remote_instance).loc[0]
 
     if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            df = skdata.ix[0]
+            df = skdata.loc[0]
         elif not return_skdata:
-            return sum([calc_cable(skdata.ix[i]) for i in range(skdata.shape[0])])
+            return sum([calc_cable(skdata.loc[i]) for i in range(skdata.shape[0])])
         else:
-            return core.CatmaidNeuronList([calc_cable(skdata.ix[i], return_skdata=return_skdata) for i in range(skdata.shape[0])])
+            return core.CatmaidNeuronList([calc_cable(skdata.loc[i], return_skdata=return_skdata) for i in range(skdata.shape[0])])
     else:
         raise Exception('Unable to interpret data of type', type(skdata))
 
     # Copy node data too
     df.nodes = df.nodes.copy()
+
+    # Catch single-node neurons
+    if df.nodes.shape[0] == 1:
+        if return_skdata:
+            df.nodes['parent_dist'] = 0
+            return df
+        else:
+            return 0
 
     if smoothing > 1:
         df = downsample_neuron(df, smoothing)
@@ -1147,7 +1164,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     # Calculate distance to parent for each node
     tn_coords = df.nodes[['x', 'y', 'z']].reset_index()
-    parent_coords = df.nodes.ix[[n for n in df.nodes.parent_id.tolist()]][
+    parent_coords = df.nodes.loc[[n for n in df.nodes.parent_id.tolist()],
         ['x', 'y', 'z']].reset_index()
 
     # Calculate distances between nodes and their parents
@@ -1182,6 +1199,9 @@ def cable_within_distance(a, b, increment=1 ):
     Returns
     -------
     pandas.DataFrame
+            Dataframe in which each row represents a distance.
+
+            >>> df
             within_distance[um]   percent_cable   total_cable[um]
                 1                    5               12              
                 2                    15              36
@@ -1229,7 +1249,7 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
     Parameters
     ----------
     skdata :      {CatmaidNeuron, CatmaidNeuronList}       
-                  E.g. from  ``pymaid.pymaid.get_neuron()``
+                  E.g. from  ``pymaid.pymaid.get_neuron()``.
     inplace :     bool, optional
                   If False, a copy of original skdata is returned.
     method :      {'standard','greedy'}, optional
@@ -1253,11 +1273,11 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
         df = skdata
     elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         if skdata.shape[0] == 1:
-            df = skdata.ix[0]
+            df = skdata.loc[0]
         else:
             res = []
             for i in trange(0, skdata.shape[0] ):
-                res.append(  calc_strahler_index(skdata.ix[i], inplace=inplace, method=method ) ) 
+                res.append(  calc_strahler_index(skdata.loc[i], inplace=inplace, method=method ) ) 
 
             if not inplace:
                 return core.CatmaidNeuronList( res )
@@ -1325,7 +1345,7 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
             spine = [this_node]
 
             #parent_node = list_of_parents [ this_node ]
-            parent_node = df.nodes.ix[this_node].parent_id
+            parent_node = df.nodes.loc[this_node,'parent_id']
 
             while parent_node not in branch_nodes and parent_node != None:
                 this_node = parent_node
@@ -1336,7 +1356,7 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
 
                 # Find next parent
                 try:
-                    parent_node = df.nodes.ix[this_node].parent_id
+                    parent_node = df.nodes.loc[this_node,'parent_id']
                 except:
                     # Will fail if at root (no parent)
                     break
@@ -1380,11 +1400,13 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
     ----------
     x :             {core.CatmaidNeuron, core.CatmaidNeuronList}
     to_prune :      {int, list, range}, optional
-                    Strahler indices to prune. 
-                    1. ``to_prune = 1`` removes all leaf branches
-                    2. ``to_prune = [1,2]`` removes indices 1 and 2
-                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
-                    4. ``to_prune = -1`` removes everything but the highest index       
+                    Strahler indices to prune:
+
+                      (1) ``to_prune=1`` removes all leaf branches
+                      (2) ``to_prune=[1,2]`` removes indices 1 and 2
+                      (3) ``to_prune=range(1,4)`` removes indices 1, 2 and 3  
+                      (4) ``to_prune=s-1`` removes everything but the highest 
+                          index       
     reroot_soma :   bool, optional
                     If True, neuron will be rerooted to its soma
     inplace :       bool, optional
@@ -1449,6 +1471,14 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
                 this_tn = parent_dict[ this_tn ]
             neuron.connectors.loc[cn.Index,'treenode_id'] = this_tn
 
+    # Reset indices of node and connector tables (important for igraph!)
+    neuron.nodes.reset_index(inplace=True,drop=True)
+    neuron.connectors.reset_index(inplace=True,drop=True)
+
+    # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node 
+    # We have to fix the nodes that lost their parents
+    neuron.nodes.loc[ ~neuron.nodes.parent_id.isin( neuron.nodes.treenode_id.tolist() ), 'parent_id' ] = None
+
     # Remove temporary attributes
     neuron._clear_temp_attr()    
 
@@ -1502,7 +1532,7 @@ def _walk_to_root(start_node, list_of_parents, visited_nodes):
     return round(sum(distances_traveled)), visited_nodes
 
 
-def in_volume(x, volume, remote_instance=None, inplace=False, mode='IN'):
+def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     """ Test if points are within a given CATMAID volume.
 
     Important
@@ -1516,14 +1546,12 @@ def in_volume(x, volume, remote_instance=None, inplace=False, mode='IN'):
     ----------
     x :               {list of tuples, CatmaidNeuron, CatmaidNeuronList}
 
-                      1. List/np array -  ``[ ( x, y , z ), [ ... ] ]``
+                      1. List/np array -  ``[ ( x,y,z ), ( ... ) ]``
                       2. DataFrame - needs to have 'x','y','z' columns                      
 
     volume :          {str, list of str, core.Volume} 
                       Name of the CATMAID volume to test OR core.Volume dict
-                      as returned by e.g. :func:`pymaid.pymaid.get_volume()`
-    remote_instance : CATMAID instance, optional
-                      Pass if volume is a volume name
+                      as returned by e.g. :func:`~pymaid.pymaid.get_volume()`    
     inplace :         bool, optional
                       If False, a copy of the original DataFrames/Neuron is 
                       returned. Does only apply to CatmaidNeuron or 
@@ -1532,16 +1560,18 @@ def in_volume(x, volume, remote_instance=None, inplace=False, mode='IN'):
     mode :            {'IN','OUT'}, optional
                       If 'IN', parts of the neuron that are within the volume
                       are kept.
+    remote_instance : CATMAID instance, optional
+                      Pass if volume is a volume name
 
     Returns
     -------
     CatmaidNeuron
-                      If input is CatmaidNeuron or CatmaidNeuronList - will
+                      If input is CatmaidNeuron or CatmaidNeuronList, will
                       return parts of the neuron (nodes and connectors) that
                       are within the volume
     list of bools
-                      If input is list or DataFrame - True if in volume, 
-                      False if not
+                      If input is list or DataFrame, returns boolean: ``True`` 
+                      if in volume, ``False`` if not
     dict
                       If multiple volumes are provided as list of strings, 
                       results will be returned as dict of above returns.
@@ -1592,6 +1622,7 @@ def in_volume(x, volume, remote_instance=None, inplace=False, mode='IN'):
 
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].as_matrix()
+
     elif isinstance(x, core.CatmaidNeuron):
         n = x
 
@@ -1615,6 +1646,15 @@ def in_volume(x, volume, remote_instance=None, inplace=False, mode='IN'):
         # Fix root nodes
         n.nodes.loc[~n.nodes.parent_id.isin(
             n.nodes.treenode_id.tolist() + [None]), 'parent_id'] = None
+
+        # Reset indices of node and connector tables (important for igraph!)
+        n.nodes.reset_index(inplace=True,drop=True)
+        n.connectors.reset_index(inplace=True,drop=True)
+
+        # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node 
+        # We have to fix the nodes that lost their parents
+        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() ), 
+                          'parent_id' ] = None
 
         if not inplace:
             return n
@@ -1668,7 +1708,10 @@ def _in_volume_ray(points, volume):
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # by those that occur "above" the point
     intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
-                         2] >= points[k][2]])for k, ray in enumerate(rayPointList)]
+                         2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList, 
+                                                                           desc='Calc. intersections',
+                                                                           disable=module_logger.getEffectiveLevel()>=40
+                                                                        ))]
 
     # Count odd intersection
     return [i % 2 != 0 for i in intersections]
@@ -1713,7 +1756,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     >>> split = pymaid.split_axon_dendrite(x, method='centrifugal', reroot_soma=True)
     >>> split    
     <class 'pymaid.core.CatmaidNeuronList'> of 3 neurons 
-                          neuron_name skeleton_id  n_nodes  n_connectors  \
+                          neuron_name skeleton_id  n_nodes  n_connectors  
     0  neuron 123457_primary_neurite          16      148             0   
     1             neuron 123457_axon          16     9682          1766   
     2         neuron 123457_dendrite          16     2892           113 
@@ -1764,7 +1807,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
         return cut
 
     # If cut node is a branch point, we will try cutting off main neurite
-    if x.nodes.set_index('treenode_id').ix[ cut ].type =='branch' and primary_neurite:    
+    if x.nodes.set_index('treenode_id').loc[ cut ].type =='branch' and primary_neurite:
         rest, primary_neurite = cut_neuron( x, cut )
         # Change name and color
         primary_neurite.neuron_name = x.neuron_name + '_primary_neurite'
@@ -1783,7 +1826,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
         dendrite, axon = b, a
     
     axon.neuron_name = x.neuron_name + '_axon'
-    dendrite.neuron_name = x.neuron_name + '_dendrite'
+    dendrite.neuron_name = x.neuron_name + '_dendrites'
 
     #Change colors    
     axon.color = (255,0,0)
@@ -2199,44 +2242,53 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
         return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
 
 
-def stitch_neurons( *neurons, tn_to_stitch=None, method='ALL'):
+def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
     """ Function to stich multiple neurons together. The first neuron provided
-    will be the master neuron. Unless treenode_ids are provided, neurons will
-    be stitched at the closest distance (see method parameter).
+    will be the master neuron. Unless treenode IDs are provided via 
+    ``tn_to_stitch``, neurons will be stitched at the closest point.
 
     Parameters
     ----------
-    neurons :           CatmaidNeuron/CatmaidNeuronList
+    x :                 CatmaidNeuron/CatmaidNeuronList
                         Neurons to stitch.
     tn_to_stitch :      List of treenode IDs, optional
                         If provided, these treenodes will be preferentially
                         used to stitch neurons together. If there are more 
                         than two possible treenodes for a single stitching
                         operation, the two closest are used.
-    method :            {'LEAFS','ALL'}, optional
-                        Defines automated stitching mode: if 'LEAFS', only
-                        leaf (including root) nodes will be considered for
-                        stitching. If 'ALL', all treenodes are considered.
+    method :            {'LEAFS','ALL','NONE'}, optional
+                        Defines automated stitching mode.
+                            (1) 'LEAFS': only leaf (including root) nodes will 
+                                be considered for stitching
+                            (2) 'ALL': all treenodes are considered
+                            (3) 'NONE': node and connector tables will simply
+                                be combined. Use this if your neurons consists
+                                of fragments with multiple roots.
 
     Returns
     -------
     core.CatmaidNeuron
     """
 
-    if method not in ['LEAFS', 'ALL']:
+    if method not in ['LEAFS', 'ALL', 'NONE']:
         raise ValueError('Unknown method: %s' % str(method))
 
-    for n in neurons:
+    # Compile list of individual neurons
+    neurons = []
+    for n in x:        
         if not isinstance(n, (core.CatmaidNeuron, core.CatmaidNeuronList) ):
             raise TypeError( 'Unable to stitch non-CatmaidNeuron objects' )
-        elif isinstance( n, (core.CatmaidNeuronList,list) ):
+        elif isinstance(n, core.CatmaidNeuronList):
             neurons += n.neurons
+        else:
+            neurons.append(n)
 
     #Use copies of the original neurons!
     neurons = [ n.copy() for n in neurons if isinstance(n, core.CatmaidNeuron )]
 
     if len(neurons) < 2:
-        raise ValueError('Need at least 2 neurons to stitch, found %i' % len(neurons))
+        module_logger.warning('Need at least 2 neurons to stitch, found %i' % len(neurons))
+        return neurons[0]
 
     module_logger.debug('Stitching %i neurons...' % len(neurons))
 
@@ -2249,8 +2301,8 @@ def stitch_neurons( *neurons, tn_to_stitch=None, method='ALL'):
     for nB in neurons[1:]:
         #First find treenodes to connect
         if tn_to_stitch and set(tn_to_stitch) & set(stitched_n.nodes.treenode_id) and set(tn_to_stitch) & set(nB.nodes.treenode_id):
-            treenodesA = stitched_n.nodes.set_index('treenode_id').ix[ tn_to_stitch ].reset_index()
-            treenodesB = nB.nodes.set_index('treenode_id').ix[ tn_to_stitch ].reset_index()
+            treenodesA = stitched_n.nodes.set_index('treenode_id').loc[ tn_to_stitch ].reset_index()
+            treenodesB = nB.nodes.set_index('treenode_id').loc[ tn_to_stitch ].reset_index()
         elif method == 'LEAFS':
             treenodesA = stitched_n.nodes[ stitched_n.nodes.type.isin(['end','root']) ].reset_index()
             treenodesB = nB.nodes[ nB.nodes.type.isin(['end','root']) ].reset_index()
@@ -2258,22 +2310,23 @@ def stitch_neurons( *neurons, tn_to_stitch=None, method='ALL'):
             treenodesA = stitched_n.nodes
             treenodesB = nB.nodes
 
-        #Calculate pairwise distances
-        pdist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
-                                              treenodesB[['x','y','z']].values, 
-                                              metric='euclidean' )                
+        if method != 'NONE':
+            #Calculate pairwise distances
+            pdist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
+                                                  treenodesB[['x','y','z']].values, 
+                                                  metric='euclidean' )                
 
-        #Get the closest treenodes
-        tnA = treenodesA.ix[ pdist.argmin(axis=0)[0] ].treenode_id
-        tnB = treenodesB.ix[ pdist.argmin(axis=1)[0] ].treenode_id
+            #Get the closest treenodes
+            tnA = treenodesA.loc[ pdist.argmin(axis=0)[0] ].treenode_id
+            tnB = treenodesB.loc[ pdist.argmin(axis=1)[0] ].treenode_id
 
-        module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
+            module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
 
-        #Reroot neuronB onto the node that will be stitched
-        nB.reroot( tnB )
+            #Reroot neuronB onto the node that will be stitched
+            nB.reroot( tnB )
 
-        #Change neuronA root node's parent to treenode of neuron B
-        nB.nodes.loc[ nB.nodes.parent_id.isnull(), 'parent_id' ] = tnA
+            #Change neuronA root node's parent to treenode of neuron B
+            nB.nodes.loc[ nB.nodes.parent_id.isnull(), 'parent_id' ] = tnA
 
         #Add nodes, connectors and tags onto the stitched neuron
         stitched_n.nodes = pd.concat( [ stitched_n.nodes, nB.nodes ], ignore_index=True )
@@ -2290,13 +2343,13 @@ def distal_to(x, a=None, b=None):
 
     Important
     ---------
-    Please note that if a node is not distal to another this does *not* 
+    Please note that if node A is not distal to node B, this does **not** 
     automatically mean it is proximal instead: if nodes are on different 
     branches, they are neither distal nor proximal to one another! To test 
-    for this case run a->b and b->a - if both return False, nodes are on
+    for this case run a->b and b->a - if both return ``False``, nodes are on
     different branches.
 
-    Also: if a and b are the same node, will return True too!
+    Also: if a and b are the same node, this function will return ``True``!
 
     Parameters
     ----------
@@ -2369,5 +2422,150 @@ def distal_to(x, a=None, b=None):
     else:
         # Return boolean
         return df != float('inf')
+
+def filter_connectivity( x, restrict_to, remote_instance=None):
+    """ Filters connectivity data by volume or skeleton data. Use this e.g. to 
+    restrict connectivity to edges within a given volume or to certain 
+    compartments of neurons.
+
+    Important
+    ---------
+    Order of columns/rows may change during filtering.
+
+
+    Parameter
+    ---------
+    x :                 Connectivity
+                        Data to filter. Currently accepts either:
+                         (1) Connectivity table from 
+                                :func:`~pymaid.pymaid.get_partners`
+                         (2) Adjacency matrix from 
+                             :func:`~pymaid.morpho.adjacency_matrix`
+    restrict_to :       {str, pymaid.Volume, pymaid.CatmaidNeuronList}
+                        Volume or neurons to restrict connectivity to. Strings
+                        will be interpreted as volumes.
+    remote_instance :   CATMAID instance, optional
+                        If not passed, will try using globally defined.
+
+    Returns
+    -------
+    Restricted connectivity data
+
+    """     
+
+    if not isinstance( restrict_to, (str, core.Volume, 
+                                          core.CatmaidNeuron, 
+                                          core.CatmaidNeuronList ) ):
+        raise TypeError('Unable to restrict connectivity to type'.format(type(restrict_to)))
+
+    if isinstance(restrict_to, str):
+        restrict_to = pymaid.get_volume( restrict_to, remote_instance = remote_instance )
+
+    datatype = getattr(x, 'datatype', None)
+
+    if datatype not in ['connectivity_table','adjacency_matrix']:
+        raise TypeError('Unknown connectivity data. See help(filter_connectivity) for details.')
+    
+    if datatype == 'connectivity_table':
+        neurons = [ c for c in x.columns if c not in ['neuron_name', 'skeleton_id', 'num_nodes', 'relation', 'total'] ]
+
+        # First get connector between neurons on the table
+        if not x[ x.relation=='upstream' ].empty:    
+            upstream = pymaid.get_connectors_between( x[ x.relation=='upstream' ].skeleton_id,
+                                                      neurons,
+                                                      directional=True,
+                                                      remote_instance=remote_instance )
+            # Now filter connectors
+            if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+                upstream = upstream[ upstream.connector_id.isin( x.connectors ) ]
+            elif isinstance( restrict_to, core.Volume ):
+                upstream = upstream[ in_volume( upstream.connector_loc.values , restrict_to ) ]
+        else:
+            upstream = None                             
+
+        if not x[ x.relation=='downstream' ].empty:
+            downstream = pymaid.get_connectors_between( neurons,
+                                                        x[ x.relation=='downstream'].skeleton_id,
+                                                        directional=True,
+                                                        remote_instance=remote_instance )      
+            # Now filter connectors
+            if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):                
+                downstream = downstream[ downstream.connector_id.isin( x.connectors ) ]
+            elif isinstance( restrict_to, core.Volume ):                
+                downstream = downstream[ in_volume( downstream.connector_loc.values , restrict_to ) ]
+        else:
+            downstream = None
+
+        if not isinstance( downstream, type(None)) and not isinstance( upstream, type(None)):
+            cn_data = pd.concat( [upstream, downstream], axis=0 )
+        elif isinstance( downstream, type(None)):
+            cn_data = upstream
+        else:
+            cn_data = downstream            
+
+    elif datatype == 'adjacency_matrix':
+        cn_data = pymaid.get_connectors_between( x.index.tolist(), 
+                                                 x.columns.tolist(),
+                                                 directional=True,
+                                                 remote_instance=remote_instance )
+
+        # Now filter connectors
+        if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+            cn_data = cn_data[ cn_data.connector_id.isin( x.connectors ) ]            
+        elif isinstance( restrict_to, core.CatmaidNeuron ):
+            cn_data = cn_data[ in_volume( cn_data.connector_loc.values , restrict_to ) ]
+
+    if cn_data.empty:
+        module_logger.warning('No connectivity left after filtering')
+        return
+
+    # Reconstruct connectivity data:    
+    # Collect edges
+    edges = cn_data[['source_neuron','target_neuron']].values
+
+    # Turn individual edges into synaptic connections
+    unique_edges, counts = np.unique( edges, return_counts=True, axis=0 )
+    unique_skids = np.unique(edges).astype(str)
+    unique_edges=unique_edges.astype(str)    
+
+    # Create empty adj_mat
+    adj_mat = pd.DataFrame( np.zeros(( len(unique_skids), len(unique_skids) )),
+                            columns=unique_skids, index=unique_skids )
+
+    # Fill in values
+    for i, e in enumerate(tqdm(unique_edges, disable=module_logger.getEffectiveLevel()>=40, desc='Adj. matrix')):
+        # using df.at here speeds things up tremendously!
+        adj_mat.loc[ str(e[0]), str(e[1]) ] = counts[i]
+
+    if datatype == 'adjacency_matrix':
+        adj_mat.datatype = 'adjacency_matrix'
+        return adj_mat
+
+    # Generate connectivity table by subsetting adjacency matrix to our neurons of interest
+    all_upstream = adj_mat[ adj_mat[ neurons ].sum(axis=1) > 0 ][ neurons ]
+    all_upstream['skeleton_id'] = all_upstream.index
+    all_upstream['relation'] = 'upstream'
+
+    all_downstream = adj_mat.T[ adj_mat.T[ neurons ].sum(axis=1) > 0 ][ neurons ]
+    all_downstream['skeleton_id'] = all_downstream.index
+    all_downstream['relation'] = 'downstream'    
+
+    # Merge tables
+    df = pd.concat( [all_upstream,all_downstream], axis=0, ignore_index=True )
+
+    # Use original connectivity table to populate data
+    aux = x.set_index('skeleton_id')[['neuron_name','num_nodes']].to_dict()    
+    df['num_nodes'] = [ aux['num_nodes'][s] for s in df.skeleton_id.tolist() ]
+    df['neuron_name'] = [ aux['neuron_name'][s] for s in df.skeleton_id.tolist() ]    
+    df['total'] = df[neurons].sum(axis=1)
+
+    # Reorder columns
+    df = df[[ 'neuron_name', 'skeleton_id', 'num_nodes', 'relation','total'] + neurons ]
+
+    df.sort_values(['relation','total'], inplace=True, ascending=False)  
+    df.type = 'connectivity_table'
+    df.reset_index(drop=True, inplace=True)  
+
+    return df
 
 
