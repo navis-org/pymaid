@@ -421,6 +421,10 @@ class CatmaidInstance:
         """ Use to get user history. """
         return self.djangourl("/" + str(self.project_id) + "/stats/user-history")
 
+    def _get_stats_node_count(self):
+        """ Use to get nodecounts per user. """
+        return self.djangourl("/" + str(self.project_id) + "/stats/nodecount")
+
     def _rename_neuron_url(self, neuron_id):
         """ Use to rename a single neuron. Does need postdata."""
         return self.djangourl("/" + str(self.project_id) + "/neurons/" + str(neuron_id) + '/rename')
@@ -3316,6 +3320,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
             reviewed :          DataFrame containing nodes reviewed. 
                                 Rows = users, columns = dates
             user_details :      user-list (see pymaid.get_user_list())
+            node_counts :       Series containing nodes created by user.
             }
 
     Examples
@@ -3427,19 +3432,26 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_treenodes', stats['days']) for u in stats['stats_table']],
                      index=[user_list.ix[u].login for u in stats[
                          'stats_table'].keys()],
-                     columns=[datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']]),
+                     columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_connectors', stats['days']) for u in stats['stats_table']],
                      index=[user_list.ix[u].login for u in stats[
                          'stats_table'].keys()],
-                     columns=[datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']]),
+                     columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_reviewed_nodes', stats['days']) for u in stats['stats_table']],
                      index=[user_list.ix[u].login for u in stats[
                          'stats_table'].keys()],
-                     columns=[datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']]),
+                     columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         user_list.reset_index(drop=True)
     ],
         index=['cable', 'connector_links', 'reviewed', 'user_details']
     )
+
+    # Add node counts
+    nc = remote_instance.fetch( remote_instance._get_stats_node_count() )
+
+    df['node_count'] = pd.Series( data = list (nc.values()),
+                                  index = [ user_list.ix[u].login for u in nc.keys() ] ).sort_values(ascending=False)
+
     return df
 
 
