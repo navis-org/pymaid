@@ -255,11 +255,11 @@ def neuron2graph(skdata, append=True):
 
     # Get list of edges as indices (needs to exclude root node)
     tn_index_with_parent = df.nodes[
-        ~df.nodes.parent_id.isnull()].index.tolist()
-    parent_ids = df.nodes[~df.nodes.parent_id.isnull()].parent_id.tolist()
+        ~df.nodes.parent_id.isnull()].index.values
+    parent_ids = df.nodes[~df.nodes.parent_id.isnull()].parent_id.values
     df.nodes['temp_index'] = df.nodes.index  # add temporary index column
     parent_index = df.nodes.set_index('treenode_id').loc[parent_ids,
-        'temp_index'].values.astype(int).tolist()
+        'temp_index'].values
     # remove temporary column
     df.nodes.drop('temp_index', axis=1, inplace=True)
 
@@ -278,14 +278,16 @@ def neuron2graph(skdata, append=True):
     g.vs['Y'] = df.nodes.y.tolist()
     g.vs['Z'] = df.nodes.z.tolist()
 
+    # Find nodes with synapses and assign the custom property'has_synapse'    
+    # This turned out to be really time consuming
+    #g.vs['has_synapse'] = False
+    #g.vs.select(node_id_in=df.connectors.treenode_id.tolist())['has_synapse'] = True    
 
     # Generate weights by calculating edge lengths = distance between nodes
-    tn_coords = df.nodes.loc[[e[0]
-                             for e in elist]][['x', 'y', 'z']].reset_index()
-    parent_coords = df.nodes.loc[[e[1]
-                                 for e in elist]][['x', 'y', 'z']].reset_index()
-    w = np.sqrt(np.sum(
-        (tn_coords[['x', 'y', 'z']] - parent_coords[['x', 'y', 'z']]) ** 2, axis=1)).tolist()
+    tn_coords = df.nodes.loc[[e[0] for e in elist], ['x', 'y', 'z']].values
+    parent_coords = df.nodes.loc[[e[1] for e in elist], ['x', 'y', 'z']].values
+
+    w = np.sqrt(np.sum((tn_coords - parent_coords) ** 2, axis=1).astype(float)).tolist()
     g.es['weight'] = w
 
     if append:
@@ -338,8 +340,8 @@ def dist_from_root(data, synapses_only=False):
     distance_matrix = g.shortest_paths_dijkstra(mode='All', weights='weight')
 
     if synapses_only:
-        nodes = [(v.index, v['node_id'])
-                 for v in g.vs.select(has_synapse=True)]
+        nodes = [ (v.index, v['node_id']) 
+                 for v in g.vs.select(_node_id_in=data.connectors.treenode_id )]
     else:
         nodes = [(v.index, v['node_id']) for v in g.vs]
 
