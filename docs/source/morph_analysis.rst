@@ -50,6 +50,6 @@ Documentation
 =============
 
 .. automodule:: pymaid
-    :members: arbor_confidence, cable_within_distance, calc_bending_flow, calc_cable, calc_flow_centrality, calc_segregation_index, calc_strahler_index, classify_nodes, cut_neuron, distal_to, downsample_neuron, filter_connectivity, in_volume, longest_neurite, prune_by_strahler, reroot_neuron, split_axon_dendrite, stitch_neurons, synapse_root_distances
+    :members: arbor_confidence, calc_bending_flow, calc_cable, calc_flow_centrality, calc_overlap, calc_segregation_index, calc_strahler_index, classify_nodes, cut_neuron, distal_to, dist_between, downsample_neuron, resample_neuron, filter_connectivity, in_volume, longest_neurite, prune_by_strahler, reroot_neuron, split_axon_dendrite, stitch_neurons, synapse_root_distances
     :undoc-members:
     :show-inheritance:

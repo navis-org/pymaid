@@ -125,8 +125,8 @@ Functions for clustering:
 Functions for morphological analyses:
 
 - :func:`~pymaid.arbor_confidence`: calculates confidence along the arbor
-- :func:`~pymaid.cable_within_distance`: calculate cable between pairs of neurons that is within given distance
 - :func:`~pymaid.calc_cable`: calculate cable length of given neuron
+- :func:`~pymaid.calc_overlap`: calculate cable between pairs of neurons that is within given distance
 - :func:`~pymaid.calc_segregation_index`: calculate segregation index (polarity) based on Schneider-Mizell et al., 2016
 - :func:`~pymaid.calc_strahler_index`: calculate strahler index for each node
 - :func:`~pymaid.calc_bending_flow`: variation of synapse flow centrality
@@ -134,12 +134,14 @@ Functions for morphological analyses:
 - :func:`~pymaid.classify_nodes`: adds a new column to a neuron's dataframe categorizing each node as branch, slab, leaf or root
 - :func:`~pymaid.cut_neuron`: cut neuron at a node or node tag
 - :func:`~pymaid.distal_to`: use this to check spatial relation of nodes within a neuron
+- :func:`~pymaid.dist_between`: geodesic (along the arbor) distance between two treenodes
 - :func:`~pymaid.downsample_neuron`: takes skeleton data and reduces the number of nodes while preserving synapses, branch points, etc.
 - :func:`~pymaid.filter_connectivity`: filter connectivity based on volumes or pruned neurons
 - :func:`~pymaid.in_volume`: test if points are within given CATMAID volume
 - :func:`~pymaid.longest_neurite`: prunes neuron to its longest neurite
 - :func:`~pymaid.prune_by_strahler`: prunes the neuron by strahler index
 - :func:`~pymaid.reroot_neuron`: reroot neuron to a specific node
+- :func:`~pymaid.resample_neuron`: resample neuron to given resolution
 - :func:`~pymaid.split_axon_dendrite`: split neuron into axon, dendrite and primary neurite based on synapse flow centrality
 - :func:`~pymaid.synapse_root_distances`: similar to :func:`pymaid.dist_from_root` but does not use iGraph
 - :func:`~pymaid.stitch_neurons`: stitch neurons back together
