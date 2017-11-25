@@ -278,11 +278,6 @@ def neuron2graph(skdata, append=True):
     g.vs['Y'] = df.nodes.y.tolist()
     g.vs['Z'] = df.nodes.z.tolist()
 
-    # Find nodes with synapses and assign them the custom property
-    # 'has_synapse'
-    nodes_w_synapses = df.connectors.treenode_id.tolist()
-    g.vs['has_synapse'] = [
-        n in nodes_w_synapses for n in df.nodes.treenode_id.tolist()]
 
     # Generate weights by calculating edge lengths = distance between nodes
     tn_coords = df.nodes.loc[[e[0]
