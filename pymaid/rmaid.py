@@ -298,9 +298,10 @@ def neuron2py(neuron, remote_instance=None):
                 neuron_list['name'] = neuron.slots['df'][2]
             else:
                 neuron_list['name'] = ['NA'] * neuron_list.shape[0]
-        elif cl(neuron)[0] == 'catmaidneuron' or cl(neuron)[0] == 'neuron':
+        elif cl(neuron)[0] == 'catmaidneuron' or cl(neuron)[0] == 'neuron':            
             neuron_list = pd.DataFrame(
-                data=[[data2py(e) for e in neuron]], columns=neuron.names)
+                data=[[e for e in neuron]], columns=neuron.names)
+            neuron_list = neuron_list.applymap(data2py)
             neuron_list['name'] = ['NA']
             # neuron_list.columns = neuron.names  #[ 'NumPoints',
             # 'StartPoint','BranchPoints','EndPoints','nTrees', 'NumSeqs',
@@ -320,28 +321,28 @@ def neuron2py(neuron, remote_instance=None):
         module_logger.warning(
             'Neuron has only nodes (no name, skid, connectors or tags).')
 
+
     data = []
-    for i in range(neuron.shape[0]):
-        n = neuron.ix[i]
+    for i in range(neuron.shape[0]):        
         # Note that radius is divided by 2 -> this is because in rcatmaid the
         # original radius is doubled for some reason
         nodes = pd.DataFrame([[no.PointNo, no.Parent, None, no.X, no.Y,
-                               no.Z, no.W / 2, None] for no in n.d.itertuples()], dtype=object)
+                               no.Z, no.W / 2, None] for no in neuron.loc[i,'d'].itertuples()], dtype=object)
         nodes.columns = ['treenode_id', 'parent_id',
                          'creator_id', 'x', 'y', 'z', 'radius', 'confidence']
         nodes.loc[nodes.parent_id == -1, 'parent_id'] = None
 
-        if 'connectors' in n:
+        if 'connectors' in neuron:
             connectors = pd.DataFrame([[cn.treenode_id, cn.connector_id, cn.prepost, cn.x, cn.y, cn.z]
-                                       for cn in n.connectors.itertuples()], dtype=object)
+                                       for cn in neuron.loc[i,'connectors'].itertuples()], dtype=object)
             connectors.columns = ['treenode_id',
                                   'connector_id', 'relation', 'x', 'y', 'z']
         else:
             connectors = pd.DataFrame(
                 columns=['treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'])
 
-        if 'skid' in n:
-            skid = n.skid[0]
+        if 'skid' in neuron:
+            skid = neuron.loc[i,'skid'][0]
         else:
             skid = 'NA'
 
@@ -356,12 +357,17 @@ def neuron2py(neuron, remote_instance=None):
                       )
     df['igraph'] = None
 
-    if 'tags' in n:
+    if 'tags' in neuron:
         df['tags'] = neuron.tags.tolist()
+    else:
+        df['tags'] = [ {} for n in df.skeleton_id.tolist() ]
 
-    if 'skid' in n and neuron_names is not None:
+
+    if 'skid' in neuron and neuron_names is not None:
         df['neuron_name'] = [neuron_names[
             str(n)] for n in df.skeleton_id.tolist()]
+    else:
+        df['neuron_name'] = [ 'NA' for n in df.skeleton_id.tolist() ]
 
     return core.CatmaidNeuronList(df, remote_instance=remote_instance)
 
@@ -424,7 +430,7 @@ def neuron2r(neuron, convert_to_um=False):
 
         return nlist
 
-    elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
+    elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):        
         n = neuron
 
         if convert_to_um:
