@@ -428,9 +428,9 @@ def plot2d(x, *args, **kwargs):
         if not connectors_only:
             # Now make traces
             try:
-                neuron.slabs
+                neuron._generate_segments
             except:
-                neuron.slabs = morpho._generate_slabs(neuron)
+                neuron._generate_segments = morpho._generate_segments(neuron)
 
             lines = _slabs_to_coords(neuron, neuron.slabs, invert=False)
 
@@ -965,7 +965,7 @@ def plot3d(x, *args, **kwargs):
         module_logger.info('Generating traces...')
 
         #Generate slabs for all neurons at once -> uses multi-cores!
-        skdata._generate_slabs()
+        skdata._generate_segments()
 
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
