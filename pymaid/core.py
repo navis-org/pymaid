@@ -114,6 +114,9 @@ class CatmaidNeuron:
     DataFrame (df) containing: df.nodes, df.connectors, df.skeleton_id, 
     df.neuron_name, df.tags
 
+    Using a CatmaidNeuron to initialise a CatmaidNeuron will automatically
+    make a copy.
+
     Parameters
     ----------
     x                   {skeletonID, CatmaidNeuron}
@@ -123,11 +126,6 @@ class CatmaidNeuron:
                         neuron annotations, review status, etc.
     meta_data :         dict, optional
                         any additional data
-    make_copy :         boolean, optional
-                        If true, DataFrames are copied [.copy()] before being 
-                        assigned to the neuron object to prevent 
-                        backpropagation of subsequent changes to the data. 
-                        Default = True
 
 
     Attributes
@@ -140,6 +138,12 @@ class CatmaidNeuron:
                         Contains complete treenode table
     connectors :        ``pandas.DataFrame``
                         Contains complete connector table
+    presynapses :       ``pandas.DataFrame``
+                        All presynaptic connectors
+    postsynapses :      ``pandas.DataFrame``
+                        All postsynaptic connectors
+    gap_junctions :     ``pandas.DataFrame``
+                        All gap junction connectors
     date_retrieved :    ``datetime`` object
                         Timestamp of data retrieval
     tags :              dict
@@ -148,6 +152,8 @@ class CatmaidNeuron:
                         This neuron's annotations
     igraph :            ``iGraph`` object
                         iGraph representation of this neuron
+    dps :               ``pandas.DataFrame``
+                        Dotproduct representation of this neuron.
     review_status :     int
                         This neuron's review status
     n_connectors :      int
@@ -166,7 +172,8 @@ class CatmaidNeuron:
                         'uncertain end', 'soma' or 'uncertain continuation'
     cable_length :      float
                         Cable length in micrometers [um]
-    slabs :             list of treenode IDs
+    segments :          list of treenode IDs
+                        Linear segments of the neuron
     soma :              treenode_id of soma
                         Returns None if no soma or 'NA' if data not available
     root :              treenode_id of root
@@ -195,6 +202,7 @@ class CatmaidNeuron:
     ... [ 'annotation1', 'annotation2' ]
     >>> # Force update of annotations
     >>> n.get_annotations()
+
     """
 
     def __init__(self, x, remote_instance=None, meta_data=None):
@@ -228,49 +236,38 @@ class CatmaidNeuron:
         #Default color is yellow
         self.color = (255, 255, 0)
 
-        if isinstance(x, CatmaidNeuron) or isinstance(x, pd.Series):
-            self.skeleton_id = copy(x.skeleton_id)
-            
-            try:
-                self.color = x.color
-            except:
-                pass
-
-            if 'type' not in x.nodes:
-                morpho.classify_nodes(x)
-
-            self.nodes = x.nodes.copy()
-            self.connectors = x.connectors.copy()
-            
-            self.tags = copy(x.tags)
-
-            # There is no common query for CatmaidNeuron and pd.Series
-            try:
-                self.neuron_name = copy(x.neuron_name)
-            except:
-                pass
-
-            if 'igraph' in x.__dict__:
-                self.igraph = x.igraph.copy()
-
-            if 'slabs' in x.__dict__:
-                self.slabs = x.slabs.copy()
-
-            if isinstance(x, CatmaidNeuron):
-                # Remote instance will not be copied!
-                self._remote_instance = x._remote_instance
-                self._meta_data = copy(x._meta_data)
-                self.date_retrieved = copy(x.date_retrieved)
-
-                self.soma_detection_radius = copy(x.soma_detection_radius)
-                self.soma_detection_tag = copy(x.soma_detection_tag)
-        else:
+        if not isinstance(x, (CatmaidNeuron, pd.Series, pd.DataFrame)):
             try:
                 int(x)  # Check if this is a skeleton ID
-                self.skeleton_id = str(x)
+                self.skeleton_id = str(x) # Make sure skid is a string
             except:
                 raise Exception(
                     'Unable to construct CatmaidNeuron from data provided: %s' % str(type(x)))
+        else:
+            # If we are dealing with a DataFrame or a CatmaidNeuron get the essentials
+            essential_attributes = [ 'skeleton_id', 'neuron_name', 'nodes', 'connectors', 'tags' ]
+
+            for at in essential_attributes:
+                setattr(self, at, getattr(x, at ) )
+
+            if 'type' not in self.nodes:
+                morpho.classify_nodes(self)
+
+            # Now move additional attributes
+            for at in x.__dict__:
+                if at not in essential_attributes:
+                    setattr(self, at, getattr(x, at ) )
+
+            # If a CatmaidNeuron is used to initialize, we need to make this 
+            # new object independent by copying important attributes
+            if isinstance(x, CatmaidNeuron):
+                for at in self.__dict__:
+                    try:
+                        # Simple attributes don't have a .copy()
+                        setattr( self, at, getattr(self, at).copy() )
+                    except:
+                        pass
+
 
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
@@ -279,6 +276,8 @@ class CatmaidNeuron:
 
         if key == 'igraph':
             return self.get_igraph()
+        elif key == 'dps':
+            return self.get_dps()
         elif key == 'nodes_geodesic_distance_matrix':
             module_logger.info('Creating geodesic distance matrix for treenodes...')
             self.nodes_geodesic_distance_matrix = self.igraph.shortest_paths_dijkstra(mode='All', weights='weight')
@@ -295,9 +294,15 @@ class CatmaidNeuron:
         elif key == 'connectors':
             self.get_skeleton()
             return self.connectors
-        elif key == 'slabs':
-            self._get_slabs()
-            return self.slabs
+        elif key == 'presynapses':
+            return self.connectors[ self.connectors.relation == 0 ].reset_index()
+        elif key == 'postsynapses':
+            return self.connectors[ self.connectors.relation == 1 ].reset_index()
+        elif key == 'gap_junctions':
+            return self.connectors[ self.connectors.relation == 2 ].reset_index()
+        elif key == 'segments':
+            self._get_segments()
+            return self.segments
         elif key == 'soma':
             return self._get_soma()
         elif key == 'root':
@@ -341,14 +346,15 @@ class CatmaidNeuron:
             if 'connectors' in self.__dict__:
                 return self.connectors[ self.connectors.relation == 1 ].shape[0]
             else:
-                return 'NA'
+                return 'NA'        
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
-                return morpho.calc_cable(self)
+                # Simply sum up edge weight of all igraph edges
+                return sum( self.igraph.es['weight'] ) / 1000
             else:
                 return 'NA'
         else:
-            raise AttributeError('Attribute %s not found' % key)
+            raise AttributeError('Attribute "%s" not found' % key)
 
     def __copy__(self):
         return self.copy()
@@ -384,10 +390,7 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
         module_logger.info('Retrieving skeleton data...')
         skeleton = pymaid.get_neuron(
-            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]
-
-        if 'type' not in skeleton.nodes:
-            morpho.classify_nodes(skeleton)
+            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]       
 
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
@@ -397,11 +400,15 @@ class CatmaidNeuron:
 
         # Delete outdated attributes
         self._clear_temp_attr()
+
+        if 'type' not in self.nodes:
+            morpho.classify_nodes(self)
+
         return
 
     def _clear_temp_attr(self):
         """Clear temporary attributes."""
-        for a in ['igraph','slabs','nodes_geodesic_distance_matrix']:
+        for a in ['igraph','segments','nodes_geodesic_distance_matrix','dps']:
             try:
                 delattr(self, a)
             except:
@@ -417,18 +424,36 @@ class CatmaidNeuron:
 
     def get_igraph(self):
         """Calculates iGraph representation of neuron. Once calculated stored
-        as `.igraph`. Call function again to update iGraph. """
+        as `.igraph`. Call function again to update iGraph. 
+
+
+        See Also
+        --------
+        :func:`pymaid.neuron2graph`
+        """
         level = igraph_catmaid.module_logger.level
         igraph_catmaid.module_logger.setLevel('WARNING')
         self.igraph = igraph_catmaid.neuron2graph(self)
         igraph_catmaid.module_logger.setLevel(level)
         return self.igraph
 
-    def _get_slabs(self):
-        """Generate slabs for neuron."""
-        module_logger.debug('Generating slabs for neuron %s' % str(self.skeleton_id))
-        self.slabs = morpho._generate_slabs(self)
-        return self.slabs
+    def get_dps(self):
+        """Calculates dotproduct representation of neuron. Once calculated stored
+        as `.igraph`. Call function again to update iGraph.
+
+        See Also
+        --------
+        :func:`pymaid.to_dotproduct`
+        """
+
+        self.dps = morpho.to_dotproduct( self )
+        return self.dps
+
+    def _get_segments(self):
+        """Generate segments for neuron."""
+        module_logger.debug('Generating segments for neuron %s' % str(self.skeleton_id))
+        self.segments = morpho._generate_segments(self)
+        return self.segments
 
     def _get_soma(self):
         """Search for soma and return treenode ID of soma.
@@ -592,6 +617,38 @@ class CatmaidNeuron:
             str(self.skeleton_id)]
         return self.neuron_name
 
+    def resample(self, resample_to, inplace=True):
+        """Resample the neuron to given resolution.
+
+        Parameters
+        ----------
+        resample_to :           int
+                                Resolution in nanometer to which to resample
+                                the neuron.        
+        inplace :               bool, optional
+                                If True, operation will be performed on 
+                                itself. If False, operation is performed on 
+                                copy which is then returned.
+
+        See Also
+        --------
+        :func:`~pymaid.resample_neuron`
+            Base function. See for details and examples.
+
+        """
+        if inplace:
+            x = self
+        else:
+            x = self.copy()
+
+        morpho.resample_neuron(x, resample_to, inplace=True )
+
+        # No need to call this as base function does this for us        
+        # x._clear_temp_attr()
+
+        if not inplace:
+            return x
+
     def downsample(self, factor=5, preserve_cn_treenodes=True, inplace=True):
         """Downsample the neuron by given factor.
 
@@ -603,24 +660,40 @@ class CatmaidNeuron:
         preserve_cn_treenodes : bool, optional
                                 If True, treenodes that have connectors are 
                                 preserved.
-        """
-        if not inplace:
-            nl_copy = self.copy()
-            nl_copy.downsample(factor=factor)
-            return nl_copy
+        inplace :               bool, optional
+                                If True, operation will be performed on 
+                                itself. If False, operation is performed on 
+                                copy which is then returned.
 
-        morpho.downsample_neuron(self, factor, inplace=True, preserve_cn_treenodes=preserve_cn_treenodes)
+        See Also
+        --------
+        :func:`~pymaid.downsample_neuron`
+            Base function. See for details and examples.
+
+        """
+        if inplace:
+            x = self
+        else:
+            x = self.copy()
+
+        morpho.downsample_neuron(x, factor, inplace=True, preserve_cn_treenodes=preserve_cn_treenodes)
 
         # Delete outdated attributes
-        self._clear_temp_attr()
+        x._clear_temp_attr()
 
-    def reroot(self, new_root):
+        if not inplace:
+            return x
+
+    def reroot(self, new_root, inplace=True):
         """ Reroot neuron to given treenode ID or node tag.
 
         Parameters
         ----------
         new_root :  {int, str}
                     Either treenode ID or node tag
+        inplace :   bool, optional
+                    If True, operation will be performed on itself. If False, 
+                    operation is performed on copy which is then returned.
 
         See Also
         --------
@@ -628,18 +701,30 @@ class CatmaidNeuron:
             Base function. See for details and examples.
 
         """
-        morpho.reroot_neuron(self, new_root, inplace=True)
+
+        if inplace:
+            x = self
+        else:
+            x = self.copy()
+
+        morpho.reroot_neuron(x, new_root, inplace=True)
 
         # Clear temporary attributes
-        self._clear_temp_attr()        
+        x._clear_temp_attr()   
 
-    def prune_distal_to(self, node):
+        if not inplace:
+            return x     
+
+    def prune_distal_to(self, node, inplace=True):
         """Cut off nodes distal to given nodes.
 
         Parameters
         ----------
         node :      {treenode_id, node_tag}
                     Provide either treenode ID(s) or a unique tag(s)
+        inplace :   bool, optional
+                    If True, operation will be performed on itself. If False, 
+                    operation is performed on copy which is then returned.
 
         See Also
         --------
@@ -647,23 +732,34 @@ class CatmaidNeuron:
             Base function. See for details and examples.
         """
 
+        if inplace:
+            x = self
+        else:
+            x = self.copy()
+
         if not isinstance( node, (list, np.ndarray) ):                
             node = [node]
 
         for n in node:
-            dist, prox = morpho.cut_neuron(self, n)
-            self.__init__(prox, self._remote_instance, self._meta_data)
+            dist, prox = morpho.cut_neuron(x, n)
+            x.__init__(prox, x._remote_instance, x._meta_data)
 
         # Clear temporary attributes
-        self._clear_temp_attr()
+        x._clear_temp_attr()
 
-    def prune_proximal_to(self, node):
+        if not inplace:
+            return x
+
+    def prune_proximal_to(self, node, inplace=True):
         """Remove nodes proximal to given node. Reroots neuron to cut node.
 
         Parameters
         ----------
         node :      {treenode_id, node tag}
                     Provide either a treenode ID or a (unique) tag
+        inplace :   bool, optional
+                    If True, operation will be performed on itself. If False, 
+                    operation is performed on copy which is then returned.
 
         See Also
         --------
@@ -671,82 +767,125 @@ class CatmaidNeuron:
             Base function. See for details and examples.
 
         """
-        dist, prox = morpho.cut_neuron(self, node)
-        self.__init__(dist, self._remote_instance, self._meta_data)
+
+        if inplace:
+            x = self
+        else:
+            x = self.copy()
+
+        dist, prox = morpho.cut_neuron(x, node)
+        x.__init__(dist, x._remote_instance, x._meta_data)
 
         # Clear temporary attributes
-        self._clear_temp_attr()
+        x._clear_temp_attr()
 
-    def prune_by_strahler(self, to_prune=range(1, 2)):
+        if not inplace:
+            return x
+
+    def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
         """ Prune neuron based on strahler order. Will reroot neuron to
-        soma if possible.
+        soma if possible.        
+
+        Parameters
+        ----------
+        to_prune :  {int, list, range}, optional
+                    Strahler indices to prune. 
+                    1. ``to_prune = 1`` removes all leaf branches
+                    2. ``to_prune = [1,2]`` removes indices 1 and 2
+                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
+                    4. ``to_prune = -1`` removes everything but the highest index 
+        inplace :   bool, optional
+                    If True, operation will be performed on itself. If False, 
+                    operation is performed on copy which is then returned.
 
         See Also
         --------
         :func:`~pymaid.prune_by_strahler` 
             This is the base function. See for details and examples.
 
-        Parameters
-        ----------
-        to_prune :      {int, list, range}, optional
-                        Strahler indices to prune. 
-                        1. ``to_prune = 1`` removes all leaf branches
-                        2. ``to_prune = [1,2]`` removes indices 1 and 2
-                        3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
-                        4. ``to_prune = -1`` removes everything but the highest index 
+        """     
 
-        """        
+        if inplace:
+            x = self
+        else:
+            x = self.copy()   
 
         morpho.prune_by_strahler(
-            self, to_prune=to_prune, inplace=True, reroot_soma=True)
+            x, to_prune=to_prune, reroot_soma=True, inplace=True)
 
         # No need to call this as morpho.prune_by_strahler does this already
         #self._clear_temp_attr()
 
+        if not inplace:
+            return x
 
-    def prune_by_longest_neurite(self, reroot_to_soma=False):
+    def prune_by_longest_neurite(self, reroot_to_soma=False, inplace=True):
         """ Prune neuron down to the longest neurite.
 
         Parameters
         ----------
         reroot_to_soma :    bool, optional
                             If True, will reroot to soma before pruning.
+        inplace :           bool, optional
+                            If True, operation will be performed on itself. 
+                            If False, operation is performed on copy which is 
+                            then returned.
 
         See Also
         --------
         :func:`~pymaid.longest_neurite`
             This is the base function. See for details and examples.
 
-        """        
+        """     
+
+        if inplace:
+            x = self
+        else:
+            x = self.copy()   
 
         morpho.longest_neurite(
-            self, inplace=True, reroot_to_soma=reroot_to_soma)
+            x, inplace=True, reroot_to_soma=reroot_to_soma)
 
         # Clear temporary attributes
-        self._clear_temp_attr()
+        x._clear_temp_attr()
 
-    def prune_by_volume(self, v, mode='IN'):
+        if not inplace:
+            return x
+
+    def prune_by_volume(self, v, mode='IN', inplace=True):
         """ Prune neuron by intersection with given volume(s).
 
         Parameters
         ----------
-        v :     {str, pymaid.Volume, list of either}
-                Volume(s) to check for intersection
-        mode :  {'IN','OUT'}, optional
-                If 'IN', parts of the neuron inside the volume are kept.
+        v :         {str, pymaid.Volume, list of either}
+                    Volume(s) to check for intersection
+        mode :      {'IN','OUT'}, optional
+                    If 'IN', parts of the neuron inside the volume are kept.
+        inplace :   bool, optional
+                    If True, operation will be performed on itself. If False, 
+                    operation is performed on copy which is then returned.
 
         See Also
         --------
         :func:`~pymaid.in_volume`
             Base function. See for details and examples.
         """ 
-        if not isinstance(v, Volume):            
-            v = pymaid.get_volume(v, combine_vols=True, remote_instance=self._remote_instance)
 
-        morpho.in_volume(self, v, inplace=True, remote_instance=self._remote_instance, mode=mode)
+        if inplace:
+            x = self
+        else:
+            x = self.copy()
+
+        if not isinstance(v, Volume):            
+            v = pymaid.get_volume(v, combine_vols=True, remote_instance=x._remote_instance)
+
+        morpho.in_volume(x, v, inplace=True, remote_instance=x._remote_instance, mode=mode)
 
         # Clear temporary attributes
-        self._clear_temp_attr()        
+        x._clear_temp_attr()   
+
+        if not inplace:
+            return x     
 
     def reload(self, remote_instance=None):
         """Reload neuron from server. Currently only updates name, nodes, 
@@ -1129,7 +1268,7 @@ class CatmaidNeuronList:
             return (self.__len__(),)
         elif key in ['n_nodes','n_connectors','n_presynapses','n_postsynapses',
                      'n_open_ends','n_end_nodes','cable_length','tags','igraph',
-                     'soma','root','slabs', 'igraph','n_branch_nodes']:
+                     'soma','root','segments', 'igraph','n_branch_nodes','dps']:
             self.get_skeletons(skip_existing=True)
             return np.array([ getattr(n,key) for n in self.neurons ])
         elif key == 'neuron_name':
@@ -1137,13 +1276,9 @@ class CatmaidNeuronList:
             return np.array([n.neuron_name for n in self.neurons])
         elif key == 'skeleton_id':
             return np.array([n.skeleton_id for n in self.neurons])        
-        elif key == 'nodes':
-            self.get_skeletons(skip_existing=True)            
-            return pd.concat([n.nodes for n in self.neurons], axis=0, ignore_index=True).drop('index', axis=1)
-        elif key == 'connectors':
-            self.get_skeletons(skip_existing=True)            
-            return pd.concat([n.connectors for n in self.neurons], axis=0, ignore_index=True).drop('index', axis=1)
-
+        elif key in ['nodes','connectors','presynapses','postsynapses','gap_junctions']:
+            self.get_skeletons(skip_existing=True)
+            return pd.concat([ getattr(n, key) for n in self.neurons], axis=0, ignore_index=True)
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]            
@@ -1173,7 +1308,7 @@ class CatmaidNeuronList:
         elif key == 'empty':
             return len(self.neurons) == 0
         else:
-            raise AttributeError('Attribute %s not found' % key)
+            raise AttributeError('Attribute "%s" not found' % key)
 
     def __contains__(self, x):
         return x in self.neurons or str(x) in self.skeleton_id or x in self.neuron_name
@@ -1247,6 +1382,50 @@ class CatmaidNeuronList:
         random.shuffle(indices)
         return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]])
 
+    def resample(self, resample_to, preserve_cn_treenodes=False, inplace=True):
+        """Resamples all neurons to given resolution.
+
+        Parameters
+        ----------
+        resample_to :           int
+                                Resolution in nm to resample neurons to.
+        inplace :               bool, optional
+                                If False, a downsampled COPY of this 
+                                CatmaidNeuronList is returned.
+
+        See Also
+        --------
+        :func:`~pymaid.resample_neuron`
+                Base function - see for details.
+        """                
+
+        x = self
+        if not inplace:
+            x = x.copy() 
+
+        _set_loggers('ERROR')
+
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,resample_to) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._resample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
+
+            pool.close()
+            pool.join()  
+        else:
+            for n in tqdm(x.neurons, desc='Resampling', disable=module_logger.getEffectiveLevel()>=40):
+                n.resample(resample_to=resample_to, inplace=True)
+            
+        _set_loggers('INFO')
+
+        if not inplace:
+            return x
+
+    def _resample_helper(self, x):
+        """ Helper function to parallelise basic operations."""    
+        x[0].resample(resample_to=x[1],inplace=True)
+        return x[0]
+
     def downsample(self, factor=5, preserve_cn_treenodes=False, inplace=True):
         """Downsamples (simplifies) all neurons by given factor.
 
@@ -1260,7 +1439,7 @@ class CatmaidNeuronList:
                                 preserved.
         inplace :               bool, optional
                                 If False, a downsampled COPY of this 
-                                CatmaidNeuronList is returned
+                                CatmaidNeuronList is returned.
 
         See Also
         --------
@@ -1268,32 +1447,34 @@ class CatmaidNeuronList:
                 Base function - see for details.
         """                
 
+        x = self
         if not inplace:
-            nl_copy = self.copy()
-            nl_copy.downsample(factor=factor, inplace=False)
-            return nl_copy
+            x = x.copy() 
 
         _set_loggers('ERROR')
 
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,factor,preserve_cn_treenodes) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._downsample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,factor,preserve_cn_treenodes) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._downsample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
             pool.join()  
         else:
-            for n in tqdm(self.neurons, desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40):
-                n.downsample(factor=factor, preserve_cn_treenodes=preserve_cn_treenodes)
+            for n in tqdm(x.neurons, desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40):
+                n.downsample(factor=factor, preserve_cn_treenodes=preserve_cn_treenodes, inplace=True)
             
         _set_loggers('INFO')
 
+        if not inplace:
+            return x
+
     def _downsample_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].downsample(factor=x[1],preserve_cn_treenodes=preserve_cn_treenodes)                
+        x[0].downsample(factor=x[1],preserve_cn_treenodes=preserve_cn_treenodes,inplace=True)                
         return x[0]
 
-    def reroot(self, new_root):
+    def reroot(self, new_root, inplace=True):
         """ Reroot neuron to treenode ID or node tag.
 
         Parameters
@@ -1301,6 +1482,9 @@ class CatmaidNeuronList:
         new_root :  {int, str, list of either}
                     Either treenode IDs or node tag(s). If not a list, the
                     same tag is used to reroot all neurons
+        inplace :   bool, optional
+                    If False, a rerooted COPY of this CatmaidNeuronList is 
+                    returned
 
         See Also
         --------
@@ -1312,9 +1496,17 @@ class CatmaidNeuronList:
         >>> # Reroot all neurons to soma
         >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
         >>> nl.reroot( nl.soma )
-        """
+        """       
+
         if not isinstance(new_root, (list,np.ndarray)):
             new_root = [new_root] * len(self.neurons)
+
+        if len(new_root) != len(self.neurons):
+            raise ValueError('Must provided a new root for every neuron.')
+
+        x = self
+        if not inplace:
+            x = x.copy() 
 
         # Silence loggers (except Errors)
         morpholevel = morpho.module_logger.getEffectiveLevel()
@@ -1322,88 +1514,108 @@ class CatmaidNeuronList:
         igraph_catmaid.module_logger.setLevel('ERROR')
         morpho.module_logger.setLevel('ERROR')
         
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,new_root[i]) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._reroot_helper, combinations, chunksize=10 ), total=len(combinations), desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40 ))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,new_root[i]) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._reroot_helper, combinations, chunksize=10 ), total=len(combinations), desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
             pool.join()
         else:
-            for i, n in enumerate( tqdm(self.neurons, desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40) ):
-                n.reroot( new_root[i] )
+            for i, n in enumerate( tqdm(x.neurons, desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40) ):
+                n.reroot( new_root[i], inplace=True )
 
         # Reset logger level to previous state
         igraph_catmaid.module_logger.setLevel(igraphlevel)
         morpho.module_logger.setLevel(morpholevel)
 
-        print('\n') #We need to force a new line in terminal
+        if not inplace:
+            return x
 
     def _reroot_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].reroot(x[1])                
+        x[0].reroot(x[1], inplace=True)                
         return x[0]
 
-    def prune_distal_to(self, tag):
+    def prune_distal_to(self, tag, inplace=True):
         """Cut off nodes distal to given node. 
 
         Parameters
         ----------
         node :      node tag
                     A (unique) tag at which to cut the neurons
+        inplace :   bool, optional
+                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    returned.
 
         """
+        x = self
+        if not inplace:
+            x = x.copy() 
+
         _set_loggers('ERROR')
 
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,tag) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._prune_distal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._prune_distal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
             pool.join()   
         else:
-            for n in tqdm(self.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_distal_to( tag )
+            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+                n.prune_distal_to( tag, inplace=True )
 
-        _set_loggers('INFO')        
+        _set_loggers('INFO')   
+
+        if not inplace:
+            return x     
 
     def _prune_distal_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].prune_distal_to(x[1])                
+        x[0].prune_distal_to(x[1], inplace=True)                
         return x[0]
 
-    def prune_proximal_to(self, tag):
+    def prune_proximal_to(self, tag, inplace=True):
         """Remove nodes proximal to given node. Reroots neurons to cut node.
 
         Parameters
         ----------
         node :      node tag
                     A (unique) tag at which to cut the neurons
+        inplace :   bool, optional
+                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    returned.
 
         """
+        x = self
+        if not inplace:
+            x = x.copy() 
 
         _set_loggers('ERROR')
 
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,tag) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._prune_proximal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._prune_proximal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
             pool.join() 
         else:
-            for n in tqdm(self.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_proximal_to(tag)
+            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+                n.prune_proximal_to(tag, inplace=True)
 
         _set_loggers('INFO')        
 
+        if not inplace:
+            return x
+
     def _prune_proximal_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].prune_proximal_to(x[1])                
+        x[0].prune_proximal_to(x[1], inplace=True)                
         return x[0]
 
-    def prune_by_strahler(self, to_prune=range(1, 2)):
+    def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
         """ Prune neurons based on strahler order. Will reroot neurons to
         soma if possible.
 
@@ -1415,6 +1627,9 @@ class CatmaidNeuronList:
                     2. ``to_prune = [1,2]`` removes indices 1 and 2
                     3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
                     4. ``to_prune = -1`` removes everything but the highest index 
+        inplace :   bool, optional
+                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    returned.
 
         See Also
         --------
@@ -1422,28 +1637,34 @@ class CatmaidNeuronList:
                     Basefunction - see for details and examples. 
 
         """
+        x = self
+        if not inplace:
+            x = x.copy() 
 
         _set_loggers('ERROR')
 
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,to_prune) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._prune_strahler_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,to_prune) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._prune_strahler_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(self.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_by_strahler(to_prune=to_prune)
+            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+                n.prune_by_strahler(to_prune=to_prune, inplace=True)
 
         _set_loggers('INFO')
 
+        if not inplace:
+            return x
+
     def _prune_strahler_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].prune_by_strahler(to_prune=x[1])                
+        x[0].prune_by_strahler(to_prune=x[1], inplace=True)                
         return x[0]
 
-    def prune_by_longest_neurite(self, reroot_to_soma=False):
+    def prune_by_longest_neurite(self, reroot_to_soma=False, inplace=True):
         """ Prune neurons down to their longest neurites.
 
         Parameters
@@ -1451,43 +1672,56 @@ class CatmaidNeuronList:
         reroot_to_soma :    bool, optional
                             If True, neurons will be rerooted to their somas 
                             before pruning.
+        inplace :           bool, optional
+                            If False, a pruned COPY of this CatmaidNeuronList 
+                            is returned.
 
         See Also
         --------
         :func:`pymaid.prune_by_strahler`
                         Basefunction - see for details and examples.
-
         """
+
+        x = self
+        if not inplace:
+            x = x.copy() 
 
         _set_loggers('ERROR')
 
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,reroot_to_soma) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._prune_neurite_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,reroot_to_soma) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._prune_neurite_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(self.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_by_longest_neurite(reroot_to_soma=reroot_to_soma)
+            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+                n.prune_by_longest_neurite(reroot_to_soma=reroot_to_soma, inplace=True)
 
         _set_loggers('INFO')
 
+        if not inplace:
+            return x
+
     def _prune_neurite_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].prune_by_longest_neurite(x[1])                
+        x[0].prune_by_longest_neurite(x[1], inplace=True)                
         return x[0]
 
-    def prune_by_volume(self, v, mode='IN'):
+    def prune_by_volume(self, v, mode='IN', inplace=True):
         """ Prune neuron by intersection with given volume(s).
 
         Parameters
         ----------
-        v :     {str, pymaid.Volume, list of either}
-                Volume(s) to check for intersection
-        mode :  {'IN','OUT'}, optional
-                If 'IN', part of the neuron inside the volume(s) is kept.
+        v :         {str, pymaid.Volume, list of either}
+                    Volume(s) to check for intersection.
+        mode :      {'IN','OUT'}, optional
+                    If 'IN', part of the neuron inside the volume(s) is kept.
+        inplace :   bool, optional
+                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    returned.
+
 
         See Also
         --------
@@ -1495,27 +1729,34 @@ class CatmaidNeuronList:
                 Basefunction - see for details and examples.
         """ 
         
+        x = self
+        if not inplace:
+            x = x.copy()       
+        
         if not isinstance(v, Volume):            
             v = pymaid.get_volume(v, combine_vols=True) 
 
         _set_loggers('ERROR')
 
-        if self._use_parallel:
-            pool = mp.Pool(self.n_cores)
-            combinations = [ (n,v,mode) for i,n in enumerate(self.neurons) ]   
-            self.neurons = list(tqdm( pool.imap( self._prune_by_volume_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning' , disable=module_logger.getEffectiveLevel()>=40))
+        if x._use_parallel:
+            pool = mp.Pool(x.n_cores)
+            combinations = [ (n,v,mode) for i,n in enumerate(x.neurons) ]   
+            x.neurons = list(tqdm( pool.imap( x._prune_by_volume_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning' , disable=module_logger.getEffectiveLevel()>=40))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(self.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_by_volume(v, mode=mode)
+            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+                n.prune_by_volume(v, mode=mode, inplace=True)
 
         _set_loggers('INFO')
 
+        if not inplace:
+            return x
+
     def _prune_by_volume_helper(self, x):
         """ Helper function to parallelise basic operations."""
-        x[0].prune_by_volume(x[1],mode=x[2])
+        x[0].prune_by_volume(x[1],mode=x[2], inplace=True)
         return x[0]
 
     def get_review(self, skip_existing=False):
@@ -1562,32 +1803,32 @@ class CatmaidNeuronList:
                 if str(n.skeleton_id) in names:
                     n.neuron_name = names[str(n.skeleton_id)]                
 
-    def _generate_slabs(self):
-        """ Helper function to use multiprocessing to generate slabs for all
-        neurons. This will NOT force update of existing slabs! This is about
+    def _generate_segments(self):
+        """ Helper function to use multiprocessing to generate segments for all
+        neurons. This will NOT force update of existing segments! This is about
         1.5X faster than calling them individually on a 4 core system.
         """
 
         if self._use_parallel:
-            to_retrieve = [ n for n in self.neurons if 'slabs' not in n.__dict__ ]
-            to_retrieve_ix = [ i for i,n in enumerate(self.neurons) if 'slabs' not in n.__dict__ ]
+            to_retrieve = [ n for n in self.neurons if 'segments' not in n.__dict__ ]
+            to_retrieve_ix = [ i for i,n in enumerate(self.neurons) if 'segments' not in n.__dict__ ]
 
             pool = mp.Pool(self.n_cores)        
-            update = list(tqdm( pool.imap( self._generate_slabs_helper, to_retrieve, chunksize=10 ), total=len(to_retrieve), desc='Gen. slabs', disable=module_logger.getEffectiveLevel()>=40 ))
+            update = list(tqdm( pool.imap( self._generate_segments_helper, to_retrieve, chunksize=10 ), total=len(to_retrieve), desc='Gen. segments', disable=module_logger.getEffectiveLevel()>=40 ))
             pool.close()
             pool.join()        
 
             for ix,n in zip(to_retrieve_ix,update):
                 self.neurons[ ix ] = n
         else:
-            for n in tqdm(self.neurons, desc='Gen. slabs', disable=module_logger.getEffectiveLevel()>=40):
-                if 'slabs' not in n.__dict__:
-                    _ = n.slabs
+            for n in tqdm(self.neurons, desc='Gen. segments', disable=module_logger.getEffectiveLevel()>=40):
+                if 'segments' not in n.__dict__:
+                    _ = n.segments
 
-    def _generate_slabs_helper(self, x):
+    def _generate_segments_helper(self, x):
         """ Helper function to parallelise basic operations."""   
-        if 'slabs' not in x.__dict__:         
-            _ = x.slabs        
+        if 'segments' not in x.__dict__:         
+            _ = x.segments        
         return x      
 
     def reload(self):
@@ -1609,16 +1850,16 @@ class CatmaidNeuronList:
         if to_update:
             skdata = pymaid.get_neuron(
                 [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
-            for n in tqdm(to_update, desc='Processing neurons', disable=module_logger.getEffectiveLevel()>=40):
-
-                if 'type' not in skdata.loc[str(n.skeleton_id),'nodes']:
-                    morpho.classify_nodes(skdata.loc[str(n.skeleton_id)])
+            for n in tqdm(to_update, desc='Processing neurons', disable=module_logger.getEffectiveLevel()>=40):                
 
                 n.nodes = skdata.loc[str(n.skeleton_id),'nodes']
                 n.connectors = skdata.loc[str(n.skeleton_id),'connectors']
                 n.tags = skdata.loc[str(n.skeleton_id),'tags']
                 n.neuron_name = skdata.loc[str(n.skeleton_id),'neuron_name']
                 n.date_retrieved = datetime.datetime.now().isoformat()
+
+                if 'type' not in n.nodes:
+                    morpho.classify_nodes(n)
 
                 # Delete outdated attributes
                 n._clear_temp_attr()
