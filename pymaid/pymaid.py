@@ -757,9 +757,6 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                     dtype=object
                 )
 
-            # Placeholder for igraph representations of neurons
-            df['igraph'] = None
-
             # Collect this batch
             collection.append(df)            
 
@@ -3630,7 +3627,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     """
 
-    def _contribution_helper(skids, nl):
+    def _contribution_helper(skids):
         """ Helper to test if users have contributed more than X nodes to 
         neuron.
 
@@ -3639,7 +3636,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
         Filtered list of skeleton IDs
         """
         nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
-        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
+        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(users)].shape[0] > minimum_cont]
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -3670,7 +3667,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     # Warn if from/to_date are used without also querying by user or reviewer
     if from_date and not ( users or reviewed_by ):
-        module_logger.warning('Start/End dates can only be used in queries with <users> or <reviewed_by>')
+        module_logger.warning('Start/End dates can only be used for queries against <users> or <reviewed_by>')
 
     # Now go over all parameters and get sets of skids
     sets_of_skids = []
@@ -3725,7 +3722,8 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
             sets_of_skids.append( set(this_annotation) )    
 
     # Get skids by user
-    if users:        
+    if users:
+        by_users = []     
         for u in tqdm(users, desc='Fetching by users', disable=module_logger.getEffectiveLevel()>=40):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['created_by'] = u
@@ -3738,16 +3736,15 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
             remote_get_list_url = remote_instance._get_list_skeletons_url()
             remote_get_list_url += '?%s' % urllib.parse.urlencode(
-                get_skeleton_list_GET_data)
+                get_skeleton_list_GET_data)            
 
-            print(remote_get_list_url)
+            by_users += remote_instance.fetch(remote_get_list_url)
 
-            this_user = set( remote_instance.fetch(remote_get_list_url) )
+        # This step is actually SUPER WASTEFUL - we should save the skeletondata and return it alongside the skids
+        if minimum_cont:
+            by_users = _contribution_helper( by_users ) 
 
-            if minimum_cont:
-                this_user = _contribution_helper( this_user )
-
-            sets_of_skids.append( this_user )
+        sets_of_skids.append( set( by_users ) )
 
     # Get skids by reviewer
     if reviewed_by:        
@@ -3860,6 +3857,9 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
                             in given volumes.
     only_soma :             bool, optional
                             If True, only neurons with a soma will be returned.
+                            In case you are going to retrieve skeleton data
+                            anyway, it is better to do that for all neurons 
+                            and then filter for soma.
     remote_instance :       CATMAID instance 
                             If not passed directly, will try using global.
 
@@ -4590,7 +4590,7 @@ def eval_skids(x, remote_instance=None):
                 return get_skids_by_name(x[5:], remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
             else:
                 return get_skids_by_name(x, remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
-    elif isinstance(x, (list, np.ndarray)):
+    elif isinstance(x, (list, np.ndarray, set)):
         skids = []
         for e in x:
             temp = eval_skids(e, remote_instance=remote_instance)
