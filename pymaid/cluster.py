@@ -421,13 +421,12 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         if this_cn.shape[0] == 0:
             module_logger.warning('No %s partners found: filtered?' % d)
 
+        combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB]) for nA in neurons for nB in neurons ]      
+        
         pool = mp.Pool()
-        combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB]) for nA in neurons for nB in neurons ]   
-
-        matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d, disable=module_logger.getEffectiveLevel()>=40 ))
-
+        matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d, disable=module_logger.getEffectiveLevel()>=40, smoothing=0 ))
         pool.close()
-        pool.join()    
+        pool.join()          
 
         for i,v in enumerate(combinations):
             matching_scores[d].loc[ v[0],v[1] ] = matching_indices[i][similarity]
@@ -551,11 +550,14 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     shared = connectivity[nA_cn & nB_cn]
     n_shared = shared.shape[0]
 
-    n_synapses_sharedA = shared.sum()[neuronA]
-    n_synapses_sharedB = shared.sum()[neuronB]
+    shared_sum = shared.sum()
+    n_synapses_sharedA = shared_sum[neuronA]
+    n_synapses_sharedB = shared_sum[neuronB]    
     n_synapses_shared = n_synapses_sharedA + n_synapses_sharedB
-    n_synapses_totalA = total.sum()[neuronA]
-    n_synapses_totalB = total.sum()[neuronB]
+
+    total_sum = total.sum()
+    n_synapses_totalA = total_sum[neuronA]
+    n_synapses_totalB = total_sum[neuronB]
     n_synapses_total = n_synapses_totalA + n_synapses_totalB
 
     # Vertex similarity based on Jarrell et al., 2012
@@ -576,20 +578,22 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
         # scrambles the column
         nA_index = connectivity.columns.tolist().index(neuronA)
         nB_index = connectivity.columns.tolist().index(neuronB)
+        
+        # We only need the columns for neuronA and neuronB
+        this_cn = total[ [neuronA, neuronB] ]
 
-        # Go over all entries in which either neuron has at least a single connection
-        # If both have 0 synapses, similarity score would not change at all
-        # anyway
-        # index=False neccessary otherwise nA_index is off by +1
-        for entry in total.itertuples(index=False):
-            a = entry[nA_index]
-            b = entry[nB_index]
+        # Get min and max between both neurons
+        this_max = np.max(this_cn, axis=1)
+        this_min = np.min(this_cn, axis=1)
 
-            max_score += max([a, b])
+        # Keep track of max possible score
+        max_score = this_max.sum()
 
-            vertex_similarity += (
-                min([a, b]) - C1 * max([a, b]) * math.exp(- C2 * min([a, b]))
-            )
+        # Implement: f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
+        v_sim = this_min - C1 * this_max * np.exp( - C2 * this_min )
+
+        # Sum over all partners
+        vertex_similarity = v_sim.sum()        
 
         try:
             similarity_indices['vertex_normalized'] = (
@@ -603,11 +607,10 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
         similarity_indices['matching_index'] = n_shared / n_total
         similarity_indices[
             'matching_index_synapses'] = n_synapses_shared / n_synapses_total
-        try:
+        if n_synapses_sharedA != 0 and n_synapses_sharedB != 0:
             similarity_indices['matching_index_weighted_synapses'] = (
-                n_synapses_sharedA / n_synapses_totalA) * (n_synapses_sharedB / n_synapses_totalB)
-            # * 2 / ((n_synapses_sharedA/n_synapses_totalA) + (n_synapses_sharedB/n_synapses_totalB))
-        except:
+                n_synapses_sharedA / n_synapses_totalA) * (n_synapses_sharedB / n_synapses_totalB)            
+        else:
             # If no shared synapses at all:
             similarity_indices['matching_index_weighted_synapses'] = 0
     else:
@@ -936,7 +939,7 @@ class clust_results:
         Parameters
         ----------
         method :    str, optional
-                    Clustering method (see scipy.hierarchy.linkage 
+                    Clustering method (see scipy.cluster.hierarchy.linkage 
                     for reference)
         """
 
@@ -956,7 +959,7 @@ class clust_results:
         # thinks we are passing observations instead of final scores
         self.condensed_dist_mat = scipy.spatial.distance.squareform( self.dist_mat, checks=False )
 
-        self.linkage = scipy.hierarchy.linkage(self.condensed_dist_mat, method=method)
+        self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat, method=method)
 
         # Save method in case we want to look it up later
         self.method = method
@@ -976,7 +979,7 @@ class clust_results:
                             Labels in order of original observation or
                             dictionary with mapping original labels
         kwargs             
-                            Passed to `scipy.hierarchy.dendrogram()`
+                            Passed to `scipy.cluster.hierarchy.dendrogram()`
         """
 
         if not labels:
@@ -987,7 +990,7 @@ class clust_results:
         if not fig:
             fig = plt.figure()
 
-        dn = scipy.hierarchy.dendrogram(self.linkage,
+        dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
                                           color_threshold=color_threshold,
                                           labels=labels,
                                           leaf_rotation=90,
