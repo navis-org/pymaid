@@ -68,6 +68,7 @@ import datetime
 import logging
 import pandas as pd
 import numpy as np
+import math
 import datetime
 import random
 import json
@@ -77,6 +78,7 @@ from copy import copy, deepcopy
 import csv
 import sys
 import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import scipy
 
 from pymaid import igraph_catmaid, morpho, pymaid, plotting
@@ -1091,9 +1093,10 @@ class CatmaidNeuronList:
     root :              np.array of treenode_ids
     n_cores :           int
                         Number of cores to use. Default is os.cpu_count()-1
-    _use_parallel :     bool (default=False)
-                        If True, will use parallel processing. Faster but uses
-                        lots of memory. Do not use for large lists!
+    _use_parallel :     bool (default=True)
+                        If True, will use parallel threads. Should be slightly
+                        up to a lot faster depending of the numbers of cores.
+                        Switch off if you experience performance issues.
 
     Examples
     --------
@@ -1127,13 +1130,14 @@ class CatmaidNeuronList:
 
     def __init__(self, x, remote_instance=None, make_copy=True, _use_parallel=False):
         # Set number of cores
-        self.n_cores = max(1, os.cpu_count()-1)
+        self.n_cores = max(1, os.cpu_count())
 
         # If below parameter is True, most calculations will be parallelized
         # which speeds them up quite a bit. Unfortunately, this uses A TON of 
         # memory - for large lists this might make your system run out of 
         # memory. In these cases, leave this property at False
         self._use_parallel = _use_parallel
+        self._use_threading = True
 
         # Determines if subsetting this NeuronList will return copies
         self.copy_on_subset = False
@@ -1177,20 +1181,18 @@ class CatmaidNeuronList:
                 to_convert.append( (n,remote_instance,i) )
 
         if to_convert:
-            if self._use_parallel:
-                pool = mp.Pool(self.n_cores)
+            if self._use_threading:
+                with ThreadPoolExecutor(max_workers=self.n_cores) as e:
 
-                # For some reason this acts up when we use disable=True with tqdm here
-                if module_logger.getEffectiveLevel()<=40:
-                    converted = list(tqdm( pool.imap( self._convert_helper, to_convert, chunksize=10 ), total=len(to_convert), desc='Making neurons', disable=module_logger.getEffectiveLevel()>=40))
-                else:
-                    converted = list(pool.imap( self._convert_helper, to_convert, chunksize=10 ))
+                    futures = e.map( CatmaidNeuron, [ n[0] for n in to_convert ]  )
 
-                pool.close()
-                pool.join()
+                    converted = [ n for n in tqdm(futures, total=len(to_convert), 
+                                                  desc='Making neurons', 
+                                                  disable=module_logger.getEffectiveLevel()>=40 ) ]
 
-                for i,c in enumerate(to_convert):
-                    self.neurons[ c[2] ] = converted[ i ]
+                    for i, c in enumerate(to_convert):
+                        self.neurons[ c[2] ] = converted[ i ]
+
             else:
                 for n in tqdm(to_convert, desc='Making neurons', disable=module_logger.getEffectiveLevel()>=40):
                     self.neurons[ n[2] ] = CatmaidNeuron(
@@ -2015,7 +2017,7 @@ class CatmaidNeuronList:
 
     def copy(self):
         """Return copy of this CatmaidNeuronList."""
-        return CatmaidNeuronList(self, make_copy=True)
+        return CatmaidNeuronList(self, make_copy=True, _use_parallel=self._use_parallel)
 
     def head(self, n=5):
         """Return summary for top N neurons."""
