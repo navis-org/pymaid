@@ -226,7 +226,7 @@ class handler:
         cu.bevel_resolution = 5
         cu.bevel_depth = 0.007
 
-        for s in x.slabs:
+        for s in x.segments:
             newSpline = cu.splines.new('POLY')
             coords = x.nodes.set_index('treenode_id').ix[s][
                 ['x', 'y', 'z']].as_matrix()
