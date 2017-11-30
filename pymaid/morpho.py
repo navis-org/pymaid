@@ -28,7 +28,6 @@ import scipy
 from scipy.spatial import ConvexHull
 import scipy.interpolate
 from tqdm import tqdm, trange
-import warnings
 import itertools
 from igraph import Graph
 
@@ -59,7 +58,7 @@ __all__ = sorted([ 'calc_cable','calc_strahler_index','classify_nodes','cut_neur
             'calc_overlap','stitch_neurons','arbor_confidence',
             'split_axon_dendrite', 'distal_to', 'calc_bending_flow', 'calc_flow_centrality',
             'calc_segregation_index', 'filter_connectivity','dist_between',
-            'to_dotproduct','resample_neuron'])
+            'to_dotproduct','resample_neuron','predict_connectivity'])
 
 def generate_list_of_childs(skdata):
     """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
@@ -357,13 +356,14 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
         x = x.copy()
 
     nodes = x.nodes.set_index('treenode_id')
+    locs = nodes[['x','y','z']]
 
     new_nodes = []
     max_tn_id = x.nodes.treenode_id.max() + 1 
 
     # Iterate over segments
     for i,seg in enumerate(tqdm(x.segments, desc='Proc. segments', disable=module_logger.getEffectiveLevel()>=40 )):
-        coords = nodes.loc[ seg, ['x','y','z'] ].values.astype(float)
+        coords = locs.loc[ seg ].values.astype(float)
         
         # vecs between subsequently measured points
         vecs = np.diff(coords.T)
@@ -564,7 +564,6 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     if not inplace:
         return df
-
 
 def longest_neurite(x, reroot_to_soma=False, inplace=False):
     """ Returns a neuron consisting only of the longest neurite (based on 
@@ -1450,25 +1449,106 @@ def to_dotproduct(x):
 
     return dps
 
-
-def calc_overlap(a, b, dist=2, method='avg' ):
-    """ Calculates the amount of cable of neurons A within distance of neuron b.
-    This uses distances between treenodes for simplicity: if treenode X of 
-    neuron a is within given distance to any treenode of neuron b, then the
-    distance between X and parent of X counts as "within distance". This uses
-    the dotprodut representation of a neuron!
+def predict_connectivity(a, b, method='possible_contacts', remote_instance=None, **kwargs):
+    """ Calculates potential synapses between neurons A -> B. Based on a 
+    concept by Alex Bates.    
 
     Parameters
     ----------
-    a :         {CatmaidNeuron, CatmaidNeuronList}
-                Neuron(s) for which to compute cable within distance.
-    b :         {CatmaidNeuron, CatmaidNeuronList}
-                Neuron(s) which needs to be within given distance.
+    a,b :       {CatmaidNeuron, CatmaidNeuronList}
+                Neuron(s) for which to compute potential connectivity.
+    method :    {'possible_contacts'}
+                Method to use for calculations.
+    **kwargs :  Arbitrary keyword arguments.
+                1. For method = 'possible_contacts':
+                    - `stdev` to set number of 
+    
+
+    Returns
+    -------
+    pandas.DataFrame
+            Matrix holding possible synaptic contacts. Neurons A are rows, 
+            neurons B are columns.
+
+            >>> df
+                        skidB1   skidB2  skidB3 ...
+                skidA1    5        1        0
+                skidA2    10       20       5
+                skidA3    4        3        15
+                ...
+
+    """
+
+    if not remote_instance:
+        try:
+            remote_instance = a._remote_instance
+        except:
+            pass
+
+    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        raise TypeError('Need to pass CatmaidNeurons')
+
+    if isinstance(a, core.CatmaidNeuron):
+        a = core.CatmaidNeuronList(a)
+
+    if isinstance(b, core.CatmaidNeuron):
+        b = core.CatmaidNeuronList(b)
+
+    allowed_methods = ['possible_contacts']
+    if method not in allowed_methods:
+        raise ValueError('Unknown method "{0}". Allowed methods: "{0}"'.format(method, ','.join(allowed_methods)))
+
+    matrix = pd.DataFrame( np.zeros(( a.shape[0], b.shape[0] )), index=a.skeleton_id, columns=b.skeleton_id )
+
+    # First let's calculate at what distance synapses are being made
+    cn_between = pymaid.get_connectors_between(a,b, remote_instance=remote_instance)
+
+    cn_locs = np.vstack(cn_between.connector_loc.values)
+    tn_locs = np.vstack(cn_between.treenode2_loc.values)
+
+    distances = np.sqrt ( np.sum((cn_locs  - tn_locs) ** 2, axis=1) )
+
+    module_logger.info('Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(),distances.std()))
+
+    # Calculate distances threshold
+    n_std = kwargs.get('n_std', 2 )
+    dist_threshold = distances.mean() + n_std * distances.std()    
+
+    with tqdm(total=len(b), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+        for nB in b:
+            # Create cKDTree for nB
+            tree = scipy.spatial.cKDTree( nB.nodes[['x','y','z']].values, leafsize=10 )
+            for nA in a:
+                # Query against presynapses
+                dist, ix = tree.query( nA.presynapses[['x','y','z']].values,
+                                       k=1, 
+                                       distance_upper_bound=dist_threshold,
+                                       n_jobs=-1
+                                    )
+
+                # Calculate possible contacts
+                possible_contacts = sum( dist != float('inf') )
+
+                matrix.at[ nA.skeleton_id, nB.skeleton_id ] = possible_contacts
+
+            pbar.update( 1 )
+
+    return matrix.astype(int)
+
+
+def calc_overlap(a, b, dist=2, method='min' ):
+    """ Calculates the amount of cable of neuron A within distance of neuron b.
+    Uses dotproduct representation of a neuron!
+
+    Parameters
+    ----------
+    a,b :       {CatmaidNeuron, CatmaidNeuronList}
+                Neuron(s) for which to compute cable within distance.    
     dist :      int, optional
-                Distance in microns to return cable for.
+                Maximum distance in microns.
     method :    {'min','max','avg'}
                 Method by which to calculate the overlapping cable between
-                the nearest two segments.
+                two cables.
 
     Returns
     -------
@@ -1483,9 +1563,10 @@ def calc_overlap(a, b, dist=2, method='avg' ):
                 skidA3    4        3        15
                 ...
 
-    """
+    """    
 
-    # TODO:   
+    # Convert distance to nm
+    dist *= 1000  
 
     if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         raise TypeError('Need to pass CatmaidNeurons')
@@ -1502,43 +1583,53 @@ def calc_overlap(a, b, dist=2, method='avg' ):
 
     matrix = pd.DataFrame( np.zeros(( a.shape[0], b.shape[0] )), index=a.skeleton_id, columns=b.skeleton_id )
 
-    with tqdm(total=len(a)*len(b), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(a), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+        # Keep track of KDtrees
+        trees = {}
         for nA in a:
+            # Get cKDTree for nA            
+            tA = trees.get( nA.skeleton_id, None )
+            if not tA:
+                trees[nA.skeleton_id] = tA = scipy.spatial.cKDTree( np.vstack( nA.dps.point ), leafsize=10 )
+
             for nB in b:
-                #First, generate an all-by-all distance matrix between all points of both neurons
-                dist_mat = scipy.spatial.distance.cdist( np.vstack( nA.dps.point ), 
-                                                         np.vstack( nB.dps.point ) )
+                # Get cKDTree for nB            
+                tB = trees.get( nB.skeleton_id, None )
+                if not tB:
+                    trees[nB.skeleton_id] = tB = scipy.spatial.cKDTree( np.vstack( nB.dps.point ), leafsize=10 )
 
-                # Convert to um
-                dist_mat /= 1000
+                # Query nB -> nA
+                distA, ixA = tA.query( np.vstack( nB.dps.point ),
+                                           k=1, 
+                                           distance_upper_bound=dist,
+                                           n_jobs=-1
+                                        )
+                # Query nA -> nB
+                distB, ixB = tB.query( np.vstack( nA.dps.point ),
+                                           k=1, 
+                                           distance_upper_bound=dist,
+                                           n_jobs=-1
+                                        )
 
-                #Get closest distances
-                closest_dist = dist_mat.min(axis=1)
+                nA_in_dist = nA.dps.loc[ ixA[ distA != float('inf') ] ]
+                nB_in_dist = nB.dps.loc[ ixB[ distB != float('inf') ] ]
 
-                # Get indices of closest distances
-                closest_ix = dist_mat.argmin(axis=1)
 
-                # Get vectors to match up
-                to_add_nA = nA.dps.loc[ closest_dist <= dist ]
-                to_add_nB = nB.dps.loc[ closest_ix[ closest_dist <= dist ] ]
-
-                vec_lengths = np.array( [ [l,r] for l,r in zip( to_add_nA.vec_length.values, to_add_nB.vec_length.values ) ] )
-
-                if not vec_lengths.any():
+                if nA_in_dist.empty:
                     overlap = 0
                 elif method == 'avg':
-                    overlap = vec_lengths.mean(axis=1).sum() 
+                    overlap = ( nA_in_dist.vec_length.sum() + nB_in_dist.vec_length.sum() ) / 2
                 elif method == 'max':
-                    overlap = vec_lengths.max(axis=1).sum() 
+                    overlap = max( nA_in_dist.vec_length.sum() , nB_in_dist.vec_length.sum() ) 
                 elif method == 'min':
-                    overlap = vec_lengths.min(axis=1).sum() 
-
-                # Convert to um
-                overlap /= 1000
+                    overlap = min( nA_in_dist.vec_length.sum() , nB_in_dist.vec_length.sum() )               
 
                 matrix.at[ nA.skeleton_id, nB.skeleton_id ] = overlap
 
-                pbar.update( 1 )
+            pbar.update( 1 )
+
+     # Convert to um
+    matrix /= 1000
 
     return matrix
 
@@ -2614,13 +2705,13 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
 
         if method != 'NONE':
             #Calculate pairwise distances
-            pdist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
+            dist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
                                                   treenodesB[['x','y','z']].values, 
                                                   metric='euclidean' )                
 
             #Get the closest treenodes
-            tnA = treenodesA.loc[ pdist.argmin(axis=0)[0] ].treenode_id
-            tnB = treenodesB.loc[ pdist.argmin(axis=1)[0] ].treenode_id
+            tnA = treenodesA.loc[ dist.argmin(axis=0)[0] ].treenode_id
+            tnB = treenodesB.loc[ dist.argmin(axis=1)[0] ].treenode_id
 
             module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
 
