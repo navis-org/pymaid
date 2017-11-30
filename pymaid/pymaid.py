@@ -66,8 +66,6 @@ from tqdm import tqdm, trange
 import sys
 import os
 import math
-import warnings
-#warnings.simplefilter('default') #Make warnings be shown by default
 
 from pymaid import core, morpho, igraph_catmaid
 
@@ -488,7 +486,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Fetching', ext
     if isinstance( external_pbar, tqdm ):
         pbar = external_pbar
     else:
-        pbar = tqdm(total=len(threads), desc=desc, disable=module_logger.getEffectiveLevel()>=40 or disable_pbar)
+        pbar = tqdm(total=len(threads), desc=desc, disable=module_logger.getEffectiveLevel()>=40 or disable_pbar) 
 
     # Save start value of pbar (in case we have an external pbar)
     pbar_start = pbar.n
@@ -703,16 +701,17 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
             # Retrieve abutting
             if get_abutting:
+                urls_abut = []
                 module_logger.debug(
                     'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
 
                 for s in to_retrieve:
                     get_connectors_GET_data = {'skeleton_ids[0]': str(s),
                                                'relation_type': 'abutting'}
-                    urls.append(remote_instance._get_connectors_url() + '?%s' %
+                    urls_abut.append(remote_instance._get_connector_links_url() + '?%s' % 
                                 urllib.parse.urlencode(get_connectors_GET_data))
 
-                cn_data = _get_urls_threaded(urls, remote_instance, disable_pb=True)
+                cn_data = _get_urls_threaded(urls_abut, remote_instance, disable_pbar=False) 
 
                 # Add abutting to other connectors in skdata with type == 3
                 for i, cn in enumerate(cn_data):
@@ -2345,9 +2344,8 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     """
 
-    warnings.warn(
-            "get_skids_by_name() is deprecated, use find_neurons() instead",
-            DeprecationWarning
+    module_logger.warning(
+            "Depcreationwarning: get_skids_by_name() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2402,9 +2400,9 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
                             ``[skid1, skid2, skid3 ]``
     """
 
-    warnings.warn(
-            "get_skids_by_annotation() is deprecated, use find_neurons() instead",
-            DeprecationWarning
+
+    module_logger.warning(
+            "Depcreationwarning: get_skids_by_annotation() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -3199,9 +3197,8 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
         return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
 
-    warnings.warn(
-            "get_neuron_list() is deprecated, use find_neurons() instead",
-            DeprecationWarning
+    module_logger.warning(
+            "Depcreationwarning: get_neuron_list() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -3890,9 +3887,8 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
 
     """
 
-    warnings.warn(
-            "get_neurons_in_volume() is deprecated, use find_neurons() instead",
-            DeprecationWarning 
+    module_logger.warning(
+            "Depcreationwarning: get_neurons_in_volume() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
