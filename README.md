@@ -53,6 +53,7 @@ Optional:
 
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually
 - [pyoctree](https://pypi.python.org/pypi/pyoctree/) - used to calculate points in volume, highly recommended
+- [shapely](https://shapely.readthedocs.io/en/latest/) - required if you want 2D plots of CATMAID volumes
 
 
 ## Quickstart:

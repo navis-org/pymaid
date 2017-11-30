@@ -117,7 +117,7 @@ Provides flexible drawing of graphs.
 
 tqdm
 ****
-Neat progress bar.
+Neat progress bars.
 
   - Download: https://pypi.python.org/pypi/tqdm
 
@@ -135,9 +135,15 @@ Generates octrees from meshes to compute ray casting. Used to check if objects a
   - PyPi: https://pypi.python.org/pypi/pyoctree/
   - Github: https://github.com/mhogg/pyoctree
 
-Rpy2
-****
+Rpy2 (optional)
+***************
 Provides interface with R. This allows you to use e.g. R packages from https://github.com/jefferis and https://github.com/alexanderbates. Note that this package is not installed automatically as it would fail if R is not already installed on the system. You have to install Rpy2 manually!
 
   - Download: https://rpy2.readthedocs.io/en/version_2.8.x/overview.html#installation
+
+Shapely (optional)
+******************
+This is used to get 2D representations of CATMAID volumes (currently only required for :func:`~pymaid.plot2d`)
+
+  - Download: hhttps://shapely.readthedocs.io/en/latest/
 
