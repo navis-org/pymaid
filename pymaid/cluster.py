@@ -890,11 +890,11 @@ class clust_results:
 
         if isinstance(self.mat, pd.DataFrame):
             if use_labels:
-                return [self.labels[i] for i in scipy.hierarchy.leaves_list(self.linkage)]
+                return [self.labels[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
             else:
-                return [self.mat.columns.tolist()[i] for i in scipy.hierarchy.leaves_list(self.linkage)]
+                return [self.mat.columns.tolist()[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
         else:
-            return scipy.hierarchy.leaves_list(self.linkage)    
+            return scipy.cluster.hierarchy.leaves_list(self.linkage)    
 
     def calc_cophenet(self):
         """ Returns Cophenetic Correlation coefficient of your clustering.
@@ -904,7 +904,7 @@ class clust_results:
         preserves the original distances,
         """        
 
-        return scipy.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
+        return scipy.cluster.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
 
     def calc_agg_coeff(self):
         """ Returns the agglomerative coefficient, measuring the clustering
@@ -932,7 +932,7 @@ class clust_results:
 
         return coeff
 
-    def cluster(self, method='average'):
+    def cluster(self, method='ward'):
         """ Cluster distance matrix. This will automatically be called when
         attribute linkage is requested for the first time.
 
@@ -1055,14 +1055,14 @@ class clust_results:
         # Compute and plot first dendrogram for all nodes.
         fig = pylab.figure(figsize=(8, 8))
         ax1 = fig.add_axes([0.09, 0.1, 0.2, 0.6])
-        Z1 = scipy.hierarchy.dendrogram(
+        Z1 = scipy.cluster.hierarchy.dendrogram(
             self.linkage, orientation='left', labels=self.labels)
         ax1.set_xticks([])
         ax1.set_yticks([])
 
         # Compute and plot second dendrogram.
         ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
-        Z2 = scipy.hierarchy.dendrogram(self.linkage, labels=self.labels)
+        Z2 = scipy.cluster.hierarchy.dendrogram(self.linkage, labels=self.labels)
         ax2.set_xticks([])
         ax2.set_yticks([])
 
@@ -1204,7 +1204,7 @@ class clust_results:
                     list of clusters [ [leaf1, leaf5], [leaf2, ...], ... ]
         """
 
-        cl = scipy.hierarchy.fcluster(self.linkage, k, criterion=criterion)
+        cl = scipy.cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
 
         if self.labels and return_type.lower()=='labels':
             return [[self.labels[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
