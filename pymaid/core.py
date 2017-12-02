@@ -821,11 +821,13 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def prune_by_longest_neurite(self, reroot_to_soma=False, inplace=True):
+    def prune_by_longest_neurite(self, n=1, reroot_to_soma=False, inplace=True):
         """ Prune neuron down to the longest neurite.
 
         Parameters
         ----------
+        n :                 int, optional
+                            Number of longest neurites to preserve.
         reroot_to_soma :    bool, optional
                             If True, will reroot to soma before pruning.
         inplace :           bool, optional
@@ -846,7 +848,7 @@ class CatmaidNeuron:
             x = self.copy()   
 
         morpho.longest_neurite(
-            x, inplace=True, reroot_to_soma=reroot_to_soma)
+            x, n, inplace=True, reroot_to_soma=reroot_to_soma)
 
         # Clear temporary attributes
         x._clear_temp_attr()
@@ -1666,11 +1668,13 @@ class CatmaidNeuronList:
         x[0].prune_by_strahler(to_prune=x[1], inplace=True)                
         return x[0]
 
-    def prune_by_longest_neurite(self, reroot_to_soma=False, inplace=True):
+    def prune_by_longest_neurite(self, n=1, reroot_to_soma=False, inplace=True):
         """ Prune neurons down to their longest neurites.
 
         Parameters
         ----------
+        n :                 int, optional
+                            Number of longest neurites to preserve.
         reroot_to_soma :    bool, optional
                             If True, neurons will be rerooted to their somas 
                             before pruning.
@@ -1699,7 +1703,7 @@ class CatmaidNeuronList:
             pool.join()
         else:
             for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_by_longest_neurite(reroot_to_soma=reroot_to_soma, inplace=True)
+                n.prune_by_longest_neurite(n, reroot_to_soma=reroot_to_soma, inplace=True)
 
         _set_loggers('INFO')
 
@@ -1708,7 +1712,7 @@ class CatmaidNeuronList:
 
     def _prune_neurite_helper(self, x):
         """ Helper function to parallelise basic operations."""    
-        x[0].prune_by_longest_neurite(x[1], inplace=True)                
+        x[0].prune_by_longest_neurite(x[1], n, inplace=True)                
         return x[0]
 
     def prune_by_volume(self, v, mode='IN', inplace=True):

@@ -565,14 +565,16 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     if not inplace:
         return df
 
-def longest_neurite(x, reroot_to_soma=False, inplace=False):
-    """ Returns a neuron consisting only of the longest neurite (based on 
+def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
+    """ Returns a neuron consisting of the longest neurite(s) (based on 
     geodesic distance).
 
     Parameters
     ----------
     x :                 {CatmaidNeuron,CatmaidNeuronList} 
                         May contain multiple neurons.
+    n :                 int, optional
+                        Number of longest neurites to retain.
     reroot_to_soma :    bool, optional
                         If True, neuron will be rerooted to soma. Soma is the 
                         node with >1000 radius.
@@ -586,15 +588,17 @@ def longest_neurite(x, reroot_to_soma=False, inplace=False):
                    Contains only node data of the longest neurite
     """
 
-    if isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
+    if isinstance(x, core.CatmaidNeuron):
         x = x
-    elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
+    elif isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] == 1:
             x = x.loc[0]
         else:
             module_logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception
+    else:
+        raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
     if not inplace:
         x = x.copy()
@@ -602,31 +606,50 @@ def longest_neurite(x, reroot_to_soma=False, inplace=False):
     if reroot_to_soma and x.soma:
         x.reroot( x.soma )       
 
-    #First collect leafs and root
-    leaf_nodes = x.nodes[x.nodes.type=='end'].treenode_id.tolist()
-    root_nodes = x.nodes[x.nodes.type=='root'].treenode_id.tolist()
+    tn_to_preserve = []
 
-    #Convert to igraph vertex indices
-    leaf_ix = [ v.index for v in x.igraph.vs if v['node_id'] in leaf_nodes ]
-    root_ix = [ v.index for v in x.igraph.vs if v['node_id'] in root_nodes ]
+    for i in range(n):
+        this_x = x.copy()
 
-    #Now get paths from all tips to the root
-    paths = x.igraph.get_shortest_paths( root_ix[0], leaf_ix, mode='ALL' )
+        # Remove nodes that we have already preserved
+        this_x.nodes = this_x.nodes[~this_x.nodes.treenode_id.isin(
+        tn_to_preserve)].reset_index(drop=True)
 
-    #Translate indices back into treenode ids
-    paths_tn = [ [ x.igraph.vs[i]['node_id'] for i in p ] for p in paths ]    
+        # Make sure that all root nodes have their parent set to none
+        this_x.nodes.loc[~this_x.nodes.parent_id.isin(this_x.nodes.treenode_id),'parent_id'] = None
 
-    #Generate DataFrame with all the info
-    path_df = pd.DataFrame( [ [p, x.nodes.set_index('treenode_id').loc[p].reset_index() ] for p in paths_tn ],
-                            columns=['path','nodes']  )
+        # Clear attributes
+        this_x._clear_temp_attr()
 
-    #Now calculate cable of each of the paths
-    path_df['cable'] = [ calc_cable(path_df.loc[i], return_skdata=False, smoothing=1) for i in range(path_df.shape[0])]    
+        #First collect leafs and root
+        leaf_nodes = this_x.nodes[this_x.nodes.type=='end'].treenode_id.tolist()
+        root_nodes = this_x.nodes[this_x.nodes.type=='root'].treenode_id.tolist()
 
-    tn_to_preverse = path_df.sort_values('cable', ascending=False).reset_index().loc[0].path
-    
+        #Convert to igraph vertex indices
+        leaf_ix = [ v.index for v in this_x.igraph.vs if v['node_id'] in leaf_nodes ]
+        root_ix = [ v.index for v in this_x.igraph.vs if v['node_id'] in root_nodes ]
+
+        #Now get path lenghts from all tips to the root
+        all_paths = pd.DataFrame( this_x.igraph.shortest_paths_dijkstra( root_ix, leaf_ix, mode='ALL', weights='weight' ) )
+
+        #Set impossible paths from "inf" to 0
+        all_paths[ all_paths == float('inf')] = 0
+
+        #Get root and leaf pair of largest neurite
+        longest_root = root_ix [ all_paths.max(axis=1).idxmax() ]
+        longest_leaf = leaf_ix[ all_paths.loc[  all_paths.max(axis=1).idxmax() ].idxmax() ]
+
+        # Get path
+        path = this_x.igraph.get_shortest_paths( longest_root, longest_leaf, mode='ALL' )[0]
+
+        #Translate indices back into treenode ids
+        tn_to_preserve += [  this_x.igraph.vs[n]['node_id'] for n in path ]
+
+    #Subset neuron    
     x.nodes = x.nodes[x.nodes.treenode_id.isin(
-        tn_to_preverse)].reset_index(drop=True)
+        tn_to_preserve)].reset_index(drop=True)
+    x.connectors = x.connectors[ x.connectors.treenode_id.isin(
+                    tn_to_preserve)].reset_index(drop=True)
 
     # Reset indices of node and connector tables (important for igraph!)
     x.nodes.reset_index(inplace=True,drop=True)
