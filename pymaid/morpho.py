@@ -2822,7 +2822,8 @@ def distal_to(x, a=None, b=None):
             If a and b are single treenode IDs respectively
     pd.DataFrame
             If a and/or b are lists of treenode IDs. Columns and rows (index)
-            represent treenode IDs.
+            represent treenode IDs. Neurons *a* are rows, neurons *b* are
+            columns.
 
     Examples
     --------
@@ -2843,38 +2844,36 @@ def distal_to(x, a=None, b=None):
     if not isinstance(x, core.CatmaidNeuron ):
         raise ValueError('Please pass a SINGLE CatmaidNeuron')
 
-    if a:
+    if a != None:
         if not isinstance(a, (list, np.ndarray)):
             a = [a]
         # Make sure we're dealing with integers
-        a = np.array(a).astype(int)
-        # Get iGraph vertex indices for our treenodes
-        ix_a = np.array([ v.index for v in x.igraph.vs if v['node_id'] in a ])
-
-        if ix_a.shape != a.shape :
-            module_logger.warning('{0} source treenodes were not found'.format( a.shape[0] - ix_a.shape[0] ))
+        a = np.unique(a).astype(int)
+        # Get iGraph vertex indices for our treenodes 
+        a_vs = x.igraph.vs.select(node_id_in=a)        
     else:
-        ix_a = None
-        a = [ v['node_id'] for v in x.igraph.vs ]
+        a_vs = x.igraph.vs
     
-    if b:
+    if b != None:
         if not isinstance(b, (list, np.ndarray)):
             b = [b]
         # Make sure we're dealing with integers
-        b = np.array(b).astype(int)
-        ix_b = np.array([ v.index for v in x.igraph.vs if v['node_id'] in b ])
-
-        if ix_b.shape != b.shape :
-            module_logger.warning('{0} source treenodes were not found'.format( b.shape[0] - ix_b.shape[0] ))    
+        b = np.unique(b).astype(int)
+        
+        # Get iGraph vertex indices for our treenodes 
+        b_vs = x.igraph.vs.select(node_id_in=b)        
     else:
-        ix_b = None
-        b = [ v['node_id'] for v in x.igraph.vs ]
+        b_vs = x.igraph.vs        
+
+    a_tn = [ v['node_id'] for v in a_vs ]
+    b_tn = [ v['node_id'] for v in b_vs ]
     
     # This holds distances
-    all_paths = x.igraph.shortest_paths_dijkstra(ix_a, ix_b, mode='IN')
+    all_paths = x.igraph.shortest_paths_dijkstra(a_vs, b_vs, mode='IN')
 
-    # Make matrix and transpose
-    df = pd.DataFrame( all_paths, columns=b, index=a ).T
+    # Make and sort matrix
+    df = pd.DataFrame( all_paths, columns=b_tn, index=a_tn)
+    df = df.loc[ a, b ]
 
     if df.shape == (1,1):
         return df.values[0][0] != float('inf')
@@ -2925,6 +2924,17 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
     
     if datatype == 'connectivity_table':
         neurons = [ c for c in x.columns if c not in ['neuron_name', 'skeleton_id', 'num_nodes', 'relation', 'total'] ]
+
+        """
+        # Keep track of existing edges
+        old_upstream = np.array([ [ (source, n) for n in neurons ] for source in x[x.relation=='upstream'].skeleton_id ]) 
+        old_upstream = old_upstream[ x[x.relation=='upstream'][neurons].values > 0 ]
+
+        old_downstream = np.array([ [ (n, target) for n in neurons ] for target in x[x.relation=='downstream'].skeleton_id ]) 
+        old_downstream = old_downstream[ x[x.relation=='downstream'][neurons].values > 0 ]
+
+        old_edges = np.concatenate([old_upstream, old_downstream], axis=0).astype(int)
+        """
 
         # First get connector between neurons on the table
         if not x[ x.relation=='upstream' ].empty:    
@@ -2981,7 +2991,7 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
     edges = cn_data[['source_neuron','target_neuron']].values
 
     # Turn individual edges into synaptic connections
-    unique_edges, counts = np.unique( edges, return_counts=True, axis=0 )
+    unique_edges, counts = np.unique( edges, return_counts=True, axis=0 ) 
     unique_skids = np.unique(edges).astype(str)
     unique_edges=unique_edges.astype(str)    
 
@@ -3013,6 +3023,10 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
 
     # Merge tables
     df = pd.concat( [all_upstream,all_downstream], axis=0, ignore_index=True )
+
+    # Remove neurons that were not in the original data - under certain 
+    # circumstances, neurons can sneak back in
+    df = df[ df.skeleton_id.isin( x.skeleton_id ) ]
 
     # Use original connectivity table to populate data
     aux = x.set_index('skeleton_id')[['neuron_name','num_nodes']].to_dict()    
