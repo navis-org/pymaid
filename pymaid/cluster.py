@@ -223,21 +223,34 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
     pandas.DataFrame    
     """
 
+    PERMISSIBLE_METHODS = ['AVERAGE','MIN','MAX','SUM']
+
+    if method not in PERMISSIBLE_METHODS:
+        raise ValueError('Unknown method "{0}"'.format(method))
+
     # Convert numpy array to DataFrame
     if isinstance(mat, np.ndarray):
         mat = pd.DataFrame(mat)
 
+    # Make sure everything is string
+    mat.index = mat.index.astype(str)
+    mat.columns = mat.columns.astype(str)
+
     if not row_groups:
         row_groups = {r: [r] for r in mat.index.tolist()}
+    else:
+        row_groups = { r : [ str(n) for n in row_groups[r] ] for r in row_groups }
     if not col_groups:
         col_groups = {c: [c] for c in mat.columns.tolist()}
+    else:
+        col_groups = { c : [ str(n) for n in col_groups[c] ] for c in col_groups }
 
     clean_col_groups = {}
     clean_row_groups = {}
 
     not_found = []
     for row in row_groups:
-        not_found += [r for r in row_groups[row]
+        not_found += [ r for r in row_groups[row]
                       if r not in mat.index.tolist()]
         clean_row_groups[row] = [r for r in row_groups[
             row] if r in mat.index.tolist()]
@@ -247,9 +260,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
         clean_col_groups[col] = [c for c in col_groups[
             col] if c in mat.columns.tolist()]
 
-    if not found:
+    if not_found:
         module_logger.warning(
-            'Unable to find the following indices - will skip them: %s' % ', '.join(list(set(not_found))))
+            'Unable to find the following indices - will skip them: {0}'.format(','.join(list(set(not_found)))))
 
     new_mat = pd.DataFrame(np.zeros((len(clean_row_groups), len(
         clean_col_groups))), index=clean_row_groups.keys(), columns=clean_col_groups.keys())
@@ -352,7 +365,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
     # Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
-    neurons = pymaid.eval_skids(x, remote_instance=remote_instance)
+    neurons = pymaid.eval_skids(x, remote_instance=remote_instance)    
 
     # Make sure neurons are strings, not integers
     neurons = [str(n) for n in list(set(neurons))]
@@ -394,10 +407,10 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     number_of_partners = {n: {'upstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'upstream')].shape[0],
                               'downstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'downstream')].shape[0]
                               }
-                          for n in neurons}
-
-    module_logger.debug('Retrieving neuron names')
+                          for n in neurons}    
+    
     # Retrieve names
+    module_logger.debug('Retrieving neuron names')
     neuron_names = pymaid.get_names(
         list(set(neurons + connectivity.skeleton_id.tolist())), remote_instance)
 
