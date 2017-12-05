@@ -39,6 +39,7 @@ Examples
 """
 
 import pandas as pd
+import numpy as np
 from pymaid import core, pymaid
 import logging
 import colorsys
@@ -226,10 +227,12 @@ class handler:
         cu.bevel_resolution = 5
         cu.bevel_depth = 0.007
 
+        # Create dictionary (MUCH fast lookup)
+        node_locs = { r.treenode_id : (r.x,r.y,r.z) for r in x.nodes.itertuples() }
+
         for s in x.segments:
             newSpline = cu.splines.new('POLY')
-            coords = x.nodes.set_index('treenode_id').ix[s][
-                ['x', 'y', 'z']].as_matrix()
+            coords = np.vstack( [node_locs[tn] for tn in s ] )            
             coords *= self.conversion
             coords = coords.tolist()
 
