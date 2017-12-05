@@ -312,8 +312,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
     Important
     ---------
-    Currently, this function generate new treenodes without mapping synapses
-    or tags back onto them!
+    Currently, this function generate new treenodes without mapping soma, 
+    synapses or tags back onto them!
 
     Parameters
     ----------
@@ -812,12 +812,12 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
         return
 
 
-def cut_neuron(skdata, cut_node, g=None):
-    """ Uses igraph to Cut the neuron at given point and returns two new neurons.
+def cut_neuron(x, cut_node, g=None):
+    """ Uses igraph to split neuron at given point and returns two new neurons.
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron, CatmaidNeuronList} 
+    x :        {CatmaidNeuron, CatmaidNeuronList} 
                Must be a single neuron.
     cut_node : {int, str}
                Node ID or a tag of the node to cut. 
@@ -834,9 +834,9 @@ def cut_neuron(skdata, cut_node, g=None):
     >>> # Example for multiple cuts 
     >>> import pymaid    
     >>> remote_instance = pymaid.CatmaidInstance( url, http_user, http_pw, token )
-    >>> skeleton_dataframe = pymaid.get_neuron(skeleton_id,remote_instance)   
+    >>> n = pymaid.get_neuron(skeleton_id)   
     >>> # First cut
-    >>> nA, nB = cut_neuron2( skeleton_data, cut_node1 )
+    >>> nA, nB = cut_neuron2( n, cut_node1 )
     >>> # Second cut
     >>> nD, nE = cut_neuron2( nA, cut_node2 )  
 
@@ -850,54 +850,41 @@ def cut_neuron(skdata, cut_node, g=None):
 
     module_logger.info('Cutting neuron...')
 
-    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
-        df = skdata.copy()
-    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        if skdata.shape[0] == 1:
-            df = skdata.loc[0].copy()
+    if isinstance(x, core.CatmaidNeuron):
+        df = x.copy()
+    elif isinstance(x, core.CatmaidNeuronList):
+        if x.shape[0] == 1:
+            df = x.loc[0].copy()
         else:
             module_logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
+                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception(
-                '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
+                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
+    else:
+        raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
     if g is None:
         g = df.igraph
 
-    if g is None:
-        # Generate iGraph -> order/indices of vertices are the same as in
-        # skdata
-        g = igraph_catmaid.neuron2graph(df)
-    else:
-        g = g.copy()
-
     # If cut_node is a tag (rather than an ID), try finding that node
     if isinstance(cut_node, str):
-        if cut_node not in df.tags:
-            module_logger.error(
-                '#%s: Found no treenode with tag %s - please double check!' % (str(df.skeleton_id),str(cut_node)))                
+        if cut_node not in df.tags:              
             raise ValueError(
                 '#%s: Found no treenode with tag %s - please double check!' % (str(df.skeleton_id),str(cut_node)))
 
         elif len(df.tags[cut_node]) > 1:
-            module_logger.warning(
-                '#%s: Found multiple treenode with tag %s - please double check!' % (str(df.skeleton_id),str(cut_node)))
             raise ValueError(
                 '#%s: Found multiple treenode with tag %s - please double check!' % (str(df.skeleton_id),str(cut_node)))
         else:
-            cut_node = df.tags[cut_node][0]
-
-    module_logger.debug('Cutting neuron...')
+            cut_node = df.tags[cut_node][0]    
 
     try:
         # Select nodes with the correct ID as cut node
-        cut_node_index = g.vs.select(node_id=int(cut_node))[0].index
-    # Should have found only one cut node
-    except:
-        module_logger.error(
-            'No treenode with ID %s in graph - please double check!' % str(cut_node))
+        # Should have found only one cut node
+        cut_node_index = g.vs.select(node_id=int(cut_node))[0].index    
+    except:        
         raise ValueError(
-            'No treenode with ID %s in graph - please double check!' % str(cut_node))
+            'No treenode with ID {0} in graph - please double check!'.format(cut_node))
 
     # Select the cut node's parent (works only if it is not already at root)
     if cut_node != df.root:
@@ -908,8 +895,6 @@ def cut_neuron(skdata, cut_node, g=None):
         cut_node_index = [ v.index for v in df.igraph.vs if v['parent_id'] == cut_node ][0]
     # If that also fails: throw exception
     else:
-        module_logger.error(
-            'Unable to find parent for cut node. Is cut node = root?')
         #parent_node_index = g.es.select(_target=cut_node_index)[0].source
         raise Exception('Unable to cut: Is cut node = root?')
 
@@ -920,97 +905,59 @@ def cut_neuron(skdata, cut_node, g=None):
     # part with the source and mc.partition[1] the part with the target
     if g.vs.select(mc.partition[0]).select(node_id=int(cut_node)):
         dist_partition = mc.partition[0]
-        dist_graph = mc.subgraph(0)
+        #dist_graph = mc.subgraph(0)
         prox_partition = mc.partition[1]
-        prox_graph = mc.subgraph(1)
+        #prox_graph = mc.subgraph(1)
     else:
         dist_partition = mc.partition[1]
-        dist_graph = mc.subgraph(1)
+        #dist_graph = mc.subgraph(1)
         prox_partition = mc.partition[0]
-        prox_graph = mc.subgraph(0)
+        #prox_graph = mc.subgraph(0)
 
     # Set parent_id of distal fragment's graph to None
-    dist_graph.vs.select(node_id=int(cut_node))[0]['parent_id'] = None
+    # dist_graph.vs.select(node_id=int(cut_node))[0]['parent_id'] = None
 
     # Partitions hold the indices -> now we have to translate this into node
     # ids
     dist_partition_ids = g.vs.select(dist_partition)['node_id']
     prox_partition_ids = g.vs.select(prox_partition)['node_id']
 
-    # Set dataframe indices to treenode IDs - will facilitate distributing
-    # nodes
-    if df.nodes.index.name != 'treenode_id':
-        df.nodes.set_index('treenode_id', inplace=True)
+    # If cut was made at root, add cut_node to this neuron
+    if cut_node == df.root:
+        prox_partition_ids += [ cut_node ]
 
-    neuron_dist = pd.DataFrame([[
-        df.neuron_name + '_dist',
-        df.skeleton_id,
-        df.nodes.loc[dist_partition_ids],
-        df.connectors[
-            [c.treenode_id in dist_partition_ids for c in df.connectors.itertuples()]].reset_index(),
-        df.tags,
-        dist_graph
-    ]],
-        columns=['neuron_name', 'skeleton_id',
-                 'nodes', 'connectors', 'tags', 'igraph'],
-        dtype=object
-    ).loc[0]
-
-    neuron_dist.nodes.loc[cut_node, 'parent_id'] = None
-
-    neuron_prox = pd.DataFrame([[
-        df.neuron_name + '_prox',
-        df.skeleton_id,
-        df.nodes.loc[prox_partition_ids],
-        df.connectors[
-            [c.treenode_id not in dist_partition_ids for c in df.connectors.itertuples()]].reset_index(),
-        df.tags,
-        prox_graph
-    ]],
-        columns=['neuron_name', 'skeleton_id',
-                 'nodes', 'connectors', 'tags', 'igraph'],
-        dtype=object
-    ).loc[0]
-
-    # Reclassify cut node in distal as 'root' and its parent in proximal as
-    # 'end' (unless cut was made at the root node)
-    if 'type' in df.nodes:
-        neuron_dist.nodes.loc[cut_node, 'type'] = 'root'
-        if cut_node != df.nodes[df.nodes.parent_id.isnull()].index[0]:
-            neuron_prox.nodes.loc[df.nodes.loc[cut_node,'parent_id'], 'type'] = 'end'
-        else:            
-            neuron_prox.nodes = pd.concat( [ neuron_prox.nodes, neuron_dist.nodes.loc[ [cut_node] ] ] )
-
-    # Now reindex dataframes
-    neuron_dist.nodes.reset_index(inplace=True)
-    neuron_prox.nodes.reset_index(inplace=True)
-    df.nodes.reset_index(inplace=True)
+    # Subset distal neuron
+    neuron_dist = df.copy()
+    neuron_dist.neuron_name += '_dist'
+    # Subset nodes
+    neuron_dist.nodes = neuron_dist.nodes[ neuron_dist.nodes.treenode_id.isin( dist_partition_ids ) ]
+    neuron_dist.connectors = neuron_dist.connectors[ neuron_dist.connectors.treenode_id.isin( dist_partition_ids ) ]
+    # Filter tags
+    neuron_dist.tags = { t : [ tn for tn in df.tags[t] if tn in dist_partition_ids ] for t in neuron_dist.tags }
+    neuron_dist.tags = { t : neuron_dist.tags[t] for t in neuron_dist.tags if neuron_dist.tags[t] }
+    # Set new root node
+    neuron_dist.nodes.loc[ neuron_dist.nodes.treenode_id==cut_node, 'parent_id'] = None        
+    # Reset attributes
+    neuron_dist._clear_temp_attr()
+    
+    # Subset proximal neuron
+    neuron_prox = df.copy()
+    neuron_prox.neuron_name += '_prox'
+    # Subset nodes
+    neuron_prox.nodes = neuron_prox.nodes[ neuron_prox.nodes.treenode_id.isin( prox_partition_ids ) ]
+    neuron_prox.connectors = neuron_prox.connectors[ neuron_prox.connectors.treenode_id.isin( prox_partition_ids ) ]
+    # Filter tags
+    neuron_prox.tags = { t : [ tn for tn in df.tags[t] if tn in prox_partition_ids ] for t in neuron_prox.tags }
+    neuron_prox.tags = { t : neuron_prox.tags[t] for t in neuron_prox.tags if neuron_prox.tags[t] }    
+    # Reset attributes
+    neuron_prox._clear_temp_attr()
 
     module_logger.debug('Cutting finished in {0}s'.format(
                         round(time.time() - start_time)) )
     module_logger.info('Distal: %i nodes/%i synapses| |Proximal: %i nodes/%i synapses' % (neuron_dist.nodes.shape[
-                       0], neuron_dist.connectors.shape[0], neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]))
+                       0], neuron_dist.connectors.shape[0], neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]))      
 
-    if isinstance(df, pd.Series):
-        return neuron_dist, neuron_prox
-    elif isinstance(df, core.CatmaidNeuron):
-        n_dist = df.copy()
-        n_dist.neuron_name += '_dist'
-        #n_dist.nodes = df.nodes.ix[dist_partition_ids].reset_index(drop=True).copy()
-        n_dist.nodes = neuron_dist.nodes
-        n_dist.connectors = df.connectors[
-            [c.treenode_id in dist_partition_ids for c in df.connectors.itertuples()]].reset_index().copy()
-        n_dist.igraph = dist_graph.copy()        
-
-        n_prox = df.copy()
-        n_prox.neuron_name += '_prox'
-        #n_prox.nodes = df.nodes.ix[prox_partition_ids].copy()
-        n_prox.nodes = neuron_prox.nodes
-        n_prox.connectors = df.connectors[
-            [c.treenode_id in prox_partition_ids for c in df.connectors.itertuples()]].reset_index().copy()
-        n_prox.igraph = prox_graph.copy()        
-
-        return n_dist, n_prox
+    return neuron_dist, neuron_prox
 
 
 def _cut_neuron(skdata, cut_node):
@@ -2871,7 +2818,7 @@ def distal_to(x, a=None, b=None):
     # This holds distances
     all_paths = x.igraph.shortest_paths_dijkstra(a_vs, b_vs, mode='IN')
 
-    # Make and sort matrix
+    # Generate matrix and sort according to order of input treenode lists
     df = pd.DataFrame( all_paths, columns=b_tn, index=a_tn)
     df = df.loc[ a, b ]
 
