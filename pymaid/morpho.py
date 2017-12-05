@@ -537,22 +537,19 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
             else:
                 new_parents[this_node] = None
                 break    
-    new_nodes = df.nodes[
-        [tn in new_parents for tn in df.nodes.treenode_id]].copy()    
-    new_nodes.loc[:,'parent_id'] = [new_parents[tn]
-                           for tn in new_nodes.treenode_id]    
+    new_nodes = df.nodes[ df.nodes.treenode_id.isin( list(new_parents.keys()) ) ].copy()           
+    new_nodes.loc[:,'parent_id'] = [new_parents[tn] for tn in new_nodes.treenode_id]
 
     # We have to temporarily set parent of root node from 1 to an integer
-    root_index = new_nodes[new_nodes.parent_id.isnull()].index[0]    
-    new_nodes.loc[root_index, 'parent_id'] = 0    
-    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(
-        int)  # first convert everything to int
-    
-    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(
-        object)  # then back to object so that we can add a 'None'
+    root_ix = new_nodes[new_nodes.parent_id.isnull()].index
+    new_nodes.loc[root_ix, 'parent_id'] = 0
+    # first convert everything to int
+    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(int)      
+    # then back to object so that we can add a 'None'
+    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(object)  
     
     # Reassign parent_id None to root node
-    new_nodes.loc[root_index, 'parent_id'] = None
+    new_nodes.loc[root_ix, 'parent_id'] = None
     
     module_logger.info('Nodes before/after: %i/%i ' %
                        (len(df.nodes), len(new_nodes)))
@@ -659,12 +656,12 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
         return x
 
 
-def reroot_neuron(skdata, new_root, g=None, inplace=False):
+def reroot_neuron(x, new_root, inplace=False):
     """ Uses igraph to reroot the neuron at given point. 
 
     Parameters
     ----------
-    skdata :   {CatmaidNeuron, CatmaidNeuronList} 
+    x :        {CatmaidNeuron, CatmaidNeuronList} 
                Must contain a SINGLE neuron.
     new_root : {int, str}
                Node ID or tag of the node to reroot to.
@@ -685,25 +682,20 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     if new_root == None:
         raise ValueError('New root can not be <None>')
 
-    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
-        df = skdata
-    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        if skdata.shape[0] == 1:
-            df = skdata.loc[0]
+    if isinstance(x, core.CatmaidNeuron):
+        df = x
+    elif isinstance(x, core.CatmaidNeuronList):
+        if x.shape[0] == 1:
+            df = x.loc[0]
         else:
-            module_logger.error(
-                '#%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
             raise Exception(
-                '#%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
+                '{0} neurons provided. Please provide only a single neuron!'.format(x.shape[0]))
     else:
-        module_logger.error(
-            'Unable to process data of type %s' % str(type(skdata)))
-        raise Exception('Unable to process data of type %s' %
-                        str(type(skdata)))
+        raise Exception('Unable to process data of type "{0}"'.format(type(x)))
 
     start_time = time.time()
 
-    # If cut_node is a tag, rather than a ID, try finding that node
+    # If new root is a tag, rather than a ID, try finding that node
     if isinstance(new_root, str):
         if new_root not in df.tags:
             module_logger.error(
@@ -719,37 +711,17 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     if df.nodes.set_index('treenode_id').loc[new_root].parent_id == None:
         module_logger.info('New root == old root! No need to reroot.')
         if not inplace:
-            return df
-        else:
-            return
-
-    if not g:
-        if isinstance(df, core.CatmaidNeuron):
-            g = df.igraph
-        elif instance(df, pd.Series):
-            if df.igraph != None:
-                # Generate iGraph -> order/indices of vertices are the same as
-                # in skdata
-                g = igraph_catmaid.neuron2graph(df)
-                df.igraph = g
-            else:
-                g = df.igraph
+            return df        
+        return
 
     if not inplace:
-        # Now that we have generated the graph, make sure to make all further
-        # work on a copy!
         df = df.copy()
-        df = skdata.copy()
-        # Make sure to copy nodes/connectors as well (essentially everything
-        # that is a DataFrame itself)
-        df.nodes = df.nodes.copy()
-        df.connectors = df.connectors.copy()
-        df.igraph = df.igraph.copy()
+
+    g = df.igraph    
 
     try:
-        # Select nodes with the correct ID as cut node
-        new_root_index = g.vs.select(node_id=int(new_root))[0].index
-    # Should have found only one cut node
+        # Select nodes with the correct ID as new root node
+        new_root_index = g.vs.select(node_id=int(new_root))[0].index    
     except:
         module_logger.error(
             '#%s: Found no treenodes with ID %s - please double check!' % (str(df.skeleton_id),str(new_root)))            
@@ -796,12 +768,7 @@ def reroot_neuron(skdata, new_root, g=None, inplace=False):
     df.nodes.loc[new_root, 'parent_id'] = None
     df.nodes.reset_index(inplace=True)  # Reset index
 
-    # Recalculate node types
-    classify_nodes(df)
-
-    # Delete igraph
-    #df.igraph = igraph_catmaid.neuron2graph(df)
-    del df.igraph
+    df._clear_temp_attr()    
 
     module_logger.info('%s #%s successfully rerooted (%s s)' % (
         df.neuron_name, df.skeleton_id, round(time.time() - start_time, 1)))
