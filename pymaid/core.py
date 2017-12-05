@@ -746,8 +746,8 @@ class CatmaidNeuron:
             dist, prox = morpho.cut_neuron(x, n)
             x.__init__(prox, x._remote_instance, x._meta_data)
 
-        # Clear temporary attributes
-        x._clear_temp_attr()
+        # Clear temporary attributes is done by cut_neuron
+        # x._clear_temp_attr()
 
         if not inplace:
             return x
@@ -778,8 +778,8 @@ class CatmaidNeuron:
         dist, prox = morpho.cut_neuron(x, node)
         x.__init__(dist, x._remote_instance, x._meta_data)
 
-        # Clear temporary attributes
-        x._clear_temp_attr()
+        # Clear temporary attributes is done by cut_neuron
+        # x._clear_temp_attr()
 
         if not inplace:
             return x
