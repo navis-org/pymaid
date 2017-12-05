@@ -250,33 +250,36 @@ def neuron2graph(skdata, append=True):
 
     module_logger.info('Generating graph from skeleton data...')
 
+    # Make sure we have correctly numbered indices
+    nodes = df.nodes.reset_index(drop=True)
+
     # Generate list of vertices -> this order is retained
-    vlist = df.nodes.treenode_id.tolist()
+    vlist = nodes.treenode_id.tolist()
 
     # Get list of edges as indices (needs to exclude root node)
-    tn_index_with_parent = df.nodes[
-        ~df.nodes.parent_id.isnull()].index.values
-    parent_ids = df.nodes[~df.nodes.parent_id.isnull()].parent_id.values
-    df.nodes['temp_index'] = df.nodes.index  # add temporary index column
-    parent_index = df.nodes.set_index('treenode_id').loc[parent_ids,
+    tn_index_with_parent = nodes[
+        ~nodes.parent_id.isnull()].index.values
+    parent_ids = nodes[~nodes.parent_id.isnull()].parent_id.values
+    nodes['temp_index'] = nodes.index  # add temporary index column
+    parent_index = nodes.set_index('treenode_id').loc[parent_ids,
         'temp_index'].values
     # remove temporary column
-    df.nodes.drop('temp_index', axis=1, inplace=True)
+    nodes.drop('temp_index', axis=1, inplace=True)
 
     # Generate list of edges based on index of vertices
     elist = list(zip(tn_index_with_parent, parent_index))
 
     # Save this as backup
-    #elist = [ [ n.Index, vlist.index( n.parent_id )  ] for n in df.nodes.itertuples() if n.parent_id != None ]
+    #elist = [ [ n.Index, vlist.index( n.parent_id )  ] for n in nodes.itertuples() if n.parent_id != None ]
 
     # Generate graph and assign custom properties
     g = Graph(elist, n=len(vlist), directed=True)
 
-    g.vs['node_id'] = df.nodes.treenode_id.tolist()
-    g.vs['parent_id'] = df.nodes.parent_id.tolist()
-    g.vs['X'] = df.nodes.x.tolist()
-    g.vs['Y'] = df.nodes.y.tolist()
-    g.vs['Z'] = df.nodes.z.tolist()
+    g.vs['node_id'] = nodes.treenode_id.tolist()
+    g.vs['parent_id'] = nodes.parent_id.tolist()
+    g.vs['X'] = nodes.x.tolist()
+    g.vs['Y'] = nodes.y.tolist()
+    g.vs['Z'] = nodes.z.tolist()
 
     # Find nodes with synapses and assign the custom property'has_synapse'    
     # This turned out to be really time consuming
@@ -284,8 +287,8 @@ def neuron2graph(skdata, append=True):
     #g.vs.select(node_id_in=df.connectors.treenode_id.tolist())['has_synapse'] = True    
 
     # Generate weights by calculating edge lengths = distance between nodes
-    tn_coords = df.nodes.loc[[e[0] for e in elist], ['x', 'y', 'z']].values
-    parent_coords = df.nodes.loc[[e[1] for e in elist], ['x', 'y', 'z']].values
+    tn_coords = nodes.loc[[e[0] for e in elist], ['x', 'y', 'z']].values
+    parent_coords = nodes.loc[[e[1] for e in elist], ['x', 'y', 'z']].values
 
     w = np.sqrt(np.sum((tn_coords - parent_coords) ** 2, axis=1).astype(float)).tolist()
     g.es['weight'] = w
