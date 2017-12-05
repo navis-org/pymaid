@@ -27,6 +27,8 @@ import colorsys
 import logging
 import png
 
+from tqdm import tqdm
+
 import plotly.plotly as py
 import plotly.offline as pyoff
 import plotly.graph_objs as go
@@ -115,7 +117,7 @@ def close3d():
         pass
 
 
-def plot2d(x, *args, **kwargs):
+def plot2d(x, perspective='frontal', *args, **kwargs):
     """ Generate 2D plots of neurons and neuropils.
 
     Parameters
@@ -158,8 +160,6 @@ def plot2d(x, *args, **kwargs):
 
     Notes
     -----
-    Currently plots only frontal view (x,y axes). X and y limits have been set
-    to fit the adult EM volume -> adjust if necessary.
 
     Optional ``*args`` and ``**kwargs``:
 
@@ -170,10 +170,13 @@ def plot2d(x, *args, **kwargs):
        Plot connectors (synapses, gap junctions, abutting)
 
     ``connectors_only`` (boolean, default = False)
-       Plot only connectors, not the neuron
+       Plot only connectors, not the neuron.
 
     ``zoom`` (boolean, default = False)
-       Zoom in on higher brain centers
+       Zoom in on higher brain centers.
+
+    ``scalebar`` (boolean, default=False)
+       Adds scale bar. Provide integer/float to set size of scalebar in um.
 
     ``auto_limits`` (boolean, default = True)
        By default, limits are being calculated such that they fit the neurons
@@ -186,11 +189,26 @@ def plot2d(x, *args, **kwargs):
        - this may not suit your needs!
 
     ``ax`` (matplotlib ax, default=None)
-       Pass an ax object if you want to plot on an existing canvas
+       Pass an ax object if you want to plot on an existing canvas.
 
     ``color`` (tuple, dict)
 
     """
+
+    POSSIBLE_VIEWS = ['frontal','lateral','top']
+
+    if perspective not in POSSIBLE_VIEWS:
+        raise ValueError('Unknown perspective "{0}". Please use either: {1}'.format(perspective, POSSIBLE_VIEWS))
+    else:
+        if perspective == 'frontal':
+            axis1 = 'x'
+            axis2 = 'y'
+        elif perspective == 'lateral':
+            axis1 = 'z'
+            axis2 = 'y'
+        elif perspective == 'top':
+            axis1 = 'x'
+            axis2 = 'z'
 
     #Dotprops are currently ignored!
     skids, skdata, _dotprops, volumes = _parse_objects(x)         
@@ -200,10 +218,11 @@ def plot2d(x, *args, **kwargs):
     connectors_only = kwargs.get('connectors_only', False)
     zoom = kwargs.get('zoom', False)
     limits = kwargs.get('limits', None)
-    auto_limits = kwargs.get('auto_limits', False)
+    auto_limits = kwargs.get('auto_limits', True)
     ax = kwargs.get('ax', None)
     color = kwargs.get('color', None)
     view = kwargs.get('view', 'frontal')
+    scalebar = kwargs.get('scalebar', False)
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -250,26 +269,20 @@ def plot2d(x, *args, **kwargs):
                 c = np.array(c) / 255
 
             vpatch = mpatches.Polygon(
-            v.to_2d(invert_y=True), closed=True, lw=0, fill=True, fc=c, alpha=1)
+            v.to_2d(view='{0}{1}'.format(axis1,axis2), invert_y=True), closed=True, lw=0, fill=True, fc=c, alpha=1)
             ax.add_patch(vpatch)   
 
     if limits:
         catmaid_limits = limits
     elif auto_limits:
-        min_x = min([n.nodes.x.min() for n in skdata.itertuples()] +
-                    [n.connectors.x.min() for n in skdata.itertuples()])
-        max_x = max([n.nodes.x.max() for n in skdata.itertuples()] +
-                    [n.connectors.x.max() for n in skdata.itertuples()])
+        min_x = min([skdata.nodes.x.min() , skdata.connectors.x.min() ])
+        max_x = max([skdata.nodes.x.max() , skdata.connectors.x.max() ])
 
-        min_y = min([n.nodes.y.min() for n in skdata.itertuples()] +
-                    [n.connectors.y.min() for n in skdata.itertuples()])
-        max_y = max([n.nodes.y.max() for n in skdata.itertuples()] +
-                    [n.connectors.y.max() for n in skdata.itertuples()])
+        min_y = min([skdata.nodes.y.min() , skdata.connectors.y.min() ])
+        max_y = max([skdata.nodes.y.max() , skdata.connectors.y.max() ])
 
-        min_z = min([n.nodes.z.min() for n in skdata.itertuples()] +
-                    [n.connectors.z.min() for n in skdata.itertuples()])
-        max_z = max([n.nodes.z.max() for n in skdata.itertuples()] +
-                    [n.connectors.z.max() for n in skdata.itertuples()])
+        min_z = min([skdata.nodes.z.min() , skdata.connectors.z.min() ])
+        max_z = max([skdata.nodes.z.max() , skdata.connectors.z.max() ])
 
         max_dim = max([max_x - min_x, max_y - min_y, max_z - min_z]) * 1.1
 
@@ -279,7 +292,7 @@ def plot2d(x, *args, **kwargs):
             'x': [int((min_x + (max_x - min_x) / 2) - max_dim / 2), int((min_x + (max_x - min_x) / 2) + max_dim / 2)],
             'z': [int((min_z + (max_z - min_z) / 2) - max_dim / 2), int((min_z + (max_z - min_z) / 2) + max_dim / 2)],
             # This needs to be inverted
-            'y': [int((min_y + (max_y - min_y) / 2) + max_dim / 2), int((min_y + (max_y - min_y) / 2) - max_dim / 2)]
+            'y': [ -1 * int((min_y + (max_y - min_y) / 2) + max_dim / 2), -1 * int((min_y + (max_y - min_y) / 2) - max_dim / 2)]
         }  # z and y need to be inverted here!
     elif zoom:
         catmaid_limits = {  # These limits refer to x/y in CATMAID -> need to invert y (CATMAID coordindates start in upper left, matplotlib bottom left)
@@ -288,50 +301,37 @@ def plot2d(x, *args, **kwargs):
         }
     else:
         catmaid_limits = {  # These limits refer to x/y in CATMAID -> need to invert y (CATMAID coordindates start in upper left, matplotlib bottom left)
-            #'x': [200000, 1000000],
-            #'y': [510000, 150000]
             'x': [200000, 1000000],
             'y': [730000, -70000]
         }
 
-    ax.set_ylim((-catmaid_limits['y'][0], -catmaid_limits['y'][1]))
+    ax.set_ylim((catmaid_limits['y'][0], catmaid_limits['y'][1]))
     ax.set_xlim((catmaid_limits['x'][0], catmaid_limits['x'][1]))
 
     plt.axis('off')
 
     module_logger.debug('Plot limits set to: x= %i -> %i; y = %i -> %i' % (catmaid_limits[
-                        'x'][0], catmaid_limits['x'][1], -catmaid_limits['y'][0], -catmaid_limits['y'][1]))    
+                        'x'][0], catmaid_limits['x'][1], catmaid_limits['y'][0], catmaid_limits['y'][1]))    
 
-    # Create slabs (lines)
-    for i, neuron in enumerate(skdata.itertuples()):
+    # Create lines from segments
+    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0])):
         module_logger.debug('Working on neuron %s...' % neuron.neuron_name)
         lines = []
-
-        if 'type' not in neuron.nodes:
-            morpho.classify_nodes(neuron)
 
         soma = neuron.nodes[neuron.nodes.radius > 1]
 
         if not connectors_only:
-            # Now make traces
-            try:
-                neuron._generate_segments
-            except:
-                neuron._generate_segments = morpho._generate_segments(neuron)
+            # Now make traces (invert y axis)
+            coords = _segments_to_coords(neuron, neuron.segments, modifier=(1,-1,1))
 
-            lines = _slabs_to_coords(neuron, neuron.slabs, invert=False)
+            # We have to add (None,None,None) to the end of each slab to
+            # make that line discontinuous there
+            coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
 
-            module_logger.debug('Creating %i lines' % len(lines))
-            module_logger.debug([len(l) for l in lines])
-            for k, l in enumerate(lines):
-                # User first line to assign a legend
-                if k == 0:
-                    this_line = mlines.Line2D([int(x[0]) for x in l], [-int(y[1]) for y in l], lw=1, alpha=.9, color=colormap[ neuron.skeleton_id ], 
-                                label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id))
-                else:
-                    this_line = mlines.Line2D(
-                        [int(x[0]) for x in l], [- int(y[1]) for y in l], lw=1, alpha=.9, color=colormap[ neuron.skeleton_id ])
-                ax.add_line(this_line)
+            this_line = mlines.Line2D( coords[:,0], coords[:,1], lw=1, alpha=.9, color=colormap[ neuron.skeleton_id ], 
+                                label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
+
+            ax.add_line(this_line)
 
             for n in soma.itertuples():
                 s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius, alpha=.9,
@@ -354,21 +354,36 @@ def plot2d(x, *args, **kwargs):
             ax.scatter(neuron.connectors[neuron.connectors.relation == 3].x.tolist(), (-neuron.connectors[
                        neuron.connectors.relation == 3].y).tolist(), c='magenta', alpha=1, zorder=4, edgecolor='none', s=1)
 
+    if scalebar != None:
+        if isinstance(scalebar, (float,int)):
+            sc_size = scalebar
+        else:
+            sc_size = 10
+
+        coords = [ [ catmaid_limits[axis1][0]*1.1, catmaid_limits[axis2][0]*.9 ],
+                   [ catmaid_limits[axis1][0]*1.1 + sc_size * 1000, catmaid_limits[axis2][0]*.9 ] ]
+
+        print(coords)        
+
+        sbar = mlines.Line2D( [int(x[0]) for x in coords], [int(y[1]) for y in coords], lw=3, alpha=.9, color='black')
+
+        ax.add_line( sbar )
+
     module_logger.info('Done. Use matplotlib.pyplot.show() to show plot.')
 
     return fig, ax
 
 
-def _slabs_to_coords(x, slabs, invert=False):
+def _segments_to_coords(x, segments, modifier=(1,1,1)):
     """Turns lists of treenode_ids into coordinates
 
     Parameters
     ----------
     x :         {pandas DataFrame, CatmaidNeuron}
                 Must contain the nodes
-    slabs :     list of treeenode IDs
-    invert :    boolean, optional
-                If True, coordinates will be inverted
+    segments :  list of treenode IDs
+    modifier :  ints, optional
+                Use to modify/invert x/y/z axes.
 
     Returns
     -------
@@ -376,15 +391,12 @@ def _slabs_to_coords(x, slabs, invert=False):
                 [ (x,y,z), (x,y,z ) ]
     """
 
-    coords = []
-    nodes = x.nodes.set_index('treenode_id')
+    if not isinstance( modifier, np.ndarray ):
+        modifier = np.array(modifier)
 
-    for l in slabs:
-        if not invert:
-            coords.append(nodes.ix[l][['x', 'y', 'z']].as_matrix().tolist())
-        else:
-            coords.append((nodes.ix[l][['x', 'y', 'z']]
-                           * -1).as_matrix().tolist())
+    locs = { r.treenode_id : (r.x,r.y,r.z) for r in x.nodes.itertuples() }
+
+    coords = ( [ np.array([ locs[tn] for tn in s ]) * modifier for s in segments ] )
 
     return coords
 
@@ -849,10 +861,7 @@ def plot3d(x, *args, **kwargs):
         # Generate sphere for somas
         fib_points = _fibonacci_sphere(samples=30)
 
-        module_logger.info('Generating traces...')
-
-        #Generate slabs for all neurons at once -> uses multi-cores!
-        skdata._generate_segments()
+        module_logger.info('Generating traces...')        
 
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
@@ -864,27 +873,19 @@ def plot3d(x, *args, **kwargs):
             if not connectors_only:
                 if by_strahler:
                     s_index = morpho.calc_strahler_index(
-                        skdata.ix[i], return_dict=True)
-
-                # First, we have to generate slabs from the neurons
-                if 'type' not in neuron.nodes:
-                    morpho.classify_nodes(neuron)
+                        skdata.ix[i], return_dict=True)                
 
                 soma = neuron.nodes[neuron.nodes.radius > 1]                
 
-                coords = _slabs_to_coords(neuron, neuron.slabs, invert=True)
+                coords = _segments_to_coords(neuron, neuron.segments, modifier=(-1,-1,-1))
 
                 # We have to add (None,None,None) to the end of each slab to
                 # make that line discontinuous there
-                coords = [t + [[None] * 3] for t in coords]
+                coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
 
-                x_coords = [co[0] for l in coords for co in l]
-                y_coords = [co[1] for l in coords for co in l]
-                z_coords = [co[2] for l in coords for co in l]
                 c = []
-
                 if by_strahler:
-                    for k, s in enumerate(slabs):
+                    for k, s in enumerate(coords):
                         this_c = 'rgba(%i,%i,%i,%f)' % (colormap[str(skid)][0],
                                                         colormap[str(skid)][1],
                                                         colormap[str(skid)][2],
@@ -899,9 +900,9 @@ def plot3d(x, *args, **kwargs):
                     except:
                         c = 'rgb(10,10,10)'
 
-                trace_data.append(go.Scatter3d(x=x_coords,
-                                               y=z_coords,  # y and z are switched
-                                               z=y_coords,
+                trace_data.append(go.Scatter3d(x=coords[:,0],
+                                               y= coords[:,2],  # y and z are switched
+                                               z=coords[:,1],
                                                mode='lines',
                                                line=dict(
                                                    color=c,
