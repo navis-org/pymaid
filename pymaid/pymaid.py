@@ -1151,10 +1151,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
             connectivity_data[d].pop(n)
 
     names = get_names([n for d in connectivity_data for n in connectivity_data[
-                      d]] + x, remote_instance)
-
-    module_logger.info('Done. Found %i up- %i downstream neurons' % (
-        len(connectivity_data['incoming']), len(connectivity_data['outgoing'])))
+                      d]] + x, remote_instance)    
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
                                'num_nodes', 'relation'] + [str(s) for s in x])
@@ -1162,7 +1159,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
     relations = {
         'incoming': 'upstream',
         'outgoing': 'downstream',
-                    'gapjunctions': 'gapjunction'
+        'gapjunctions': 'gapjunction'
     }
 
     for d in relations:
@@ -1189,7 +1186,7 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
         if not isinstance(filt, (list, np.ndarray)):
             filt = [filt]
 
-        filt = [str(s) for s in f]
+        filt = [str(s) for s in filt]
 
         df = df[df.skeleton_id.isin(filt) | df.neuron_name.isin(filt)]
 
@@ -1197,6 +1194,9 @@ def get_partners(x, remote_instance=None, threshold=1,  min_size=2, filt=[], dir
 
     # Return reindexed concatenated dataframe
     df.reset_index(drop=True, inplace=True)
+
+    module_logger.info('Done. Found {0} pre-, {1} postsynaptic and {2} gap junction-connected neurons'.format(
+        *[df[df.relation==r].shape[0] for r in ['upstream','downstream','gapjunction']]) )
 
     return df
 
@@ -1593,7 +1593,8 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
                 14: {'relation': 'presynaptic_to', 'type': 'synaptic'},
                 54650: {'relation': 'abutting', 'type': 'abutting'},
                 686364: {'relation': 'gapjunction_with', 'type': 'gap_junction'}, 
-                5989640: {'relation': 'attached_to', 'type': 'attachment'} # ATTENTION: apparently "attachment" can be part of any connector type
+                5989640: {'relation': 'attached_to', 'type': 'attachment'}, # ATTENTION: apparently "attachment" can be part of any connector type
+                'unknown': {'relation': 'unknown', 'type': 'unknown'}
             }
 
     df['type'] = [ rel_ids[ data['partners'].get( str(cn_id), [['unknown',0]])[0][-2] ]['type'] for cn_id in df.connector_id.tolist()  ]
