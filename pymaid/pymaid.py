@@ -96,7 +96,9 @@ if len( module_logger.handlers ) == 0:
     module_logger.addHandler(sh)
 
 class CatmaidInstance:
-    """ A class giving access to a CATMAID instance.
+    """ A class giving access to a CATMAID instance. Holds base url, 
+    credentials and fetches data. You can either pass this object to  
+    functions individually or define globally (default).        
 
     Attributes
     ----------
@@ -118,15 +120,7 @@ class CatmaidInstance:
                     If set to None, time-out will be max([ 30, len(requests) ]).
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
-                    adding it as module 'remote_instance' to sys.modules.
-
-    Notes
-    -----
-    CatmaidInstance holds credentials and performs fetch operations. 
-    You can either pass this object to each function individually or 
-    define module wide by using e.g:: 
-
-        pymaid.remote_instance = CatmaidInstance
+                    adding it as module 'remote_instance' to sys.modules. 
 
     Examples
     --------
@@ -755,6 +749,17 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                              'nodes', 'connectors', 'tags'],
                     dtype=object
                 )
+
+            # Convert data to respective dtypes
+            dtypes = {'treenode_id':int, 'parent_id':object, 
+                      'creator_id':int, 'relation':int, 
+                      'connector_id':int, 'x':int, 'y':int, 'z':int, 
+                      'radius':int, 'confidence':int}
+
+            for k, v in dtypes.items():
+                for t in ['nodes','connectors']:
+                    if k in df.loc[0,t]:
+                        df.loc[0,t][k] = df.loc[0,t][k].astype(v)
 
             # Collect this batch
             collection.append(df)            
