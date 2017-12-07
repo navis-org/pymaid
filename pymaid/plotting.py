@@ -21,7 +21,11 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.collections as mcollections
+from matplotlib.collections import PolyCollection
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from mpl_toolkits.mplot3d import proj3d
 import matplotlib.colors as mcl
+
 import random
 import colorsys
 import logging
@@ -66,7 +70,7 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['plot3d','plot2d','plot_network','clear3d','close3d','screenshot',]
+__all__ = ['plot3d','plot2d','plot_network','clear3d','close3d','screenshot']
 
 
 def screenshot(file='screenshot.png', alpha=True):
@@ -116,9 +120,31 @@ def close3d():
     except:
         pass
 
+def _orthogonal_proj(zfront, zback):
+    """ Function to get matplotlib to use orthogonal instead of perspective
+    view. 
 
-def plot2d(x, perspective='frontal', *args, **kwargs):
-    """ Generate 2D plots of neurons and neuropils.
+    Usage:
+    proj3d.persp_transformation = _orthogonal_proj    
+    """ 
+    a = (zfront+zback)/(zfront-zback)
+    b = -2*(zfront*zback)/(zfront-zback)
+    # -0.0001 added for numerical stability as suggested in:
+    # http://stackoverflow.com/questions/23840756
+    return np.array([[1,0,0,0],
+                        [0,1,0,0],
+                        [0,0,a,b],
+                        [0,0,-0.0001,zback]])
+
+
+def plot2d(x, method='2d', *args, **kwargs):
+    """ Generate 2D plots of neurons and neuropils. The main advantage of this
+    is that you can save plot as vector graphics. *Important*: this function 
+    uses matplotlib which "fakes" 3D as it has only very limited control over 
+    layers. Therefore neurites aren't necessarily plotted in the right Z order
+    which becomes especially troublesome when plotting a complex scene with 
+    lots of neurons criss-crossing. See the _method_ parameter for details.
+    All methods use orthogonal projection. 
 
     Parameters
     ----------
@@ -128,6 +154,20 @@ def plot2d(x, perspective='frontal', *args, **kwargs):
                         - int is intepreted as skeleton ID(s) 
                         - str is intepreted as volume name(s) 
                         - multiple objects can be passed as list (see examples)
+    method :          {'2d','3d','3d_complex'}
+                      Method used to generate plot. Comes in three flavours:
+                        1. '2d' uses normal matplotlib. Neurons are plotted in
+                           the order their are provided. Well behaved when 
+                           plotting neuropils and connectors. Always gives 
+                           frontal view.
+                        2. '3d' uses matplotlib's 3D axis. Here, matplotlib
+                           decide the order of plotting. Can chance perspective
+                           either interacively or by code (see examples).
+                        3. '3d_complex' same as 3d but each neuron segment is 
+                           added individually. This allows for more complex
+                           crossing patterns to be rendered correctly. Slows
+                           down rendering though.
+
 
     remote_instance : Catmaid Instance, optional
                       Need this too if you are passing only skids
@@ -138,21 +178,33 @@ def plot2d(x, perspective='frontal', *args, **kwargs):
 
     Examples
     --------
+    >>> import matplotlib.pyplot as plt
     >>> # 1. Plot two neurons and have plot2d download the skeleton data for you:    
-    >>> fig, ax = pymaid.plot2d( [12345, 45567] )
-    >>> matplotlib.pyplot.show()
+    >>> fig, ax = pymaid.plot2d( [12345, 45567] )    
     >>> # 2. Manually download a neuron, prune it and plot it:
     >>> neuron = pymaid.get_neuron( [12345], rm )
     >>> neuron.prune_distal_to( 4567 )
     >>> fig, ax = pymaid.plot2d( neuron )
     >>> matplotlib.pyplot.show()
     >>> # 3. Plots neuropil in grey, and mushroom body in red:
-    >>> np = pymaid.get_volume('v14.neuropil')
-    >>> np.color = (.8,.8,.8)
+    >>> neurop = pymaid.get_volume('v14.neuropil')
+    >>> neurop.color = (.8,.8,.8)
     >>> mb = pymaid.get_volume('v14.MB_whole')
     >>> mb.color = (.8,0,0)
-    >>> fig, ax = pymaid.plot2d(  [ 12346, np, mb ] )    
+    >>> fig, ax = pymaid.plot2d(  [ 12346, neurop, mb ] )    
     >>> matplotlib.pyplot.show()
+    >>> # Change perspective
+    >>> fig, ax = pymaid.plot2d( neuron, method='3d_complex' )
+    >>> # Change view to lateral
+    >>> ax.azim = 0
+    >>> ax.elev = 0
+    >>> # Change view to top
+    >>> ax.azim = -90
+    >>> ax.elev = 90
+    >>> # Tilted top view
+    >>> ax.azim = -135
+    >>> ax.elev = 45
+
 
     Returns
     --------
@@ -163,52 +215,52 @@ def plot2d(x, perspective='frontal', *args, **kwargs):
 
     Optional ``*args`` and ``**kwargs``:
 
-    ``view`` (str, {'dorsal','lateral','frontal'})
-       By default, frontal view is plotted.
-
     ``connectors`` (boolean, default = True )
        Plot connectors (synapses, gap junctions, abutting)
 
     ``connectors_only`` (boolean, default = False)
-       Plot only connectors, not the neuron.
+       Plot only connectors, not the neuron.    
 
-    ``zoom`` (boolean, default = False)
-       Zoom in on higher brain centers.
-
-    ``scalebar`` (boolean, default=False)
+    ``scalebar`` (int/float, default=False)
        Adds scale bar. Provide integer/float to set size of scalebar in um.
-
-    ``auto_limits`` (boolean, default = True)
-       By default, limits are being calculated such that they fit the neurons
-       plotted.
-
-    ``limits`` (dict, default = None)
-       Manually override limits for plot. Dict needs to define min and max
-       values for each axis: ``{ 'x' : [ int, int ], 'y' : [ int, int ] }``
-       If ``auto_limits = False`` and ``limits = None``, a hard-coded fallback is used
-       - this may not suit your needs!
+       For methods '3d' and '3d_complex', this will create an axis object.
 
     ``ax`` (matplotlib ax, default=None)
        Pass an ax object if you want to plot on an existing canvas.
 
-    ``color`` (tuple, dict)
+    ``color`` (tuple/list/str, dict)
+      Tuples/lists (r,g,b) and str (color name) are interpreted as a single 
+      colors that will be applied to all neurons. Dicts will be mapped onto 
+      neurons by skeleton ID. 
+
+    ``group_neurons`` (bool, default=False)
+      If True, neurons will be grouped. Works with SVG export (not PDF). 
+      Does NOT work with method = '3d_complex'
+
+    See Also
+    --------
+    :func:`pymaid.plot3d`
+            Use this if you want interactive, perspectively correct renders 
+            and if you don't need vector graphics as outputs.
 
     """
 
-    POSSIBLE_VIEWS = ['frontal','lateral','top']
+    _ACCEPTED_KWARGS = ['remote_instance','connectors','connectors_only',
+                        'ax','color','view','scalebar','cn_mesh_colors',
+                        'linewidth','cn_size','group_neurons']
+    wrong_kwargs = [ a for a in kwargs if a not in _ACCEPTED_KWARGS ]
+    if wrong_kwargs:
+        raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS) ))
 
-    if perspective not in POSSIBLE_VIEWS:
-        raise ValueError('Unknown perspective "{0}". Please use either: {1}'.format(perspective, POSSIBLE_VIEWS))
-    else:
-        if perspective == 'frontal':
-            axis1 = 'x'
-            axis2 = 'y'
-        elif perspective == 'lateral':
-            axis1 = 'z'
-            axis2 = 'y'
-        elif perspective == 'top':
-            axis1 = 'x'
-            axis2 = 'z'
+    _METHOD_OPTIONS = ['2d','3d', '3d_complex']
+    if method not in _METHOD_OPTIONS:
+        raise ValueError('Unknown method "{0}". Please use either: {1}'.format(method, _METHOD_OPTIONS))
+
+    # Set axis to plot for method '2d'
+    axis1, axis2 = 'x', 'y'
+
+    # Keep track of limits if necessary
+    lim = []
 
     #Dotprops are currently ignored!
     skids, skdata, _dotprops, volumes = _parse_objects(x)         
@@ -216,13 +268,14 @@ def plot2d(x, perspective='frontal', *args, **kwargs):
     remote_instance = kwargs.get('remote_instance', None)
     connectors = kwargs.get('connectors', True)
     connectors_only = kwargs.get('connectors_only', False)
-    zoom = kwargs.get('zoom', False)
-    limits = kwargs.get('limits', None)
-    auto_limits = kwargs.get('auto_limits', True)
+    cn_mesh_colors = kwargs.get('cn_mesh_colors', False)              
     ax = kwargs.get('ax', None)
-    color = kwargs.get('color', None)
-    view = kwargs.get('view', 'frontal')
-    scalebar = kwargs.get('scalebar', False)
+    color = kwargs.get('color', None)    
+    scalebar = kwargs.get('scalebar', None)
+    group_neurons = kwargs.get('group_neurons', False)
+
+    linewidth = kwargs.get('linewidth', .5) 
+    cn_size = kwargs.get('cn_size', 1) 
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -253,121 +306,200 @@ def plot2d(x, perspective='frontal', *args, **kwargs):
         color = tuple( [ int(c *255) for c in mcl.to_rgb(color) ] )
         colormap = {n: color for n in skdata.skeleton_id.tolist()}
     else:
-        colormap = {} 
+        raise ValueError('Unable to interpret colors of type "{0}"'.format(type(colors)))
 
     if not ax:
-        fig, ax = plt.subplots(figsize=(8, 8))
+        if method=='2d':
+            fig, ax = plt.subplots(figsize=(8, 8))            
+        elif method in ['3d','3d_complex']:
+            fig = plt.figure(figsize=plt.figaspect(1)*1.5)
+            ax = fig.gca(projection='3d')
+            # Set projection to orthogonal
+            proj3d.persp_transformation = _orthogonal_proj
+            # This sets front view
+            ax.azim = -90
+            ax.elev = 0
         ax.set_aspect('equal')
     else:
-        fig = None #we don't really need this    
-
+        fig = None #we don't really need this
+    
     if volumes:
-        for v in volumes:            
+        for v in volumes:                        
             c = v.get('color', (0.9, 0.9, 0.9))
 
-            if sum(c) > 3:
-                c = np.array(c) / 255
+            if sum(c[:3]) > 3:
+                c = np.array(c)
+                c[:3] = np.array(c[:3]) / 255
 
-            vpatch = mpatches.Polygon(
-            v.to_2d(view='{0}{1}'.format(axis1,axis2), invert_y=True), closed=True, lw=0, fill=True, fc=c, alpha=1)
-            ax.add_patch(vpatch)   
-
-    if limits:
-        catmaid_limits = limits
-    elif auto_limits:
-        min_x = min([skdata.nodes.x.min() , skdata.connectors.x.min() ])
-        max_x = max([skdata.nodes.x.max() , skdata.connectors.x.max() ])
-
-        min_y = min([skdata.nodes.y.min() , skdata.connectors.y.min() ])
-        max_y = max([skdata.nodes.y.max() , skdata.connectors.y.max() ])
-
-        min_z = min([skdata.nodes.z.min() , skdata.connectors.z.min() ])
-        max_z = max([skdata.nodes.z.max() , skdata.connectors.z.max() ])
-
-        max_dim = max([max_x - min_x, max_y - min_y, max_z - min_z]) * 1.1
-
-        # Also make sure that dimensions along all axes are the same -
-        # otherwise plot will be skewed
-        catmaid_limits = {  # These limits refer to x/y/z in CATMAID -> will later on be inverted to make 2d plot
-            'x': [int((min_x + (max_x - min_x) / 2) - max_dim / 2), int((min_x + (max_x - min_x) / 2) + max_dim / 2)],
-            'z': [int((min_z + (max_z - min_z) / 2) - max_dim / 2), int((min_z + (max_z - min_z) / 2) + max_dim / 2)],
-            # This needs to be inverted
-            'y': [ -1 * int((min_y + (max_y - min_y) / 2) + max_dim / 2), -1 * int((min_y + (max_y - min_y) / 2) - max_dim / 2)]
-        }  # z and y need to be inverted here!
-    elif zoom:
-        catmaid_limits = {  # These limits refer to x/y in CATMAID -> need to invert y (CATMAID coordindates start in upper left, matplotlib bottom left)
-            'x': [380000, 820000],
-            'y': [355333, 150000]
-        }
-    else:
-        catmaid_limits = {  # These limits refer to x/y in CATMAID -> need to invert y (CATMAID coordindates start in upper left, matplotlib bottom left)
-            'x': [200000, 1000000],
-            'y': [730000, -70000]
-        }
-
-    ax.set_ylim((catmaid_limits['y'][0], catmaid_limits['y'][1]))
-    ax.set_xlim((catmaid_limits['x'][0], catmaid_limits['x'][1]))
-
-    plt.axis('off')
-
-    module_logger.debug('Plot limits set to: x= %i -> %i; y = %i -> %i' % (catmaid_limits[
-                        'x'][0], catmaid_limits['x'][1], catmaid_limits['y'][0], catmaid_limits['y'][1]))    
+            if method == '2d':
+                vpatch = mpatches.Polygon(
+                v.to_2d(view='{0}{1}'.format(axis1,axis2), invert_y=True), closed=True, lw=0, fill=True, fc=c, alpha=1)
+                ax.add_patch(vpatch)
+            elif method in ['3d','3d_complex']:                                            
+                verts = np.vstack( v['vertices'] )
+                # Invert y-axis
+                verts[:,1] *= -1
+                # Add alpha
+                if len(c) == 3:
+                    c = ( c[0],c[1],c[2],.1 )
+                ts = ax.plot_trisurf( verts[:,0],verts[:,2],v['faces'], verts[:,1], label=v['name'], color=c)
+                ts.set_gid( v['name'] )
+                # Keep track of limits
+                lim.append( verts.max(axis=0) )
+                lim.append( verts.min(axis=0) )
 
     # Create lines from segments
-    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0])):
-        module_logger.debug('Working on neuron %s...' % neuron.neuron_name)
-        lines = []
-
-        soma = neuron.nodes[neuron.nodes.radius > 1]
+    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0])):        
+        this_color = colormap[ neuron.skeleton_id ]
 
         if not connectors_only:
+            soma = neuron.nodes[neuron.nodes.radius > 1]
+
             # Now make traces (invert y axis)
-            coords = _segments_to_coords(neuron, neuron.segments, modifier=(1,-1,1))
+            coords = _segments_to_coords(neuron, neuron.segments, modifier=(1,-1,1))            
 
-            # We have to add (None,None,None) to the end of each slab to
-            # make that line discontinuous there
-            coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
+            if method == '2d':
+                # We have to add (None,None,None) to the end of each slab to
+                # make that line discontinuous there
+                coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
 
-            this_line = mlines.Line2D( coords[:,0], coords[:,1], lw=1, alpha=.9, color=colormap[ neuron.skeleton_id ], 
-                                label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
+                this_line = mlines.Line2D( coords[:,0], coords[:,1], lw=linewidth, alpha=.9, color=this_color, 
+                                    label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )                
 
-            ax.add_line(this_line)
+                ax.add_line(this_line)
 
-            for n in soma.itertuples():
-                s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius, alpha=.9,
-                                    fill=True, color=colormap[ neuron.skeleton_id ], zorder=4, edgecolor='none')
-                ax.add_patch(s)
+                for n in soma.itertuples():
+                    s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius, alpha=.9,
+                                        fill=True, color=this_color, zorder=4, edgecolor='none')
+                    ax.add_patch(s)
+
+            elif method in ['3d','3d_complex']:
+                # For simple scenes, add whole neurons at a time -> will speed up rendering
+                if method == '3d':                    
+                    lc = Line3DCollection( [ c[:,[0,2,1]] for c in coords ], color = this_color, 
+                                           label=neuron.neuron_name, 
+                                           lw=linewidth)
+                    if group_neurons:
+                        lc.set_gid( neuron.neuron_name )                    
+                    ax.add_collection3d( lc )   
+                # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
+                elif method =='3d_complex':                    
+                    for c in coords:
+                        lc = Line3DCollection( [c[:,[0,2,1]] ], color = this_color, 
+                                               lw=linewidth )                        
+                        if group_neurons:
+                            lc.set_gid( neuron.neuron_name )
+                        ax.add_collection3d( lc )
+
+                coords = np.vstack(coords)
+                lim.append( coords.max(axis=0) )
+                lim.append( coords.min(axis=0) )                    
+
+                for n in soma.itertuples():
+                    resolution = 20
+                    u = np.linspace(0, 2 * np.pi, resolution)
+                    v = np.linspace(0, np.pi, resolution)
+                    x = n.radius * np.outer(np.cos(u), np.sin(v)) + n.x
+                    y = n.radius * np.outer(np.sin(u), np.sin(v)) - n.y
+                    z = n.radius * np.outer(np.ones(np.size(u)), np.cos(v)) + n.z
+                    surf = ax.plot_surface(x, z, y, color=this_color, shade=False)
+                    if group_neurons:
+                        surf.set_gid( neuron.neuron_name )
 
         if connectors or connectors_only:
-            module_logger.debug('Plotting %i pre- and %i postsynapses' % (neuron.connectors[
-                                neuron.connectors.relation == 0].shape[0], neuron.connectors[neuron.connectors.relation == 1].shape[0]))
-            # postsynapses
-            ax.scatter(neuron.connectors[neuron.connectors.relation == 1].x.tolist(), (-neuron.connectors[
-                       neuron.connectors.relation == 1].y).tolist(), c='blue', alpha=1, zorder=4, edgecolor='none', s=2)
-            # presynapses
-            ax.scatter(neuron.connectors[neuron.connectors.relation == 0].x.tolist(), (-neuron.connectors[
-                       neuron.connectors.relation == 0].y).tolist(), c='red', alpha=1, zorder=4, edgecolor='none', s=2)
-            # gap junctions
-            ax.scatter(neuron.connectors[neuron.connectors.relation == 2].x.tolist(), (-neuron.connectors[
-                       neuron.connectors.relation == 2].y).tolist(), c='green', alpha=1, zorder=4, edgecolor='none', s=2)
-            # abutting
-            ax.scatter(neuron.connectors[neuron.connectors.relation == 3].x.tolist(), (-neuron.connectors[
-                       neuron.connectors.relation == 3].y).tolist(), c='magenta', alpha=1, zorder=4, edgecolor='none', s=1)
+            if not cn_mesh_colors:
+                cn_types = {0: 'red', 1 : 'blue', 2 : 'green', 3 : 'magenta'}
+            else:
+                cn_types = {0:  this_color, 1 :  this_color, 2 : this_color, 3 : this_color}
+            if method == '2d': 
+                for c in cn_types:
+                    this_cn = neuron.connectors[neuron.connectors.relation == c]                               
+                    ax.scatter(this_cn.x.values, 
+                              (-this_cn.y).values, 
+                              c=cn_types[c], alpha=1, zorder=4, edgecolor='none', s=cn_size)
+                    ax.get_children()[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
+            elif method in ['3d','3d_complex']:
+                all_cn = neuron.connectors
+                c = [ cn_types[i] for i in all_cn.relation.tolist() ]
+                ax.scatter(all_cn.x.values, all_cn.z.values, -all_cn.y.values,
+                           c=c, s=cn_size, depthshade=False, edgecolor='none') 
+                ax.get_children()[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
 
-    if scalebar != None:
-        if isinstance(scalebar, (float,int)):
-            sc_size = scalebar
-        else:
-            sc_size = 10
+            coords = neuron.connectors[['x','y','z']].as_matrix()
+            coords[:,1] *= -1
+            lim.append( coords.max(axis=0) )
+            lim.append( coords.min(axis=0) )     
+    
+    if method == '2d':
+        ax.autoscale()
+    elif method in ['3d','3d_complex']:
+        lim = np.vstack(lim)
+        lim_min = lim.min(axis=0)
+        lim_max = lim.max(axis=0)
 
-        coords = [ [ catmaid_limits[axis1][0]*1.1, catmaid_limits[axis2][0]*.9 ],
-                   [ catmaid_limits[axis1][0]*1.1 + sc_size * 1000, catmaid_limits[axis2][0]*.9 ] ]
+        center = lim_min + ( lim_max - lim_min ) / 2 
+        max_dim = ( lim_max - lim_min ).max()
 
-        print(coords)        
+        new_min = center - max_dim / 2
+        new_max = center + max_dim / 2
 
-        sbar = mlines.Line2D( [int(x[0]) for x in coords], [int(y[1]) for y in coords], lw=3, alpha=.9, color='black')
+        ax.set_xlim( new_min[0], new_max[0] )
+        ax.set_ylim( new_min[2], new_max[2] )
+        ax.set_zlim( new_max[1], new_min[1] )
 
-        ax.add_line( sbar )
+        ax.set_xlim( lim_min[0], lim_min[0]+max_dim )
+        ax.set_ylim( lim_min[2], lim_min[2]+max_dim )
+        ax.set_zlim( lim_max[1]-max_dim, lim_max[1] )
+
+    if scalebar != None:       
+        # Convert sc size to nm
+        sc_size = scalebar * 1000      
+
+        # Hard-coded offset from figure boundaries
+        ax_offset = 1000
+
+        if method == '2d':
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()        
+
+            coords = np.array( [ [ xlim[0] + ax_offset, ylim[0] + ax_offset ],
+                                 [ xlim[0] + ax_offset + sc_size, ylim[0] + ax_offset ]
+                                ])        
+
+            sbar = mlines.Line2D( coords[:,0], coords[:,1], lw=3, alpha=.9, color='black')
+            sbar.set_gid('{0}_um'.format(scalebar))
+
+            ax.add_line( sbar ) 
+        elif method in ['3d','3d_complex']:
+            left = lim_min[0] + ax_offset
+            bottom = lim_min[1] + ax_offset
+            front = lim_min[2] + ax_offset
+
+            sbar = [ np.array( [ [ left, front, bottom ], 
+                                 [ left, front, bottom ] ] ),
+                     np.array( [ [ left, front, bottom ], 
+                                 [ left, front, bottom ] ] ),
+                     np.array( [ [ left, front, bottom ], 
+                                 [ left, front, bottom ] ] ) ]
+            sbar[0][1][0] += sc_size
+            sbar[1][1][1] += sc_size
+            sbar[2][1][2] += sc_size
+
+            lc = Line3DCollection( sbar, color='black', lw=1)                    
+            lc.set_gid( '{0}_um'.format(scalebar) )                    
+            ax.add_collection3d( lc ) 
+
+            """
+            sbar_x = ax.plot( [left, left+sc_size], [front,front], [bottom,bottom], c='black' )            
+            sbar_y = ax.plot( [left, left], [front,front-sc_size], [bottom,bottom], c='black' )
+            sbar_z = ax.plot( [left, left], [front,front], [bottom,bottom+sc_size], c='black' )
+
+            sbar_x.set_gid('{0}_um'.format(scalebar))
+            sbar_y.set_gid('{0}_um'.format(scalebar))
+            sbar_z.set_gid('{0}_um'.format(scalebar))
+            """
+
+    plt.axis('off')
 
     module_logger.info('Done. Use matplotlib.pyplot.show() to show plot.')
 
@@ -859,7 +991,7 @@ def plot3d(x, *args, **kwargs):
         trace_data = []
 
         # Generate sphere for somas
-        fib_points = _fibonacci_sphere(samples=30)
+        fib_points = _fibonacci_sphere(samples=30)        
 
         module_logger.info('Generating traces...')        
 
