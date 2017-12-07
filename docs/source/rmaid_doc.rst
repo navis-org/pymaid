@@ -105,8 +105,8 @@ Nblasting
 >>> nbl.plot(hits = 4)
 
 
-Documentation
-=============
+Reference
+=========
 
 .. automodule:: pymaid.rmaid
     :members:

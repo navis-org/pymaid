@@ -64,8 +64,8 @@ Quickstart
 >>> # Clear all objects
 >>> handler.clear()
 
-The b3d module
-==============
+Reference
+=========
 
 .. automodule:: pymaid.b3d
     :members:
