@@ -33,6 +33,7 @@ MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'pylab', 'bpy', 'pyoctre
                 'rpy2', 'rpy2.robjects','rpy2.robjects.packages','rpy2.robjects.packages.importr', 
                 'rpy2.robjects.pandas2ri' ,'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs', 
                 'matplotlib', 'matplotlib.pyplot', 'plt', 'png', 'matplotlib.externals', 'matplotlib.externals.six',
+                'matplotlib.externals.six.moves',
                 'matplotlib.collections', 'matplotlib.lines', 'matplotlib.patches', 'matplotlib.colors',
                 'matplotlib.mplot3d','matplotlib.mplot3d.proj3d','matplotlib.colors', 'matplotlib.mplot3d.art3d',
                 'matplotlib.mplot3d.art3d.Line3DCollection',
