@@ -308,19 +308,21 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
 
 def resample_neuron(x, resample_to, method='linear', inplace=False):
     """ Resamples neuron(s) to given resolution. Preserves root, leafs, 
-    branchpoints. 
+    branchpoints. Tags, connectors and radii > 0 are mapped onto the closest
+    new treenode. Columns "confidence" and "creator" of the treenode table
+    are currently discarded.
 
     Important
     ---------
-    Currently, this function generate new treenodes without mapping soma, 
-    synapses or tags back onto them!
+    This generates an entirely new set of treenode IDs! Those will be unique
+    within a neuron, but you may encounter duplicates across neurons.
 
     Parameters
     ----------
     x :                 {CatmaidNeuron,CatmaidNeuronList} 
                         Neuron(s) to resample.
-    resampling_factor : int 
-                        Factor by which to reduce the node count.
+    resample_to :       int
+                        New resolution in nanometer.
     method :            str, optional
                         See `scipy.interpolate.interp1d` for possible options.
                         By default, we're using linear interpolation.
@@ -372,7 +374,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
         path = np.cumsum(np.linalg.norm(vecs, axis=0))
         path = np.insert(path, 0, 0)
 
-        # If path is too short, just use first and last treenode
+        # If path is too short, just keep the first and last treenode
         if path[-1] < resample_to:
             new_nodes += [[ seg[0], seg[-1], None, coords[0][0], coords[0][1], coords[0][2], -1, 5 ]]
             continue
@@ -412,12 +414,44 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
                               columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z', 'radius', 'confidence'],
                               dtype=object
                                )
+
+    # Remove duplicate treenodes (branch points)
+    new_nodes = new_nodes[ ~new_nodes.treenode_id.duplicated() ]
+
+    # Map connectors back:
+    # 1. Get position of old synapse-bearing treenodes
+    old_tn_position = x.nodes.set_index('treenode_id').loc[ x.connectors.treenode_id, ['x','y','z']].values
+    # 2. Get closest neighbours
+    distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
+    min_ix = np.argmin(distances, axis=1)
+    # 3. Map back onto neuron
+    x.connectors['treenode_id'] = new_nodes.iloc[ min_ix ].treenode_id.values
+
+    # Map tags back:
+    if x.tags:
+        # 1. Get position of old tag bearing treenodes
+        tag_tn = set( [ tn for l in x.tags.values() for tn in l ] )
+        old_tn_position = x.nodes.set_index('treenode_id').loc[ tag_tn, ['x','y','z']].values
+        # 2. Get closest neighbours
+        distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
+        min_ix = np.argmin(distances, axis=1)
+        # 3. Create a dictionary
+        new_tag_tn = { tn : new_nodes.iloc[ min_ix[i] ].treenode_id for i, tn in enumerate( tag_tn ) }
+        # 4. Map tags back
+        new_tags = { t : [ new_tag_tn[tn] for tn in x.tags[t] ] for t in x.tags }
+        x.tags = new_tags
+
+    # Map nodes with radius > 0 back
+    # 1. Get position of old synapse-bearing treenodes
+    old_tn_position = x.nodes.loc[ x.nodes.radius > 0, ['x','y','z']].values
+    # 2. Get closest neighbours
+    distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
+    min_ix = np.argmin(distances, axis=1)
+    # 3. Map radii onto 
+    new_nodes.loc[ min_ix, 'radius'] = x.nodes.loc[ x.nodes.radius > 0, 'radius' ].values
    
     # Set nodes
     x.nodes = new_nodes
-
-    # Remove duplicate treenodes (branch points)
-    x.nodes = x.nodes[ ~x.nodes.treenode_id.duplicated() ]
 
     # Clear attributes
     x._clear_temp_attr()
