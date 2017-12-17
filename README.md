@@ -59,7 +59,7 @@ Optional:
 
 ## Quickstart:
 
-### Retrieve 3D skeleton data
+### Retrieve and plot 3D skeleton data
 ```python
 import pymaid
 
@@ -104,7 +104,7 @@ nl.plot3d()
 plot.clear3d()
 ```
 
-### Cluster synapses based on distance along the arbor using iGraph
+### Cluster neurons based on their synapse placement
 ```python
 import pymaid
 import matplotlib.pyplot as plt
@@ -114,9 +114,6 @@ remote_instance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 'user'
 
 # Retrieve 3D skeleton data for neuron of interest
 nl = pymaid.get_neuron ( [ '12345' ] )
-
-# Optional: downsampling for large neurons (preverses branch points, end points, synapses, etc.)
-nl.downsample( factor = 4 )
 
 # Cluster by synapse synapse placement
 clust_res = pymaid.cluster_by_synapse_placement( ds_neuron )
