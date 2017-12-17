@@ -41,20 +41,21 @@ Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install a
 Must have: 
 
 - [Pandas](http://pandas.pydata.org/)
-- [iGraph](http://www.igraph.org) 
+- [NetworkX](https://networkx.github.io) 
 - [SciPy](http://www.scipy.org)
 - [Numpy](http://www.scipy.org) 
 - [Matplotlib](http://www.matplotlib.org)
 - [vispy](http://vispy.org/) - this also requires one of the supported backend. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
 - [Plotly](http://plot.ly)
+- [tqdm](https://pypi.python.org/pypi/tqdm)
 - [pypng](https://pythonhosted.org/pypng/)
 
 Optional: 
 
+- [iGraph](http://www.igraph.org) - graph library written C++ (faster). PyMaid will try using this over NetworkX if available
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually
 - [pyoctree](https://pypi.python.org/pypi/pyoctree/) - used to calculate points in volume, highly recommended
 - [shapely](https://shapely.readthedocs.io/en/latest/) - required if you want 2D plots of CATMAID volumes
-
 
 ## Quickstart:
 

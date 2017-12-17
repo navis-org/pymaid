@@ -61,7 +61,7 @@ import numpy as np
 from colorsys import hsv_to_rgb
 
 import pymaid.cluster as pyclust
-from pymaid import core, pymaid, plotting
+from pymaid import core, fetch, plotting
 
 # Set up logging
 module_logger = logging.getLogger(__name__)

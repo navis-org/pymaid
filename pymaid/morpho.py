@@ -25,13 +25,10 @@ import logging
 import pandas as pd
 import numpy as np
 import scipy
-from scipy.spatial import ConvexHull
-import scipy.interpolate
 from tqdm import tqdm, trange
 import itertools
-from igraph import Graph
 
-from pymaid import pymaid, igraph_catmaid, core
+from pymaid import fetch, core, graph_utils
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -47,1174 +44,9 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-try:
-    from pyoctree import pyoctree
-except:
-    module_logger.warning("Module pyoctree not found. Falling back to scipy's ConvexHull for intersection calculations.")
-
-__all__ = sorted([ 'calc_cable','calc_strahler_index','classify_nodes','cut_neuron',
-            'downsample_neuron','in_volume','longest_neurite',
-            'prune_by_strahler','reroot_neuron','synapse_root_distances',
-            'calc_overlap','stitch_neurons','arbor_confidence',
-            'split_axon_dendrite', 'distal_to', 'calc_bending_flow', 'calc_flow_centrality',
-            'calc_segregation_index', 'filter_connectivity','dist_between',
-            'to_dotproduct','resample_neuron','predict_connectivity'])
-
-def generate_list_of_childs(skdata):
-    """ Transforms list of nodes into a dictionary { parent: [child1,child2,...]}
-
-    Parameters
-    ----------
-    skdata :   {CatmaidNeuron,CatmaidNeuronList} 
-               Must contain a SINGLE neuron.
-
-    Returns
-    -------
-    dict   
-     ``{ treenode_id : [ child_treenode, child_treenode, ... ] }``
-
-    """
-    module_logger.debug('Generating list of childs...')
-
-    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
-        nodes = skdata.nodes
-    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        if skdata.shape[0] == 1:
-            nodes = skdata.loc[0].nodes
-        else:
-            module_logger.error('Please pass a SINGLE neuron.')
-            raise Exception('Please pass a SINGLE neuron.')
-
-    list_of_childs = {n.treenode_id: [] for n in nodes.itertuples()}
-
-    for n in nodes.itertuples():
-        try:
-            list_of_childs[n.parent_id].append(n.treenode_id)
-        except:
-            list_of_childs[None] = [None]
-
-    return list_of_childs
-
-def classify_nodes(skdata, inplace=True):
-    """ Takes list of nodes and classifies them as end nodes, branches, slabs
-    and root.
-
-    Parameters
-    ----------
-    skdata :    {CatmaidNeuron,CatmaidNeuronList} 
-                Neuron(s) to classify nodes for.
-    inplace :   bool, optional 
-                If False, nodes will be classified on a copy which is then 
-                returned.
-
-    Returns
-    -------
-    skdata 
-               Only if ``inplace=False``. Added columns 'type' and 
-               'has_connectors' to skdata.nodes.
-
-    """    
-
-    if not inplace:
-        skdata = skdata.copy()
-
-    # If more than one neuron
-    if isinstance(skdata, (pd.DataFrame, core.CatmaidNeuronList)):        
-        for i in trange(skdata.shape[0], desc='Classifying'):
-            classify_nodes(skdata.ix[i], inplace=True)
-    elif isinstance(skdata, (pd.Series, core.CatmaidNeuron)):
-        # Get iGraph representation of neuron
-        g = skdata.igraph
-        # Get branch and end nodes based on their degree of connectivity 
-        ends = g.vs.select(_degree=1)['node_id']        
-        branches = g.vs.select(_degree_gt=2)['node_id']
-        
-        skdata.nodes['type'] = 'slab'
-        skdata.nodes.loc[ skdata.nodes.treenode_id.isin(ends), 'type' ] = 'end'
-        skdata.nodes.loc[ skdata.nodes.treenode_id.isin(branches), 'type' ] = 'branch'
-        skdata.nodes.loc[ skdata.nodes.parent_id.isnull(), 'type' ] = 'root'
-        
-        skdata.nodes.loc[:,'has_connectors'] = False
-        skdata.nodes.loc[ skdata.nodes.treenode_id.isin( skdata.connectors.treenode_id ), 'has_connectors' ] = True
-    else:
-        raise TypeError('Unknown neuron type: %s' % str(type(skdata)))
-
-    if not inplace:
-        return skdata
-
-def _generate_segments(x, append=True):
-    """ Generate segments for a given neuron.
-
-    Parameters
-    ----------
-    x :         {CatmaidNeuron,CatmaidNeuronList} 
-                May contain multiple neurons.
-    append :    bool, optional 
-                If True slabs will be appended to neuron.
-
-    Returns
-    -------
-    list      
-                Slabs as list of lists containing treenode ids.
-    """
-
-    if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
-        return [_generate_segments(x.loc[i], append=append) for i in range(x.shape[0])]
-    elif isinstance(x, pd.Series):
-        if x.igraph is None:
-            x.igraph = igraph_catmaid.neuron2graph(x)
-    elif isinstance(x, core.CatmaidNeuron):
-        pass
-    else:
-        module_logger.error('Unexpected datatype: %s' % str(type(skdata)))
-        raise ValueError
-
-    # Make a copy of the graph -> we will delete edges later on
-    g = x.igraph.copy()
-
-    if 'type' not in x.nodes:
-        classify_nodes(x)
-
-    branch_points = x.nodes[x.nodes.type == 'branch'].treenode_id.tolist()
-    root_node = x.nodes[x.nodes.type == 'root'].treenode_id.tolist()    
-
-    # Now remove edges which have a branch point or the root node as target
-    node_indices = [i for i in range(len(g.vs)) if g.vs[i][
-        'node_id'] in branch_points + root_node]
-    edges_to_delete = [i for i in range(len(g.es)) if g.es[
-        i].target in node_indices]
-    g.delete_edges(edges_to_delete)
-
-    # Now chop graph into disconnected components
-    components = [g.subgraph(sg) for sg in g.components(mode='WEAK')]
-
-    # Problem here: components appear ordered by treenode_id. We have to generate 
-    # subgraphs, sort them and turn vertex IDs into treenode ids. Attention: 
-    # order changed when we created the subgraphs!
-    slabs = [[sg.vs[i]['node_id'] for i in sg.topological_sorting()]
-             for sg in components]
-
-    # Delete root node slab -> otherwise this will be its own slab
-    #slabs = [l for l in slabs if len(l) != 1 and l[0] not in root_node]
-    slabs = [l for l in slabs if l[0] not in root_node]
-
-    # Now add the parent to the last node of each slab (which should be a
-    # branch point or the node)
-    list_of_parents = {
-        n.treenode_id: n.parent_id for n in x.nodes.itertuples()}
-    for s in slabs:
-        s.append(list_of_parents[s[-1]])
-
-    if append:
-        x.slabs = slabs
-
-    return slabs
-
-def _resample_neuron_spline(x, resample_to, inplace=False):
-    """ Resamples neuron(s) by given resolution. Uses spline interpolation.
-
-    Important
-    ---------
-    Currently, this function replaces treenodes without mapping e.g. synapses
-    or tags back!
-
-    Parameters
-    ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList} 
-                             Neuron(s) to downsample.
-    resampling_factor :      int 
-                             Factor by which to reduce the node count.
-    inplace :                bool, optional   
-                             If True, will modify original neuron. If False, a 
-                             downsampled copy is returned.
-    preserve_cn_treenodes :  bool, optional
-                             If True, treenodes that have connectors are 
-                             preserved.
-    preserve_tag_treenodes : bool, optional
-                             If True, treenodes with tags are preserved.    
-
-    Returns
-    -------
-    x
-                         Downsampled Pandas Dataframe or CatmaidNeuron object
-    """    
-    if isinstance(x, core.CatmaidNeuronList):
-        results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace) for i in range(x.shape[0]) ]
-        if not inplace:
-            return core.CatmaidNeuronList( results )    
-    elif not isinstance(x, core.CatmaidNeuron):
-        module_logger.error('Unexpected datatype: %s' % str(type(x)))
-        raise ValueError
-
-    if not inplace:
-        x = x.copy()
-
-    # Prepare nodes for subsetting
-    nodes = x.nodes.set_index('treenode_id')
-    
-    # Iterate over segments
-    for i,seg in enumerate(tqdm(x.segments, desc='Working on segments')):
-        # Get length of this segment
-        this_length = x.igraph.shortest_paths( x.igraph.vs.select(node_id=seg[0])[0], 
-                                               x.igraph.vs.select(node_id=seg[-1])[0], 
-                                               weights='weight')[0][0]
-        
-        if this_length < resample_to or len(seg) <= 3:
-            continue
-
-        # Get new number of points on the spline
-        n_nodes = int(this_length / resample_to)        
-
-        # Get all coordinates of all nodes in this segment
-        coords = nodes.loc[ seg, ['x','y','z'] ].values
-
-        # Transpose to get in right format
-        data = coords.T.astype(float)
-
-        try:
-            # Get all knots and info about the interpolated spline
-            tck, u = scipy.interpolate.splprep(data)
-        except:
-            module_logger.warning('Error downsampling segment {0} ({1} nodes, {2} nm) '.format(i, len(seg), int(this_length), n_nodes))
-            continue
-
-        # Interpolate to new resolution
-        new_coords = scipy.interpolate.splev(np.linspace(0,1,n_nodes), tck)  
-
-        # Change back into x/y/z
-        new_coords = np.array( new_coords ).T.round()
-
-        # Now that we have new coordinates, we need to "rewire" the neuron
-        # First, add new treenodes (we're starting at the distal node!) and
-        # discard every treenode but the first and the last
-        
-        max_tn_id = x.nodes.treenode_id.max() + 1        
-        new_ids = seg[:1] + [ max_tn_id + i  for i in range( len(new_coords) - 2 ) ] + seg[-1:]
-
-        new_nodes = pd.DataFrame( [ [ tn, pn, None , co[0], co[1], co[2], -1, 5, 'slab', False ] for tn, pn,co in zip( new_ids[:-1], new_ids[1:], new_coords[:-1] ) ],
-                                  columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z', 'radius', 'confidence', 'type', 'has_connectors'] )
-        new_nodes.loc[0, 'type'] = x.nodes.set_index('treenode_id').loc[ seg[0], 'type' ]       
-
-        # Remove old treenodes
-        x.nodes = x.nodes[ ~x.nodes.treenode_id.isin( seg[:-1] ) ]
-
-        # Append new treenodes
-        x.nodes = x.nodes.append( new_nodes, ignore_index=True )
-
-    x._clear_temp_attr()
-
-    if not inplace:
-        return x
-
-def resample_neuron(x, resample_to, method='linear', inplace=False):
-    """ Resamples neuron(s) to given resolution. Preserves root, leafs, 
-    branchpoints. Tags, connectors and radii > 0 are mapped onto the closest
-    new treenode. Columns "confidence" and "creator" of the treenode table
-    are currently discarded.
-
-    Important
-    ---------
-    This generates an entirely new set of treenode IDs! Those will be unique
-    within a neuron, but you may encounter duplicates across neurons.
-
-    Parameters
-    ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList} 
-                        Neuron(s) to resample.
-    resample_to :       int
-                        New resolution in nanometer.
-    method :            str, optional
-                        See `scipy.interpolate.interp1d` for possible options.
-                        By default, we're using linear interpolation.
-    inplace :           bool, optional   
-                        If True, will modify original neuron. If False, a 
-                        resampled copy is returned. 
-
-    Returns
-    -------
-    x
-                        Downsampled CatmaidNeuron/List object
-
-    See Also
-    --------
-    :func:`pymaid.downsample_neuron`
-                        This function reduces the number of nodes instead of
-                        resample to certain resolution. Usefull if you are 
-                        just after some simplification e.g. for speeding up 
-                        your calculations or you want to preserve more of a 
-                        neuron's strucutre.
-    """   
-
-    if isinstance(x, core.CatmaidNeuronList):
-        results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace) 
-                        for i in trange(x.shape[0], desc='Resampl. neurons', disable=module_logger.getEffectiveLevel()>=40 ) ]
-        if not inplace:
-            return core.CatmaidNeuronList( results )    
-    elif not isinstance(x, core.CatmaidNeuron):
-        module_logger.error('Unexpected datatype: %s' % str(type(x)))
-        raise ValueError
-
-    if not inplace:
-        x = x.copy()
-
-    nodes = x.nodes.set_index('treenode_id')
-    locs = nodes[['x','y','z']]
-
-    new_nodes = []
-    max_tn_id = x.nodes.treenode_id.max() + 1 
-
-    # Iterate over segments
-    for i,seg in enumerate(tqdm(x.segments, desc='Proc. segments', disable=module_logger.getEffectiveLevel()>=40 )):
-        coords = locs.loc[ seg ].values.astype(float)
-        
-        # vecs between subsequently measured points
-        vecs = np.diff(coords.T)
-
-        # path: cum distance along points (norm from first to ith point)
-        path = np.cumsum(np.linalg.norm(vecs, axis=0))
-        path = np.insert(path, 0, 0)
-
-        # If path is too short, just keep the first and last treenode
-        if path[-1] < resample_to:
-            new_nodes += [[ seg[0], seg[-1], None, coords[0][0], coords[0][1], coords[0][2], -1, 5 ]]
-            continue
-
-        # Coords of interpolation
-        n_nodes = int(path[-1] / resample_to)
-        interp_coords = np.linspace(path[0], path[-1], n_nodes) 
-
-        # Interpolation func for each axis with the path
-        sampleX = scipy.interpolate.interp1d(path, coords[:,0], kind=method)
-        sampleY = scipy.interpolate.interp1d(path, coords[:,1], kind=method)
-        sampleZ = scipy.interpolate.interp1d(path, coords[:,2], kind=method)
-
-        # Sample each dim
-        xnew = sampleX(interp_coords)
-        ynew = sampleY(interp_coords)
-        znew = sampleZ(interp_coords)
-
-        # Generate new coordinates
-        new_coords = np.array([xnew, ynew, znew]).T.round()
-               
-        # Generate new ids
-        new_ids = seg[:1] + [ max_tn_id + i  for i in range( len(new_coords) - 2 ) ] + seg[-1:]        
-
-        # Keep track of new nodes
-        new_nodes += [ [ tn, pn, None , co[0], co[1], co[2], -1, 5, ] for tn, pn,co in zip( new_ids[:-1], new_ids[1:], new_coords ) ]
-
-        # Increase max index
-        max_tn_id += len(new_ids)        
-
-    # Add root node
-    root = nodes.loc[ x.root ]
-    new_nodes += [ [ x.root, root.parent_id, root.creator_id, root.x, root.y, root.z, root.radius, root.confidence ] ]
-
-    # Generate new nodes dataframe
-    new_nodes = pd.DataFrame( data = new_nodes,
-                              columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z', 'radius', 'confidence'],
-                              dtype=object
-                               )
-
-    # Remove duplicate treenodes (branch points)
-    new_nodes = new_nodes[ ~new_nodes.treenode_id.duplicated() ]
-
-    # Map connectors back:
-    # 1. Get position of old synapse-bearing treenodes
-    old_tn_position = x.nodes.set_index('treenode_id').loc[ x.connectors.treenode_id, ['x','y','z']].values
-    # 2. Get closest neighbours
-    distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
-    min_ix = np.argmin(distances, axis=1)
-    # 3. Map back onto neuron
-    x.connectors['treenode_id'] = new_nodes.iloc[ min_ix ].treenode_id.values
-
-    # Map tags back:
-    if x.tags:
-        # 1. Get position of old tag bearing treenodes
-        tag_tn = set( [ tn for l in x.tags.values() for tn in l ] )
-        old_tn_position = x.nodes.set_index('treenode_id').loc[ tag_tn, ['x','y','z']].values
-        # 2. Get closest neighbours
-        distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
-        min_ix = np.argmin(distances, axis=1)
-        # 3. Create a dictionary
-        new_tag_tn = { tn : new_nodes.iloc[ min_ix[i] ].treenode_id for i, tn in enumerate( tag_tn ) }
-        # 4. Map tags back
-        new_tags = { t : [ new_tag_tn[tn] for tn in x.tags[t] ] for t in x.tags }
-        x.tags = new_tags
-
-    # Map nodes with radius > 0 back
-    # 1. Get position of old synapse-bearing treenodes
-    old_tn_position = x.nodes.loc[ x.nodes.radius > 0, ['x','y','z']].values
-    # 2. Get closest neighbours
-    distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
-    min_ix = np.argmin(distances, axis=1)
-    # 3. Map radii onto 
-    new_nodes.loc[ min_ix, 'radius'] = x.nodes.loc[ x.nodes.radius > 0, 'radius' ].values
-   
-    # Set nodes
-    x.nodes = new_nodes
-
-    # Clear attributes
-    x._clear_temp_attr()
-
-    # Reclassfiy nodes
-    classify_nodes(x, inplace=True)
-
-    if not inplace:
-        return x
-
-
-def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_treenodes=True, preserve_tag_treenodes=False):
-    """ Downsamples neuron(s) by a given factor. Preserves root, leafs, 
-    branchpoints by default. Preservation of treenodes with synapses can
-    be toggled.
-
-    Parameters
-    ----------
-    skdata :                 {CatmaidNeuron,CatmaidNeuronList} 
-                             Neuron(s) to downsample.
-    resampling_factor :      int 
-                             Factor by which to reduce the node count.
-    inplace :                bool, optional   
-                             If True, will modify original neuron. If False, a 
-                             downsampled copy is returned.
-    preserve_cn_treenodes :  bool, optional
-                             If True, treenodes that have connectors are 
-                             preserved.
-    preserve_tag_treenodes : bool, optional
-                             If True, treenodes with tags are preserved.    
-
-    Returns
-    -------
-    skdata
-                             Downsampled Pandas Dataframe or CatmaidNeuron 
-                             object.
-
-    See Also
-    --------
-    :func:`pymaid.downsample_neuron`
-                             This function resamples a neuron to given 
-                             resolution.
-    """
-
-    if isinstance(skdata, pd.DataFrame):
-        return pd.DataFrame([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
-    elif isinstance(skdata, core.CatmaidNeuronList):
-        return core.CatmaidNeuronList([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
-    elif isinstance(skdata, pd.Series):
-        if not inplace:
-            df = skdata.copy()
-            df.nodes = df.nodes.copy()
-            df.connectors = df.connectors.copy()
-        else:
-            df = skdata
-    elif isinstance(skdata, core.CatmaidNeuron):
-        if not inplace:
-            df = core.CatmaidNeuron(skdata)
-        else:
-            df = skdata
-    else:
-        module_logger.error('Unexpected datatype: %s' % str(type(skdata)))
-        raise ValueError
-
-    if df.nodes.shape[0] == 0:
-        module_logger.warning('Unable to downsample: no nodes in neuron')
-        return df
-
-    module_logger.info('Preparing to downsample neuron...')
-
-    list_of_parents = {
-        n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
-
-    if 'type' not in df.nodes:
-        classify_nodes(df)
-
-    selection = df.nodes.type != 'slab'    
-
-    if preserve_cn_treenodes:
-        selection = selection | df.nodes.has_connectors == True    
-
-    if preserve_tag_treenodes:
-        with_tags = [ t for l in df.tags.values() for t in l ]
-        selection = selection | df.nodes.treenode_id.isin( with_tags )    
-
-    fix_points = df.nodes[ selection ].treenode_id.values
-
-    # Add soma node
-    if not isinstance( df.soma, type(None) ) and df.soma not in fix_points:   
-        fix_points = np.append( fix_points, df.soma )
-
-    # Walk from all fix points to the root - jump N nodes on the way
-    new_parents = {}
-
-    module_logger.info('Sampling neuron down by factor of %i' %
-                       resampling_factor)
-    for en in fix_points:
-        this_node = en
-
-        while True:
-            stop = False
-            new_p = list_of_parents[this_node]
-            if new_p != None:
-                for i in range(resampling_factor):
-                    if new_p in fix_points:
-                        new_parents[this_node] = new_p
-                        stop = True
-                        break
-                    else:
-                        new_p = list_of_parents[new_p]
-
-                if stop is True:
-                    break
-                else:
-                    new_parents[this_node] = new_p
-                    this_node = new_p
-            else:
-                new_parents[this_node] = None
-                break    
-    new_nodes = df.nodes[ df.nodes.treenode_id.isin( list(new_parents.keys()) ) ].copy()           
-    new_nodes.loc[:,'parent_id'] = [new_parents[tn] for tn in new_nodes.treenode_id]
-
-    # We have to temporarily set parent of root node from 1 to an integer
-    root_ix = new_nodes[new_nodes.parent_id.isnull()].index
-    new_nodes.loc[root_ix, 'parent_id'] = 0
-    # first convert everything to int
-    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(int)      
-    # then back to object so that we can add a 'None'
-    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(object)  
-    
-    # Reassign parent_id None to root node
-    new_nodes.loc[root_ix, 'parent_id'] = None
-    
-    module_logger.info('Nodes before/after: %i/%i ' %
-                       (len(df.nodes), len(new_nodes)))
-
-    df.nodes = new_nodes
-
-    # This is essential -> otherwise e.g. igraph_catmaid.neuron2graph will fail
-    df.nodes.reset_index(inplace=True, drop=True)
-
-    if not inplace:
-        return df
-
-def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
-    """ Returns a neuron consisting of the longest neurite(s) (based on 
-    geodesic distance).
-
-    Parameters
-    ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList} 
-                        May contain multiple neurons.
-    n :                 int, optional
-                        Number of longest neurites to retain.
-    reroot_to_soma :    bool, optional
-                        If True, neuron will be rerooted to soma. Soma is the 
-                        node with >1000 radius.
-    inplace :           bool, optional
-                        If False, copy of the neuron will be trimmed down to 
-                        longest neurite and returned.
-
-    Returns
-    -------
-    pandas.DataFrame/CatmaidNeuron object
-                   Contains only node data of the longest neurite
-    """
-
-    if isinstance(x, core.CatmaidNeuron):
-        x = x
-    elif isinstance(x, core.CatmaidNeuronList):
-        if x.shape[0] == 1:
-            x = x.loc[0]
-        else:
-            module_logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
-            raise Exception
-    else:
-        raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
-
-    if not inplace:
-        x = x.copy()
-
-    if reroot_to_soma and x.soma:
-        x.reroot( x.soma )       
-
-    tn_to_preserve = []
-
-    for i in range(n):
-        this_x = x.copy()
-
-        # Remove nodes that we have already preserved
-        this_x.nodes = this_x.nodes[~this_x.nodes.treenode_id.isin(
-        tn_to_preserve)].reset_index(drop=True)
-
-        # Make sure that all root nodes have their parent set to none
-        this_x.nodes.loc[~this_x.nodes.parent_id.isin(this_x.nodes.treenode_id),'parent_id'] = None
-
-        # Clear attributes
-        this_x._clear_temp_attr()
-
-        #First collect leafs and root
-        leaf_nodes = this_x.nodes[this_x.nodes.type=='end'].treenode_id.tolist()
-        root_nodes = this_x.nodes[this_x.nodes.type=='root'].treenode_id.tolist()
-
-        #Convert to igraph vertex indices
-        leaf_ix = [ v.index for v in this_x.igraph.vs if v['node_id'] in leaf_nodes ]
-        root_ix = [ v.index for v in this_x.igraph.vs if v['node_id'] in root_nodes ]
-
-        #Now get path lenghts from all tips to the root
-        all_paths = pd.DataFrame( this_x.igraph.shortest_paths_dijkstra( root_ix, leaf_ix, mode='ALL', weights='weight' ) )
-
-        #Set impossible paths from "inf" to 0
-        all_paths[ all_paths == float('inf')] = 0
-
-        #Get root and leaf pair of largest neurite
-        longest_root = root_ix [ all_paths.max(axis=1).idxmax() ]
-        longest_leaf = leaf_ix[ all_paths.loc[  all_paths.max(axis=1).idxmax() ].idxmax() ]
-
-        # Get path
-        path = this_x.igraph.get_shortest_paths( longest_root, longest_leaf, mode='ALL' )[0]
-
-        #Translate indices back into treenode ids
-        tn_to_preserve += [  this_x.igraph.vs[n]['node_id'] for n in path ]
-
-    #Subset neuron    
-    x.nodes = x.nodes[x.nodes.treenode_id.isin(
-        tn_to_preserve)].reset_index(drop=True)
-    x.connectors = x.connectors[ x.connectors.treenode_id.isin(
-                    tn_to_preserve)].reset_index(drop=True)
-
-    # Reset indices of node and connector tables (important for igraph!)
-    x.nodes.reset_index(inplace=True,drop=True)
-    x.connectors.reset_index(inplace=True,drop=True)
-
-    if not inplace:
-        return x
-
-
-def reroot_neuron(x, new_root, inplace=False):
-    """ Uses igraph to reroot the neuron at given point. 
-
-    Parameters
-    ----------
-    x :        {CatmaidNeuron, CatmaidNeuronList} 
-               Must contain a SINGLE neuron.
-    new_root : {int, str}
-               Node ID or tag of the node to reroot to.
-    inplace :  bool, optional
-               If True the input neuron will be rerooted.
-
-    Returns
-    -------
-    pandas.Series or CatmaidNeuron object
-               Containing the rerooted neuron.
-
-    See Also
-    --------
-    :func:`~pymaid.CatmaidNeuron.reroot`
-                Quick access to reroot directly from CatmaidNeuron/List objects
-    """
-
-    if new_root == None:
-        raise ValueError('New root can not be <None>')
-
-    if isinstance(x, core.CatmaidNeuron):
-        df = x
-    elif isinstance(x, core.CatmaidNeuronList):
-        if x.shape[0] == 1:
-            df = x.loc[0]
-        else:
-            raise Exception(
-                '{0} neurons provided. Please provide only a single neuron!'.format(x.shape[0]))
-    else:
-        raise Exception('Unable to process data of type "{0}"'.format(type(x)))
-
-    start_time = time.time()
-
-    # If new root is a tag, rather than a ID, try finding that node
-    if isinstance(new_root, str):
-        if new_root not in df.tags:
-            module_logger.error(
-                '#%s: Found no treenodes with tag %s - please double check!' % (str(df.skeleton_id),str(new_root)))
-            return
-        elif len(df.tags[new_root]) > 1:
-            module_logger.error(
-                '#%s: Found multiple treenodes with tag %s - please double check!' % (str(df.skeleton_id),str(new_root)))
-            return
-        else:
-            new_root = df.tags[new_root][0]
-
-    if df.nodes.set_index('treenode_id').loc[new_root].parent_id == None:
-        module_logger.info('New root == old root! No need to reroot.')
-        if not inplace:
-            return df        
-        return
-
-    if not inplace:
-        df = df.copy()
-
-    g = df.igraph    
-
-    try:
-        # Select nodes with the correct ID as new root node
-        new_root_index = g.vs.select(node_id=int(new_root))[0].index    
-    except:
-        module_logger.error(
-            '#%s: Found no treenodes with ID %s - please double check!' % (str(df.skeleton_id),str(new_root)))            
-        return
-
-    if 'type' not in df.nodes:
-        classify_nodes(df)
-
-    leaf_nodes = df.nodes[df.nodes.type == 'end'].treenode_id.tolist()
-
-    # We need to make sure that the current root node is not a leaf node itself.
-    # If it is, we have to add it too:
-    old_root = df.nodes.set_index('parent_id').loc[None, 'treenode_id']
-    if df.nodes[df.nodes.parent_id==old_root].shape[0] < 2:
-        leaf_nodes.append( old_root )
-
-    leaf_indices = [v.index for v in g.vs if v['node_id'] in leaf_nodes]
-
-    shortest_paths = g.get_shortest_paths(
-        new_root_index, to=leaf_indices, mode='ALL')
-
-    # Convert indices to treenode ids
-    new_paths = [[g.vs[i]['node_id'] for i in p] for p in shortest_paths]
-
-    # Remove root node to root node (path length == 1)
-    new_paths = [n for n in new_paths if len(n) > 1]
-
-    new_parents = {}
-    new_edges = []
-    for p in new_paths:
-        new_parents.update({p[-i]: p[-i - 1] for i in range(1, len(p))})
-    # This is a placeholder! Can't set this yet otherwise .astype(int) will
-    # fail
-    new_parents.update({new_root: 0})
-
-    df.nodes.set_index('treenode_id', inplace=True)  # Set index to treenode_id
-    # index is currently the treenode_id
-    df.nodes.parent_id = [new_parents[n] for n in df.nodes.index.tolist()]
-    df.nodes.parent_id = df.nodes.parent_id.values.astype(
-        int)  # first convert everything to int
-    df.nodes.parent_id = df.nodes.parent_id.values.astype(
-        object)  # then back to object so that we can add a 'None'
-    # Set parent_id to None (previously 0 as placeholder)
-    df.nodes.loc[new_root, 'parent_id'] = None
-    df.nodes.reset_index(inplace=True)  # Reset index
-
-    df._clear_temp_attr()    
-
-    module_logger.info('%s #%s successfully rerooted (%s s)' % (
-        df.neuron_name, df.skeleton_id, round(time.time() - start_time, 1)))
-
-    if not inplace:
-        return df
-    else:
-        return
-
-
-def cut_neuron(x, cut_node, g=None):
-    """ Uses igraph to split neuron at given point and returns two new neurons.
-
-    Parameters
-    ----------
-    x :        {CatmaidNeuron, CatmaidNeuronList} 
-               Must be a single neuron.
-    cut_node : {int, str}
-               Node ID or a tag of the node to cut. 
-
-    Returns
-    -------
-    neuron_dist 
-                Part of the neuron distal to the cut.
-    neuron_prox 
-                Part of the neuron proximal to the cut.
-
-    Examples
-    --------
-    >>> # Example for multiple cuts 
-    >>> import pymaid    
-    >>> remote_instance = pymaid.CatmaidInstance( url, http_user, http_pw, token )
-    >>> n = pymaid.get_neuron(skeleton_id)   
-    >>> # First cut
-    >>> nA, nB = cut_neuron2( n, cut_node1 )
-    >>> # Second cut
-    >>> nD, nE = cut_neuron2( nA, cut_node2 )  
-
-    See Also
-    --------
-    :func:`~pymaid.CatmaidNeuron.prune_distal_to`
-    :func:`~pymaid.CatmaidNeuron.prune_proximal_to`
-
-    """
-    start_time = time.time()
-
-    module_logger.info('Cutting neuron...')
-
-    if isinstance(x, core.CatmaidNeuron):
-        df = x.copy()
-    elif isinstance(x, core.CatmaidNeuronList):
-        if x.shape[0] == 1:
-            df = x.loc[0].copy()
-        else:
-            module_logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
-            raise Exception(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
-    else:
-        raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
-
-    if g is None:
-        g = df.igraph
-
-    # If cut_node is a tag (rather than an ID), try finding that node
-    if isinstance(cut_node, str):
-        if cut_node not in df.tags:              
-            raise ValueError(
-                '#%s: Found no treenode with tag %s - please double check!' % (str(df.skeleton_id),str(cut_node)))
-
-        elif len(df.tags[cut_node]) > 1:
-            raise ValueError(
-                '#%s: Found multiple treenode with tag %s - please double check!' % (str(df.skeleton_id),str(cut_node)))
-        else:
-            cut_node = df.tags[cut_node][0]    
-
-    try:
-        # Select nodes with the correct ID as cut node
-        # Should have found only one cut node
-        cut_node_index = g.vs.select(node_id=int(cut_node))[0].index    
-    except:        
-        raise ValueError(
-            'No treenode with ID {0} in graph - please double check!'.format(cut_node))
-
-    # Select the cut node's parent (works only if it is not already at root)
-    if cut_node != df.root:
-        parent_node_index = g.es.select(_source=cut_node_index)[0].target
-    # If we are at root but root is a fork, try using one of its child
-    elif df.nodes[ df.nodes.parent_id == df.root ].shape[0] > 1:
-        parent_node_index = cut_node_index
-        cut_node_index = [ v.index for v in df.igraph.vs if v['parent_id'] == cut_node ][0]
-    # If that also fails: throw exception
-    else:
-        #parent_node_index = g.es.select(_target=cut_node_index)[0].source
-        raise Exception('Unable to cut: Is cut node = root?')
-
-    # Now calculate the min cut
-    mc = g.st_mincut(parent_node_index, cut_node_index, capacity=None)
-
-    # mc.partition holds the two partitions with mc.partition[0] holding the 
-    # part with the source and mc.partition[1] the part with the target
-    if g.vs.select(mc.partition[0]).select(node_id=int(cut_node)):
-        dist_partition = mc.partition[0]
-        #dist_graph = mc.subgraph(0)
-        prox_partition = mc.partition[1]
-        #prox_graph = mc.subgraph(1)
-    else:
-        dist_partition = mc.partition[1]
-        #dist_graph = mc.subgraph(1)
-        prox_partition = mc.partition[0]
-        #prox_graph = mc.subgraph(0)
-
-    # Set parent_id of distal fragment's graph to None
-    # dist_graph.vs.select(node_id=int(cut_node))[0]['parent_id'] = None
-
-    # Partitions hold the indices -> now we have to translate this into node
-    # ids
-    dist_partition_ids = g.vs.select(dist_partition)['node_id']
-    prox_partition_ids = g.vs.select(prox_partition)['node_id']
-
-    # If cut was made at root, add cut_node to this neuron
-    if cut_node == df.root:
-        prox_partition_ids += [ cut_node ]
-
-    # Subset distal neuron
-    neuron_dist = df.copy()
-    neuron_dist.neuron_name += '_dist'
-    # Subset nodes
-    neuron_dist.nodes = neuron_dist.nodes[ neuron_dist.nodes.treenode_id.isin( dist_partition_ids ) ]
-    neuron_dist.connectors = neuron_dist.connectors[ neuron_dist.connectors.treenode_id.isin( dist_partition_ids ) ]
-    # Filter tags
-    neuron_dist.tags = { t : [ tn for tn in df.tags[t] if tn in dist_partition_ids ] for t in neuron_dist.tags }
-    neuron_dist.tags = { t : neuron_dist.tags[t] for t in neuron_dist.tags if neuron_dist.tags[t] }
-    # Set new root node
-    neuron_dist.nodes.loc[ neuron_dist.nodes.treenode_id==cut_node, 'parent_id'] = None        
-    # Reset attributes
-    neuron_dist._clear_temp_attr()
-    
-    # Subset proximal neuron
-    neuron_prox = df.copy()
-    neuron_prox.neuron_name += '_prox'
-    # Subset nodes
-    neuron_prox.nodes = neuron_prox.nodes[ neuron_prox.nodes.treenode_id.isin( prox_partition_ids ) ]
-    neuron_prox.connectors = neuron_prox.connectors[ neuron_prox.connectors.treenode_id.isin( prox_partition_ids ) ]
-    # Filter tags
-    neuron_prox.tags = { t : [ tn for tn in df.tags[t] if tn in prox_partition_ids ] for t in neuron_prox.tags }
-    neuron_prox.tags = { t : neuron_prox.tags[t] for t in neuron_prox.tags if neuron_prox.tags[t] }    
-    # Reset attributes
-    neuron_prox._clear_temp_attr()
-
-    module_logger.debug('Cutting finished in {0}s'.format(
-                        round(time.time() - start_time)) )
-    module_logger.info('Distal: %i nodes/%i synapses| |Proximal: %i nodes/%i synapses' % (neuron_dist.nodes.shape[
-                       0], neuron_dist.connectors.shape[0], neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]))      
-
-    return neuron_dist, neuron_prox
-
-
-def _cut_neuron(skdata, cut_node):
-    """ DEPRECATED! Cuts a neuron at given point and returns two new neurons. 
-    Does not use igraph (slower).
-
-    Parameters
-    ----------
-    skdata :   {CatmaidNeuron, CatmaidNeuronList} 
-               Must contain a SINGLE neuron.
-    cut_node : {int, str}    
-               Node ID or a tag of the node to cut.
-
-    Returns
-    -------
-    neuron_dist
-               Neuron object distal to the cut.
-    neuron_prox
-               Neuron object proximal to the cut.
-    """
-    start_time = time.time()
-
-    module_logger.info('Preparing to cut neuron...')
-
-    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
-        df = skdata.copy()
-    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        if skdata.shape[0] == 1:
-            df = skdata.loc[0].copy()
-        else:
-            module_logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
-            raise Exception(
-                '%i neurons provided. Please provide only a single neuron!' % skdata.shape[0])
-
-    list_of_childs = generate_list_of_childs(skdata)
-    list_of_parents = {
-        n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
-
-    if 'type' not in df.nodes:
-        classify_nodes(df)
-
-    # If cut_node is a tag, rather than a ID, try finding that node
-    if type(cut_node) == type(str()):
-        if cut_node not in df.tags:
-            module_logger.error(
-                'Error: Found no treenodes with tag %s - please double check!' % str(cut_node))
-            return
-        elif len(df.tags[cut_node]) > 1:
-            module_logger.error(
-                'Error: Found multiple treenodes with tag %s - please double check!' % str(cut_node))
-            return
-        else:
-            cut_node = df.tags[cut_node][0]
-
-    if len(list_of_childs[cut_node]) == 0:
-        module_logger.warning('Cannot cut: cut_node is a leaf node!')
-        return
-    elif list_of_parents[cut_node] == None:
-        module_logger.warning('Cannot cut: cut_node is a root node!')
-        return
-    elif cut_node not in list_of_parents:
-        module_logger.warning('Cannot cut: cut_node not found!')
-        return
-
-    end_nodes = df.nodes[df.nodes.type == 'end'].treenode_id.values
-    branch_nodes = df.nodes[df.nodes.type == 'branch'].treenode_id.values
-    root = df.nodes[df.nodes.type == 'root'].treenode_id.values[0]
-
-    # Walk from all end points to the root - if you hit the cut node assign
-    # this branch to neuronA otherwise neuronB
-    distal_nodes = []
-    proximal_nodes = []
-
-    module_logger.info('Cutting neuron...')
-    for i, en in enumerate(end_nodes.tolist() + [cut_node]):
-        this_node = en
-        nodes_walked = [en]
-        while True:
-            this_node = list_of_parents[this_node]
-            nodes_walked.append(this_node)
-
-            # Stop if this node is the cut node
-            if this_node == cut_node:
-                distal_nodes += nodes_walked
-                break
-            # Stop if this node is the root node
-            elif this_node == root:
-                proximal_nodes += nodes_walked
-                break
-            # Stop if we have seen this branchpoint before
-            elif this_node in branch_nodes:
-                if this_node in distal_nodes:
-                    distal_nodes += nodes_walked
-                    break
-                elif this_node in proximal_nodes:
-                    proximal_nodes += nodes_walked
-                    break
-
-    # Set dataframe indices to treenode IDs - will facilitate distributing
-    # nodes
-    if df.nodes.index.name != 'treenode_id':
-        df.nodes.set_index('treenode_id', inplace=True)
-
-    distal_nodes = list(set(distal_nodes))
-    proximal_nodes = list(set(proximal_nodes))
-
-    neuron_dist = pd.DataFrame([[
-        df.neuron_name + '_dist',
-        df.skeleton_id,
-        df.nodes.loc[distal_nodes],
-        df.connectors[
-            [c.treenode_id in distal_nodes for c in df.connectors.itertuples()]].reset_index(),
-        df.tags
-    ]],
-        columns=['neuron_name', 'skeleton_id', 'nodes', 'connectors', 'tags'],
-        dtype=object
-    ).loc[0]
-
-    neuron_dist.nodes.loc[cut_node,'parent_id'] = None
-    neuron_dist.nodes.loc[cut_node,'type'] = 'root'
-
-    neuron_prox = pd.DataFrame([[
-        df.neuron_name + '_prox',
-        df.skeleton_id,
-        df.nodes.loc[proximal_nodes],
-        df.connectors[
-            [c.treenode_id not in distal_nodes for c in df.connectors.itertuples()]].reset_index(),
-        df.tags
-    ]],
-        columns=['neuron_name', 'skeleton_id', 'nodes', 'connectors', 'tags'],
-        dtype=object
-    ).loc[0]
-
-    # Reclassify cut node in proximal neuron as end node
-    neuron_prox.nodes.loc[cut_node,'type'] = 'end'
-
-    # Now reindex dataframes
-    neuron_dist.nodes.reset_index(inplace=True)
-    neuron_prox.nodes.reset_index(inplace=True)
-    df.nodes.reset_index(inplace=True)
-
-    module_logger.info('Cutting finished in %is' %
-                       round(time.time() - start_time))
-    module_logger.info('Distal to cut node: %i nodes/%i synapses' %
-                       (neuron_dist.nodes.shape[0], neuron_dist.connectors.shape[0]))
-    module_logger.info('Proximal to cut node: %i nodes/%i synapses' %
-                       (neuron_prox.nodes.shape[0], neuron_prox.connectors.shape[0]))
-
-    return neuron_dist, neuron_prox
-
-
-def synapse_root_distances(skdata, pre_skid_filter=[], post_skid_filter=[], remote_instance=None):
-    """ Calculates geodesic (along the arbor) distance of synapses to root 
-    (i.e. soma).
-
-    Parameters
-    ----------  
-    skdata :            {CatmaidNeuron, CatmaidNeuronList} 
-                        Must contain a SINGLE neuron.
-    pre_skid_filter :   list of int, optional
-                        If provided, only synapses from these neurons will be 
-                        processed.
-    post_skid_filter :  list of int, optional 
-                        If provided, only synapses to these neurons will be 
-                        processed.
-    remote_instance :   CatmaidInstance, optional
-                        If not passed directly, will try using global.
-
-    Returns
-    -------
-    pre_node_distances 
-       ``{'connector_id: distance_to_root[nm]'}`` for all presynaptic sites of 
-       this neuron
-    post_node_distances 
-       ``{'connector_id: distance_to_root[nm]'}`` for all postsynaptic sites of 
-       this neuron
-    """
-
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            module_logger.error(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            raise Exception(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-
-    if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
-        df = skdata
-    elif isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
-        if skdata.shape[0] == 1:
-            df = skdata.loc[0]
-        else:
-            module_logger.error(
-                '%i neurons provided. Currently, only a single neuron is supported!' % skdata.shape[0])
-            raise Exception(
-                '%i neurons provided. Currently, only a single neuron is supported!' % skdata.shape[0])
-
-    # Reindex dataframe to treenode
-    if df.nodes.index.name != 'treenode_id':
-        df.nodes.set_index('treenode_id', inplace=True)
-
-    # Calculate distance to parent for each node
-    tn_coords = skdata.nodes[['x', 'y', 'z']].reset_index()
-    parent_coords = skdata.nodes.loc[skdata.nodes.parent_id.tolist(),
-        ['x', 'y', 'z']].reset_index()
-    w = np.sqrt(np.sum(
-        (tn_coords[['x', 'y', 'z']] - parent_coords[['x', 'y', 'z']]) ** 2, axis=1)).tolist()
-
-    # Get connector details
-    cn_details = pymaid.get_connector_details(
-        skdata.connectors.connector_id.tolist(), remote_instance=remote_instance)
-
-    list_of_parents = {n[0]: (n[1], n[3], n[4], n[5]) for n in skdata[0]}
-
-    if pre_skid_filter or post_skid_filter:
-        # Filter connectors that are both pre- and postsynaptic to the skid in
-        # skid_filter
-        filtered_cn = [c for c in cn_details.itertuples() if True in [int(
-            f) in c.postsynaptic_to for f in post_skid_filter] and True in [int(f) == c.presynaptic_to for f in pre_skid_filter]]
-        module_logger.debug('%i of %i connectors left after filtering' % (
-            len(filtered_cn), cn_details.shape[0]))
-    else:
-        filtered_cn = cn_details
-
-    pre_node_distances = {}
-    post_node_distances = {}
-    visited_nodes = {}
-
-    module_logger.info('Calculating distances to root')
-    for i, cn in enumerate(filtered_cn):
-
-        if i % 10 == 0:
-            module_logger.debug('%i of %i' % (i, len(filtered_cn)))
-
-        if cn[1]['presynaptic_to'] == int(skdata.skeleton_id) and cn[1]['presynaptic_to_node'] in list_of_parents:
-            dist, visited_nodes = _walk_to_root([(n[0], n[3], n[4], n[5]) for n in skdata[
-                                                0] if n[0] == cn[1]['presynaptic_to_node']][0], list_of_parents, visited_nodes)
-
-            pre_node_distances[cn[1]['presynaptic_to_node']] = dist
-
-        if int(skdata.skeleton_id) in cn[1]['postsynaptic_to']:
-            for nd in cn[1]['postsynaptic_to_node']:
-                if nd in list_of_parents:
-                    dist, visited_nodes = _walk_to_root([(n[0], n[3], n[4], n[5]) for n in skdata[
-                                                        0] if n[0] == nd][0], list_of_parents, visited_nodes)
-
-                    post_node_distances[nd] = dist
-
-    # Reindex dataframe
-    df.nodes.reset_index(inplace=True)
-
-    return pre_node_distances, post_node_distances
+__all__ = sorted([ 'calc_cable','calc_strahler_index', 'prune_by_strahler','stitch_neurons','arbor_confidence',
+            'split_axon_dendrite',  'calc_bending_flow', 'calc_flow_centrality',
+            'calc_segregation_index', 'to_dotproduct'])
 
 def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
     """ Calculates confidence for each treenode by walking from root to leafs
@@ -1240,8 +72,8 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
     def walk_to_leafs( this_node, this_confidence=1 ):
         pbar.update(1)                
         while True:                    
-            this_confidence *= confidences[ 5 - x.nodes.loc[ this_node ].confidence ]
-            x.nodes.loc[ this_node,'arbor_confidence'] = this_confidence            
+            this_confidence *= confidences[ 5 - nodes.loc[ this_node ].confidence ]
+            nodes.loc[ this_node,'arbor_confidence'] = this_confidence            
 
             if len(loc[this_node]) > 1:
                 for c in loc[this_node]:
@@ -1264,19 +96,19 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
     if not inplace:
         x = x.copy()
 
-    loc = generate_list_of_childs(x)   
+    loc = graph_utils.generate_list_of_childs(x)   
 
     x.nodes['arbor_confidence'] = [None] * x.nodes.shape[0] 
+    
+    nodes = x.nodes.set_index('treenode_id')    
+    nodes.loc[x.root,'arbor_confidence'] = 1
 
-    root = x.root
-    x.nodes.set_index('treenode_id', inplace=True, drop=True)
-    x.nodes.loc[root,'arbor_confidence'] = 1
+    with tqdm(total=len(x.segments),desc='Calc confidence', disable=module_logger.getEffectiveLevel()>=40 ) as pbar:
+        for r in x.root:
+            for c in loc[r]:
+                walk_to_leafs(c)    
 
-    with tqdm(total=len(x.slabs),desc='Calc confidence', disable=module_logger.getEffectiveLevel()>=40 ) as pbar:
-        for c in loc[root]:
-            walk_to_leafs(c)
-
-    x.nodes.reset_index(inplace=True, drop=False)
+    x.nodes['arbor_confidence'] = nodes['arbor_confidence'].values
 
     if not inplace:
         return x
@@ -1319,7 +151,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
             remote_instance = globals()['remote_instance']
 
     if isinstance(skdata, int) or isinstance(skdata, str):
-        skdata = pymaid.get_neuron([skdata], remote_instance).loc[0]
+        skdata = fetch.get_neuron([skdata], remote_instance).loc[0]
 
     if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
@@ -1351,8 +183,9 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
         df.nodes.set_index('treenode_id', inplace=True)
 
     # Calculate distance to parent for each node
-    tn_coords = df.nodes[['x', 'y', 'z']].reset_index()
-    parent_coords = df.nodes.loc[[n for n in df.nodes.parent_id.tolist()],
+    nodes = df.nodes[~df.nodes.parent_id.isnull()]
+    tn_coords = nodes[['x', 'y', 'z']].reset_index()
+    parent_coords = df.nodes.loc[[n for n in nodes.parent_id.tolist()],
         ['x', 'y', 'z']].reset_index()
 
     # Calculate distances between nodes and their parents
@@ -1388,7 +221,7 @@ def to_dotproduct(x):
     Examples
     --------
     >>> x = pymaid.get_neurons(16)
-    >>> dps = pymaid.to_dps(x)
+    >>> dps = pymaid.to_dotproduct(x)
     >>> # Get array of all locations
     >>> locs = numpy.vstack(dps.point.values)
 
@@ -1419,190 +252,6 @@ def to_dotproduct(x):
     dps['vec_length'] = (dps.vector ** 2).apply(sum).apply(math.sqrt)
 
     return dps
-
-def predict_connectivity(a, b, method='possible_contacts', remote_instance=None, **kwargs):
-    """ Calculates potential synapses between neurons A -> B. Based on a 
-    concept by Alex Bates.    
-
-    Parameters
-    ----------
-    a,b :       {CatmaidNeuron, CatmaidNeuronList}
-                Neuron(s) for which to compute potential connectivity.
-    method :    {'possible_contacts'}
-                Method to use for calculations.
-    **kwargs :  Arbitrary keyword arguments.
-                1. For method = 'possible_contacts':
-                    - `stdev` to set number of 
-    
-
-    Returns
-    -------
-    pandas.DataFrame
-            Matrix holding possible synaptic contacts. Neurons A are rows, 
-            neurons B are columns.
-
-            >>> df
-                        skidB1   skidB2  skidB3 ...
-                skidA1    5        1        0
-                skidA2    10       20       5
-                skidA3    4        3        15
-                ...
-
-    """
-
-    if not remote_instance:
-        try:
-            remote_instance = a._remote_instance
-        except:
-            pass
-
-    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise TypeError('Need to pass CatmaidNeurons')
-
-    if isinstance(a, core.CatmaidNeuron):
-        a = core.CatmaidNeuronList(a)
-
-    if isinstance(b, core.CatmaidNeuron):
-        b = core.CatmaidNeuronList(b)
-
-    allowed_methods = ['possible_contacts']
-    if method not in allowed_methods:
-        raise ValueError('Unknown method "{0}". Allowed methods: "{0}"'.format(method, ','.join(allowed_methods)))
-
-    matrix = pd.DataFrame( np.zeros(( a.shape[0], b.shape[0] )), index=a.skeleton_id, columns=b.skeleton_id )
-
-    # First let's calculate at what distance synapses are being made
-    cn_between = pymaid.get_connectors_between(a,b, remote_instance=remote_instance)
-
-    cn_locs = np.vstack(cn_between.connector_loc.values)
-    tn_locs = np.vstack(cn_between.treenode2_loc.values)
-
-    distances = np.sqrt ( np.sum((cn_locs  - tn_locs) ** 2, axis=1) )
-
-    module_logger.info('Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(),distances.std()))
-
-    # Calculate distances threshold
-    n_std = kwargs.get('n_std', 2 )
-    dist_threshold = distances.mean() + n_std * distances.std()    
-
-    with tqdm(total=len(b), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
-        for nB in b:
-            # Create cKDTree for nB
-            tree = scipy.spatial.cKDTree( nB.nodes[['x','y','z']].values, leafsize=10 )
-            for nA in a:
-                # Query against presynapses
-                dist, ix = tree.query( nA.presynapses[['x','y','z']].values,
-                                       k=1, 
-                                       distance_upper_bound=dist_threshold,
-                                       n_jobs=-1
-                                    )
-
-                # Calculate possible contacts
-                possible_contacts = sum( dist != float('inf') )
-
-                matrix.at[ nA.skeleton_id, nB.skeleton_id ] = possible_contacts
-
-            pbar.update( 1 )
-
-    return matrix.astype(int)
-
-
-def calc_overlap(a, b, dist=2, method='min' ):
-    """ Calculates the amount of cable of neuron A within distance of neuron b.
-    Uses dotproduct representation of a neuron!
-
-    Parameters
-    ----------
-    a,b :       {CatmaidNeuron, CatmaidNeuronList}
-                Neuron(s) for which to compute cable within distance.    
-    dist :      int, optional
-                Maximum distance in microns.
-    method :    {'min','max','avg'}
-                Method by which to calculate the overlapping cable between
-                two cables.
-
-    Returns
-    -------
-    pandas.DataFrame
-            Matrix in which neurons A are rows, neurons B are columns. Cable
-            within distance is given in microns.
-
-            >>> df
-                        skidB1   skidB2  skidB3 ...
-                skidA1    5        1        0
-                skidA2    10       20       5
-                skidA3    4        3        15
-                ...
-
-    """    
-
-    # Convert distance to nm
-    dist *= 1000  
-
-    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise TypeError('Need to pass CatmaidNeurons')
-
-    if isinstance(a, core.CatmaidNeuron):
-        a = core.CatmaidNeuronList(a)
-
-    if isinstance(b, core.CatmaidNeuron):
-        b = core.CatmaidNeuronList(b)
-
-    allowed_methods = ['min','max','avg']
-    if method not in allowed_methods:
-        raise ValueError('Unknown method "{0}". Allowed methods: "{0}"'.format(method, ','.join(allowed_methods)))
-
-    matrix = pd.DataFrame( np.zeros(( a.shape[0], b.shape[0] )), index=a.skeleton_id, columns=b.skeleton_id )
-
-    with tqdm(total=len(a), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
-        # Keep track of KDtrees
-        trees = {}
-        for nA in a:
-            # Get cKDTree for nA            
-            tA = trees.get( nA.skeleton_id, None )
-            if not tA:
-                trees[nA.skeleton_id] = tA = scipy.spatial.cKDTree( np.vstack( nA.dps.point ), leafsize=10 )
-
-            for nB in b:
-                # Get cKDTree for nB            
-                tB = trees.get( nB.skeleton_id, None )
-                if not tB:
-                    trees[nB.skeleton_id] = tB = scipy.spatial.cKDTree( np.vstack( nB.dps.point ), leafsize=10 )
-
-                # Query nB -> nA
-                distA, ixA = tA.query( np.vstack( nB.dps.point ),
-                                           k=1, 
-                                           distance_upper_bound=dist,
-                                           n_jobs=-1
-                                        )
-                # Query nA -> nB
-                distB, ixB = tB.query( np.vstack( nA.dps.point ),
-                                           k=1, 
-                                           distance_upper_bound=dist,
-                                           n_jobs=-1
-                                        )
-
-                nA_in_dist = nA.dps.loc[ ixA[ distA != float('inf') ] ]
-                nB_in_dist = nB.dps.loc[ ixB[ distB != float('inf') ] ]
-
-
-                if nA_in_dist.empty:
-                    overlap = 0
-                elif method == 'avg':
-                    overlap = ( nA_in_dist.vec_length.sum() + nB_in_dist.vec_length.sum() ) / 2
-                elif method == 'max':
-                    overlap = max( nA_in_dist.vec_length.sum() , nB_in_dist.vec_length.sum() ) 
-                elif method == 'min':
-                    overlap = min( nA_in_dist.vec_length.sum() , nB_in_dist.vec_length.sum() )               
-
-                matrix.at[ nA.skeleton_id, nB.skeleton_id ] = overlap
-
-            pbar.update( 1 )
-
-     # Convert to um
-    matrix /= 1000
-
-    return matrix
 
 
 def calc_strahler_index(skdata, inplace=True, method='standard'):
@@ -1665,7 +314,7 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
     root = df.nodes[df.nodes.type == 'root'].treenode_id.tolist()
 
     # Generate dicts for childs and parents
-    list_of_childs = generate_list_of_childs(skdata)
+    list_of_childs = graph_utils.generate_list_of_childs(skdata)
     #list_of_parents = { n[0]:n[1] for n in skdata[0] }
 
     # Reindex according to treenode_id
@@ -1732,13 +381,14 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
             # The last this_node is either a branch node or the root
             # If a branch point: check, if all its childs have already been
             # processed
-            node_ready = True
-            for child in list_of_childs[parent_node]:
-                if child not in nodes_processed:
-                    node_ready = False
+            if parent_node != None:
+                node_ready = True
+                for child in list_of_childs[parent_node]:
+                    if child not in nodes_processed:
+                        node_ready = False
 
-            if node_ready is True and parent_node != None:
-                new_starting_points.append(parent_node)
+                if node_ready is True and parent_node != None:
+                    new_starting_points.append(parent_node)
 
         # Remove those starting_points that were successfully processed in this
         # run before the next iteration
@@ -1854,234 +504,6 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
         return
 
 
-def _walk_to_root(start_node, list_of_parents, visited_nodes):
-    """ Helper function for synapse_root_distances(): 
-    Walks to root from start_node and sums up geodesic distances along the way.     
-
-    Parameters
-    ----------
-    start_node :        (node_id, x,y,z)
-    list_of_parents :   {node_id: (parent_id, x,y,z) }
-    visited_nodes :     {node_id: distance_to_root}
-                        Make sure to not walk the same path twice by keeping 
-                        track of visited nodes and their distances to soma
-
-    Returns
-    -------
-    [1] distance_to_root
-    [2] updated visited_nodes
-    """
-    dist = 0
-    distances_traveled = []
-    nodes_seen = []
-    this_node = start_node
-
-    # Walk to root
-    while list_of_parents[this_node[0]][0] != None:
-        parent = list_of_parents[this_node[0]]
-        if parent[0] not in visited_nodes:
-            d = _calc_dist(this_node[1:], parent[1:])
-            distances_traveled.append(d)
-            nodes_seen.append(this_node[0])
-        else:
-            d = visited_nodes[parent[0]]
-            distances_traveled.append(d)
-            nodes_seen.append(this_node[0])
-            break
-
-        this_node = parent
-
-    # Update visited_nodes
-    visited_nodes.update(
-        {n: sum(distances_traveled[i:]) for i, n in enumerate(visited_nodes)})
-
-    return round(sum(distances_traveled)), visited_nodes
-
-
-def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
-    """ Test if points are within a given CATMAID volume.
-
-    Important
-    ---------
-    This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_ 
-    which is only an optional dependency of PyMaid. If pyoctree is not 
-    installed, we will fall back to using scipy ConvexHull instead of ray
-    casting. This is slower and may give wrong positives for concave meshes!
-
-    Parameters
-    ----------
-    x :               {list of tuples, CatmaidNeuron, CatmaidNeuronList}
-
-                      1. List/np array -  ``[ ( x,y,z ), ( ... ) ]``
-                      2. DataFrame - needs to have 'x','y','z' columns                      
-
-    volume :          {str, list of str, core.Volume} 
-                      Name of the CATMAID volume to test OR core.Volume dict
-                      as returned by e.g. :func:`~pymaid.get_volume()`    
-    inplace :         bool, optional
-                      If False, a copy of the original DataFrames/Neuron is 
-                      returned. Does only apply to CatmaidNeuron or 
-                      CatmaidNeuronList objects. Does apply if multiple 
-                      volumes are provided
-    mode :            {'IN','OUT'}, optional
-                      If 'IN', parts of the neuron that are within the volume
-                      are kept.
-    remote_instance : CATMAID instance, optional
-                      Pass if volume is a volume name
-
-    Returns
-    -------
-    CatmaidNeuron
-                      If input is CatmaidNeuron or CatmaidNeuronList, will
-                      return parts of the neuron (nodes and connectors) that
-                      are within the volume
-    list of bools
-                      If input is list or DataFrame, returns boolean: ``True`` 
-                      if in volume, ``False`` if not
-    dict
-                      If multiple volumes are provided as list of strings, 
-                      results will be returned as dict of above returns.
-
-    Examples
-    --------
-    >>> # Advanced example (assumes you already set up a CATMAID instance)
-    >>> # Check with which antennal lobe glomeruli a neuron intersects
-    >>> # First get names of glomeruli
-    >>> all_volumes = remote_instance.fetch( remote_instance._get_volumes() )
-    >>> right_gloms = [ v['name'] for v in all_volumes if v['name'].endswith('glomerulus') ]
-    >>> # Neuron to check
-    >>> n = pymaid.get_neuron('name:PN unknown glomerulus', remote_instance = remote_instance )
-    >>> # Get intersections
-    >>> res = pymaid.in_volume( n, right_gloms, remote_instance = remote_instance )
-    >>> # Extract cable
-    >>> cable = { v : res[v].cable_length for v in res  }
-    >>> # Plot graph
-    >>> import pandas as pd
-    >>> import matplotlib.pyplot as plt
-    >>> df = pd.DataFrame( list( cable.values() ), 
-    ...                    index = list( cable.keys() )
-    ...                   )
-    >>> df.boxplot()
-    >>> plt.show()
-
-    """        
-
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-
-    if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
-        #Turn into dict 
-        if not isinstance(volume, dict):
-            volume = { v['name'] : v for v in volume }
-
-        data = dict()
-        for v in tqdm(volume, desc='Volumes', disable=module_logger.getEffectiveLevel()>=40):
-            data[v] = in_volume(
-                x, volume[v], remote_instance=remote_instance, inplace=False, mode=mode)
-        return data
-
-    if isinstance(volume, str):
-        volume = pymaid.get_volume(volume, remote_instance)        
-
-    if isinstance(x, pd.DataFrame):
-        points = x[['x', 'y', 'z']].as_matrix()
-
-    elif isinstance(x, core.CatmaidNeuron):
-        n = x
-
-        if not inplace:
-            n = n.copy()
-            try:
-                del n.igraph
-            except:
-                pass
-
-        in_v = in_volume(n.nodes[['x', 'y', 'z']].as_matrix(), volume, mode=mode)
-
-        # If mode is OUT, invert selection
-        if mode == 'OUT':
-            in_v = ~np.array(in_v)
-
-        n.nodes = n.nodes[ in_v ]
-        n.connectors = n.connectors[
-            n.connectors.treenode_id.isin(n.nodes.treenode_id.tolist())]
-
-        # Fix root nodes
-        n.nodes.loc[~n.nodes.parent_id.isin(
-            n.nodes.treenode_id.tolist() + [None]), 'parent_id'] = None
-
-        # Reset indices of node and connector tables (important for igraph!)
-        n.nodes.reset_index(inplace=True,drop=True)
-        n.connectors.reset_index(inplace=True,drop=True)
-
-        # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node 
-        # We have to fix the nodes that lost their parents
-        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() ), 
-                          'parent_id' ] = None
-
-        if not inplace:
-            return n
-        else: 
-            return
-
-    elif isinstance(x, core.CatmaidNeuronList):
-        nl = x
-
-        if not inplace:
-            nl = nl.copy()
-
-        for n in nl:
-            n = in_volume(n, volume, inplace=True, mode=mode)
-
-        if not inplace:
-            return nl
-        else:
-            return
-    else:
-        points = x    
-
-    try:        
-        return _in_volume_ray( points, volume )        
-    except:
-        module_logger.warning('Package pyoctree not found. Falling back to ConvexHull.')
-        return _in_volume_convex( points, volume, approximate=False )
-
-def _in_volume_ray(points, volume):
-    """ Uses pyoctree's raycsasting to test if points are within a given 
-    CATMAID volume.    
-    """    
-    
-    if 'pyoctree' in volume:
-        # Use store octree if available
-        tree = volume['pyoctree']
-    else:
-        # Create octree from scratch
-        tree = pyoctree.PyOctree(np.array(volume['vertices'], dtype=float),
-                                 np.array(volume['faces'], dtype=np.int32)
-                                 )
-        volume['pyoctree'] = tree
-
-    # Generate rays for points
-    mx = np.array(volume['vertices']).max(axis=0)
-    mn = np.array(volume['vertices']).min(axis=0)
-    
-    rayPointList = np.array(
-                [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
-
-    # Unfortunately rays are bidirectional -> we have to filter intersections
-    # by those that occur "above" the point
-    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
-                         2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList, 
-                                                                           desc='Calc. intersections',
-                                                                           disable=module_logger.getEffectiveLevel()>=40
-                                                                        ))]
-
-    # Count odd intersection
-    return [i % 2 != 0 for i in intersections]
-
 def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_soma=True, return_point=False ):
     """ This function tries to split a neuron into axon, dendrite and primary
     neurite. The result is highly depending on the method and on your 
@@ -2141,7 +563,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     if method not in ['centrifugal','centripetal','sum','bending']:
         raise ValueError('Unknown parameter for mode: {0}'.format(mode))
 
-    if x.soma and x.soma != x.root and reroot_soma:
+    if x.soma and x.soma not in x.root and reroot_soma:
         x.reroot(x.soma)
 
     # Calculate flow centrality if necessary
@@ -2164,17 +586,15 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     # Now get the node point with the highest flow centrality.
     cut = x.nodes[ (x.nodes.flow_centrality == x.nodes.flow_centrality.max()) ].treenode_id.tolist()    
 
-    # If there is more than one  point we need to get one closest to the soma (root)    
-    cut = sorted(cut, key = lambda y : len( x.igraph.get_shortest_paths( x.igraph.vs.select(node_id=y)[0], 
-                                                            x.igraph.vs.select(node_id=x.root)[0] )[0] )
-           )[0]
+    # If there is more than one point we need to get one closest to the soma (root)    
+    cut = sorted(cut, key = lambda y : graph_utils.dist_between( x.graph, y, x.root[0] ) )[0]
 
     if return_point:
         return cut
 
     # If cut node is a branch point, we will try cutting off main neurite
-    if x.nodes.set_index('treenode_id').loc[ cut ].type =='branch' and primary_neurite:
-        rest, primary_neurite = cut_neuron( x, cut )
+    if x.graph.degree(cut) > 2 and primary_neurite:
+        rest, primary_neurite = cut_neuron( x, next( x.graph.successors(cut) ) )
         # Change name and color
         primary_neurite.neuron_name = x.neuron_name + '_primary_neurite'
         primary_neurite.color = (0,255,0)
@@ -2183,7 +603,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
         primary_neurite = None
 
     # Next, cut the rest into axon and dendrite
-    a, b = cut_neuron( rest, cut )
+    a, b = graph_utils.cut_neuron( rest, cut )
 
     # Figure out which one is which by comparing number of presynapses
     if a.n_presynapses < b.n_presynapses:
@@ -2329,7 +749,7 @@ def calc_bending_flow(x, polypre=False):
     if isinstance(x, core.CatmaidNeuronList):
         return [ calc_bending_flow(n, mode=mode, polypre=polypre, ) for n in x ]
 
-    if x.soma and x.root != x.soma:
+    if x.soma and x.soma not in x.root:
         module_logger.warning('Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
 
     # We will be processing a super downsampled version of the neuron to speed up calculations
@@ -2341,51 +761,35 @@ def calc_bending_flow(x, polypre=False):
 
     if polypre:
         # Get details for all presynapses
-        cn_details = pymaid.get_connector_details( y.connectors[ y.connectors.relation==0 ] )            
+        cn_details = fetch.get_connector_details( y.connectors[ y.connectors.relation==0 ] )            
 
     # Get list of nodes with pre/postsynapses
-    pre_node_ids = y.connectors[ y.connectors.relation==0 ].treenode_id.unique()
-    post_node_ids = y.connectors[ y.connectors.relation==1 ].treenode_id.unique()
-    total_pre = len(pre_node_ids)
-    total_post = len(post_node_ids)
-
-    # Turn these into vertex indices of the igraph representation
-    # We need to make this somewhat complicated construct in case a treenode
-    # has multiple connectors
-    pre_vs_ix = [ [v.index for v in y.igraph.vs if v['node_id'] == tn ][0] for tn in pre_node_ids ]
-    post_vs_ix = [ [v.index for v in y.igraph.vs if v['node_id'] == tn ][0] for tn in post_node_ids ]
+    pre_node_ids = y.connectors[ y.connectors.relation==0 ].treenode_id.values
+    post_node_ids = y.connectors[ y.connectors.relation==1 ].treenode_id.values
 
     # Get list of branch_points
     bp_node_ids = y.nodes[ y.nodes.type == 'branch' ].treenode_id.values.tolist()
     # Add root if it is also a branch point
-    if y.igraph.vs.select( node_id = y.root )[0].degree() > 1:
-        bp_node_ids.append( y.root )
+    for root in y.root:
+        if y.graph.degree( root ) > 1:
+            bp_node_ids += list( root )
 
-    # Get indices of the igraph nodes
-    bp_vs_ix = [ [v.index for v in y.igraph.vs if v['node_id'] == tn ][0] for tn in bp_node_ids ]
+    # Get list of childs of each branch point
+    bp_childs = { t : [ e[0] for e in y.graph.in_edges(t) ] for t in bp_node_ids }
+    childs = [ tn for l in bp_childs.values() for tn in l ]
 
-    # Get indices of the childs of our branch points and map them
-    bp_childs = { t : [ e.source for e in y.igraph.es.select(_target=t) ] for t in bp_vs_ix }
-    childs_vs_ix = [ ix for l in bp_childs.values() for ix in l ]
-
-    # Get possible paths from the branch point childs FROM all pre and postynapses
-    pre_paths = y.igraph.shortest_paths_dijkstra( childs_vs_ix, pre_vs_ix, mode='IN' )
-    post_paths = y.igraph.shortest_paths_dijkstra( childs_vs_ix, post_vs_ix, mode='IN' )    
-
-    # Turn into DataFramex
-    distal_pre = pd.DataFrame( np.array(pre_paths) != float('inf'), index=childs_vs_ix, columns=pre_vs_ix )
-    distal_post = pd.DataFrame( np.array(post_paths) != float('inf'), index=childs_vs_ix, columns=post_vs_ix )
+    # Get number of pre/postsynapses distal to each branch's childs
+    distal_pre = graph_utils.distal_to( y, pre_node_ids, childs )
+    distal_post = graph_utils.distal_to( y, post_node_ids, childs )
 
     # Multiply columns (presynapses) by the number of postsynaptically connected nodes
     if polypre:
         # Map vertex ID to number of postsynaptic nodes (avoid 0)        
-        distal_pre *= [ max( 1, len( cn_details[ cn_details.presynaptic_to_node== y.igraph.vs[n]['node_id'] ].postsynaptic_to_node.sum() ) ) for n in distal_pre.columns ]
-        # Also change total_pre as accordingly
-        total_pre = sum( [ max( 1, len(row) ) for row in cn_details.postsynaptic_to_node.tolist() ] )
+        distal_pre *= [ max( 1, len( cn_details[ cn_details.presynaptic_to_node == n ].postsynaptic_to_node.sum() ) ) for n in distal_pre.columns ]        
 
-    # Sum up axis - now each row 
-    distal_pre = distal_pre.sum(axis=1)
-    distal_post = distal_post.sum(axis=1)
+    # Sum up axis - now each row represents the number of pre/postsynapses distal to that node 
+    distal_pre = distal_pre.T.sum(axis=1)
+    distal_post = distal_post.T.sum(axis=1)
 
     # Now go over all branch points and check flow between branches (centrifugal) vs flow from branches to root (centripetal)
     flow = { bp : 0 for bp in bp_childs }    
@@ -2401,7 +805,7 @@ def calc_bending_flow(x, polypre=False):
     x.nodes.set_index('treenode_id', inplace=True)
 
     # Add flow (make sure we use igraph of y to get node ids!)
-    x.nodes.loc[ [ y.igraph.vs[i]['node_id'] for i in flow.keys() ], 'flow_centrality' ] = list(flow.values())
+    x.nodes.loc[ flow.keys(), 'flow_centrality' ] = list(flow.values())
 
     # Add little info on method used for flow centrality
     x.centrality_method = 'bending'
@@ -2465,7 +869,7 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
     Returns
     -------        
     Adds a new column 'flow_centrality' to ``x.nodes``. Ignores non-synapse
-    holding slab nodes!
+    holding segment nodes!
 
     """
 
@@ -2482,7 +886,7 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
     if isinstance(x, core.CatmaidNeuronList):
         return [ calc_flow_centrality(n, mode=mode, polypre=polypre, ) for n in x ]
 
-    if x.soma and x.root != x.soma:
+    if x.soma and x.soma not in x.root:
         module_logger.warning('Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
 
     # We will be processing a super downsampled version of the neuron to speed up calculations
@@ -2494,7 +898,7 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
 
     if polypre:
         # Get details for all presynapses
-        cn_details = pymaid.get_connector_details( y.connectors[ y.connectors.relation==0 ] )            
+        cn_details = fetch.get_connector_details( y.connectors[ y.connectors.relation==0 ] )            
 
     # Get list of nodes with pre/postsynapses
     pre_node_ids = y.connectors[ y.connectors.relation==0 ].treenode_id.unique()
@@ -2502,43 +906,32 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
     total_pre = len(pre_node_ids)
     total_post = len(post_node_ids)
 
-    # Turn these into vertex indices of the igraph representation
-    # We need to make this somewhat complicated construct in case a treenode
-    # has multiple connectors
-    pre_vs_ix = [ [v.index for v in y.igraph.vs if v['node_id'] == tn ][0] for tn in pre_node_ids ]
-    post_vs_ix = [ [v.index for v in y.igraph.vs if v['node_id'] == tn ][0] for tn in post_node_ids ]
-
     # Get list of points to calculate flow centrality for: 
     # branches and nodes with synapses
-    calc_node_ids = y.nodes[ (y.nodes.type == 'branch') | (y.nodes.has_connectors == True ) ].treenode_id.values
+    calc_node_ids = y.nodes[ (y.nodes.type == 'branch') | (y.nodes.treenode_id.isin(y.connectors.treenode_id) ) ].treenode_id.values
 
-    # Get indices of the igraph nodes
-    calc_vs_ix = [ [v.index for v in y.igraph.vs if v['node_id'] == tn ][0] for tn in calc_node_ids ]    
-
-    # Get possible paths to our calc_nodes FROM all pre and postynapses    
-    pre_paths = y.igraph.shortest_paths_dijkstra( calc_vs_ix, pre_vs_ix, mode='IN' )
-    post_paths = y.igraph.shortest_paths_dijkstra( calc_vs_ix, post_vs_ix, mode='IN' )    
-
-    # Turn into binary DataFrame: True == this nodes is distal to, False if not distal
-    distal_pre = pd.DataFrame( np.array(pre_paths) != float('inf'), index=calc_node_ids, columns=pre_vs_ix )
-    distal_post = pd.DataFrame( np.array(post_paths) != float('inf'), index=calc_node_ids, columns=post_vs_ix )
+    # Get number of pre/postsynapses distal to each branch's childs
+    distal_pre = graph_utils.distal_to( y, pre_node_ids, calc_node_ids  )
+    distal_post = graph_utils.distal_to( y, post_node_ids, calc_node_ids )
 
     # Multiply columns (presynapses) by the number of postsynaptically connected nodes
     if polypre:
         # Map vertex ID to number of postsynaptic nodes (avoid 0)        
-        distal_pre *= [ max( 1, len( cn_details[ cn_details.presynaptic_to_node== y.igraph.vs[n]['node_id'] ].postsynaptic_to_node.sum() ) ) for n in distal_pre.columns ]
+        distal_pre *= [ max( 1, len( cn_details[ cn_details.presynaptic_to_node == n ].postsynaptic_to_node.sum() ) ) for n in distal_pre.columns ]
         # Also change total_pre as accordingly
         total_pre = sum( [ max( 1, len(row) ) for row in cn_details.postsynaptic_to_node.tolist() ] )
 
     # Sum up axis - now each row represents the number of pre/postsynapses that are distal to that node
-    distal_pre = distal_pre.sum(axis=1)
-    distal_post = distal_post.sum(axis=1)
-        
-    # Centrifugal is the flow from all non-distal postsynapses to all distal presynapses
-    centrifugal = { n : ( total_post - distal_post[n] ) * distal_pre[n] for n in calc_node_ids }
+    distal_pre = distal_pre.T.sum(axis=1)
+    distal_post = distal_post.T.sum(axis=1)
+    
+    if mode != 'centripetal':    
+        # Centrifugal is the flow from all non-distal postsynapses to all distal presynapses
+        centrifugal = { n : ( total_post - distal_post[n] ) * distal_pre[n] for n in calc_node_ids }
 
-    # Centripetal is the flow from all distal postsynapses to all non-distal presynapses
-    centripetal = { n : distal_post[n] * ( total_post - distal_pre[n]) for n in calc_node_ids }    
+    if mode != 'centrifugal':
+        # Centripetal is the flow from all distal postsynapses to all non-distal presynapses
+        centripetal = { n : distal_post[n] * ( total_post - distal_pre[n]) for n in calc_node_ids }    
 
     # Set flow centrality to None for all nodes
     x.nodes['flow_centrality'] = None
@@ -2567,45 +960,6 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
     return 
 
 
-def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
-    """ Uses scipy to test if points are within a given CATMAID volume.
-    The idea is to test if adding the point to the cloud would change the
-    convex hull. 
-    """
-
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-
-    if type(volume) == type(str()):
-        volume = pymaid.get_volume(volume, remote_instance)
-
-    verts = volume['vertices']
-
-    if not approximate:
-        intact_hull = ConvexHull(verts)
-        intact_verts = list(intact_hull.vertices)
-
-        if isinstance(points, list):
-            points = np.array(points)
-        elif isinstance(points, pd.DataFrame):
-            points = points.to_matrix()
-
-        return [list(ConvexHull(np.append(verts, list([p]), axis=0)).vertices) == intact_verts for p in points]
-    else:
-        bbox = [(min([v[0] for v in verts]), max([v[0] for v in verts])),
-                (min([v[1] for v in verts]), max([v[1] for v in verts])),
-                (min([v[2] for v in verts]), max([v[2] for v in verts]))
-                ]
-
-        for a in ignore_axis:
-            bbox[a] = (float('-inf'), float('inf'))
-
-        return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
-
-
 def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
     """ Function to stich multiple neurons together. The first neuron provided
     will be the master neuron. Unless treenode IDs are provided via 
@@ -2621,7 +975,7 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
                         than two possible treenodes for a single stitching
                         operation, the two closest are used.
     method :            {'LEAFS','ALL','NONE'}, optional
-                        Defines automated stitching mode.
+                        Set stitching method:
                             (1) 'LEAFS': only leaf (including root) nodes will 
                                 be considered for stitching
                             (2) 'ALL': all treenodes are considered
@@ -2658,6 +1012,19 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
 
     stitched_n = neurons[0]
 
+    # If method is none, we can just merge the data tables
+    if method == 'NONE':
+        stitched_n.nodes = pd.concat( [ n.nodes for n in neurons ], ignore_index=True )
+        stitched_n.connectors = pd.concat( [ n.connectors for n in neurons ], ignore_index=True )        
+        stitched_n.tags = {}
+        for n in neurons:
+            stitched_n.tags.update( n.tags )
+
+        #Reset temporary attributes of our final neuron
+        stitched_n._clear_temp_attr()
+
+        return stitched_n
+
     if tn_to_stitch and not isinstance(tn_to_stitch, (list, np.ndarray)):
         tn_to_stitch = [ tn_to_stitch ]
         tn_to_stitch = [ str(tn) for tn in tn_to_stitch ]
@@ -2673,24 +1040,23 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
         else:
             treenodesA = stitched_n.nodes
             treenodesB = nB.nodes
+        
+        #Calculate pairwise distances
+        dist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
+                                              treenodesB[['x','y','z']].values, 
+                                              metric='euclidean' )                
 
-        if method != 'NONE':
-            #Calculate pairwise distances
-            dist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values, 
-                                                  treenodesB[['x','y','z']].values, 
-                                                  metric='euclidean' )                
+        #Get the closest treenodes
+        tnA = treenodesA.loc[ dist.argmin(axis=0)[0] ].treenode_id
+        tnB = treenodesB.loc[ dist.argmin(axis=1)[0] ].treenode_id
 
-            #Get the closest treenodes
-            tnA = treenodesA.loc[ dist.argmin(axis=0)[0] ].treenode_id
-            tnB = treenodesB.loc[ dist.argmin(axis=1)[0] ].treenode_id
+        module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
 
-            module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
+        #Reroot neuronB onto the node that will be stitched
+        nB.reroot( tnB )
 
-            #Reroot neuronB onto the node that will be stitched
-            nB.reroot( tnB )
-
-            #Change neuronA root node's parent to treenode of neuron B
-            nB.nodes.loc[ nB.nodes.parent_id.isnull(), 'parent_id' ] = tnA
+        #Change neuronA root node's parent to treenode of neuron B
+        nB.nodes.loc[ nB.nodes.parent_id.isnull(), 'parent_id' ] = tnA
 
         #Add nodes, connectors and tags onto the stitched neuron
         stitched_n.nodes = pd.concat( [ stitched_n.nodes, nB.nodes ], ignore_index=True )
@@ -2701,294 +1067,5 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
     stitched_n._clear_temp_attr()
 
     return stitched_n
-
-def dist_between(x, a, b):
-    """ Returns the geodesic distance between two nodes in nanometers.
-
-    Parameters
-    ----------
-    x :             {CatmaidNeuron, iGraph}
-                    Neuron containing the nodes
-    a,b :           treenode IDs
-                    Treenodes to check.
-    
-    Returns
-    -------
-    int
-                    distance in nm
-
-    See Also
-    --------
-    :func:`~pymaid.distal_to`
-        Check if a node A is distal to node B
-    """
-
-    if isinstance( x, core.CatmaidNeuron ):
-        g = x.igraph 
-    elif isinstance( x, Graph ):
-        g = x
-    else:
-        raise ValueError('Need either CatmaidNeuron or iGraph object')
-
-    try:
-        _ = int(a)
-        _ = int(b)
-    except:
-        raise ValueError('a, b need to be treenode IDs')
-
-    # Find treenodes in Graph
-    a = [ n for n in g.vs if n['node_id'] == a ]
-    b = [ n for n in g.vs if n['node_id'] == b ]
-
-    if not a or not b:
-        raise ValueError('Unable to find treenode ID(s) in graph')    
-
-    return int( g.shortest_paths( a[0], b[0], mode='ALL', weights='weight' )[0][0] )
-
-def distal_to(x, a=None, b=None):
-    """ Checks if nodes a are distal to nodes b.
-
-    Important
-    ---------
-    Please note that if node A is not distal to node B, this does **not** 
-    automatically mean it is proximal instead: if nodes are on different 
-    branches, they are neither distal nor proximal to one another! To test 
-    for this case run a->b and b->a - if both return ``False``, nodes are on
-    different branches.
-
-    Also: if a and b are the same node, this function will return ``True``!
-
-    Parameters
-    ----------
-    x :     CatmaidNeuron
-    a,b :   {single treenode ID, list of treenode IDs, None}, optional
-            If no treenode IDs are provided, will consider all treenodes.
-
-    Returns
-    -------
-    bool 
-            If a and b are single treenode IDs respectively
-    pd.DataFrame
-            If a and/or b are lists of treenode IDs. Columns and rows (index)
-            represent treenode IDs. Neurons *a* are rows, neurons *b* are
-            columns.
-
-    Examples
-    --------
-    >>> # Get a neuron
-    >>> x = pymaid.get_neuron(16)
-    >>> # Get a treenode ID from tag
-    >>> a = x.tags['TEST_TAG'][0]
-    >>> # Check all nodes if they are distal or proximal to that tag
-    >>> df = pymaid.distal_to(x, a )
-    >>> # Get the IDs of the nodes that are distal
-    >>> df[ df[a] ].index.tolist()
-    
-    """
-
-    if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
-        x = x[0]
-
-    if not isinstance(x, core.CatmaidNeuron ):
-        raise ValueError('Please pass a SINGLE CatmaidNeuron')
-
-    if a != None:
-        if not isinstance(a, (list, np.ndarray)):
-            a = [a]
-        # Make sure we're dealing with integers
-        a = np.unique(a).astype(int)
-        # Get iGraph vertex indices for our treenodes 
-        a_vs = x.igraph.vs.select(node_id_in=a)        
-    else:
-        a_vs = x.igraph.vs
-    
-    if b != None:
-        if not isinstance(b, (list, np.ndarray)):
-            b = [b]
-        # Make sure we're dealing with integers
-        b = np.unique(b).astype(int)
-        
-        # Get iGraph vertex indices for our treenodes 
-        b_vs = x.igraph.vs.select(node_id_in=b)        
-    else:
-        b_vs = x.igraph.vs        
-
-    a_tn = [ v['node_id'] for v in a_vs ]
-    b_tn = [ v['node_id'] for v in b_vs ]
-    
-    # This holds distances
-    all_paths = x.igraph.shortest_paths_dijkstra(a_vs, b_vs, mode='IN')
-
-    # Generate matrix and sort according to order of input treenode lists
-    df = pd.DataFrame( all_paths, columns=b_tn, index=a_tn)
-    df = df.loc[ a, b ]
-
-    if df.shape == (1,1):
-        return df.values[0][0] != float('inf')
-    else:
-        # Return boolean
-        return df != float('inf')
-
-def filter_connectivity( x, restrict_to, remote_instance=None):
-    """ Filters connectivity data by volume or skeleton data. Use this e.g. to 
-    restrict connectivity to edges within a given volume or to certain 
-    compartments of neurons.
-
-    Important
-    ---------
-    Order of columns/rows may change during filtering.
-
-
-    Parameter
-    ---------
-    x :                 Connectivity object
-                        Currently accepts either::                        
-                         (1) Connectivity table from :func:`~pymaid.get_partners`
-                         (2) Adjacency matrix from :func:`~pymaid.adjacency_matrix`
-    restrict_to :       {str, pymaid.Volume, pymaid.CatmaidNeuronList}
-                        Volume or neurons to restrict connectivity to. Strings
-                        will be interpreted as volumes.
-    remote_instance :   CATMAID instance, optional
-                        If not passed, will try using globally defined.
-
-    Returns
-    -------
-    Restricted connectivity data
-
-    """     
-
-    if not isinstance( restrict_to, (str, core.Volume, 
-                                          core.CatmaidNeuron, 
-                                          core.CatmaidNeuronList ) ):
-        raise TypeError('Unable to restrict connectivity to type'.format(type(restrict_to)))
-
-    if isinstance(restrict_to, str):
-        restrict_to = pymaid.get_volume( restrict_to, remote_instance = remote_instance )
-
-    datatype = getattr(x, 'datatype', None)
-
-    if datatype not in ['connectivity_table','adjacency_matrix']:
-        raise TypeError('Unknown connectivity data. See help(filter_connectivity) for details.')
-    
-    if datatype == 'connectivity_table':
-        neurons = [ c for c in x.columns if c not in ['neuron_name', 'skeleton_id', 'num_nodes', 'relation', 'total'] ]
-
-        """
-        # Keep track of existing edges
-        old_upstream = np.array([ [ (source, n) for n in neurons ] for source in x[x.relation=='upstream'].skeleton_id ]) 
-        old_upstream = old_upstream[ x[x.relation=='upstream'][neurons].values > 0 ]
-
-        old_downstream = np.array([ [ (n, target) for n in neurons ] for target in x[x.relation=='downstream'].skeleton_id ]) 
-        old_downstream = old_downstream[ x[x.relation=='downstream'][neurons].values > 0 ]
-
-        old_edges = np.concatenate([old_upstream, old_downstream], axis=0).astype(int)
-        """
-
-        # First get connector between neurons on the table
-        if not x[ x.relation=='upstream' ].empty:    
-            upstream = pymaid.get_connectors_between( x[ x.relation=='upstream' ].skeleton_id,
-                                                      neurons,
-                                                      directional=True,
-                                                      remote_instance=remote_instance )
-            # Now filter connectors
-            if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-                upstream = upstream[ upstream.connector_id.isin( x.connectors ) ]
-            elif isinstance( restrict_to, core.Volume ):
-                upstream = upstream[ in_volume( upstream.connector_loc.values , restrict_to ) ]
-        else:
-            upstream = None                             
-
-        if not x[ x.relation=='downstream' ].empty:
-            downstream = pymaid.get_connectors_between( neurons,
-                                                        x[ x.relation=='downstream'].skeleton_id,
-                                                        directional=True,
-                                                        remote_instance=remote_instance )      
-            # Now filter connectors
-            if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):                
-                downstream = downstream[ downstream.connector_id.isin( x.connectors ) ]
-            elif isinstance( restrict_to, core.Volume ):                
-                downstream = downstream[ in_volume( downstream.connector_loc.values , restrict_to ) ]
-        else:
-            downstream = None
-
-        if not isinstance( downstream, type(None)) and not isinstance( upstream, type(None)):
-            cn_data = pd.concat( [upstream, downstream], axis=0 )
-        elif isinstance( downstream, type(None)):
-            cn_data = upstream
-        else:
-            cn_data = downstream            
-
-    elif datatype == 'adjacency_matrix':
-        cn_data = pymaid.get_connectors_between( x.index.tolist(), 
-                                                 x.columns.tolist(),
-                                                 directional=True,
-                                                 remote_instance=remote_instance )
-
-        # Now filter connectors
-        if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            cn_data = cn_data[ cn_data.connector_id.isin( x.connectors ) ]            
-        elif isinstance( restrict_to, core.CatmaidNeuron ):
-            cn_data = cn_data[ in_volume( cn_data.connector_loc.values , restrict_to ) ]
-
-    if cn_data.empty:
-        module_logger.warning('No connectivity left after filtering')
-        return
-
-    # Reconstruct connectivity data:    
-    # Collect edges
-    edges = cn_data[['source_neuron','target_neuron']].values
-
-    # Turn individual edges into synaptic connections
-    unique_edges, counts = np.unique( edges, return_counts=True, axis=0 ) 
-    unique_skids = np.unique(edges).astype(str)
-    unique_edges=unique_edges.astype(str)    
-
-    # Create empty adj_mat
-    adj_mat = pd.DataFrame( np.zeros(( len(unique_skids), len(unique_skids) )),
-                            columns=unique_skids, index=unique_skids )
-
-    # Fill in values
-    for i, e in enumerate(tqdm(unique_edges, disable=module_logger.getEffectiveLevel()>=40, desc='Adj. matrix')):
-        # using df.at here speeds things up tremendously!
-        adj_mat.at[ str(e[0]), str(e[1]) ] = counts[i]
-
-    if datatype == 'adjacency_matrix':
-        adj_mat.datatype = 'adjacency_matrix'
-        # Bring into original format
-        adj_mat = adj_mat.loc[ x.index, x.columns ]
-        # If we dropped any columns/rows because they didn't contain connectivity, we have to fill them now
-        adj_mat.fillna(0, inplace=True)
-        return adj_mat 
-
-    # Generate connectivity table by subsetting adjacency matrix to our neurons of interest
-    all_upstream = adj_mat[ adj_mat[ neurons ].sum(axis=1) > 0 ][ neurons ]
-    all_upstream['skeleton_id'] = all_upstream.index
-    all_upstream['relation'] = 'upstream'
-
-    all_downstream = adj_mat.T[ adj_mat.T[ neurons ].sum(axis=1) > 0 ][ neurons ]
-    all_downstream['skeleton_id'] = all_downstream.index
-    all_downstream['relation'] = 'downstream'    
-
-    # Merge tables
-    df = pd.concat( [all_upstream,all_downstream], axis=0, ignore_index=True )
-
-    # Remove neurons that were not in the original data - under certain 
-    # circumstances, neurons can sneak back in
-    df = df[ df.skeleton_id.isin( x.skeleton_id ) ]
-
-    # Use original connectivity table to populate data
-    aux = x.set_index('skeleton_id')[['neuron_name','num_nodes']].to_dict()    
-    df['num_nodes'] = [ aux['num_nodes'][s] for s in df.skeleton_id.tolist() ]
-    df['neuron_name'] = [ aux['neuron_name'][s] for s in df.skeleton_id.tolist() ]    
-    df['total'] = df[neurons].sum(axis=1)
-
-    # Reorder columns
-    df = df[[ 'neuron_name', 'skeleton_id', 'num_nodes', 'relation','total'] + neurons ]
-
-    df.sort_values(['relation','total'], inplace=True, ascending=False)  
-    df.type = 'connectivity_table'
-    df.reset_index(drop=True, inplace=True)  
-
-    return df
 
 

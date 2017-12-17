@@ -51,8 +51,10 @@ Examples
 >>> plotly.offline.plot(fig) 
 """
 
-from pymaid.pymaid import get_neuron, get_user_list, get_node_user_details, get_contributor_statistics, eval_skids, _eval_remote_instance
-from pymaid import core
+# TODOs
+# - Github punch card alike figure
+
+from pymaid import core, fetch
 import logging
 import pandas as pd
 from tqdm import tqdm
@@ -114,14 +116,12 @@ def get_user_contributions(x, remote_instance=None):
                            such as total reconstruction/review time.
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = fetch._eval_remote_instance(remote_instance)
 
-    skids = eval_skids(x, remote_instance)
-
-    user_list = get_user_list(remote_instance).set_index('id')
+    skids = fetch.eval_skids(x, remote_instance)    
     
-    cont = get_contributor_statistics(
-        skids, remote_instance, separate=False).ix[0]
+    cont = fetch.get_contributor_statistics(
+        skids, remote_instance, separate=False)
 
     all_users = set(list(cont.node_contributors.keys(
     )) + list(cont.pre_contributors.keys()) + list(cont.post_contributors.keys()))
@@ -139,7 +139,7 @@ def get_user_contributions(x, remote_instance=None):
     for u in cont.post_contributors:
         stats['postsynapses'][u] = cont.post_contributors[u]    
 
-    return pd.DataFrame([[user_list.ix[int(u)].last_name, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
+    return pd.DataFrame([[ u, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM', max_inactive_time=3):
@@ -248,9 +248,9 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     if mode not in ['SUM','OVER_TIME','ACTIONS']:
         raise ValueError('Unknown mode %s' % str(mode))    
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = fetch._eval_remote_instance(remote_instance)
 
-    skids = eval_skids(x, remote_instance)
+    skids = fetch.eval_skids(x, remote_instance)
 
     # Maximal inactive time is simply translated into binning
     # We need this later for pandas.TimeGrouper() anyway
@@ -260,10 +260,10 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     # Update minimum_actions to reflect actions/interval instead of actions/minute
     minimum_actions *= interval
 
-    user_list = get_user_list(remote_instance).set_index('id')
+    user_list = fetch.get_user_list(remote_instance).set_index('id')
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        x = get_neuron(skids, remote_instance=remote_instance)
+        x = fetch.get_neuron(skids, remote_instance=remote_instance)
 
     if isinstance(x, core.CatmaidNeuron):
         skdata = core.CatmaidNeuronList(x)
@@ -280,7 +280,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
             connector_ids += n.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = get_node_user_details( 
+    node_details = fetch.get_node_user_details( 
         node_ids + connector_ids, remote_instance=remote_instance )
 
     # Dataframe for creation (i.e. the actual generation of the nodes)

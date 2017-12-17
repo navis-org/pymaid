@@ -34,17 +34,18 @@ From shell:
 
 import unittest
 
-from pymaid import pymaid, core, plot, user_stats, igraph_catmaid, cluster
+from pymaid import fetch, core, plot, user_stats, graph, cluster
 import pandas as pd
 import numpy as np
-import igraph
+import networkx as nx
 import matplotlib.pyplot as plt
 
 # Silence most loggers
 user_stats.module_logger.setLevel('ERROR')
-igraph_catmaid.module_logger.setLevel('ERROR')
+graph.module_logger.setLevel('ERROR')
 cluster.module_logger.setLevel('ERROR')
 plot.module_logger.setLevel('ERROR')
+fetch.module_logger.setLevel('ERROR')
 
 try:
     import config_test
@@ -209,10 +210,10 @@ class TestCore(unittest.TestCase):
         nl.reload()
         self.assertIsInstance(nl, core.CatmaidNeuronList)
 
-    def test_igraph_related(self):
+    def test_graph_related(self):
         nl = pymaid.get_neuron('annotation:%s' % example_annotations[
                                0], remote_instance=self.rm)
-        self.assertIsInstance(nl[0].igraph, igraph.Graph)
+        self.assertIsInstance(nl[0].graph, nx.Graph)
         self.assertIsInstance(nl[0].slabs, list)
 
     def test_indexing(self):
@@ -288,7 +289,7 @@ class TestUserStats(unittest.TestCase):
             example_skids, remote_instance=self.rm), pd.DataFrame)
 
 
-class TestIgraphCatmaid(unittest.TestCase):
+class TestGraphCatmaid(unittest.TestCase):
     """Test pymaid.igraph_catmaid """
 
     def setUp(self):
@@ -302,13 +303,8 @@ class TestIgraphCatmaid(unittest.TestCase):
     def test_cluster_synapse_nodes(self):
         nl = pymaid.get_neuron('annotation:%s' % example_annotations[
                                0], remote_instance=self.rm)
-        self.assertIsInstance(igraph_catmaid.cluster_nodes_w_synapses(
+        self.assertIsInstance(graph.cluster_nodes_w_synapses(
             nl[0]), np.ndarray)
-
-    def test_network2graph(self):
-        self.assertIsInstance(igraph_catmaid.network2graph(
-            'annotation:' + example_annotations[0], remote_instance=self.rm),
-            igraph.Graph)
 
 
 if __name__ == '__main__':

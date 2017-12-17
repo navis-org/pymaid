@@ -14,41 +14,25 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" Collection of tools to turn CATMAID neurons into iGraph objects to 
-efficiently calculate distances and cluster synapses.
-
-Examples
---------
->>> import pymaid
->>> remote_instance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
-...                                           'user', 
-...                                           'password', 
-...                                           'token' 
-...                                         )
->>> # Example skid
->>> example_skid = '12345'
->>> # Retrieve 3D skeleton data for neuron of interest
->>> skdata = pymaid.get_neuron ( example_skid )
->>> # Cluster synapses - generates plot and returns clustering for nodes with synapses
->>> syn_linkage = pymaid.cluster_nodes_w_synapses( skdata, plot_graph = True )
->>> # Find the last two clusters (= the two biggest):
->>> clusters = syn_linkage.get_clusters( 2, criterion='maxclust')
->>> # Print summary
->>> print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters), 
-... len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
-
+""" Collection of tools to turn CATMAID neurons into Graph representations.
 """
 
 import sys
 import math
 import pylab
 import numpy as np
-from igraph import Graph
 import scipy.cluster
 import logging
 import pandas as pd
 import time
-from pymaid import core, pymaid
+from pymaid import core, fetch
+
+import networkx as nx 
+
+try:
+    import igraph
+except:
+    igraph = None
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -63,7 +47,7 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted(['network2graph','neuron2graph','matrix2graph','cluster_nodes_w_synapses','dist_from_root'])
+__all__ = sorted(['network2graph','neuron2igraph','matrix2graph','cluster_nodes_w_synapses','dist_from_root','neuron2nx'])
 
 
 def network2graph(x, remote_instance=None, threshold=1):
@@ -116,16 +100,16 @@ def network2graph(x, remote_instance=None, threshold=1):
 
     if not isinstance(x, pd.DataFrame):
         module_logger.info('Generating network from skeleton IDs...')
-        skids = pymaid.eval_skids(x, remote_instance=remote_instance)
+        skids = fetch.eval_skids(x, remote_instance=remote_instance)
         indices = { int(s): skids.index(s) for s in skids}
 
         try:
             neuron_names = x.neuron_names.tolist()
         except:
-            names = pymaid.get_names(skids, remote_instance=remote_instance)
+            names = fetch.get_names(skids, remote_instance=remote_instance)
             neuron_names = [names[str(n)] for n in skids]
 
-        edges = pymaid.get_edges(skids, remote_instance=remote_instance)
+        edges = fetch.get_edges(skids, remote_instance=remote_instance)
         edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
                           for e in edges[edges.weight >= threshold].itertuples()]
         weight = edges[ edges.weight >= threshold ].weight.tolist()
@@ -139,7 +123,7 @@ def network2graph(x, remote_instance=None, threshold=1):
         weight = [ x.loc[i,j] for i in range( x.shape[0] ) for j in range( x.shape[1]) if x.loc[i,j] >= threshold ]
 
     # Generate graph and assign custom properties
-    g = Graph(directed=True)
+    g = igraph.Graph(directed=True)
     g.add_vertices(len(skids))
     g.add_edges(edges_by_index)
 
@@ -213,7 +197,7 @@ def matrix2graph(adj_matrix, **kwargs):
     if syn_cutoff:
         weights = [min(e, syn_cutoff) for e in weights]
 
-    g = Graph(directed=True)
+    g = igraph.Graph(directed=True)
 
     # Add vertices
     g.add_vertices(len(neurons))
@@ -225,8 +209,45 @@ def matrix2graph(adj_matrix, **kwargs):
 
     return g
 
+def neuron2nx(x):
+    """ Takes CATMAID single skeleton data and turns it into an NetworkX Graph
 
-def neuron2graph(skdata, append=True):
+    Parameters
+    ----------
+    skdata :          {pandas.DataFrame, CatmaidNeuron}
+                      Containing either a single or multiple neurons.
+    append :          bool, optional
+                      Unless False, graph is automatically appended to the 
+                      dataframe.
+
+    Returns
+    -------
+    NetworX Graph
+                      Representation of the neuron 
+
+    """ 
+    # Collect nodes
+    nodes = x.nodes.set_index('treenode_id')
+    # Collect edges
+    edges = x.nodes[~x.nodes.parent_id.isnull()][['treenode_id','parent_id']].values
+    # Collect weight
+    weights = np.sqrt( np.sum( (nodes.loc[ edges[:,0], ['x','y','z'] ].values.astype(int) 
+                                - nodes.loc[edges[:,1], ['x','y','z'] ].values.astype(int) )**2, axis=1) ) 
+    # Generate weight dictionary
+    edge_dict = np.array( [ { 'weight' : w } for w in weights ] )
+    # Add weights to dictionary
+    edges = np.append( edges, edge_dict.reshape( len( edges ), 1 ), axis=1)
+    # Create empty directed Graph
+    g = nx.DiGraph()    
+    # Add nodes (in case we have disconnected nodes)
+    g.add_nodes_from( x.nodes.treenode_id.values )
+    # Add edges
+    g.add_edges_from( edges )
+
+    return g
+
+
+def neuron2igraph(skdata, append=True):
     """ Takes CATMAID single skeleton data and turns it into an iGraph object
 
     Parameters
@@ -243,12 +264,16 @@ def neuron2graph(skdata, append=True):
                       Representation of the neuron 
 
     """
+    # If igraph is not installed return nothing
+    if igraph == None:
+        return None
+
     if isinstance(skdata, pd.DataFrame) or isinstance(skdata, core.CatmaidNeuronList):
         return [neuron2graph(skdata.loc[i]) for i in range(skdata.shape[0])]
     elif isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
 
-    module_logger.info('Generating graph from skeleton data...')
+    module_logger.debug('Generating graph from skeleton data...')
 
     # Make sure we have correctly numbered indices
     nodes = df.nodes.reset_index(drop=True)
@@ -262,9 +287,7 @@ def neuron2graph(skdata, append=True):
     parent_ids = nodes[~nodes.parent_id.isnull()].parent_id.values
     nodes['temp_index'] = nodes.index  # add temporary index column
     parent_index = nodes.set_index('treenode_id').loc[parent_ids,
-        'temp_index'].values
-    # remove temporary column
-    nodes.drop('temp_index', axis=1, inplace=True)
+        'temp_index'].values    
 
     # Generate list of edges based on index of vertices
     elist = list(zip(tn_index_with_parent, parent_index))
@@ -273,13 +296,13 @@ def neuron2graph(skdata, append=True):
     #elist = [ [ n.Index, vlist.index( n.parent_id )  ] for n in nodes.itertuples() if n.parent_id != None ]
 
     # Generate graph and assign custom properties
-    g = Graph(elist, n=len(vlist), directed=True)
+    g = igraph.Graph(elist, n=len(vlist), directed=True)
 
     g.vs['node_id'] = nodes.treenode_id.tolist()
     g.vs['parent_id'] = nodes.parent_id.tolist()
-    g.vs['X'] = nodes.x.tolist()
-    g.vs['Y'] = nodes.y.tolist()
-    g.vs['Z'] = nodes.z.tolist()
+    #g.vs['X'] = nodes.x.tolist()
+    #g.vs['Y'] = nodes.y.tolist()
+    #g.vs['Z'] = nodes.z.tolist()
 
     # Find nodes with synapses and assign the custom property'has_synapse'    
     # This turned out to be really time consuming
@@ -329,7 +352,7 @@ def dist_from_root(data, synapses_only=False):
     elif isinstance(data, pd.Series) or isinstance(data, core.CatmaidNeuron):
         g = data.igraph
         if g is None:
-            g = neuron2graph(data)
+            g = neuron2igraph(data)
     else:
         raise Exception('Unexpected data type: %s' % str(type(data)))
 
@@ -355,12 +378,12 @@ def dist_from_root(data, synapses_only=False):
     for n in nodes:
         distances_to_root[n[1]] = distance_matrix[n[0]][root]
 
-    if isinstance(data, Graph):
+    if isinstance(data, igraph.Graph):
         return distances_to_root
     else:
         data.nodes['dist_to_root'] = [distances_to_root[n]
                                       for n in data.nodes.treenode_id.tolist()]
-        data.igraph = neuron2graph(data)
+        data.igraph = neuron2igraph(data)
         return data
 
 
@@ -379,7 +402,7 @@ def cluster_nodes_w_synapses(data, plot_graph=False):
                    Scipy hiearchical clustering encoded as linkage matrix
     """
 
-    if isinstance(data, Graph):
+    if isinstance(data, igraph.Graph):
         g = data
     elif isinstance(data, pd.DataFrame) or isinstance(data, core.CatmaidNeuronList):
         if data.shape[0] == 1:
@@ -389,7 +412,7 @@ def cluster_nodes_w_synapses(data, plot_graph=False):
     elif isinstance(data, pd.Series) or isinstance(data, core.CatmaidNeuron):
         g = data.igraph
         if g == None:
-            g = neuron2graph(data)
+            g = neuron2igraph(data)
     else:
         raise Exception('Unexpected data type: %s' % str(type(data)))
 

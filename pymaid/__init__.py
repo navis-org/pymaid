@@ -18,10 +18,10 @@ if len( module_logger.handlers ) == 0:
 # Flatten namespace by importing contents of all modules of pymaid 
 
 try:
-    from pymaid.pymaid import *
+    from pymaid.fetch import *
 except Exception as error:
     module_logger.warning(str(error))
-    module_logger.warning('Error importing pymaid.pymaid:\n' + str(error))
+    module_logger.warning('Error importing pymaid.fetch:\n' + str(error))
 
 try:
     from pymaid.cluster import *
@@ -54,10 +54,34 @@ except Exception as error:
     module_logger.warning('Error importing pymaid.core:\n' + str(error))
 
 try:
-    from pymaid.igraph_catmaid import *
+    from pymaid.graph import *
 except Exception as error:
     module_logger.warning(str(error))
-    module_logger.warning('Error importing pymaid.igraph_catmaid:\n' + str(error))  
+    module_logger.warning('Error importing pymaid.graph:\n' + str(error))  
+
+try:
+    from pymaid.graph_utils import *
+except Exception as error:
+    module_logger.warning(str(error))
+    module_logger.warning('Error importing pymaid.graph_utils:\n' + str(error))
+
+try:
+    from pymaid.resample import *
+except Exception as error:
+    module_logger.warning(str(error))
+    module_logger.warning('Error importing pymaid.resample:\n' + str(error))
+
+try:
+    from pymaid.intersect import *
+except Exception as error:
+    module_logger.warning(str(error))
+    module_logger.warning('Error importing pymaid.intersect:\n' + str(error))
+
+try:
+    from pymaid.connectivity import *
+except Exception as error:
+    module_logger.warning(str(error))
+    module_logger.warning('Error importing pymaid.connectivity:\n' + str(error))
 
 try:
     from pymaid.rmaid import *

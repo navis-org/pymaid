@@ -45,9 +45,6 @@ dtype: object
 >>> # Get skeleton IDs of all neurons above a given size
 >>> 
 
-Notes
------
-Also see https://github.com/schlegelp/PyMaid for Jupyter notebooks
 """
 
 import urllib
@@ -67,7 +64,7 @@ import sys
 import os
 import math
 
-from pymaid import core, morpho, igraph_catmaid
+from pymaid import core, morpho, graph
 
 __all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_skeleton',
             'get_3D_skeletons','get_annotation_details','get_annotation_id',
@@ -750,22 +747,23 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                     dtype=object
                 )
 
-            # Convert data to respective dtypes
-            dtypes = {'treenode_id':int, 'parent_id':object, 
-                      'creator_id':int, 'relation':int, 
-                      'connector_id':int, 'x':int, 'y':int, 'z':int, 
-                      'radius':int, 'confidence':int}
-
-            for k, v in dtypes.items():
-                for t in ['nodes','connectors']:
-                    if k in df.loc[0,t]:
-                        df.loc[0,t][k] = df.loc[0,t][k].astype(v)
-
             # Collect this batch
             collection.append(df)            
 
         # Combine batches into a single DataFrame
         df = pd.concat(collection, ignore_index=True ) 
+
+    # Convert data to respective dtypes
+    dtypes = {'treenode_id':int, 'parent_id':object, 
+              'creator_id':int, 'relation':int, 
+              'connector_id':int, 'x':int, 'y':int, 'z':int, 
+              'radius':int, 'confidence':int}
+
+    for k, v in dtypes.items():
+        for t in ['nodes','connectors']:
+            for i in range(df.shape[0]):
+                if k in df.loc[i,t]:
+                    df.loc[i,t][k] = df.loc[i,t][k].astype(v)
 
     if return_df:
         return df
@@ -2351,7 +2349,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     """
 
     module_logger.warning(
-            "Depcreationwarning: get_skids_by_name() is deprecated, use find_neurons() instead."
+            "Deprecationwarning: get_skids_by_name() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2408,7 +2406,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
 
     module_logger.warning(
-            "Depcreationwarning: get_skids_by_annotation() is deprecated, use find_neurons() instead."
+            "Deprecationwarning: get_skids_by_annotation() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -3204,7 +3202,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
 
     module_logger.warning(
-            "Depcreationwarning: get_neuron_list() is deprecated, use find_neurons() instead."
+            "Deprecationwarning: get_neuron_list() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -3894,7 +3892,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
     """
 
     module_logger.warning(
-            "Depcreationwarning: get_neurons_in_volume() is deprecated, use find_neurons() instead."
+            "Deprecationwarning: get_neurons_in_volume() is deprecated, use find_neurons() instead."
         )
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -4331,11 +4329,11 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     response = remote_instance.fetch(url, post=post_data)
 
     # Turn neurons into an iGraph graph
-    g = igraph_catmaid.network2graph(
+    g = graph.network2graph(
         response, remote_instance=remote_instance, threshold=min_synapses)
 
     # Get all paths between sources and targets
-    all_paths = igraph_catmaid._find_all_paths(g,
+    all_paths = graph._find_all_paths(g,
                                                [i for i, v in enumerate(g.vs) if v[
                                                    'node_id'] in sources],
                                                [i for i, v in enumerate(g.vs) if v[

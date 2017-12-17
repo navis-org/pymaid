@@ -40,7 +40,7 @@ Examples
 
 import pandas as pd
 import numpy as np
-from pymaid import core, pymaid
+from pymaid import core, fetch
 import logging
 import colorsys
 import json
@@ -380,7 +380,7 @@ class handler:
         >>> selection.presynapses.color( 0, 1, 0 )
         """
 
-        skids = pymaid.eval_skids(x)
+        skids = fetch.eval_skids(x)
 
         if not skids:
             module_logger.error('No skids found.')

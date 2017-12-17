@@ -30,7 +30,7 @@ import multiprocessing as mp
 import os
 import json
 
-from pymaid import pymaid, core, plotting
+from pymaid import fetch, core, plotting
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -45,248 +45,9 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted([  'adjacency_matrix','cluster_by_connectivity',
+__all__ = sorted([  'cluster_by_connectivity',
                     'cluster_by_synapse_placement','cluster_xyz',
-                    'group_matrix', 'clust_results'])
-
-
-def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
-    """ Wrapper to generate a matrix for synaptic connections between neuronsA
-    -> neuronsB (unidirectional!).
-
-    Parameters
-    ----------
-    n_a           
-                        Source neurons as single or list of either:
-
-                        1. skeleton IDs (int or str)
-                        2. neuron name (str, exact match)
-                        3. annotation: e.g. 'annotation:PN right'
-                        4. CatmaidNeuron or CatmaidNeuronList object
-    n_b                 optional
-                        Target neurons as single or list of either:
-
-                        1. skeleton IDs (int or str)
-                        2. neuron name (str, exact match)
-                        3. annotation: e.g. 'annotation:PN right'
-                        4. CatmaidNeuron or CatmaidNeuronList object
-                        If not provided, source neurons = target neurons.
-    remote_instance :   CATMAID instance, optional
-    syn_cutoff :        int, optional
-                        If set, will cut off synapses above given value.                          
-    syn_threshold :     int, optional
-                        If set, will cut off synapses below given value.                      
-    row_groups :        dict, optional
-                        Use to collapse neuronsA/B into groups:
-                        ``{'Group1': [skid1,skid2], 'Group2' : [..], .. }``
-    col_groups :        dict, optional
-                        See row_groups
-
-    Returns
-    -------
-    matrix :          ``pandas.Dataframe``
-
-    Examples
-    --------
-    Generate and plot a adjacency matrix
-
-    >>> import seaborn as sns
-    >>> import matplotlib.pyplot as plt
-    >>> import pymaid
-    >>> rm = pymaid.CatmaidInstance(url, user, pw,, token)
-    >>> neurons = pymaid.get_neurons('annotation:test')
-    >>> mat = pymaid.adjacency_matrix( neurons )
-    >>> g = sns.heatmap(adj_mat, square=True)
-    >>> g.set_yticklabels(g.get_yticklabels(), rotation = 0, fontsize = 7)
-    >>> g.set_xticklabels(g.get_xticklabels(), rotation = 90, fontsize = 7)
-    >>> plt.show()
-
-    """
-
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            module_logger.error(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            raise Exception(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-
-    if n_b is None:
-        n_b = n_a
-
-    neuronsA = pymaid.eval_skids(n_a, remote_instance=remote_instance)
-    neuronsB = pymaid.eval_skids(n_b, remote_instance=remote_instance)
-
-    if not isinstance(neuronsA, list):
-        neuronsA = [neuronsA]
-    if not isinstance(neuronsB, list):
-        neuronsB = [neuronsB]
-
-    # Make sure neurons are strings, not integers
-    neurons = list(set([str(n) for n in (neuronsA + neuronsB)]))
-    neuronsA = [str(n) for n in neuronsA]
-    neuronsB = [str(n) for n in neuronsB]
-
-    # Make sure neurons are unique
-    neuronsA = sorted(set(neuronsA), key=neuronsA.index)
-    neuronsB = sorted(set(neuronsB), key=neuronsB.index)
-
-    neuron_names = pymaid.get_names(neurons, remote_instance)
-
-    module_logger.info('Retrieving and filtering connectivity...')
-
-    edges = pymaid.get_edges(neurons, remote_instance=remote_instance)
-
-    if row_groups or col_groups:
-        rows_grouped = {str(n): g for g in row_groups for n in row_groups[g]}
-        cols_grouped = {str(n): g for g in col_groups for n in col_groups[g]}
-
-        # Groups are sorted alphabetically
-        neuronsA = sorted(list(row_groups.keys())) + \
-            [n for n in neuronsA if n not in list(rows_grouped.keys())]
-        neuronsB = sorted(list(col_groups.keys())) + \
-            [n for n in neuronsB if n not in list(cols_grouped.keys())]
-
-        edge_dict = {n: {} for n in neuronsA}
-        for e in edges.itertuples():
-            if str(e.source_skid) in rows_grouped:
-                source_string = rows_grouped[str(e.source_skid)]
-            elif str(e.source_skid) in neuronsA:
-                source_string = str(e.source_skid)
-            else:
-                continue
-
-            if str(e.target_skid) in cols_grouped:
-                target_string = cols_grouped[str(e.target_skid)]
-            elif str(e.target_skid) in neuronsB:
-                target_string = str(e.target_skid)
-            else:
-                continue
-
-            try:
-                edge_dict[source_string][target_string] += e.weight
-            except:
-                edge_dict[source_string][target_string] = e.weight
-
-    else:
-        edge_dict = {n: {} for n in neuronsA}
-        for e in edges.itertuples():
-            if str(e.source_skid) in neuronsA:
-                edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
-
-    matrix = pd.DataFrame(
-        np.zeros((len(neuronsA), len(neuronsB))), index=neuronsA, columns=neuronsB)     
-
-    for nA in neuronsA:
-        for nB in neuronsB:
-            try:
-                e = edge_dict[nA][nB]
-            except:
-                e = 0
-
-            if syn_cutoff:
-                e = min(e, syn_cutoff)
-
-            if e < syn_threshold:
-                e = 0
-
-            matrix.loc[ nA, nB ] = e
-
-    module_logger.info('Finished!')
-
-    matrix.datatype = 'adjacency_matrix'
-
-    return matrix
-
-
-def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
-    """ Takes a matrix or a pandas Dataframe and groups values by keys provided.
-
-    Parameters
-    ----------
-    mat :               {pandas.DataFrame, numpy.array}
-                        Matrix to group
-    row_groups :        dict, optional
-                        For pandas DataFrames members need to be column
-                        or index, for np they need to be slices indices:
-                        ``{ 'group name' : [ member1, member2, ... ], .. }``
-    col_groups :        dict, optional
-                        See row_groups.
-    method :            {'AVERAGE', 'MAX', 'MIN','SUM'}
-                        Method by which values are collapsed into groups.
-
-    Returns
-    -------
-    pandas.DataFrame    
-    """
-
-    PERMISSIBLE_METHODS = ['AVERAGE','MIN','MAX','SUM']
-
-    if method not in PERMISSIBLE_METHODS:
-        raise ValueError('Unknown method "{0}"'.format(method))
-
-    # Convert numpy array to DataFrame
-    if isinstance(mat, np.ndarray):
-        mat = pd.DataFrame(mat)
-
-    # Make sure everything is string
-    mat.index = mat.index.astype(str)
-    mat.columns = mat.columns.astype(str)
-
-    if not row_groups:
-        row_groups = {r: [r] for r in mat.index.tolist()}
-    else:
-        row_groups = { r : [ str(n) for n in row_groups[r] ] for r in row_groups }
-    if not col_groups:
-        col_groups = {c: [c] for c in mat.columns.tolist()}
-    else:
-        col_groups = { c : [ str(n) for n in col_groups[c] ] for c in col_groups }
-
-    clean_col_groups = {}
-    clean_row_groups = {}
-
-    not_found = []
-    for row in row_groups:
-        not_found += [ r for r in row_groups[row]
-                      if r not in mat.index.tolist()]
-        clean_row_groups[row] = [r for r in row_groups[
-            row] if r in mat.index.tolist()]
-    for col in col_groups:
-        not_found += [c for c in col_groups[col]
-                      if c not in mat.columns.tolist()]
-        clean_col_groups[col] = [c for c in col_groups[
-            col] if c in mat.columns.tolist()]
-
-    if not_found:
-        module_logger.warning(
-            'Unable to find the following indices - will skip them: {0}'.format(','.join(list(set(not_found)))))
-
-    new_mat = pd.DataFrame(np.zeros((len(clean_row_groups), len(
-        clean_col_groups))), index=clean_row_groups.keys(), columns=clean_col_groups.keys())
-
-    for row in clean_row_groups:
-        for col in clean_col_groups:
-            values = [[mat.ix[r][c] for c in clean_col_groups[col]]
-                      for r in clean_row_groups[row]]
-            flat_values = [v for l in values for v in l]
-            try:
-                if method == 'AVERAGE':
-                    new_mat.ix[row][col] = sum(flat_values) / len(flat_values)
-                elif method == 'MAX':
-                    new_mat.ix[row][col] = max(flat_values)
-                elif method == 'MIN':
-                    new_mat.ix[row][col] = min(flat_values)
-                elif method == 'SUM':
-                    new_mat.ix[row][col] = sum(flat_values)
-                else:
-                    raise ValueError('Unknown method provided.')
-            except:
-                new_mat.ix[row][col] = 0
-
-    return new_mat
+                    'clust_results'])
 
 
 def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True, 
@@ -365,7 +126,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
     # Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
-    neurons = pymaid.eval_skids(x, remote_instance=remote_instance)    
+    neurons = fetch.eval_skids(x, remote_instance=remote_instance)    
 
     # Make sure neurons are strings, not integers
     neurons = [str(n) for n in list(set(neurons))]
@@ -378,7 +139,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
     if isinstance(connectivity_table, type(None)):
         # Retrieve connectivity and apply filters
-        connectivity = pymaid.get_partners(
+        connectivity = fetch.get_partners(
             neurons, remote_instance, min_size=min_nodes, threshold=threshold)
     else:
         connectivity = connectivity_table[ ( connectivity_table.num_nodes >= min_nodes ) & 
@@ -393,11 +154,11 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
         if include_skids:
             connectivity = connectivity[
-                connectivity.skeleton_id.isin(pymaid.eval_skids(include_skids, remote_instance=remote_instance))]
+                connectivity.skeleton_id.isin(fetch.eval_skids(include_skids, remote_instance=remote_instance))]
 
         if exclude_skids:
             connectivity = connectivity[
-                ~connectivity.skeleton_id.isin(pymaid.eval_skids(exclude_skids, remote_instance=remote_instance))]
+                ~connectivity.skeleton_id.isin(fetch.eval_skids(exclude_skids, remote_instance=remote_instance))]
 
         module_logger.info('%i entries after filtering' %
                            (connectivity.shape[0]))
@@ -411,7 +172,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     
     # Retrieve names
     module_logger.debug('Retrieving neuron names')
-    neuron_names = pymaid.get_names(
+    neuron_names = fetch.get_names(
         list(set(neurons + connectivity.skeleton_id.tolist())), remote_instance)
 
     matching_scores = {}
@@ -756,7 +517,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
             else:
                 raise Exception(
                     'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-        neurons = pymaid.get_neuron(x, remote_instance=remote_instance)
+        neurons = fetch.get_neuron(x, remote_instance=remote_instance)
     else:
         neurons = x
 

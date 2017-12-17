@@ -56,7 +56,7 @@ import math
 import igraph
 from colorsys import hsv_to_rgb
 
-from pymaid import morpho, igraph_catmaid, core, pymaid
+from pymaid import morpho, graph, core, fetch
 from pymaid import cluster as clustmaid
 
 module_logger = logging.getLogger(__name__)
@@ -284,7 +284,7 @@ def plot2d(x, method='2d', *args, **kwargs):
             remote_instance = globals()['remote_instance']
 
     if skids:
-        skdata += pymaid.get_neuron(skids, remote_instance, connector_flag=1,
+        skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
                                    tag_flag=0, get_history=False, get_abutting=True)   
 
     if not color and (skdata.shape[0] + _dotprops.shape[0])>0:
@@ -772,16 +772,13 @@ def plot3d(x, *args, **kwargs):
                 neuron.nodes.parent_id.isnull()].index.tolist()            
 
             if not connectors_only:
+                nodes = neuron.nodes[ ~neuron.nodes.parent_id.isnull() ]
 
                 # Extract treenode_coordinates and their parent's coordinates                
-                tn_coords = neuron.nodes[['x', 'y', 'z']].apply(
+                tn_coords = nodes[['x', 'y', 'z']].apply(
                     pd.to_numeric).as_matrix()
-                parent_coords = neuron.nodes.set_index('treenode_id').loc[neuron.nodes.parent_id.tolist(
-                )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
-
-                # Pop root from coordinate lists
-                tn_coords = np.delete(tn_coords, root_ix, axis=0)
-                parent_coords = np.delete(parent_coords, root_ix, axis=0)
+                parent_coords = neuron.nodes.set_index('treenode_id').loc[nodes.parent_id.tolist(
+                )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()                
 
                 # Turn coordinates into segments
                 segments = [item for sublist in zip(
@@ -1331,7 +1328,7 @@ def plot3d(x, *args, **kwargs):
             remote_instance = globals()['remote_instance']
         
     if skids and remote_instance:
-        skdata += pymaid.get_neuron(skids, remote_instance,
+        skdata += fetch.get_neuron(skids, remote_instance,
                                    connector_flag=1,
                                    tag_flag=0,
                                    get_history=False,                                   
@@ -1378,7 +1375,7 @@ def plot3d(x, *args, **kwargs):
                     'Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ... >')
                 return
             else:
-                v = pymaid.get_volume(v, remote_instance)
+                v = fetch.get_volume(v, remote_instance)
         
         volumes_data[ v['name'] ] = {'verts': v['vertices'],
                            'faces': v['faces'], 'color': v['color']}
@@ -1513,7 +1510,7 @@ def plot_network(x, *args, **kwargs):
             remote_instance = globals()['remote_instance']
 
     if not isinstance(x, (igraph.Graph,pd.DataFrame) ):
-        x = pymaid.eval_skids(x, remote_instance=remote_instance)
+        x = fetch.eval_skids(x, remote_instance=remote_instance)
         adj_mat = clustmaid.create_adjacency_matrix(x,
                                                     x,
                                                     remote_instance,
@@ -1527,7 +1524,7 @@ def plot_network(x, *args, **kwargs):
 
     if not isinstance(x, igraph.Graph):
         # Generate igraph object and apply layout
-        g = igraph_catmaid.matrix2graph(
+        g = graph.matrix2graph(
             adj_mat, syn_threshold=syn_threshold, syn_cutoff=syn_cutoff)
     else:
         g = x

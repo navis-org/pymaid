@@ -80,8 +80,9 @@ import sys
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import scipy
+import networkx as nx
 
-from pymaid import igraph_catmaid, morpho, pymaid, plotting
+from pymaid import graph, morpho, fetch, plotting, graph_utils, resample, intersect
 
 __all__ = ['CatmaidNeuron','CatmaidNeuronList','Dotprops','Volume']
 
@@ -152,10 +153,13 @@ class CatmaidNeuron:
                         Treenode tags
     annotations :       list
                         This neuron's annotations
-    igraph :            ``iGraph`` object
-                        iGraph representation of this neuron
+    graph :             ``NetworkX`` graph
+                        Graph representation of this neuron
+    igraph :            ``igraph`` graph
+                        iGraph representation of this neuron. Will be None, if
+                        igraph is not installed.
     dps :               ``pandas.DataFrame``
-                        Dotproduct representation of this neuron.
+                        Dotproduct representation of this neuron
     review_status :     int
                         This neuron's review status
     n_connectors :      int
@@ -178,9 +182,9 @@ class CatmaidNeuron:
                         Linear segments of the neuron
     soma :              treenode_id of soma
                         Returns None if no soma or 'NA' if data not available
-    root :              treenode_id of root
+    root :              treenode_id(s) of root
     color :             tuple
-                        Color of neuron. Used for e.g. export to json.
+                        Color of neuron. Used for e.g. export to json
 
     Examples
     --------
@@ -227,7 +231,7 @@ class CatmaidNeuron:
 
         # These will be overriden if x is a CatmaidNeuron
         self._remote_instance = remote_instance
-        self._meta_data = meta_data
+        self.meta_data = meta_data
         self.date_retrieved = datetime.datetime.now().isoformat()
 
         # Parameters for soma detection
@@ -253,7 +257,7 @@ class CatmaidNeuron:
                 setattr(self, at, getattr(x, at ) )
 
             if 'type' not in self.nodes:
-                morpho.classify_nodes(self)
+                graph_utils.classify_nodes(self)
 
             # Now move additional attributes
             for at in x.__dict__:
@@ -278,11 +282,12 @@ class CatmaidNeuron:
 
         if key == 'igraph':
             return self.get_igraph()
+        elif key == 'graph':
+            return self.get_graph_nx()
         elif key == 'dps':
             return self.get_dps()
         elif key == 'nodes_geodesic_distance_matrix':
-            module_logger.info('Creating geodesic distance matrix for treenodes...')
-            self.nodes_geodesic_distance_matrix = self.igraph.shortest_paths_dijkstra(mode='All', weights='weight')
+            self.nodes_geodesic_distance_matrix = graph_utils.geodesic_matrix(self)
             return self.nodes_geodesic_distance_matrix
         elif key == 'neuron_name':
             return self.get_name()
@@ -352,7 +357,7 @@ class CatmaidNeuron:
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
                 # Simply sum up edge weight of all igraph edges
-                return sum( self.igraph.es['weight'] ) / 1000
+                return sum( nx.get_edge_attributes( self.graph, 'weight' ).values() ) / 1000
             else:
                 return 'NA'
         else:
@@ -391,7 +396,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
         module_logger.info('Retrieving skeleton data...')
-        skeleton = pymaid.get_neuron(
+        skeleton = fetch.get_neuron(
             self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]       
 
         self.nodes = skeleton.nodes
@@ -404,44 +409,63 @@ class CatmaidNeuron:
         self._clear_temp_attr()
 
         if 'type' not in self.nodes:
-            morpho.classify_nodes(self)
+            graph_utils.classify_nodes(self)
 
         return
 
-    def _clear_temp_attr(self):
+    def _clear_temp_attr(self, exclude=[]):
         """Clear temporary attributes."""
-        for a in ['igraph','segments','nodes_geodesic_distance_matrix','dps']:
+        temp_att = ['igraph','graph','segments','nodes_geodesic_distance_matrix','dps']
+        for a in [at for at in temp_att if at not in exclude]:
             try:
                 delattr(self, a)
             except:
                 pass
 
+        temp_node_cols = ['flow_centrality','type'] 
+
         # Remove temporary node values
-        for c in ['flow_centrality','type']:
+        for c in [col for col in temp_node_cols if col not in exclude]:
             if c in self.nodes:
                 self.nodes.drop( c, axis=1, inplace=True)
 
-        #Reclassify nodes
-        morpho.classify_nodes(self, inplace=True)
+        if 'classify_nodes' not in exclude:
+            #Reclassify nodes
+            graph_utils.classify_nodes(self, inplace=True)
 
-    def get_igraph(self):
-        """Calculates iGraph representation of neuron. Once calculated stored
-        as `.igraph`. Call function again to update iGraph. 
+    def get_graph_nx(self):
+        """Calculates networkX representation of neuron. Once calculated stored
+        as `.graph`. Call function again to update graph. 
 
 
         See Also
         --------
-        :func:`pymaid.neuron2graph`
+        :func:`pymaid.neuron2nx`
         """
-        level = igraph_catmaid.module_logger.level
-        igraph_catmaid.module_logger.setLevel('WARNING')
-        self.igraph = igraph_catmaid.neuron2graph(self)
-        igraph_catmaid.module_logger.setLevel(level)
+        self.graph = graph.neuron2nx(self)        
+        return self.graph
+
+    def get_igraph(self):
+        """Calculates iGraph representation of neuron. Once calculated stored
+        as `.igraph`. Call function again to update iGraph.
+
+        Important
+        --------
+        Returns ``None`` if igraph is not installed!
+
+        See Also
+        --------
+        :func:`pymaid.neuron2igraph`
+        """
+        level = graph.module_logger.level
+        graph.module_logger.setLevel('WARNING')
+        self.igraph = graph.neuron2igraph(self)
+        graph.module_logger.setLevel(level)
         return self.igraph
 
     def get_dps(self):
         """Calculates dotproduct representation of neuron. Once calculated stored
-        as `.igraph`. Call function again to update iGraph.
+        as `.ps`. Call function again to update dotproduct.
 
         See Also
         --------
@@ -454,7 +478,7 @@ class CatmaidNeuron:
     def _get_segments(self):
         """Generate segments for neuron."""
         module_logger.debug('Generating segments for neuron %s' % str(self.skeleton_id))
-        self.segments = morpho._generate_segments(self)
+        self.segments = graph_utils._generate_segments(self)
         return self.segments
 
     def _get_soma(self):
@@ -496,12 +520,9 @@ class CatmaidNeuron:
         return tn
 
     def _get_root(self):
-        """Thin wrapper to get root node."""
-        roots = self.nodes[self.nodes.parent_id.isnull()].treenode_id.tolist()[0] 
-        if isinstance(roots, (list, np.ndarray)) and len(roots) == 1:
-            return roots[0]
-        else:
-            return roots
+        """Thin wrapper to get root node(s)."""
+        roots = self.nodes[self.nodes.parent_id.isnull()].treenode_id.values        
+        return roots
 
     def get_review(self, remote_instance=None):
         """Get review status for neuron."""
@@ -511,7 +532,7 @@ class CatmaidNeuron:
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
-        self.review_status = pymaid.get_review(self.skeleton_id, remote_instance).ix[
+        self.review_status = fetch.get_review(self.skeleton_id, remote_instance).ix[
             0].percent_reviewed
         return self.review_status
 
@@ -524,7 +545,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.annotations = pymaid.get_annotations(
+        self.annotations = fetch.get_annotations(
             self.skeleton_id, remote_instance)[str(self.skeleton_id)]
         return self.annotations
 
@@ -615,7 +636,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.neuron_name = pymaid.get_names(self.skeleton_id, remote_instance)[
+        self.neuron_name = fetch.get_names(self.skeleton_id, remote_instance)[
             str(self.skeleton_id)]
         return self.neuron_name
 
@@ -643,7 +664,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        morpho.resample_neuron(x, resample_to, inplace=True )
+        resample.resample_neuron(x, resample_to, inplace=True )
 
         # No need to call this as base function does this for us        
         # x._clear_temp_attr()
@@ -678,7 +699,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        morpho.downsample_neuron(x, factor, inplace=True, preserve_cn_treenodes=preserve_cn_treenodes)
+        resample.downsample_neuron(x, factor, inplace=True, preserve_cn_treenodes=preserve_cn_treenodes)
 
         # Delete outdated attributes
         x._clear_temp_attr()
@@ -709,10 +730,10 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        morpho.reroot_neuron(x, new_root, inplace=True)
+        graph_utils.reroot_neuron(x, new_root, inplace=True)
 
-        # Clear temporary attributes
-        x._clear_temp_attr()   
+        # Clear temporary attributes is done by morpho.reroot_neuron()
+        # x._clear_temp_attr()   
 
         if not inplace:
             return x     
@@ -743,8 +764,8 @@ class CatmaidNeuron:
             node = [node]
 
         for n in node:
-            dist, prox = morpho.cut_neuron(x, n)
-            x.__init__(prox, x._remote_instance, x._meta_data)
+            dist, prox = graph_utils.cut_neuron(x, n)
+            x.__init__(prox, x._remote_instance, x.meta_data)
 
         # Clear temporary attributes is done by cut_neuron
         # x._clear_temp_attr()
@@ -775,8 +796,8 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        dist, prox = morpho.cut_neuron(x, node)
-        x.__init__(dist, x._remote_instance, x._meta_data)
+        dist, prox = graph_utils.cut_neuron(x, node)
+        x.__init__(dist, x._remote_instance, x.meta_data)
 
         # Clear temporary attributes is done by cut_neuron
         # x._clear_temp_attr()
@@ -847,7 +868,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()   
 
-        morpho.longest_neurite(
+        graph_utils.longest_neurite(
             x, n, inplace=True, reroot_to_soma=reroot_to_soma)
 
         # Clear temporary attributes
@@ -881,12 +902,12 @@ class CatmaidNeuron:
             x = self.copy()
 
         if not isinstance(v, Volume):            
-            v = pymaid.get_volume(v, combine_vols=True, remote_instance=x._remote_instance)
+            v = fetch.get_volume(v, combine_vols=True, remote_instance=x._remote_instance)
 
-        morpho.in_volume(x, v, inplace=True, remote_instance=x._remote_instance, mode=mode)
+        intersect.in_volume(x, v, inplace=True, remote_instance=x._remote_instance, mode=mode)
 
         # Clear temporary attributes
-        x._clear_temp_attr()   
+        # x._clear_temp_attr()   
 
         if not inplace:
             return x     
@@ -901,9 +922,9 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        n = pymaid.get_neuron(
+        n = fetch.get_neuron(
             self.skeleton_id, remote_instance=remote_instance)
-        self.__init__(n, self._remote_instance, self._meta_data)
+        self.__init__(n, self._remote_instance, self.meta_data)
 
         # Clear temporary attributes
         self._clear_temp_attr()
@@ -924,7 +945,7 @@ class CatmaidNeuron:
         if remote_instance:
             self._remote_instance = remote_instance
         elif server_url and auth_token:
-            self._remote_instance = pymaid.CatmaidInstance(server_url,
+            self._remote_instance = fetch.CatmaidInstance(server_url,
                                                            http_user,
                                                            http_pw,
                                                            auth_token
@@ -1027,8 +1048,9 @@ class CatmaidNeuron:
                 dtype=object
             )
 
-        # Placeholder for igraph representations of neurons
+        # Placeholder for graph representations of neurons
         df['igraph'] = None
+        df['graph'] = None
 
         return CatmaidNeuron(df)
 
@@ -1081,7 +1103,8 @@ class CatmaidNeuronList:
     tags :              np.array of dict
                         Treenode tags
     annotations :       np.array of list                        
-    igraph :            np.array of ``iGraph`` objects                        
+    graph :             np.array of ``networkx`` graph objects
+    igraph :            np.array of ``igraph`` graph objects                        
     review_status :     np.array of int                        
     n_connectors :      np.array of int                        
     n_presynapses :     np.array of int                        
@@ -1272,7 +1295,7 @@ class CatmaidNeuronList:
             return (self.__len__(),)
         elif key in ['n_nodes','n_connectors','n_presynapses','n_postsynapses',
                      'n_open_ends','n_end_nodes','cable_length','tags','igraph',
-                     'soma','root','segments', 'igraph','n_branch_nodes','dps']:
+                     'soma','root','segments', 'graph','n_branch_nodes','dps']:
             self.get_skeletons(skip_existing=True)
             return np.array([ getattr(n,key) for n in self.neurons ])
         elif key == 'neuron_name':
@@ -1304,7 +1327,7 @@ class CatmaidNeuronList:
             to_retrieve = [
                 n.skeleton_id for n in self.neurons if 'annotations' not in n.__dict__]
             if to_retrieve:
-                re = pymaid.get_annotations(
+                re = fetch.get_annotations(
                     to_retrieve, remote_instance=self._remote_instance)
                 for n in [n for n in self.neurons if 'annotations' not in n.__dict__]:
                     n.annotations = re[str(n.skeleton_id)]
@@ -1320,7 +1343,7 @@ class CatmaidNeuronList:
     def __getitem__(self, key):
         if isinstance(key, str):
             if key.startswith('annotation:'):
-                skids = pymaid.eval_skids(
+                skids = fetch.eval_skids(
                     key, remote_instance=self._remote_instance)
                 subset = self[skids]
             else:
@@ -1514,9 +1537,12 @@ class CatmaidNeuronList:
 
         # Silence loggers (except Errors)
         morpholevel = morpho.module_logger.getEffectiveLevel()
-        igraphlevel = igraph_catmaid.module_logger.getEffectiveLevel()
-        igraph_catmaid.module_logger.setLevel('ERROR')
+        utillevel = graph_utils.module_logger.getEffectiveLevel()
+        graphlevel = graph.module_logger.getEffectiveLevel()
+
+        graph.module_logger.setLevel('ERROR')
         morpho.module_logger.setLevel('ERROR')
+        graph_utils.module_logger.setLevel('ERROR')
         
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1530,8 +1556,9 @@ class CatmaidNeuronList:
                 n.reroot( new_root[i], inplace=True )
 
         # Reset logger level to previous state
-        igraph_catmaid.module_logger.setLevel(igraphlevel)
+        graph.module_logger.setLevel(graphlevel)
         morpho.module_logger.setLevel(morpholevel)
+        graph_utils.module_logger.setLevel(morpholevel)
 
         if not inplace:
             return x
@@ -1702,8 +1729,8 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
-                n.prune_by_longest_neurite(n, reroot_to_soma=reroot_to_soma, inplace=True)
+            for neuron in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+                neuron.prune_by_longest_neurite(n, reroot_to_soma=reroot_to_soma, inplace=True)
 
         _set_loggers('INFO')
 
@@ -1740,7 +1767,7 @@ class CatmaidNeuronList:
             x = x.copy()       
         
         if not isinstance(v, Volume):            
-            v = pymaid.get_volume(v, combine_vols=True) 
+            v = fetch.get_volume(v, combine_vols=True) 
 
         _set_loggers('ERROR')
 
@@ -1774,7 +1801,7 @@ class CatmaidNeuronList:
             to_update = self.skeleton_id.tolist()
 
         if to_update:
-            re = pymaid.get_review(
+            re = fetch.get_review(
                 to_update, remote_instance=self._remote_instance).set_index('skeleton_id')
             for n in self.neurons:
                 if str(n.skeleton_id) in re:
@@ -1789,7 +1816,7 @@ class CatmaidNeuronList:
             to_update = self.skeleton_id.tolist()
 
         if to_update:
-            annotations = pymaid.get_annotations( to_update, remote_instance=self._remote_instance )
+            annotations = fetch.get_annotations( to_update, remote_instance=self._remote_instance )
             for n in self.neurons:
                 if str(n.skeleton_id) in annotations: 
                     n.annotations = annotations[ str(n.skeleton_id) ]
@@ -1803,7 +1830,7 @@ class CatmaidNeuronList:
             to_update = self.skeleton_id.tolist()
 
         if to_update:
-            names = pymaid.get_names(
+            names = fetch.get_names(
                 self.skeleton_id, remote_instance=self._remote_instance)
             for n in self.neurons:
                 if str(n.skeleton_id) in names:
@@ -1844,7 +1871,7 @@ class CatmaidNeuronList:
     def get_skeletons(self, skip_existing=False):
         """Helper function to fill in/update skeleton data of neurons.         
         Updates ``.nodes``, ``.connectors``, ``.tags``, ``.date_retrieved`` and 
-        ``.neuron_name``. Will also generate new igraph representation to match 
+        ``.neuron_name``. Will also generate new graph representation to match 
         nodes/connectors.
         """
 
@@ -1854,7 +1881,7 @@ class CatmaidNeuronList:
             to_update = self.neurons
 
         if to_update:
-            skdata = pymaid.get_neuron(
+            skdata = fetch.get_neuron(
                 [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
             for n in tqdm(to_update, desc='Processing neurons', disable=module_logger.getEffectiveLevel()>=40):                
 
@@ -1865,7 +1892,7 @@ class CatmaidNeuronList:
                 n.date_retrieved = datetime.datetime.now().isoformat()
 
                 if 'type' not in n.nodes:
-                    morpho.classify_nodes(n)
+                    graph_utils.classify_nodes(n)
 
                 # Delete outdated attributes
                 n._clear_temp_attr()
@@ -1885,7 +1912,7 @@ class CatmaidNeuronList:
         """
 
         if not remote_instance and server_url and auth_token:
-            remote_instance = pymaid.CatmaidInstance(server_url,
+            remote_instance = fetch.CatmaidInstance(server_url,
                                                      http_user,
                                                      http_pw,
                                                      auth_token
@@ -2031,8 +2058,10 @@ class CatmaidNeuronList:
 def _set_loggers(level='ERROR'):
     """Helper function to set levels for all associated module loggers."""
     morpho.module_logger.setLevel(level)
-    igraph_catmaid.module_logger.setLevel(level)
+    graph.module_logger.setLevel(level)
     plotting.module_logger.setLevel(level)
+    graph_utils.module_logger.setLevel(level)
+    module_logger.setLevel(level)
 
 
 class _IXIndexer():
