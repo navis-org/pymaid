@@ -97,11 +97,11 @@ Used to visualise neurons in 2D. Alternative to Vispy based on WebGL.
 
   - Download: https://plot.ly/python/getting-started/
 
-iGraph
-******
-Provides fast analysis of graphs (networks and neurons).
+NetworkX
+********
+Graph analysis tool written in pure Python. This is the standard library used by PyMaid. However - if available - will try using the faster iGraph (see below).
 
-  - Download: http://igraph.org/python/#downloads
+  - Download: https://networkx.github.io
 
 SciPy
 *****
@@ -146,4 +146,10 @@ Shapely (optional)
 This is used to get 2D representations of CATMAID volumes (currently only required for :func:`~pymaid.plot2d`)
 
   - Download: hhttps://shapely.readthedocs.io/en/latest/
+
+iGraph (optional)
+*****************
+Provides faster analysis of graphs (networks and neurons). PyMaid will preferentially use this over NetworkX for heavy computations (e.g. all-by-all geodesic distances).
+
+  - Download: http://igraph.org/python/#downloads
 

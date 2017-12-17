@@ -13,10 +13,11 @@ Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networ
 Plotting Neurons
 ================
 
-Neuron classes ( :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList`) as well as nblast results (:class:`~pymaid.rmaid.nbl_results`) have built-in modules that call :func:`~pymaid.plot3d` or :func:`~pymaid.plot2d`.
+Neuron objects, :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList`, as well as nblast results, :class:`~pymaid.rmaid.nbl_results`, have built-in modules that call :func:`~pymaid.plot3d` or :func:`~pymaid.plot2d`.
 
 2D Plotting
 -----------
+This uses matplotlib to generate 2D plots. The big advantage is that you can save these plots as vector graphics. Unfortunately, matplotlib's capabilities regarding 3D data are limited. The main problem is that depth (z) is at most simulated by trying to layer objects according to their z-order rather than doing proper rendering. You have several options to deal with this: see `method` parameter in :func:`pymaid.plot2d`. It is important to be aware of this issue as e.g. neuron A might be plotted in front of neuron B even though it is spatially behind it. The more busy your figure, the more likely this is to happen.
 
 >>> import pymaid
 >>> import matplib.pyplot as plt
@@ -24,23 +25,33 @@ Neuron classes ( :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuro
 ...                              'HTTP_USER' , 
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
->>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
+>>> nl = pymaid.CatmaidNeuronList([123456, 567890])
 >>> # Plot using standard parameters
 >>> fig, ax = nl.plot2d()
-2017-07-25 14:56:08,701 - pymaid - INFO - Done. Use matplotlib.pyplot.show() to show plot.
 >>> plt.show()
+>>> # Plot using matplotlib's 3D functions
+>>> fig, ax = nl.plot2d( method='3d_complex' )
+>>> # Change from default frontal view to lateral view
+>>> ax.azim = 0
+>>> plt.show()
+>>> # Render 3D rotation
+>>> for i in range(0,360,10):
+>>>   ax.azim = i
+>>>   plt.savefig('frame_{0}.png'.format(i), dpi=200)
 
-Adding volumes
-++++++++++++++
+Plotting volumes
++++++++++++++++
 
-:func:`~pymaid.plot2d` has some built-in outlines for the **adult Drosophila** brain project: ``brain``, ``MB``, ``LH``, ``AL``, ``SLP``, ``SIP``, ``CRE``
-
->>> fig, ax = nl.plot2d( brain = (.8,.8,.8), 
-...                      MB = (.3,.9,.3) )
+>>> # Retrieve volume
+>>> lh = pymaid.get_volume('LH_R')
+>>> # Set color and alpha
+>>> lh['color'] = (1,0,0,.5)
+>>> fig, ax = nl.plot2d([ 123456,56789,lh ] )
 >>> plt.show()
 
 3D Plotting
 -----------
+For 3D plots, we are using either Vispy or Plotly to render neurons and volumes. The default backend is Vispy.
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
@@ -135,8 +146,8 @@ Plotting Networks
 >>> fig = pymaid.plot_network( all_skeleton_ids, remote_instance = rm )
 >>> poff.plot(fig)
 
-Documentation
--------------
+Reference
+=========
 
 .. automodule:: pymaid
     :members: plot3d, plot2d, plot_network, clear3d, close3d, screenshot
