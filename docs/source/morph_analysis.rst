@@ -24,7 +24,6 @@ array([1590, 1180, 1035, 1106, 1215, 1183, 1059, 1870, 1747, 1296,  836,
 2  PN glomerulus DA1 57324 LK JSL       57323     4584           433   
 3      PN glomerulus DA1 57354 GA       57353     4873           317   
 4      PN glomerulus DA1 57382 ML       57381     7727           358   
-
    n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma  
 0             211          218         58   1590.676253            NA  True  
 1             156          163        105   1180.597489            NA  True  
