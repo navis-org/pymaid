@@ -26,6 +26,35 @@ In this first example, we will compare two users:
 >>> # Render plot
 >>> plt.show()
 
+Next, we will check contributions that users have made to a set of neurons. This comes in handy e.g. when deciding who to include in the author list. Please note that all time-related metrics are always in "CATMAID time" which is generally about 3x less than real-time! 
+
+>>> nl = pymaid.get_neurons('annotation:glomerulus DA1')
+>>> # Get contributions in number of nodes/links/reviews
+>>> cont = pymaid.get_user_contributions( nl )
+>>> # Note that I've scrambled the user column 
+>>> cont.head()
+       user  nodes  presynapses  postsynapses
+0  aaaaaaaa  47880         3854          1911
+1    bbbbbb   5930          403           133
+2  cccccccc   5204           87             4
+3    dddddd   4803           89           178
+4   eeeeeee   4267           61            11
+>>> # Get time invested [minutes]
+>>> inv = pymaid.get_time_invested( nl )
+>>> inv.head()
+              total  creation  edition  review
+user                                          
+aaaaaaaa       3033      2250     1620     243
+eeeeeee         627       183      180     333
+ffffffffffff    381       108       15     144
+bbbbbb          357       219      189       0
+cccccccc        333       147       72     126
+>>> # Create bar plot for top 10 contributors
+>>> import matplotlib.pyplot as plt
+>>> ax = inv.ix[:10].plot.bar()
+>>> plt.show()
+
+
 Reference
 =========
 
