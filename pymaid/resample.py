@@ -332,7 +332,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     See Also
     --------
-    :func:`pymaid.downsample_neuron`
+    :func:`pymaid.resample_neuron`
                              This function resamples a neuron to given 
                              resolution.
     """

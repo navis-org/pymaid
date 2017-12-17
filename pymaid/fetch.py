@@ -122,7 +122,7 @@ class CatmaidInstance:
     Examples
     --------
     Ordinarily, you would use one of the wrapper functions in 
-    :mod:`pymaid.pymaid` but if you want to get the raw data, 
+    :mod:`pymaid.fetch` but if you want to get the raw data, 
     here is how it goes:
 
     >>> # 1.) Fetch raw skeleton data for a single neuron
@@ -2672,6 +2672,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     Examples
     --------
     Use this to clean up end-related tags from non-end treenodes
+
     >>> import pymaid
     >>> # Load neuron
     >>> n = pymaid.get_neuron( 16 )
