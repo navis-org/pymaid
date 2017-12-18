@@ -8,8 +8,8 @@ Neurons and lists of neurons are represented by:
 .. autosummary::
     :toctree: generated/
 
- 	CatmaidNeuron
- 	CatmaidNeuronList
+ 	~pymaid.CatmaidNeuron
+ 	~pymaid.CatmaidNeuronList
 
 They can be minimally initialized with just skeleton IDs but usually you would get them returned from :func:`~pymaid.get_neuron`.
 
@@ -37,26 +37,37 @@ This is a *selection* of class attributes:
 
 Class methods
 -------------
+:toctree: generated/
 
 See :class:`~pymaid.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complete list.
 
-.. autosummary::
-    :toctree: generated/
+CatmaidNeuron/List methods
+++++++++++++++++++++++++++
+.. autosummary::    
+    
+	pymaid.CatmaidNeuron.plot3d
+	pymaid.CatmaidNeuron.plot2d
+	pymaid.CatmaidNeuron.plot_dendrogram
+	pymaid.CatmaidNeuron.prune_by_strahler
+	pymaid.CatmaidNeuron.prune_by_volume
+	pymaid.CatmaidNeuron.prune_distal_to
+	pymaid.CatmaidNeuron.prune_proximal_to
+	pymaid.CatmaidNeuron.reroot
+	pymaid.CatmaidNeuron.reload
+	pymaid.CatmaidNeuron.summary
+	pymaid.CatmaidNeuron.resample
+	pymaid.CatmaidNeuron.downsample
+	pymaid.CatmaidNeuron.copy
 
-    ~pymaid.CatmaidNeuron
-	~pymaid.CatmaidNeuron.plot3d
-	~pymaid.CatmaidNeuron.plot2d
-	~pymaid.CatmaidNeuron.plot_dendrogram
-	~pymaid.CatmaidNeuron.prune_by_strahler
-	~pymaid.CatmaidNeuron.prune_by_volume
-	~pymaid.CatmaidNeuron.prune_distal_to
-	~pymaid.CatmaidNeuron.prune_proximal_to
-	~pymaid.CatmaidNeuron.reroot
-	~pymaid.CatmaidNeuron.reload
-	~pymaid.CatmaidNeuron.summary
-	~pymaid.CatmaidNeuron.resample
-	~pymaid.CatmaidNeuron.downsample
-	~pymaid.CatmaidNeuron.copy
-	~pymaid.CatmaidNeuron.from_swc
-	~pymaid.CatmaidNeuronList.to_json
-	~pymaid.CatmaidNeuronList.from_json
+CatmaidNeuron-specific
+++++++++++++++++++++++
+.. autosummary::
+
+	pymaid.CatmaidNeuron.from_swc
+
+CatmaidNeuronList-specific
++++++++++++++++++++++++++++
+.. autosummary::
+
+	pymaid.CatmaidNeuronList.to_json
+	pymaid.CatmaidNeuronList.from_json
