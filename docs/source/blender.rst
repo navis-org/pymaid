@@ -67,9 +67,51 @@ Quickstart
 Reference
 =========
 
-.. automodule:: pymaid.b3d
-    :members:
-    :undoc-members:
-    :show-inheritance:
+Objects
+-------
+.. autosummary::
+    :toctree: generated/
+
+    b3d.handler.add
+    b3d.handler.clear
+    b3d.handler.select
+    b3d.handler.hide
+    b3d.handler.unhide
+
+Materials
+---------
+.. autosummary::
+    :toctree: generated/
+
+    b3d.handler.color
+    b3d.handler.colorize
+    b3d.handler.emit
+    b3d.handler.use_transparency
+    b3d.handler.alpha
+    b3d.handler.bevel
+
+
+Selections
+----------
+.. autosummary::
+    :toctree: generated/
+
+    b3d.handler.select
+
+    b3d.object_list.select
+    b3d.object_list.color
+    b3d.object_list.colorize
+    b3d.object_list.emit
+    b3d.object_list.use_transparency
+    b3d.object_list.alpha
+    b3d.object_list.bevel
+
+    b3d.object_list.hide
+    b3d.object_list.unhide
+    b3d.object_list.hide_others
+
+    b3d.object_list.delete
+
+    b3d.object_list.to_json
 
 

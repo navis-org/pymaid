@@ -149,7 +149,13 @@ Plotting Networks
 Reference
 =========
 
-.. automodule:: pymaid
-    :members: plot3d, plot2d, plot_network, clear3d, close3d, screenshot
-    :undoc-members:
-    :show-inheritance:
+.. autosummary::
+    :toctree: generated/
+
+    plot3d 
+    plot2d 
+    plot_network
+    clear3d 
+    close3d 
+    screenshot
+    

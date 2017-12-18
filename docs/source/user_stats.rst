@@ -58,7 +58,13 @@ cccccccc        333       147       72     126
 Reference
 =========
 
-.. automodule:: pymaid
-    :members: get_user_contributions, get_time_invested, get_history, get_logs, get_contributor_statistics, get_user_list
-    :undoc-members:
-    :show-inheritance:
+.. autosummary::
+    :toctree: generated/
+
+	get_user_contributions 
+	get_time_invested
+	get_history
+	get_logs
+	get_contributor_statistics
+	get_user_list
+    

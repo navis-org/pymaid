@@ -108,8 +108,13 @@ Nblasting
 Reference
 =========
 
-.. automodule:: pymaid.rmaid
-    :members:
-    :undoc-members:
-    :show-inheritance:
+.. autosummary::
+    :toctree: generated/
+
+	rmaid.init_rcatmaid
+	rmaid.data2py
+	rmaid.nblast
+	rmaid.nblast_allbyall
+	rmaid.neuron2py
+	rmaid.neuron2r
 

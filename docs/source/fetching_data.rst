@@ -1,5 +1,5 @@
 Fetching data from the server
------------------------------
+*****************************
 With minor exceptions, pymaid covers every API endpoint of your CATMAID server - i.e. you should be able to get all the data that your webbrowser has access to. Please see :ref:`_overview_link` for a list of available functions.
 
 .. automodule:: pymaid.fetch
