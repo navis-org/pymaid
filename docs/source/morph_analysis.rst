@@ -34,7 +34,7 @@ array([1590, 1180, 1035, 1106, 1215, 1183, 1059, 1870, 1747, 1296,  836,
 
 Rerooting, resampling, simplifying
 ==================================
-Pymaid lets you perform (virtual) surgery on neurons. Many of the base functions are also accessible directly via :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` methods. E.g. :func:`pymaid.CatmaidNeuronList.resample` is simply calling :func:`pymaid.resample`.
+Pymaid lets you perform (virtual) surgery on neurons. Many of the base functions are also accessible directly via :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` methods. E.g. :func:`pymaid.CatmaidNeuronList.resample` is simply calling :func:`pymaid.resample_neuron`.
 
 Examples continue from above code.
 
@@ -76,12 +76,57 @@ Examples continue from above code.
 >>> nl.prune_by_strahler( to_prune = [1,2,3] )
 >>> nl.plot3d(connectors=True,clear3d=True)
 
-For morphological comparisons using NBLAST, see * :ref:`_rmaid_link`.
+For morphological comparisons using NBLAST, see :ref:`_rmaid_link`.
 
 Reference
 =========
 
-.. automodule:: pymaid
-    :members: arbor_confidence, calc_bending_flow, calc_cable, calc_flow_centrality, calc_overlap, calc_segregation_index, calc_strahler_index, classify_nodes, cut_neuron, distal_to, dist_between, downsample_neuron, geodesic_matrix, resample_neuron, filter_connectivity, in_volume, longest_neurite, prune_by_strahler, reroot_neuron, split_axon_dendrite, stitch_neurons, synapse_root_distances
-    :undoc-members:
-    :show-inheritance:
+Manipulation
+------------
+.. autosummary::
+    :toctree: generated/
+
+	cut_neuron
+	reroot_neuron
+	stitch_neurons
+	split_axon_dendrite
+	longest_neurite
+	prune_by_strahler
+
+Resampling
+----------
+.. autosummary::
+    :toctree: generated/
+
+    resample_neuron
+    downsample_neuron
+
+Analysis
+--------
+.. autosummary::
+    :toctree: generated/
+
+    arbor_confidence
+    calc_bending_flow
+    calc_cable
+    calc_flow_centrality
+    calc_segregation_index
+    calc_strahler_index
+    classify_nodes
+
+Distances
+---------
+.. autosummary::
+    :toctree: generated/
+
+    calc_overlap
+    geodesic_matrix
+    distal_to
+    dist_between
+
+Intersection
+------------
+.. autosummary::
+    :toctree: generated/
+
+    in_volume
