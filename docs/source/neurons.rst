@@ -18,7 +18,7 @@ Data (e.g. nodes, connectors, name, review status, annotation) are retrieved/cal
 Class attributes
 ----------------
 
-This is a *selection* of class attributes:
+This is a *selection* of :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` class attributes:
 
 - ``skeleton_id``: neurons' skeleton ID(s)
 - ``neuron_name``: neurons' name(s)
@@ -37,16 +37,16 @@ This is a *selection* of class attributes:
 
 Class methods
 -------------
-:toctree: generated/
 
 See :class:`~pymaid.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complete list.
 
 CatmaidNeuron/List methods
 ++++++++++++++++++++++++++
 .. autosummary::    
+	:toctree: generated/
     
-	pymaid.CatmaidNeuron.plot3d
-	pymaid.CatmaidNeuron.plot2d
+	CatmaidNeuron.plot3d
+	~pymaid.CatmaidNeuron.plot2d
 	pymaid.CatmaidNeuron.plot_dendrogram
 	pymaid.CatmaidNeuron.prune_by_strahler
 	pymaid.CatmaidNeuron.prune_by_volume
@@ -62,12 +62,14 @@ CatmaidNeuron/List methods
 CatmaidNeuron-specific
 ++++++++++++++++++++++
 .. autosummary::
+	:toctree: generated/
 
 	pymaid.CatmaidNeuron.from_swc
 
 CatmaidNeuronList-specific
 +++++++++++++++++++++++++++
 .. autosummary::
+	:toctree: generated/
 
 	pymaid.CatmaidNeuronList.to_json
 	pymaid.CatmaidNeuronList.from_json
