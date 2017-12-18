@@ -111,10 +111,10 @@ Reference
 .. autosummary::
     :toctree: generated/
 
-	rmaid.init_rcatmaid
-	rmaid.data2py
-	rmaid.nblast
-	rmaid.nblast_allbyall
-	rmaid.neuron2py
-	rmaid.neuron2r
+	pymaid.rmaid.init_rcatmaid
+	pymaid.rmaid.data2py
+	pymaid.rmaid.nblast
+	pymaid.rmaid.nblast_allbyall
+	pymaid.rmaid.neuron2py
+	pymaid.rmaid.neuron2r
 

@@ -61,10 +61,10 @@ Reference
 .. autosummary::
     :toctree: generated/
 
-	pymaid.get_user_contributions 
-	pymaid.get_time_invested
-	pymaid.get_history
-	pymaid.get_logs
-	pymaid.get_contributor_statistics
-	pymaid.get_user_list
+	~pymaid.get_user_contributions 
+	~pymaid.get_time_invested
+	~pymaid.get_history
+	~pymaid.get_logs
+	~pymaid.get_contributor_statistics
+	~pymaid.get_user_list
     

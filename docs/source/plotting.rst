@@ -152,10 +152,10 @@ Reference
 .. autosummary::
     :toctree: generated/
 
-    plot3d 
-    plot2d 
-    plot_network
-    clear3d 
-    close3d 
-    screenshot
+    ~pymaid.plot3d 
+    ~pymaid.plot2d 
+    ~pymaid.plot_network
+    ~pymaid.clear3d 
+    ~pymaid.close3d 
+    ~pymaid.screenshot
     

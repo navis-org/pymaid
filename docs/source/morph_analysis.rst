@@ -86,47 +86,47 @@ Manipulation
 .. autosummary::
     :toctree: generated/
 
-	cut_neuron
-	reroot_neuron
-	stitch_neurons
-	split_axon_dendrite
-	longest_neurite
-	prune_by_strahler
+	~pymaid.cut_neuron
+	~pymaid.reroot_neuron
+	~pymaid.stitch_neurons
+	~pymaid.split_axon_dendrite
+	~pymaid.longest_neurite
+	~pymaid.prune_by_strahler
 
 Resampling
 ----------
 .. autosummary::
     :toctree: generated/
 
-    resample_neuron
-    downsample_neuron
+    ~pymaid.resample_neuron
+    ~pymaid.downsample_neuron
 
 Analysis
 --------
 .. autosummary::
     :toctree: generated/
 
-    arbor_confidence
-    calc_bending_flow
-    calc_cable
-    calc_flow_centrality
-    calc_segregation_index
-    calc_strahler_index
-    classify_nodes
+    ~pymaid.arbor_confidence
+    ~pymaid.calc_bending_flow
+    ~pymaid.calc_cable
+    ~pymaid.calc_flow_centrality
+    ~pymaid.calc_segregation_index
+    ~pymaid.calc_strahler_index
+    ~pymaid.classify_nodes
 
 Distances
 ---------
 .. autosummary::
     :toctree: generated/
 
-    calc_overlap
-    geodesic_matrix
-    distal_to
-    dist_between
+    ~pymaid.calc_overlap
+    ~pymaid.geodesic_matrix
+    ~pymaid.distal_to
+    ~pymaid.dist_between
 
 Intersection
 ------------
 .. autosummary::
     :toctree: generated/
 
-    in_volume
+    ~pymaid.in_volume

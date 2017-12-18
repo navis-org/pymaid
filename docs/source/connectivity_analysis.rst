@@ -9,38 +9,38 @@ Graphs
 .. autosummary::
     :toctree: generated/
 
-    neuron2nx
-    neuron2igraph
-    matrix2graph
-    network2graph
+    ~pymaid.neuron2nx
+    ~pymaid.neuron2igraph
+    ~pymaid.matrix2graph
+    ~pymaid.network2graph
 
 Predict connectivity
 --------------------
 .. autosummary::
     :toctree: generated/
 
-	predict_connectivity
+	~pymaid.predict_connectivity
 
 Matrices
 --------
 .. autosummary::
     :toctree: generated/
 
-    adjacency_matrix
-    group_matrix
+    ~pymaid.adjacency_matrix
+    ~pymaid.group_matrix
 
 Cluster
 -------
 .. autosummary::
     :toctree: generated/
 
-    cluster_by_connectivity
-    cluster_by_synapse_placement
-    clust_results
+    ~pymaid.cluster_by_connectivity
+    ~pymaid.cluster_by_synapse_placement
+    ~pymaid.clust_results
 
 Filtering
 ---------
 .. autosummary::
     :toctree: generated/
 
-	filter_connectivity
+	~pymaid.filter_connectivity

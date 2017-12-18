@@ -72,23 +72,23 @@ Objects
 .. autosummary::
     :toctree: generated/
 
-    b3d.handler.add
-    b3d.handler.clear
-    b3d.handler.select
-    b3d.handler.hide
-    b3d.handler.unhide
+    pymaid.b3d.handler.add
+    pymaid.b3d.handler.clear
+    pymaid.b3d.handler.select
+    pymaid.b3d.handler.hide
+    pymaid.b3d.handler.unhide
 
 Materials
 ---------
 .. autosummary::
     :toctree: generated/
 
-    b3d.handler.color
-    b3d.handler.colorize
-    b3d.handler.emit
-    b3d.handler.use_transparency
-    b3d.handler.alpha
-    b3d.handler.bevel
+    pymaid.b3d.handler.color
+    pymaid.b3d.handler.colorize
+    pymaid.b3d.handler.emit
+    pymaid.b3d.handler.use_transparency
+    pymaid.b3d.handler.alpha
+    pymaid.b3d.handler.bevel
 
 
 Selections
@@ -96,22 +96,22 @@ Selections
 .. autosummary::
     :toctree: generated/
 
-    b3d.handler.select
+    pymaid.b3d.handler.select
 
-    b3d.object_list.select
-    b3d.object_list.color
-    b3d.object_list.colorize
-    b3d.object_list.emit
-    b3d.object_list.use_transparency
-    b3d.object_list.alpha
-    b3d.object_list.bevel
+    pymaid.b3d.object_list.select
+    pymaid.b3d.object_list.color
+    pymaid.b3d.object_list.colorize
+    pymaid.b3d.object_list.emit
+    pymaid.b3d.object_list.use_transparency
+    pymaid.b3d.object_list.alpha
+    pymaid.b3d.object_list.bevel
 
-    b3d.object_list.hide
-    b3d.object_list.unhide
-    b3d.object_list.hide_others
+    pymaid.b3d.object_list.hide
+    pymaid.b3d.object_list.unhide
+    pymaid.b3d.object_list.hide_others
 
-    b3d.object_list.delete
+    pymaid.b3d.object_list.delete
 
-    b3d.object_list.to_json
+    pymaid.b3d.object_list.to_json
 
 
