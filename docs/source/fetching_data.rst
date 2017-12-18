@@ -44,7 +44,7 @@ Tags
 ----
 .. autosummary::
     :toctree: generated/
-    
+
     get_label_list
     add_tags
     delete_tags
@@ -70,8 +70,8 @@ User stats
 
     get_user_list
     get_history
-    get_time_invested
-    get_user_contributions
+    pymaid.get_time_invested
+    pymaid.get_user_contributions
     get_contributor_statistics
     get_logs
 

@@ -45,8 +45,8 @@ CatmaidNeuron/List methods
 .. autosummary::    
 	:toctree: generated/
     
-	CatmaidNeuron.plot3d
-	~pymaid.CatmaidNeuron.plot2d
+	pymaid.CatmaidNeuron.plot3d
+	pymaid.CatmaidNeuron.plot2d
 	pymaid.CatmaidNeuron.plot_dendrogram
 	pymaid.CatmaidNeuron.prune_by_strahler
 	pymaid.CatmaidNeuron.prune_by_volume
