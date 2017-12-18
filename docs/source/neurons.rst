@@ -43,6 +43,7 @@ See :class:`~pymaid.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complet
 .. autosummary::
     :toctree: generated/
 
+    CatmaidNeuron
 	CatmaidNeuron.plot3d
 	CatmaidNeuron.plot2d
 	CatmaidNeuron.plot_dendrogram

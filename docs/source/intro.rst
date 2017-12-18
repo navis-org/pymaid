@@ -207,12 +207,3 @@ Indexing CatmaidNeuronLists
 >>> nl += pymaid.get_neuron( [ 912345 ], remote_instance = rm )
 >>> # Remove item(s)
 >>> subset = nl - [ 45677 ]
-
-
-Documentation
-+++++++++++++
-
-.. automodule:: pymaid
-    :members: CatmaidNeuron, CatmaidNeuronList, Dotprops, Volume
-    :undoc-members:
-    :show-inheritance:

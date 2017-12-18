@@ -1,5 +1,5 @@
-User stats, contributions and logs
-----------------------------------
+User stats
+----------
 Pymaid has functions that let you look at stats/contributions of individual users as well as your project's history and logs.
 
 There are quite a few, simple examples in the documentation for each function. Examples given here are a bit more elaborate.
@@ -61,10 +61,10 @@ Reference
 .. autosummary::
     :toctree: generated/
 
-	get_user_contributions 
-	get_time_invested
-	get_history
-	get_logs
-	get_contributor_statistics
-	get_user_list
+	pymaid.get_user_contributions 
+	pymaid.get_time_invested
+	pymaid.get_history
+	pymaid.get_logs
+	pymaid.get_contributor_statistics
+	pymaid.get_user_list
     

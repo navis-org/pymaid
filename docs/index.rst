@@ -46,7 +46,7 @@ Table of Contents
    
    source/install
    source/intro   
-   source/overview
+   source/neurons
    source/fetching_data
    source/plotting
    source/morph_analysis
