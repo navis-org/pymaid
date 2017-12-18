@@ -45,8 +45,8 @@ Data conversion
 :mod:`pymaid.rmaid` provides functions to convert data from Python to R:
 
 1. :func:`pymaid.rmaid.data2py` converts general data from R to Python
-2. :func:`pymaid.rmaid.neuron2py` converts R neuron or neuronlist objects to Python :class:`pymaid.core.CatmaidNeuron` and :class:`pymaid.core.CatmaidNeuronList`, respectively
-3. :func:`pymaid.rmaid.neuron2r` converts :class:`pymaid.core.CatmaidNeuron` or :class:`pymaid.core.CatmaidNeuronList` to R neuron or neuronlist objects
+2. :func:`pymaid.rmaid.neuron2py` converts R neuron or neuronlist objects to Python :class:`pymaid.CatmaidNeuron` and :class:`pymaid.CatmaidNeuronList`, respectively
+3. :func:`pymaid.rmaid.neuron2r` converts :class:`pymaid.CatmaidNeuron` or :class:`pymaid.CatmaidNeuronList` to R neuron or neuronlist objects
 4. :func:`pymaid.rmaid.dotprops2py` converts R dotprop objects to pandas DataFrame that can be passed to :func:`pymaid.plot.plot3d`
 
 R catmaid
@@ -74,7 +74,7 @@ You can use other packages such as nat (https://github.com/jefferis/nat) to proc
 >>> # Use nat to prune the neuron
 >>> n_pruned = nat.prune_strahler( n[0] )
 
-Now convert to PyMaid :class:`pymaid.core.CatmaidNeuron`
+Now convert to PyMaid :class:`pymaid.CatmaidNeuron`
 
 >>> # Convert to Python
 >>> n_py = rmaid.neuron2py( n_pruned, remote_instance = rm)
