@@ -324,7 +324,7 @@ class handler:
         return
 
     def _create_mesh(self, volume):
-        """ Create mesh 
+        """ Create mesh from volume.
 
         Parameters
         ----------
@@ -359,7 +359,7 @@ class handler:
         bpy.ops.object.shade_smooth()
 
     def select(self, x, *args):
-        """ Select given neurons
+        """ Select given neurons.
 
         Parameters
         ----------
@@ -396,7 +396,7 @@ class handler:
         return object_list(names, handler=self)
 
     def color(self, r, g, b):
-        """ Assign color to all neurons
+        """ Assign color to all neurons.
 
         Parameters
         ----------
@@ -417,7 +417,7 @@ class handler:
         self.neurons.color(r, g, b)
 
     def colorize(self):
-        """ Colorize ALL neurons
+        """ Randomly colorize ALL neurons.
 
         Notes
         -----
@@ -429,12 +429,15 @@ class handler:
         self.neurons.colorize()
 
     def emit(self, v):
+        """Change emit value."""
         self.neurons.emit(v)
 
     def use_transparency(self, v):
+        """ Change transparency (True/False)"""
         self.neurons.use_transparency(v)
 
     def alpha(self, v):
+        """Change alpha (0-1)."""
         self.neurons.alpha(v)
 
     def bevel(self, r):
@@ -595,7 +598,7 @@ class object_list:
                 bpy.data.objects[n].active_material.diffuse_color = c
 
     def emit(self,e):
-        """ Change emit value (0-1)
+        """ Change emit value.
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
@@ -609,14 +612,14 @@ class object_list:
                 ob.active_material.use_transparency = t
 
     def alpha(self,a):
-        """ Change alpha (0-1)
+        """ Change alpha (0-1).
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.active_material.alpha = a
 
     def bevel(self, r):
-        """Change bevel of objects
+        """Change bevel radius of objects.
 
         Parameters
         ----------
