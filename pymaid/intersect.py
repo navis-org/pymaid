@@ -18,15 +18,13 @@
 """ This module contains functions for intersections.
 """
 
-import sys
-import math
 import time
 import logging
 import pandas as pd
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
-from tqdm import tqdm, trange
+from tqdm import tqdm
 
 from pymaid import fetch, core
 
@@ -119,11 +117,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     """        
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = fetch._eval_remote_instance(remote_instance)
 
     if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
         #Turn into dict 
@@ -240,11 +234,7 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
     convex hull. 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = fetch._eval_remote_instance(remote_instance)    
 
     if type(volume) == type(str()):
         volume = fetch.get_volume(volume, remote_instance)

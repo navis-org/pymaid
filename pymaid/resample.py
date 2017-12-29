@@ -18,9 +18,6 @@
 """ This module contains functions to manipulate neuron morphology.
 """
 
-import sys
-import math
-import time
 import logging
 import pandas as pd
 import numpy as np
