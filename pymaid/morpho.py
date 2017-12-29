@@ -18,7 +18,6 @@
 """ This module contains functions to analyse and manipulate neuron morphology.
 """
 
-import sys
 import math
 import time
 import logging
@@ -44,9 +43,9 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted([ 'calc_cable','calc_strahler_index', 'prune_by_strahler','stitch_neurons','arbor_confidence',
-            'split_axon_dendrite',  'calc_bending_flow', 'calc_flow_centrality',
-            'calc_segregation_index', 'to_dotproduct'])
+__all__ = sorted([ 'calc_cable','strahler_index', 'prune_by_strahler','stitch_neurons','arbor_confidence',
+            'split_axon_dendrite',  'bending_flow', 'flow_centrality',
+            'segregation_index', 'to_dotproduct'])
 
 def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
     """ Calculates confidence for each treenode by walking from root to leafs
@@ -118,7 +117,7 @@ def _calc_dist(v1, v2):
 
 
 def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
-    """ Calculates cable length in micrometer (um) of a given neuron     
+    """ Calculates cable length in micrometer (um).     
 
     Parameters
     ----------
@@ -132,7 +131,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
                         Pass if skdata is a skeleton ID.
     return_skdata :     bool, optional
                         If True: instead of the final cable length, a dataframe 
-                        containing the distance to each treenode's parent.                         
+                        containing the distance to each treenode's parent. 
 
     Returns
     -------
@@ -144,11 +143,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
                 ``nodes.parent_dist`` containing the distances to parent.
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = fetch._eval_remote_instance(remote_instance)    
 
     if isinstance(skdata, int) or isinstance(skdata, str):
         skdata = fetch.get_neuron([skdata], remote_instance).loc[0]
@@ -216,7 +211,14 @@ def to_dotproduct(x):
     Returns
     -------
     pandas.DataFrame
+            DataFrame in which each row represents a segments between two
+            treenodes.
+
+            >>> df
                 point  vector  vec_length
+            1
+            2
+            3
 
     Examples
     --------
@@ -224,6 +226,10 @@ def to_dotproduct(x):
     >>> dps = pymaid.to_dotproduct(x)
     >>> # Get array of all locations
     >>> locs = numpy.vstack(dps.point.values)
+
+    See Also
+    --------
+    pymaid.CatmaidNeuron.dps
 
     """
 
@@ -254,10 +260,10 @@ def to_dotproduct(x):
     return dps
 
 
-def calc_strahler_index(skdata, inplace=True, method='standard'):
-    """ Calculates Strahler Index -> starts with index of 1 at each leaf, at 
+def strahler_index(skdata, inplace=True, method='standard'):
+    """ Calculates Strahler Index. Starts with index of 1 at each leaf. At 
     forks with varying incoming strahler index, the highest index
-    is continued, at forks with the same incoming strahler index, highest 
+    is continued. At forks with the same incoming strahler index, highest 
     index + 1 is continued. Starts with end nodes, then works its way from 
     branch nodes to branch nodes up to root node
 
@@ -292,7 +298,7 @@ def calc_strahler_index(skdata, inplace=True, method='standard'):
         else:
             res = []
             for i in trange(0, skdata.shape[0] ):
-                res.append(  calc_strahler_index(skdata.loc[i], inplace=inplace, method=method ) ) 
+                res.append(  strahler_index(skdata.loc[i], inplace=inplace, method=method ) ) 
 
             if not inplace:
                 return core.CatmaidNeuronList( res )
@@ -436,7 +442,8 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
 
     Returns
     -------
-    pruned neuron
+    pymaid.CatmaidNeuron/List        
+                    Pruned neuron.
     """
 
     if isinstance(x, core.CatmaidNeuron):
@@ -457,7 +464,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
         neuron.reroot(neuron.soma)
 
     if 'strahler_index' not in neuron.nodes or force_strahler_update:
-        calc_strahler_index(neuron)
+        strahler_index(neuron)
 
     # Prepare indices
     if isinstance(to_prune, int) and to_prune < 0:
@@ -509,7 +516,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     neurite. The result is highly depending on the method and on your 
     neuron's morphology and works best for "typical" neurons, i.e. those where
     the primary neurite branches into axon and dendrites. 
-    See :func:`~pymaid.calc_flow_centrality` for details on the flow
+    See :func:`~pymaid.flow_centrality` for details on the flow
     centrality algorithm.
 
     Parameters
@@ -519,8 +526,8 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     method :            {'centrifugal','centripetal','sum', 'bending'}, optional
                         Type of flow centrality to use to split the neuron. 
                         There are four flavors: the first three refer to
-                        :func:`~pymaid.calc_flow_centrality`, the last 
-                        refers to :func:`~pymaid.calc_bending_flow`.
+                        :func:`~pymaid.flow_centrality`, the last 
+                        refers to :func:`~pymaid.bending_flow`.
 
                         Will try using stored centrality, if possible.
     primary_neurite :   bool, optional
@@ -574,9 +581,9 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     
     if last_method != method: 
         if method == 'bending':
-            _ = calc_bending_flow(x)
+            _ = bending_flow(x)
         else:
-            _ = calc_flow_centrality(x, mode = method)
+            _ = flow_centrality(x, mode = method)
 
     #Make copy, so that we don't screw things up
     x = x.copy()
@@ -623,11 +630,11 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=True, reroot_so
     else:
         return core.CatmaidNeuronList([ axon, dendrite ])  
 
-def calc_segregation_index(x, centrality_method='centrifugal'):
-    """ Calculates segregation index (SI) from Schneider-Mizell et al., eLife
-    (2016) as metric for how polarized a neuron is. SI of 1 indicates total 
+def segregation_index(x, centrality_method='centrifugal'):
+    """ Calculates segregation index (SI) from Schneider-Mizell et al. (eLife,
+    2016) as metric for how polarized a neuron is. SI of 1 indicates total 
     segregation of inputs and outputs into dendrites and axon, respectively. 
-    SI of 0 indicates homogneous distribution.
+    SI of 0 indicates homogeneous distribution.
 
     Parameters
     ----------
@@ -638,8 +645,8 @@ def calc_segregation_index(x, centrality_method='centrifugal'):
     centrality_method : {'centrifugal','centripetal','sum', 'bending'}, optional
                         Type of flow centrality to use to split the neuron. 
                         There are four flavors: the first three refer to
-                        :func:`~pymaid.calc_flow_centrality`, the last 
-                        refers to :func:`~pymaid.calc_bending_flow`.
+                        :func:`~pymaid.flow_centrality`, the last 
+                        refers to :func:`~pymaid.bending_flow`.
 
                         Will try using stored centrality, if possible.
 
@@ -702,9 +709,9 @@ def calc_segregation_index(x, centrality_method='centrifugal'):
 
     return H
 
-def calc_bending_flow(x, polypre=False):
+def bending_flow(x, polypre=False):
     """ Variation of the algorithm for calculating synapse flow from 
-    Schneider-Mizell et al., eLife (2016). 
+    Schneider-Mizell et al. (eLife, 2016). 
 
     The way this implementation works is by iterating over each branch point
     and counting the number of pre->post synapse paths that "flow" from one 
@@ -727,7 +734,7 @@ def calc_bending_flow(x, polypre=False):
 
     See Also
     --------    
-    :func:`~pymaid.calc_flow_centrality`
+    :func:`~pymaid.flow_centrality`
             Calculate synapse flow centrality after Schneider-Mizell et al
     :func:`~pymaid.segregation_score`
             Uses flow centrality to calculate segregation score (polarity)
@@ -747,7 +754,7 @@ def calc_bending_flow(x, polypre=False):
         raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
-        return [ calc_bending_flow(n, mode=mode, polypre=polypre, ) for n in x ]
+        return [ bending_flow(n, mode=mode, polypre=polypre, ) for n in x ]
 
     if x.soma and x.soma not in x.root:
         module_logger.warning('Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
@@ -817,11 +824,8 @@ def calc_bending_flow(x, polypre=False):
     return 
 
 
-def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
-    """ This is an old, slow (and possibly faulty) implementation
-    of the algorithm for calculating flow centralities from 
-    Schneider-Mizell et al., eLife (2016). Losely based on Alex Bate's 
-    implemention in https://github.com/alexanderbates/catnat.
+def flow_centrality(x, mode = 'centrifugal', polypre=False ):
+    """ Implementation of the algorithm for calculating flow centrality.    
 
     Parameters
     ----------
@@ -854,13 +858,16 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
     of each skeleton node in a 3d view, providing a characteristic signature of
     the arbor that enables subjective evaluation of its identity."
 
+    Losely based on Alex Bate's implemention in 
+    https://github.com/alexanderbates/catnat.
+
     Pymaid uses the equivalent of ``mode='sum'`` and ``polypre=True``.
 
     See Also
     --------
-    :func:`~pymaid.calc_bending_flow`
+    :func:`~pymaid.bending_flow`
             Variation of flow centrality: calculates bending flow.
-    :func:`~pymaid.calc_segregation_index`
+    :func:`~pymaid.segregation_index`
             Calculates segregation score (polarity) of a neuron
     :func:`~pymaid.flow_centrality_split`
             Tries splitting a neuron into axon, dendrite and primary neurite.
@@ -884,7 +891,7 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
         raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
-        return [ calc_flow_centrality(n, mode=mode, polypre=polypre, ) for n in x ]
+        return [ flow_centrality(n, mode=mode, polypre=polypre, ) for n in x ]
 
     if x.soma and x.soma not in x.root:
         module_logger.warning('Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
@@ -961,9 +968,13 @@ def calc_flow_centrality(x, mode = 'centrifugal', polypre=False ):
 
 
 def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
-    """ Function to stich multiple neurons together. The first neuron provided
-    will be the master neuron. Unless treenode IDs are provided via 
-    ``tn_to_stitch``, neurons will be stitched at the closest point.
+    """ Stitch multiple neurons together. 
+
+    Notes
+    -----
+    The first neuron provided will be the master neuron. Unless treenode IDs 
+    are provided via ``tn_to_stitch``, neurons will be stitched at the 
+    closest point.
 
     Parameters
     ----------
