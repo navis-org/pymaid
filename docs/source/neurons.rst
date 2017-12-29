@@ -22,8 +22,9 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.Catm
 
 - ``skeleton_id``: neurons' skeleton ID(s)
 - ``neuron_name``: neurons' name(s)
-- ``nodes``: treenode table as pandas DataFrame
-- ``connectors``: connector table pandas DataFrame
+- ``nodes``: treenode table 
+- ``connectors``: connector table 
+- ``partners``: connectivity table 
 - ``tags``: node tags (dict)
 - ``annotations``: list of neurons' annotations
 - ``cable_length``: cable length(s) in nm
@@ -52,6 +53,7 @@ CatmaidNeuron/List methods
 	pymaid.CatmaidNeuron.prune_by_volume
 	pymaid.CatmaidNeuron.prune_distal_to
 	pymaid.CatmaidNeuron.prune_proximal_to
+	pymaid.CatmaidNeuron.prune_longest_neurite
 	pymaid.CatmaidNeuron.reroot
 	pymaid.CatmaidNeuron.reload
 	pymaid.CatmaidNeuron.summary

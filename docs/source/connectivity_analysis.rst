@@ -10,9 +10,9 @@ Graphs
     :toctree: generated/
 
     ~pymaid.neuron2nx
-    ~pymaid.neuron2igraph
-    ~pymaid.matrix2graph
-    ~pymaid.network2graph
+    ~pymaid.neuron2igraph   
+    ~pymaid.network2nx
+    ~pymaid.network2igraph
 
 Predict connectivity
 --------------------
@@ -29,8 +29,8 @@ Matrices
     ~pymaid.adjacency_matrix
     ~pymaid.group_matrix
 
-Cluster
--------
+Clustering
+----------
 .. autosummary::
     :toctree: generated/
 

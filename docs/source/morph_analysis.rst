@@ -107,11 +107,11 @@ Analysis
     :toctree: generated/
 
     ~pymaid.arbor_confidence
-    ~pymaid.calc_bending_flow
+    ~pymaid.bending_flow
     ~pymaid.calc_cable
-    ~pymaid.calc_flow_centrality
-    ~pymaid.calc_segregation_index
-    ~pymaid.calc_strahler_index
+    ~pymaid.flow_centrality
+    ~pymaid.segregation_index
+    ~pymaid.strahler_index
     ~pymaid.classify_nodes
 
 Distances
@@ -119,7 +119,7 @@ Distances
 .. autosummary::
     :toctree: generated/
 
-    ~pymaid.calc_overlap
+    ~pymaid.cable_overlap
     ~pymaid.geodesic_matrix
     ~pymaid.distal_to
     ~pymaid.dist_between

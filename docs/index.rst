@@ -54,7 +54,8 @@ Table of Contents
    source/blender     
    source/rmaid_doc   
    source/user_stats   
-   source/troubleshooting   
+   source/troubleshooting
+   examples/examples_index   
 
 
 Indices and tables

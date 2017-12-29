@@ -72,6 +72,7 @@ User stats
     ~pymaid.get_user_contributions
     ~pymaid.get_contributor_statistics
     ~pymaid.get_logs
+    ~pymaid.get_transactions
 
 Volumes
 -------

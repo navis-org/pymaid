@@ -6,7 +6,7 @@ This section will teach you the basics of how to use PyMaid. If you are impatien
 
 Quickstart Guide
 ================
-At the beginning of each session, you have to initialise a :class:`~pymaid.CatmaidInstance` that holds the url and your credentials for the CATMAID server. In most examples, this instance is assigned to a variable called ``remote_instance`` or just ``rm``. Here we are requesting a list of two neurons from the server:
+At the beginning of each session, you have to initialise a :class:`~pymaid.CatmaidInstance` which holds the url and your credentials for the CATMAID server. In most examples, this instance is assigned to a variable called ``remote_instance`` or just ``rm``. Here we are requesting a list of two neurons from the server:
 
 >>> import pymaid
 >>> # HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a 
@@ -70,7 +70,7 @@ All functions that explicitly require you to pass a ``skids`` parameter (e.g. :f
 
 1. skeleton IDs (int or str)
 2. neuron name (str, exact match)
-3. annotation: e.g. 'annotation:PN right'
+3. annotation: e.g. ``'annotation:PN right'``
 4. CatmaidNeuron or CatmaidNeuronList object
 
 Some examples:
@@ -81,18 +81,18 @@ Some examples:
 ...                              'HTTP_PASSWORD', 
 ...                              'TOKEN' )
 >>> # Create neuron list from annotation
->>> neuron_list = pymaid.get_neuron( 'annotation:glomerulus DA1', remote_instance = rm )
+>>> neuron_list = pymaid.get_neuron( 'annotation:glomerulus DA1' )
 >>> # Get partners of these neurons
->>> partners = pymaid.get_partners( neuron_list, remote_instance = rm)
+>>> partners = pymaid.get_partners( neuron_list )
 >>> # Use a neuron name when adding an annotation
->>> pymaid.add_annotation( ['neuron1_name','neuron_name2'], ['annotation1','annotation2'], remote_instance = rm)
+>>> pymaid.add_annotation( ['neuron1_name','neuron_name2'], ['annotation1','annotation2'] )
 
 Advanced Stuff
 ==============
 
 Connection to the server: CatmaidInstance 
 -----------------------------------------
-As you instanciate :class:`~pymaid.CatmaidInstance`, it is made the default remote instance and you don't need to worry about it anymore.
+As you instanciate :class:`~pymaid.CatmaidInstance`, it is made the default, "global" remote instance and you don't need to worry about it anymore.
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token')
@@ -102,14 +102,14 @@ As you instanciate :class:`~pymaid.CatmaidInstance`, it is made the default remo
 However, if you - for example - are working with two separate servers or projects, you can pass a :class:`~pymaid.CatmaidInstance` explicitly to a function. This will overule any globally defined remote instance:
 
 >>> import pymaid
->>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token', set_global=False )
->>> partners = pymaid.get_partners( [12345,67890], remote_instance = rm )
+>>> rm2 = pymaid.CatmaidInstance( 'server_url2', 'http_user2', 'http_pw2', 'auth_token2', set_global=False )
+>>> partners = pymaid.get_partners( [12345,67890], remote_instance = rm2 )
 
 You can manually make a remote instance the global one:
 
->>> rm.set_global()
+>>> rm2.set_global()
 
-The project ID is part of the CatmaidInstance and defaults to 1. You can change this either when initialising or later on-the-fly:
+The project ID is part of the CatmaidInstance and defaults to 1. You can change this either when initializing or later on-the-fly:
 
 >>> # Initialise with project_id 2 (default = 1)
 >>> rm = pymaid.CatmaidInstance( 'server_url', 'http_user', 'http_pw', 'auth_token', project_id = 2 )
