@@ -52,13 +52,14 @@ Examples
 """
 
 # TODOs
-# - Github punch card alike figure
+# - Github punch card-like figure
 
 from pymaid import core, fetch
 import logging
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
-import sys
+import datetime
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -74,15 +75,15 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['get_user_contributions','get_time_invested',]
+__all__ = ['get_user_contributions','get_time_invested','get_user_actions']
 
 def get_user_contributions(x, remote_instance=None):
-    """ Takes a list of skeleton IDs and returns nodes and synapses contributed 
+    """ Takes a list of neurons and returns nodes and synapses contributed 
     by each user.
 
     Notes
     -----
-    This is essentially a wrapper for ``pymaid.get_contributor_statistics()``
+    This is essentially a wrapper for :func:`~pymaid.get_contributor_statistics`
     - if you are also interested in e.g. construction time, review time, etc. 
     you may want to consider using :func:`~pymaid.get_contributor_statistics` 
     instead.
@@ -143,7 +144,7 @@ def get_user_contributions(x, remote_instance=None):
 
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM', max_inactive_time=3):
-    """ Takes a list of skeleton IDs and calculates the time individual users 
+    """ Takes a list of neurons and calculates the time individual users 
     have spent working on this set of neurons.
 
     Parameters
@@ -246,7 +247,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     """
 
     if mode not in ['SUM','OVER_TIME','ACTIONS']:
-        raise ValueError('Unknown mode %s' % str(mode))    
+        raise ValueError('Unknown mode "%s"' % str(mode))    
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
 
@@ -314,32 +315,29 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         # Get total time spent
         for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
             stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get reconstruction time spent
         for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=module_logger.getEffectiveLevel()>=40):
             stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get edition time spent
         for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=module_logger.getEffectiveLevel()>=40):
             stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get time spent reviewing
         for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=module_logger.getEffectiveLevel()>=40):
             stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.TimeGrouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-
-        module_logger.info(
-            'Done! Use e.g. plotly to generate a plot: \n stats = get_time_invested( skids, remote_instance ) \n fig = { "data" : [ { "values" : stats.total.tolist(), "labels" : stats.user.tolist(), "type" : "pie" } ] } \n plotly.offline.plot(fig) ')
+                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
         return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
 
     elif mode == 'ACTIONS':
-        all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq='1d')).count().to_frame()
+        all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
         all_ts.columns = ['all_users'] 
         all_ts = all_ts.T
         # Get total time spent
         for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
-            this_ts = all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq='1d')).count().to_frame()
+            this_ts = all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
             this_ts.columns=[ user_list.ix[u].login ]
 
             all_ts = pd.concat( [all_ts, this_ts.T] )
@@ -348,18 +346,18 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
     elif mode == 'OVER_TIME':
         #First count all minutes with minimum number of actions
-        minutes_counting = ( all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq=bin_width)).count().to_frame() > minimum_actions )
+        minutes_counting = ( all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions )
         #Then remove the minutes that have less
         minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
         #Now group by hour
-        all_ts = minutes_counting.groupby(pd.TimeGrouper(freq='1d')).count()       
+        all_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()       
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent        
         for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):            
-            minutes_counting = ( all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.TimeGrouper(freq=bin_width)).count().to_frame() > minimum_actions )
+            minutes_counting = ( all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions )
             minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
-            this_ts = minutes_counting.groupby(pd.TimeGrouper(freq='1d')).count()
+            this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
 
             this_ts.columns=[ user_list.ix[u].login ]
 
@@ -369,5 +367,127 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
         return all_ts
 
+def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, remote_instance=None):
+    """ Get timestamps of users' actions (creations, editions, reviews).
+
+    Parameters
+    ----------
+    users :         {list}, optional
+                    List of users (logins) for which to return timestamps.
+    neurons :       {list of skeleton IDs, CatmaidNeuron/List}, optional
+                    Neurons for which to return timestamps. If None, will find 
+                    neurons by user.
+    start_date :    {tuple, datetime.date}, optional
+    end_date :      {tuple, datetime.date}, optional
+                    Start and end date. Also applied when fetching when 
+                    fetching neurons if ``neurons==None``.
+    remote_instance : {CatmaidInstance}, optional
+
+    Important
+    ---------
+    This function does return most but not all user actions:
+
+    1. The API endpoint used for finding neurons worked on by a given user 
+       (:func:`~pymaid.find_neurons`) does not return single-node neurons. 
+       Hence, placing e.g. postsynaptic nodes is not taken into account. 
+    2. Connecting a node to a connector is not taken into account as there is 
+       no API endpoint for getting timestamps of the creation of connector 
+       links.
+
+    Return
+    ------
+    pandas.DataFrame
+            >>> df
+                user      timestamp     action
+            0
+            1
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import matplotlib.pyplot as plt
+    >>> # Get all actions for a single user
+    >>> actions = pymaid.get_user_actions(users='schlegelp', start_date=(2017,11,1))
+    >>> # Group by hour and see what time of the day user is usually active
+    >>> actions.set_index(pd.DatetimeIndex(actions.timestamp), inplace=True )
+    >>> hours = actions.groupby(actions.index.hour).count()
+    >>> hours.action.plot()
+    >>> plt.show()
+
+    >>> # Plot day-by-day activity
+    >>> ax = plt.subplot()
+    >>> ax.scatter(actions.timestamp.date.tolist(), 
+    ...            actions.timestamp.time.tolist(),
+    ...            marker='_')
+
+    """
+
+    if not neurons and not users and not ( start_date or end_date ):
+        raise ValueError('Query must be restricted by at least a single parameter!')
+
+    if users and not isinstance(users,(list, np.ndarray)):
+        users = [users]
+
+    # Get user dictionary (needed later)
+    user_list = fetch.get_user_list(remote_instance=remote_instance).set_index('id')
+    user_dict = user_list.login.to_dict()
+
+    if isinstance(neurons, type(None)):
+        neurons = fetch.find_neurons(   users=users, 
+                                        from_date=start_date, to_date=end_date, 
+                                        reviewed_by=users,
+                                        remote_instance=remote_instance)
+        # Get skeletons
+        neurons.get_skeletons()
+    elif not isinstance(neurons, (core.CatmaidNeuron,core.CatmaidNeuronList)):
+        neurons = fetch.get_neuron(neurons)
+    
+    if not isinstance(end_date, (datetime.date, type(None))):
+        end_date = datetime.date(*end_date)
+
+    if not isinstance(start_date, (datetime.date, type(None))):
+        start_date = datetime.date(*start_date)
+
+    node_ids = neurons.nodes.treenode_id.tolist()
+    connector_ids = neurons.connectors.connector_id.tolist()
+
+    # Get node details
+    node_details = fetch.get_node_user_details( 
+        node_ids + connector_ids, remote_instance=remote_instance )
+
+    # Extract timestamps   
+    # Dataframe for creation (i.e. the actual generation of the nodes)
+    creation_timestamps = node_details[['user', 'creation_time']]
+    creation_timestamps['action'] = 'creation'
+    creation_timestamps.columns = ['user', 'timestamp','action']
+
+    # Dataframe for edition times
+    edition_timestamps = node_details[['editor', 'edition_time']]
+    edition_timestamps['action'] = 'edition'    
+    edition_timestamps.columns = ['user', 'timestamp','action']
+
+    # Generate dataframe for reviews
+    reviewers = [u for l in node_details.reviewers.tolist() for u in l]
+    timestamps = [ts for l in node_details.review_times.tolist() for ts in l]
+    review_timestamps = pd.DataFrame([[u, ts, 'review'] for u, ts in zip(
+        reviewers, timestamps)], columns=['user', 'timestamp','action'])
+
+    # Merge all timestamps
+    all_timestamps = pd.concat(
+        [creation_timestamps, edition_timestamps, review_timestamps], axis=0).reset_index(drop=True)
+
+    # Map login onto user ID
+    all_timestamps.user = [ user_dict[u] for u in all_timestamps.user.values ]
+
+    # Remove other users
+    all_timestamps = all_timestamps[ all_timestamps.user.isin(users) ]
+
+    # Remove timestamps outside of date range (if provided)
+    if start_date:
+        all_timestamps = all_timestamps[ all_timestamps.timestamp.values >= np.datetime64(start_date) ]
+    if end_date:
+        all_timestamps = all_timestamps[ all_timestamps.timestamp.values <= np.datetime64(end_date) ]
+
+    return all_timestamps.sort_values('timestamp').reset_index(drop=True)
 
 
