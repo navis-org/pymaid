@@ -18,9 +18,6 @@
 """ This module contains functions to analyse connectivity.
 """
 
-import sys
-import math
-import time
 import logging
 import pandas as pd
 import numpy as np
@@ -45,7 +42,7 @@ if len( module_logger.handlers ) == 0:
     module_logger.addHandler(sh)
 
 
-__all__ = sorted([ 'filter_connectivity','calc_overlap','predict_connectivity', 'adjacency_matrix','group_matrix'])
+__all__ = sorted([ 'filter_connectivity','cable_overlap','predict_connectivity', 'adjacency_matrix','group_matrix'])
 
 def filter_connectivity( x, restrict_to, remote_instance=None):
     """ Filters connectivity data by volume or skeleton data. Use this e.g. to 
@@ -209,7 +206,7 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
 
     return df
 
-def calc_overlap(a, b, dist=2, method='min' ):
+def cable_overlap(a, b, dist=2, method='min' ):
     """ Calculates the amount of cable of neuron A within distance of neuron b.
     Uses dotproduct representation of a neuron!
 
@@ -221,7 +218,11 @@ def calc_overlap(a, b, dist=2, method='min' ):
                 Maximum distance in microns.
     method :    {'min','max','avg'}
                 Method by which to calculate the overlapping cable between
-                two cables.
+                two cables. Assuming that neurons A and B have 300 and 150
+                um of cable within given distances, respectively:
+                    1. 'min' returns 150
+                    2. 'max' returns 300
+                    3. 'avg' returns 225
 
     Returns
     -------
@@ -315,10 +316,19 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     a,b :       {CatmaidNeuron, CatmaidNeuronList}
                 Neuron(s) for which to compute potential connectivity.
     method :    {'possible_contacts'}
-                Method to use for calculations.
+                Method to use for calculations. Currently only one implemented.
     **kwargs :  Arbitrary keyword arguments.
                 1. For method = 'possible_contacts':
-                    - `stdev` to set number of 
+                    - `stdev` to set number of standard-deviations of average 
+                      distance. Default = 2.
+
+    Notes
+    -----
+    Method ``possible_contacts`` works by (1) calculating mean distance `d` 
+    (connector->treenode) at which connections between neurons A and 
+    neurons B occur, (2) check for all presynapses of neurons A if they
+    are within `stdev` (default=2) standard deviations of `d` of a neurons B
+    treenode. 
     
 
     Returns
@@ -371,7 +381,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     n_std = kwargs.get('n_std', 2 )
     dist_threshold = distances.mean() + n_std * distances.std()    
 
-    with tqdm(total=len(b), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(b), desc='Predicting', disable=module_logger.getEffectiveLevel()>=40) as pbar:
         for nB in b:
             # Create cKDTree for nB
             tree = scipy.spatial.cKDTree( nB.nodes[['x','y','z']].values, leafsize=10 )
@@ -393,7 +403,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     return matrix.astype(int)
 
 def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
-    """ Wrapper to generate a matrix for synaptic connections between neuronsA
+    """ Generate adjacency matrix for synaptic connections between neuronsA
     -> neuronsB (unidirectional!).
 
     Parameters
@@ -445,16 +455,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            module_logger.error(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            raise Exception(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+    remote_instance = fetch._eval_remote_instance(remote_instance)    
 
     if n_b is None:
         n_b = n_a
@@ -545,7 +546,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
 
 def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
-    """ Takes a matrix or a pandas Dataframe and groups values by keys provided.
+    """ Groups adjacency matrix into neuron groups.
 
     Parameters
     ----------
