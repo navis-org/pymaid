@@ -31,6 +31,8 @@ import colorsys
 import logging
 import png
 
+import networkx as nx
+
 from tqdm import tqdm
 
 import plotly.plotly as py
@@ -48,16 +50,13 @@ try:
 except:
     pass
 
-import sys
 import pandas as pd
 import numpy as np
 import random
 import math
-import igraph
 from colorsys import hsv_to_rgb
 
-from pymaid import morpho, graph, core, fetch
-from pymaid import cluster as clustmaid
+from pymaid import morpho, graph, core, fetch, connectivity
 
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
@@ -167,8 +166,6 @@ def plot2d(x, method='2d', *args, **kwargs):
                            added individually. This allows for more complex
                            crossing patterns to be rendered correctly. Slows
                            down rendering though.
-
-
     remote_instance : Catmaid Instance, optional
                       Need this too if you are passing only skids
     *args
@@ -277,11 +274,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     linewidth = kwargs.get('linewidth', .5) 
     cn_size = kwargs.get('cn_size', 1) 
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = fetch._eval_remote_instance(remote_instance)
 
     if skids:
         skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
@@ -788,7 +781,7 @@ def plot3d(x, *args, **kwargs):
                 if by_strahler or by_confidence:                    
                     if by_strahler:                            
                         if 'strahler_index' not in neuron.nodes:
-                            morpho.calc_strahler_index(neuron)                        
+                            morpho.strahler_index(neuron)                        
 
                         # Generate list of alpha values
                         alpha = neuron.nodes['strahler_index'].as_matrix()
@@ -1001,7 +994,7 @@ def plot3d(x, *args, **kwargs):
 
             if not connectors_only:
                 if by_strahler:
-                    s_index = morpho.calc_strahler_index(
+                    s_index = morpho.strahler_index(
                         skdata.ix[i], return_dict=True)                
 
                 soma = neuron.nodes[neuron.nodes.radius > 1]                
@@ -1321,11 +1314,7 @@ def plot3d(x, *args, **kwargs):
         except:
             pass
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = fetch._eval_remote_instance(remote_instance)    
         
     if skids and remote_instance:
         skdata += fetch.get_neuron(skids, remote_instance,
@@ -1428,7 +1417,7 @@ def plot3d(x, *args, **kwargs):
 
 
 def plot_network(x, *args, **kwargs):
-    """ Uses python-igraph and plotly to generate a network plot    
+    """ Uses NetworkX to generate a Plotly network plot.
 
     Parameters
     ----------
@@ -1441,11 +1430,11 @@ def plot_network(x, *args, **kwargs):
                       4. CatmaidNeuron or CatmaidNeuronList object
                       5. pandas.DataFrame containing an adjacency matrix., 
                          e.g. from :funct:`~pymaid.create_adjacency_matrix`
-                      6. iGraph representation of the network    
+                      6. NetworkX Graph
     remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids.
-    layout :          string, default = 'fr' -> Fruchterman-Reingold
-                      See http://igraph.org/python/doc/tutorial/tutorial.html
+    layout :          function, default = 'nx.spring_layout'
+                      Layout function. See https://networkx.github.io/documentation/latest/reference/drawing.html
                       for available layouts.
     syn_cutoff :      int, default=False
                       If provided, connections will be maxed at this value.
@@ -1484,7 +1473,7 @@ def plot_network(x, *args, **kwargs):
     """
 
     remote_instance = kwargs.get('remote_instance', None)
-    layout = kwargs.get('layout', 'fr')
+    layout = kwargs.get('layout', nx.spring_layout)
 
     syn_cutoff = kwargs.get('syn_cutoff', None)
     syn_threshold = kwargs.get('syn_threshold', 1)
@@ -1499,53 +1488,28 @@ def plot_network(x, *args, **kwargs):
     node_size = kwargs.get('node_size', 20)
 
     width = kwargs.get('width', 800)
-    height = kwargs.get('height', 800)    
+    height = kwargs.get('height', 800)
 
-    if remote_instance is None:
-        if isinstance(x, core.CatmaidNeuronList) or isinstance(x, core.CatmaidNeuron):
-            remote_instance = x._remote_instance
-        elif 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = fetch._eval_remote_instance(remote_instance)        
 
-    if not isinstance(x, (igraph.Graph,pd.DataFrame) ):
+    if not isinstance(x, (nx.DiGraph, nx.Graph) ):
         x = fetch.eval_skids(x, remote_instance=remote_instance)
-        adj_mat = clustmaid.create_adjacency_matrix(x,
-                                                    x,
-                                                    remote_instance,
-                                                    syn_cutoff=syn_cutoff,
-                                                    syn_threshold=syn_threshold,
-                                                    row_groups=groups,  # This is where the magic happens
-                                                    col_groups=groups  # This is where the magic happens
-                                                    )
-    elif isinstance(x, pd.DataFrame ):
-        adj_mat = x
-
-    if not isinstance(x, igraph.Graph):
-        # Generate igraph object and apply layout
-        g = graph.matrix2graph(
-            adj_mat, syn_threshold=syn_threshold, syn_cutoff=syn_cutoff)
+        g = graph.network2nx(x, threshold=syn_threshold)
     else:
         g = x
-
-    try:
-        layout = g.layout(layout, weights=g.es['weight'])
-    except:
-        layout = g.layout(layout)
-    pos = layout.coords
+    
+    pos = layout(g)    
 
     # Prepare colors
-    if type(colormap) == type(dict()):
+    if isinstance(colormap, dict):
         colors = colormap
         # Give grey color to neurons that are not in colormap
-        colors.update({v['label']: (.5, .5, .5)
-                       for i, v in enumerate(g.vs) if v['label'] not in colormap})
+        colors.update({n: (.5, .5, .5) for n in g.nodes if n not in colormap})
     elif colormap == 'random':
-        c = _random_colors(len(g.vs), color_space='RGB', color_range=255)
-        colors = {v['label']: c[i] for i, v in enumerate(g.vs)}
-    elif type(colormap) == type(tuple()):
-        colors = {v['label']: colormap for i, v in enumerate(g.vs)}
+        c = _random_colors(len(g.nodes), color_space='RGB', color_range=255)
+        colors = { n: c[i] for i, n in enumerate(g.nodes)}
+    elif isinstance(colormap, tuple, list) and len(colormap) == 3:
+        colors = {n : tuple(colormap) for v in g.nodes }
     else:
         module_logger.error(
             'I dont understand the colors you have provided. Please, see help(plot.plot_network).')
@@ -1553,16 +1517,17 @@ def plot_network(x, *args, **kwargs):
 
     edges = []
     annotations = []
-    for e in g.es:
-        e_width = 2 + 5 * round(e['weight']) / max(g.es['weight'])        
+    max_weight = max( nx.get_edge_attributes(g,'weight').values() )
+    for e in  list( g.edges.data() ):
+        e_width = 2 + 5 * round(e[2]['weight']) / max_weight        
 
         edges.append(
             go.Scatter(dict(
-                x=[pos[e.source][0], pos[e.target][0], None],
-                y=[pos[e.source][1], pos[e.target][1], None],
+                x=[pos[e[0]][0], pos[e[1]][0], None],
+                y=[pos[e[0]][1], pos[e[1]][1], None],
                 mode='lines',
                 hoverinfo='text',
-                text=str(e['weight']),
+                text=str(e[2]['weight']),
                 line=dict(
                     width=e_width,
                     color='rgb(255,0,0)'
@@ -1571,8 +1536,8 @@ def plot_network(x, *args, **kwargs):
         )
 
         annotations.append(dict(
-            x=pos[e.target][0],
-            y=pos[e.target][1],
+            x=pos[e[1]][0],
+            y=pos[e[1]][1],
             xref='x',
             yref='y',
             showarrow=True,
@@ -1581,23 +1546,23 @@ def plot_network(x, *args, **kwargs):
             arrowsize=.5,
             arrowwidth=e_width,
             arrowcolor='#636363',
-            ax=pos[e.source][0],
-            ay=pos[e.source][1],
+            ax=pos[e[0]][0],
+            ay=pos[e[0]][1],
             axref='x',
             ayref='y',
             standoff=10
         ))
 
         if label_edges:
-            center_x = (pos[e.target][0] - pos[e.source]
-                        [0]) / 2 + pos[e.source][0]
-            center_y = (pos[e.target][1] - pos[e.source]
-                        [1]) / 2 + pos[e.source][1]
+            center_x = (pos[e[1]][0] - pos[e[0]]
+                        [0]) / 2 + pos[e[0]][0]
+            center_y = (pos[e[1]][1] - pos[e[0]]
+                        [1]) / 2 + pos[e[0]][1]
 
-            if e['weight'] == syn_cutoff:
-                t = '%i +' % int(e['weight'])
+            if e[2]['weight'] == syn_cutoff:
+                t = '%i +' % int(e[2]['weight'])
             else:
-                t = str(int(e['weight']))
+                t = str(int(e[2]['weight']))
 
             annotations.append(dict(
                 x=center_x,
@@ -1613,41 +1578,41 @@ def plot_network(x, *args, **kwargs):
 
     # Prepare hover text
     if not node_hover_text:
-        node_hover_text = {n['label']: n['label'] for n in g.vs}
+        node_hover_text = {n: g.nodes[n]['neuron_name'] for n in g.nodes}
     else:
         # Make sure all nodes are represented
-        node_hover_text.update({n['label']: n['label']
-                                for n in g.vs if n['label'] not in node_hover_text})
+        node_hover_text.update({n: g.nodes[n]['neuron_name']
+                                for n in g.nodes if n not in node_hover_text})
 
     # Prepare node sizes
-    if type(node_size) == type(dict()):
-        n_size = [node_size[n['label']] for n in g.vs]
+    if isinstance(node_size, dict):
+        n_size = [ node_size[n] for n in g.nodes]
     else:
         n_size = node_size
 
     nodes = go.Scatter(dict(
-        x=[e[0] for e in pos],
-        y=[e[1] for e in pos],
-        text=[node_hover_text[n['label']] for n in g.vs],
+        x=np.vstack( pos.values() )[:,0],
+        y=np.vstack( pos.values() )[:,1],
+        text=[node_hover_text[ n ] for n in g.nodes ],
         mode='markers',
         hoverinfo='text',
         marker=dict(
             size=n_size,
-            color=['rgb' + str(tuple(colors[n['label']])) for n in g.vs]
+            color=['rgb' + str(tuple(colors[ n ])) for n in g.nodes ]
         )
     ))
 
     if label_nodes:
         annotations += [dict(
-            x=e[0],
-            y=e[1],
+            x=pos[n][0],
+            y=pos[n][1],
             xref='x',
             yref='y',
-            text=g.vs[i]['label'],
+            text=g.nodes[n]['neuron_name'],
             showarrow=False,
             font=dict(color='rgb(0,0,0)', size=12)
         )
-            for i, e in enumerate(pos)]
+            for n in pos]
 
     layout = dict(
         width=width,
@@ -1681,7 +1646,7 @@ def plot_network(x, *args, **kwargs):
     return fig
 
 def _parse_objects(x,remote_instance=None):
-    """ Helper class to extract objects for plotting
+    """ Helper class to extract objects for plotting.
     """
 
     if not isinstance(x, list):
@@ -1700,8 +1665,7 @@ def _parse_objects(x,remote_instance=None):
         ob, (pd.DataFrame, pd.Series, core.CatmaidNeuron, core.CatmaidNeuronList)) 
         and not isinstance(ob, (core.Dotprops, core.Volume))] # dotprops and volumes are instances of pd.DataFrames
     
-    skdata = core.CatmaidNeuronList( neuron_obj, make_copy=False)
-    
+    skdata = core.CatmaidNeuronList( neuron_obj, make_copy=False)    
 
     # Collect dotprops
     dotprops = [ob for ob in x if isinstance(ob,core.Dotprops)]
@@ -1715,5 +1679,9 @@ def _parse_objects(x,remote_instance=None):
 
     # Collect and parse volumes
     volumes = [ ob for ob in x if isinstance(ob, (core.Volume, str) ) ]
+
+    # Collect dataframes with xyz coordinates
+    dataframes = [ ob for ob in x if isinstance(ob, (pd.DataFrame, pd.Series) ) ]
+
 
     return skids, skdata, dotprops, volumes
