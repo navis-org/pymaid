@@ -53,8 +53,7 @@ __all__ = sorted([  'cluster_by_connectivity',
 def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True, 
                             threshold=1, include_skids=[], exclude_skids=[], min_nodes=2, 
                             similarity='vertex_normalized', connectivity_table=None):
-    """ Wrapper to calculate connectivity similarity and creates a distance
-    matrix for a set of neurons. 
+    """ Calculate connectivity similarity.
 
     Parameters
     ----------
@@ -96,7 +95,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     Returns
     -------
     :func:`pymaid.clust_results`
-                         Holds distance matrix and contains wrappers to plot
+                         Holds similarity (!) matrix and contains wrappers to plot
                          dendograms.
 
     Examples
