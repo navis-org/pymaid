@@ -311,7 +311,7 @@ def neuron2py(neuron, remote_instance=None):
     # Nat function may return neuron objects that have ONLY nodes - no
     # connectors, skeleton_id, name or tags!
     if 'skid' in neuron and remote_instance:
-        neuron_names = pymaid.get_names(
+        neuron_names = fetch.get_names(
             [n[0] for n in neuron.skid.tolist()], remote_instance)
     elif 'skid' in neuron and not remote_instance:
         neuron_names = None
@@ -621,7 +621,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        x = pymaid.get_neuron(x, remote_instance)
+        x = fetch.get_neuron(x, remote_instance)
         rn = neuron2r(x, convert_to_um=True)
     else:
         module_logger.error(
@@ -784,7 +784,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
             module_logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
-        rn = neuron2r(pymaid.get_neuron(
+        rn = neuron2r(fetch.get_neuron(
             neuron, remote_instance), convert_to_um=False)
     else:
         module_logger.error(
