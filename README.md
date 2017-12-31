@@ -8,16 +8,15 @@ PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 ## Features
 
-* large set of functions to fetch data via CATMAID's API
+* fetch data via CATMAID's API
 * custom neuron classes that perform on-demand data fetching
 * 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
-* virtual neuron surgery (cutting, pruning, rerooting)
+* virtual neuron surgery: cutting, pruning, rerooting
 * clustering methods (e.g. by connectivity or synapse placement)
 * R bindings (e.g. for libraries [nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) )
-* interface with iGraph
+* interface with NetworkX and iGraph
 * tools to analyse user stats (e.g. time-invested, project history)
 * interface with Blender 3D
-* and oh so much more...
 
 ## Installation
 See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed instructions. For the impatient:
@@ -33,10 +32,12 @@ If your default distribution is Python 2, you have to explicitly tell [PIP](http
 
 `pip3 install git+git://github.com/schlegelp/pymaid@master`  
 
-**Attention**: on Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install automatically. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)). Also: one of the dependencies, `pyoctree`, requires `numpy` to already be on the system to install properly. If pip fails with `ImportError: No module named 'numpy'`, you have to manually install numpy using `pip install numpy` and then retry installing pymaid.
+**Attention** 
+
+On Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install automatically. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)). Also: one of the dependencies, `pyoctree`, requires `numpy` to already be on the system to install properly. If pip fails with `ImportError: No module named 'numpy'`, you have to manually install numpy using `pip install numpy` and then retry installing pymaid.
 
 #### External libraries used:
-Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install all essential dependencies. You may run into problems on Windows though. In that case, you need to install dependencies manually, here is a list of dependencies (check out `install_requires` in [setup.py](https://raw.githubusercontent.com/schlegelp/PyMaid/master/setup.py) for version info):
+Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install all essential dependencies. You may run into problems on Windows though. In that case, you need to install dependencies manually. Here is a list of dependencies (check out `install_requires` in [setup.py](https://raw.githubusercontent.com/schlegelp/PyMaid/master/setup.py) for version info):
 
 Must have: 
 
@@ -52,10 +53,10 @@ Must have:
 
 Optional: 
 
-- [iGraph](http://www.igraph.org) - graph library written C++ (faster). PyMaid will try using this over NetworkX if available
-- [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually
-- [pyoctree](https://pypi.python.org/pypi/pyoctree/) - used to calculate points in volume, highly recommended
-- [shapely](https://shapely.readthedocs.io/en/latest/) - required if you want 2D plots of CATMAID volumes
+- [iGraph](http://www.igraph.org) - graph library written C++ (faster). PyMaid will try using this over NetworkX if available.
+- [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
+- [pyoctree](https://pypi.python.org/pypi/pyoctree/) - used to calculate points in volume, highly recommended.
+- [shapely](https://shapely.readthedocs.io/en/latest/) - required if you want 2D plots of CATMAID volumes.
 
 ## Quickstart:
 
