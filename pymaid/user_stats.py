@@ -372,15 +372,14 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
 
     Parameters
     ----------
-    users :         {list}, optional
-                    List of users (logins) for which to return timestamps.
-    neurons :       {list of skeleton IDs, CatmaidNeuron/List}, optional
-                    Neurons for which to return timestamps. If None, will find 
-                    neurons by user.
-    start_date :    {tuple, datetime.date}, optional
-    end_date :      {tuple, datetime.date}, optional
-                    Start and end date. Also applied when fetching when 
-                    fetching neurons if ``neurons==None``.
+    users :           {list}, optional
+                      List of users (logins) for which to return timestamps.
+    neurons :         {list of skeleton IDs, CatmaidNeuron/List}, optional
+                      Neurons for which to return timestamps. If None, will find 
+                      neurons by user.
+    start_date :      {tuple, datetime.date}, optional
+    end_date :        {tuple, datetime.date}, optional
+                      Start and end date of time window to check.
     remote_instance : {CatmaidInstance}, optional
 
     Important
