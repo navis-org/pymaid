@@ -2,7 +2,7 @@ User stats
 ----------
 Pymaid has functions that let you look at stats/contributions of individual users as well as your project's history and logs.
 
-There are quite a few, simple examples in the documentation for each function. Examples given here are a bit more elaborate.
+There are quite a few simple examples in the documentation of each function. Examples given here are a bit more elaborate.
 
 In this first example, we will compare two users:
 
@@ -67,4 +67,6 @@ Reference
 	~pymaid.get_logs
 	~pymaid.get_contributor_statistics
 	~pymaid.get_user_list
+	~pymaid.get_user_actions
+	~pymaid.get_transactions
     

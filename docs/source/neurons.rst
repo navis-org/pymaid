@@ -22,15 +22,15 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.Catm
 
 - ``skeleton_id``: neurons' skeleton ID(s)
 - ``neuron_name``: neurons' name(s)
-- ``nodes``: treenode table 
-- ``connectors``: connector table 
-- ``partners``: connectivity table 
+- ``nodes``: treenode table
+- ``connectors``: connector table
+- ``partners``: connectivity table
 - ``tags``: node tags (dict)
 - ``annotations``: list of neurons' annotations
 - ``cable_length``: cable length(s) in nm
 - ``review_status``: review status of neuron(s)
 - ``soma``: treenode ID of soma (if applicable)
-- ``segments``: list of linear segments 
+- ``segments``: list of linear segments
 - ``graph``: NetworkX graph representation of the neuron
 - ``igraph``: iGraph representation of the neuron (if available)
 - ``dps``: Dotproduct representation of the neuron
@@ -43,9 +43,9 @@ See :class:`~pymaid.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complet
 
 CatmaidNeuron/List methods
 ++++++++++++++++++++++++++
-.. autosummary::    
+.. autosummary::
 	:toctree: generated/
-    
+
 	pymaid.CatmaidNeuron.plot3d
 	pymaid.CatmaidNeuron.plot2d
 	pymaid.CatmaidNeuron.plot_dendrogram
@@ -53,7 +53,7 @@ CatmaidNeuron/List methods
 	pymaid.CatmaidNeuron.prune_by_volume
 	pymaid.CatmaidNeuron.prune_distal_to
 	pymaid.CatmaidNeuron.prune_proximal_to
-	pymaid.CatmaidNeuron.prune_longest_neurite
+	pymaid.CatmaidNeuron.prune_by_longest_neurite
 	pymaid.CatmaidNeuron.reroot
 	pymaid.CatmaidNeuron.reload
 	pymaid.CatmaidNeuron.summary
@@ -75,3 +75,4 @@ CatmaidNeuronList-specific
 
 	pymaid.CatmaidNeuronList.to_json
 	pymaid.CatmaidNeuronList.from_json
+	pymaid.CatmaidNeuronList.has_annotation

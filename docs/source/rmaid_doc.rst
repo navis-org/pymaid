@@ -14,7 +14,7 @@ On a fundamental level, you can use every single R function from within Python. 
 
 Quickstart
 ==========
->>> from pymaid import pymaid
+>>> import pymaid
 >>> from pymaid import rmaid
 >>> import matplotlib.pyplot as plt
 >>> from rpy2.robjects.packages import importr
@@ -53,7 +53,8 @@ R catmaid
 =========
 :func:`rmaid.init_rcatmaid` is a wrapper to initialise R catmaid (https://github.com/jefferis/rcatmaid)
 
->>> from pymaid import pymaid, rmaid
+>>> import pymaid
+>>> from pymaid import rmaid
 >>> # Initialize a CatmaidInstance in Python
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 >>> # Initialize R's rcatmaid with Python instance
@@ -85,8 +86,7 @@ Nblasting
 =========
 :func:`pymaid.rmaid.nblast` provides a wrapper to nblast neurons.
 
->>> from pymaid.pymaid import CatmaidInstance
->>> from pymaid import rmaid
+>>> from pymaid import rmaid, CatmaidInstance
 >>> # Initialize connection to Catmaid server
 >>> rm = CatmaidInstance( 'url', 'http_user', 'http_pw', 'token' )
 >>> # Blast a neuron against default (FlyCircuit) database

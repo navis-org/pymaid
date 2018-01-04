@@ -1,7 +1,7 @@
 .. _example:
 
-Tutorial
-********
+Introduction
+************
 This section will teach you the basics of how to use PyMaid. If you are impatient check out the *Quickstart Guide* but I recommend having a look at the *Basics* too.
 
 Quickstart Guide
