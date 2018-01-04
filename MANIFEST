@@ -3,10 +3,14 @@ setup.py
 pymaid/__init__.py
 pymaid/b3d.py
 pymaid/cluster.py
+pymaid/connectivity.py
 pymaid/core.py
-pymaid/igraph_catmaid.py
+pymaid/fetch.py
+pymaid/graph.py
+pymaid/graph_utils.py
+pymaid/intersect.py
 pymaid/morpho.py
 pymaid/plotting.py
-pymaid/pymaid.py
+pymaid/resample.py
 pymaid/rmaid.py
 pymaid/user_stats.py
