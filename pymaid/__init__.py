@@ -1,4 +1,4 @@
-__version__ = "0.72.3"
+__version__ = "0.73"
 
 import logging
 
@@ -82,9 +82,3 @@ try:
 except Exception as error:
     module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.connectivity:\n' + str(error))
-
-try:
-    from pymaid.rmaid import *
-except Exception as error:
-    module_logger.warning(str(error))
-    module_logger.warning('Error importing pymaid.rmaid. This may be due to rpy2 not being installed. No worries, pymaid will still work though!' )
