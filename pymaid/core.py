@@ -20,23 +20,23 @@ also provided quick access to many other PyMaid functions.
 Examples
 --------
 >>> # Get a bunch of neurons from CATMAID server as CatmaidNeuronList
->>> nl = pymaid.get_neuron( 'annotation:uPN right' ) 
+>>> nl = pymaid.get_neuron( 'annotation:uPN right' )
 >>> # CatmaidNeuronLists work in, many ways, like pandas DataFrames
 >>> nl.head()
                             neuron_name skeleton_id  n_nodes  n_connectors  \
-0              PN glomerulus VA6 017 DB          16    12721          1878   
-1          PN glomerulus VL2a 22000 JMR       21999    10740          1687   
-2            PN glomerulus VC1 22133 BH       22132     8446          1664   
-3  PN putative glomerulus VC3m 22278 AA       22277     6228           674   
-4          PN glomerulus DL2v 22423 JMR       22422     4610           384   
+0              PN glomerulus VA6 017 DB          16    12721          1878
+1          PN glomerulus VL2a 22000 JMR       21999    10740          1687
+2            PN glomerulus VC1 22133 BH       22132     8446          1664
+3  PN putative glomerulus VC3m 22278 AA       22277     6228           674
+4          PN glomerulus DL2v 22423 JMR       22422     4610           384
 
-   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma  
-0             773          822        280   2863.743284            NA  True  
-1             505          537        194   2412.045343            NA  True  
-2             508          548        110   1977.235899            NA  True  
-3             232          243        100   1221.985849            NA  True  
-4             191          206         93   1172.948499            NA  True  
->>> # Plot neurons 
+   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma
+0             773          822        280   2863.743284            NA  True
+1             505          537        194   2412.045343            NA  True
+2             508          548        110   1977.235899            NA  True
+3             232          243        100   1221.985849            NA  True
+4             191          206         93   1172.948499            NA  True
+>>> # Plot neurons
 >>> nl.plot3d()
 >>> # Neurons in a list can be accessed by index, ...
 >>> nl[0]
@@ -101,20 +101,20 @@ if len( module_logger.handlers ) == 0:
 
 
 class CatmaidNeuron:
-    """ Catmaid neuron object holding neuron data (nodes, connectors, name, 
+    """ Catmaid neuron object holding neuron data (nodes, connectors, name,
     etc) and providing quick access to various PyMaid functions.
 
     Notes
     -----
     CatmaidNeuron can be minimally constructed from just a skeleton ID
-    and a CatmaidInstance. Other parameters (nodes, connectors, neuron name, 
+    and a CatmaidInstance. Other parameters (nodes, connectors, neuron name,
     annotations, etc.) will then be retrieved from the server 'on-demand'.
 
     The easiest way to construct a CatmaidNeuron is by using
-    :func:`~pymaid.get_neuron`. 
+    :func:`~pymaid.get_neuron`.
 
-    Manually, a complete CatmaidNeuron can be constructed from a pandas 
-    DataFrame (df) containing: df.nodes, df.connectors, df.skeleton_id, 
+    Manually, a complete CatmaidNeuron can be constructed from a pandas
+    DataFrame (df) containing: df.nodes, df.connectors, df.skeleton_id,
     df.neuron_name, df.tags
 
     Using a CatmaidNeuron to initialise a CatmaidNeuron will automatically
@@ -123,9 +123,9 @@ class CatmaidNeuron:
     Parameters
     ----------
     x                   {skeletonID, CatmaidNeuron}
-                        Data to construct neuron from.                        
+                        Data to construct neuron from.
     remote_instance :   CatmaidInstance, optional
-                        Storing this makes it more convenient to retrieve e.g. 
+                        Storing this makes it more convenient to retrieve e.g.
                         neuron annotations, review status, etc.
     meta_data :         dict, optional
                         any additional data
@@ -173,8 +173,8 @@ class CatmaidNeuron:
     n_end_nodes :       int
                         Number of end nodes
     n_open_ends :       int
-                        Number of open end nodes. Leaf nodes that are not 
-                        tagged with either: 'ends', 'not a branch', 
+                        Number of open end nodes. Leaf nodes that are not
+                        tagged with either: 'ends', 'not a branch',
                         'uncertain end', 'soma' or 'uncertain continuation'
     cable_length :      float
                         Cable length in micrometers [um]
@@ -190,15 +190,15 @@ class CatmaidNeuron:
 
     Examples
     --------
-    >>> import pymaid    
+    >>> import pymaid
     >>> # Initialize a new neuron
-    >>> n = pymaid.CatmaidNeuron( 123456 ) 
+    >>> n = pymaid.CatmaidNeuron( 123456 )
     >>> # Initialize Catmaid connections
-    >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token) 
-    >>> # Add CatmaidInstance to the neuron for convenience    
-    >>> n.remote_instance = rm 
+    >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token)
+    >>> # Add CatmaidInstance to the neuron for convenience
+    >>> n.remote_instance = rm
     >>> # Retrieve node data from server on-demand
-    >>> n.nodes 
+    >>> n.nodes
     ... CatmaidNeuron - INFO - Retrieving skeleton data...
     ...    treenode_id  parent_id  creator_id  x  y  z radius confidence
     ... 0  ...
@@ -214,14 +214,14 @@ class CatmaidNeuron:
     """
 
     def __init__(self, x, remote_instance=None, meta_data=None):
-        if isinstance(x, pd.DataFrame) or isinstance(x, CatmaidNeuronList):
+        if isinstance(x, (pd.DataFrame, CatmaidNeuronList)):
             if x.shape[0] == 1:
                 x = x.ix[0]
             else:
                 raise Exception(
                     'Unable to construct CatmaidNeuron from data containing multiple neurons. Try CatmaidNeuronList instead.')
 
-        if not isinstance(x, str) and not isinstance(x, int) and not isinstance(x, pd.Series) and not isinstance(x, CatmaidNeuron):
+        if not isinstance(x, (str, int, pd.Series, CatmaidNeuron)):
             raise TypeError(
                 'Unable to construct CatmaidNeuron from data type %s' % str(type(x)))
 
@@ -244,7 +244,7 @@ class CatmaidNeuron:
         #Default color is yellow
         self.color = (255, 255, 0)
 
-        if not isinstance(x, (CatmaidNeuron, pd.Series, pd.DataFrame)):
+        if not isinstance(x, (CatmaidNeuron, pd.Series)):
             try:
                 int(x)  # Check if this is a skeleton ID
                 self.skeleton_id = str(x) # Make sure skid is a string
@@ -253,29 +253,34 @@ class CatmaidNeuron:
                     'Unable to construct CatmaidNeuron from data provided: %s' % str(type(x)))
         else:
             # If we are dealing with a DataFrame or a CatmaidNeuron get the essentials
-            essential_attributes = [ 'skeleton_id'] #, 'neuron_name', 'nodes', 'connectors', 'tags' ]
+            essential_attributes = [ 'skeleton_id' ]
 
+            # If we have been passed a DataFrame/Series, just get the essentials
+            if isinstance(x, pd.Series):
+                essential_attributes += [ 'neuron_name', 'nodes', 'connectors', 'tags' ]
+            else:
+                # Move all attributes if CatmaidNeuron
+                for at in x.__dict__:
+                    if at not in essential_attributes:
+                        setattr(self, at, getattr(x, at ) )
+
+            # Get essential attributes
             for at in essential_attributes:
-                setattr(self, at, getattr(x, at ) )            
+                setattr(self, at, getattr(x, at ) )
 
-            # Now move additional attributes
-            for at in x.__dict__:
-                if at not in essential_attributes:
-                    setattr(self, at, getattr(x, at ) )
+        # Classify nodes if applicable
+        if 'nodes' in self.__dict__ and 'type' not in self.nodes:
+            graph_utils.classify_nodes(self)
 
-            # Classify nodes if applicable
-            if 'nodes' in self.__dict__ and 'type' not in self.nodes:
-                graph_utils.classify_nodes(self)
-
-            # If a CatmaidNeuron is used to initialize, we need to make this 
-            # new object independent by copying important attributes
-            if isinstance(x, CatmaidNeuron):
-                for at in self.__dict__:
-                    try:
-                        # Simple attributes don't have a .copy()
-                        setattr( self, at, getattr(self, at).copy() )
-                    except:
-                        pass
+        # If a CatmaidNeuron is used to initialize, we need to make this
+        # new object independent by copying important attributes
+        if isinstance(x, CatmaidNeuron):
+            for at in self.__dict__:
+                try:
+                    # Simple attributes don't have a .copy()
+                    setattr( self, at, getattr(self, at).copy() )
+                except:
+                    pass
 
 
     def __getattr__(self, key):
@@ -358,7 +363,7 @@ class CatmaidNeuron:
             if 'connectors' in self.__dict__:
                 return self.connectors[ self.connectors.relation == 1 ].shape[0]
             else:
-                return 'NA'        
+                return 'NA'
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
                 # Simply sum up edge weight of all igraph edges
@@ -382,7 +387,7 @@ class CatmaidNeuron:
         """Get/Update skeleton data for neuron.
 
         Parameters
-        ----------       
+        ----------
         **kwargs
                     Will be passed to pymaid.get_neuron()
                     e.g. to get the full treenode history use:
@@ -392,7 +397,7 @@ class CatmaidNeuron:
 
         See Also
         --------
-        :func:`~pymaid.get_neuron` 
+        :func:`~pymaid.get_neuron`
                     Function called to get skeleton information
         """
         if not remote_instance and not self._remote_instance:
@@ -402,7 +407,7 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
         module_logger.info('Retrieving skeleton data...')
         skeleton = fetch.get_neuron(
-            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]       
+            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]
 
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
@@ -427,7 +432,7 @@ class CatmaidNeuron:
             except:
                 pass
 
-        temp_node_cols = ['flow_centrality','type'] 
+        temp_node_cols = ['flow_centrality','type']
 
         # Remove temporary node values
         for c in [col for col in temp_node_cols if col not in exclude]:
@@ -440,14 +445,14 @@ class CatmaidNeuron:
 
     def get_graph_nx(self):
         """Calculates networkX representation of neuron. Once calculated stored
-        as `.graph`. Call function again to update graph. 
+        as `.graph`. Call function again to update graph.
 
 
         See Also
         --------
         :func:`pymaid.neuron2nx`
         """
-        self.graph = graph.neuron2nx(self)        
+        self.graph = graph.neuron2nx(self)
         return self.graph
 
     def get_igraph(self):
@@ -469,8 +474,8 @@ class CatmaidNeuron:
         return self.igraph
 
     def get_dps(self):
-        """Calculates/updates dotproduct representation of the neuron. Once 
-        calculated stored as `.dps`. 
+        """Calculates/updates dotproduct representation of the neuron. Once
+        calculated stored as `.dps`.
 
         See Also
         --------
@@ -492,12 +497,12 @@ class CatmaidNeuron:
         Notes
         -----
         Uses either a treenode tag or treenode radius or a combination of both
-        to identify the soma. This is set in the class attributes 
+        to identify the soma. This is set in the class attributes
         ``soma_detection_radius`` and ``soma_detection_tag``. The default
         values for these are::
 
 
-                soma_detection_radius = 100 
+                soma_detection_radius = 100
                 soma_detection_tag = 'soma'
 
 
@@ -526,7 +531,7 @@ class CatmaidNeuron:
 
     def _get_root(self):
         """Thin wrapper to get root node(s)."""
-        roots = self.nodes[self.nodes.parent_id.isnull()].treenode_id.values        
+        roots = self.nodes[self.nodes.parent_id.isnull()].treenode_id.values
         return roots
 
     def get_partners(self, remote_instance=None):
@@ -540,7 +545,7 @@ class CatmaidNeuron:
 
         # Get partners
         self.partners = fetch.get_partners(self.skeleton_id, remote_instance)
-        
+
         return self.partners
 
     def get_review(self, remote_instance=None):
@@ -569,17 +574,17 @@ class CatmaidNeuron:
         return self.annotations
 
     def plot2d(self, **kwargs):
-        """Plot neuron using pymaid.plot2d().  
+        """Plot neuron using pymaid.plot2d().
 
         Parameters
-        ----------     
-        **kwargs         
-                Will be passed to plot2d() 
-                See help(pymaid.plot3d) for a list of keywords  
+        ----------
+        **kwargs
+                Will be passed to plot2d()
+                See help(pymaid.plot3d) for a list of keywords
 
         See Also
         --------
-        :func:`pymaid.plot2d` 
+        :func:`pymaid.plot2d`
                     Function called to generate 2d plot
         """
         if 'nodes' not in self.__dict__:
@@ -587,24 +592,24 @@ class CatmaidNeuron:
         return plotting.plot2d(self, **kwargs)
 
     def plot3d(self, **kwargs):
-        """Plot neuron using pymaid.plot3d().  
+        """Plot neuron using pymaid.plot3d().
 
         Parameters
-        ----------      
+        ----------
         **kwargs
-                Will be passed to plot3d() 
-                See help(pymaid.plot3d) for a list of keywords      
+                Will be passed to plot3d()
+                See help(pymaid.plot3d) for a list of keywords
 
         See Also
         --------
-        :func:`pymaid.plot3d` 
-                    Function called to generate 3d plot   
+        :func:`pymaid.plot3d`
+                    Function called to generate 3d plot
 
         Examples
         --------
         >>> nl = pymaid.get_neuron('annotation:uPN right')
         >>> #Plot with connectors
-        >>> nl.plot3d( connectors=True )               
+        >>> nl.plot3d( connectors=True )
         """
 
         if 'remote_instance' not in kwargs:
@@ -627,17 +632,17 @@ class CatmaidNeuron:
         Returns
         -------
         scipy.hierarchy.dendrogram
-        """             
+        """
 
         # First get the all by all distances
         # need to change THIS to get_all_shortest_paths
         dist_mat = self.nodes_geodesic_distance_matrix
 
         # Remove non end nodes
-        non_leaf_ix = [ v.index for v in self.igraph.vs if v['node_id'] not in self.nodes[ self.nodes.type == 'end' ].treenode_id.values ]        
+        non_leaf_ix = [ v.index for v in self.igraph.vs if v['node_id'] not in self.nodes[ self.nodes.type == 'end' ].treenode_id.values ]
 
         ends_mat = np.delete(dist_mat, non_leaf_ix, 0)
-        ends_mat = np.delete(ends_mat, non_leaf_ix, 1)        
+        ends_mat = np.delete(ends_mat, non_leaf_ix, 1)
 
         #Cluster
         linkage = scipy.hierarchy.linkage( ends_mat, **linkage_kwargs )
@@ -666,10 +671,10 @@ class CatmaidNeuron:
         ----------
         resample_to :           int
                                 Resolution in nanometer to which to resample
-                                the neuron.        
+                                the neuron.
         inplace :               bool, optional
-                                If True, operation will be performed on 
-                                itself. If False, operation is performed on 
+                                If True, operation will be performed on
+                                itself. If False, operation is performed on
                                 copy which is then returned.
 
         See Also
@@ -685,7 +690,7 @@ class CatmaidNeuron:
 
         resample.resample_neuron(x, resample_to, inplace=True )
 
-        # No need to call this as base function does this for us        
+        # No need to call this as base function does this for us
         # x._clear_temp_attr()
 
         if not inplace:
@@ -697,14 +702,14 @@ class CatmaidNeuron:
         Parameters
         ----------
         factor :                int, optional
-                                Factor by which to downsample the neurons. 
+                                Factor by which to downsample the neurons.
                                 Default = 5
         preserve_cn_treenodes : bool, optional
-                                If True, treenodes that have connectors are 
+                                If True, treenodes that have connectors are
                                 preserved.
         inplace :               bool, optional
-                                If True, operation will be performed on 
-                                itself. If False, operation is performed on 
+                                If True, operation will be performed on
+                                itself. If False, operation is performed on
                                 copy which is then returned.
 
         See Also
@@ -734,7 +739,7 @@ class CatmaidNeuron:
         new_root :  {int, str}
                     Either treenode ID or node tag
         inplace :   bool, optional
-                    If True, operation will be performed on itself. If False, 
+                    If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
 
         See Also
@@ -752,10 +757,10 @@ class CatmaidNeuron:
         graph_utils.reroot_neuron(x, new_root, inplace=True)
 
         # Clear temporary attributes is done by morpho.reroot_neuron()
-        # x._clear_temp_attr()   
+        # x._clear_temp_attr()
 
         if not inplace:
-            return x     
+            return x
 
     def prune_distal_to(self, node, inplace=True):
         """Cut off nodes distal to given nodes.
@@ -765,7 +770,7 @@ class CatmaidNeuron:
         node :      {treenode_id, node_tag}
                     Provide either treenode ID(s) or a unique tag(s)
         inplace :   bool, optional
-                    If True, operation will be performed on itself. If False, 
+                    If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
 
         See Also
@@ -779,7 +784,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        if not isinstance( node, (list, np.ndarray) ):                
+        if not isinstance( node, (list, np.ndarray) ):
             node = [node]
 
         for n in node:
@@ -800,7 +805,7 @@ class CatmaidNeuron:
         node :      {treenode_id, node tag}
                     Provide either a treenode ID or a (unique) tag
         inplace :   bool, optional
-                    If True, operation will be performed on itself. If False, 
+                    If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
 
         See Also
@@ -826,31 +831,31 @@ class CatmaidNeuron:
 
     def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
         """ Prune neuron based on strahler order. Will reroot neuron to
-        soma if possible.        
+        soma if possible.
 
         Parameters
         ----------
         to_prune :  {int, list, range}, optional
-                    Strahler indices to prune. 
+                    Strahler indices to prune.
                     1. ``to_prune = 1`` removes all leaf branches
                     2. ``to_prune = [1,2]`` removes indices 1 and 2
-                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
-                    4. ``to_prune = -1`` removes everything but the highest index 
+                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3
+                    4. ``to_prune = -1`` removes everything but the highest index
         inplace :   bool, optional
-                    If True, operation will be performed on itself. If False, 
+                    If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
 
         See Also
         --------
-        :func:`~pymaid.prune_by_strahler` 
+        :func:`~pymaid.prune_by_strahler`
             This is the base function. See for details and examples.
 
-        """     
+        """
 
         if inplace:
             x = self
         else:
-            x = self.copy()   
+            x = self.copy()
 
         morpho.prune_by_strahler(
             x, to_prune=to_prune, reroot_soma=True, inplace=True)
@@ -871,8 +876,8 @@ class CatmaidNeuron:
         reroot_to_soma :    bool, optional
                             If True, will reroot to soma before pruning.
         inplace :           bool, optional
-                            If True, operation will be performed on itself. 
-                            If False, operation is performed on copy which is 
+                            If True, operation will be performed on itself.
+                            If False, operation is performed on copy which is
                             then returned.
 
         See Also
@@ -880,12 +885,12 @@ class CatmaidNeuron:
         :func:`~pymaid.longest_neurite`
             This is the base function. See for details and examples.
 
-        """     
+        """
 
         if inplace:
             x = self
         else:
-            x = self.copy()   
+            x = self.copy()
 
         graph_utils.longest_neurite(
             x, n, inplace=True, reroot_to_soma=reroot_to_soma)
@@ -906,33 +911,33 @@ class CatmaidNeuron:
         mode :      {'IN','OUT'}, optional
                     If 'IN', parts of the neuron inside the volume are kept.
         inplace :   bool, optional
-                    If True, operation will be performed on itself. If False, 
+                    If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
 
         See Also
         --------
         :func:`~pymaid.in_volume`
             Base function. See for details and examples.
-        """ 
+        """
 
         if inplace:
             x = self
         else:
             x = self.copy()
 
-        if not isinstance(v, Volume):            
+        if not isinstance(v, Volume):
             v = fetch.get_volume(v, combine_vols=True, remote_instance=x._remote_instance)
 
         intersect.in_volume(x, v, inplace=True, remote_instance=x._remote_instance, mode=mode)
 
         # Clear temporary attributes
-        # x._clear_temp_attr()   
+        # x._clear_temp_attr()
 
         if not inplace:
-            return x     
+            return x
 
     def reload(self, remote_instance=None):
-        """Reload neuron from server. Currently only updates name, nodes, 
+        """Reload neuron from server. Currently only updates name, nodes,
         connectors and tags."""
 
         if not remote_instance and not self._remote_instance:
@@ -949,7 +954,7 @@ class CatmaidNeuron:
         self._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
-        """Assign remote_instance to neuron. Provide either existing 
+        """Assign remote_instance to neuron. Provide either existing
         CatmaidInstance OR your credentials.
 
         Parameters
@@ -990,14 +995,14 @@ class CatmaidNeuron:
             return CatmaidNeuronList([self] + to_add.neurons, make_copy=False)
         else:
             raise TypeError('Unable to add data of type "{0}"'.format(
-                              type(to_add)))            
+                              type(to_add)))
 
     def summary(self):
         """Get a summary of this neuron."""
 
         # Look up these values without requesting them
-        neuron_name = self.__dict__.get('neuron_name', 'NA')                
-        review_status = self.__dict__.get('review_status', 'NA')        
+        neuron_name = self.__dict__.get('neuron_name', 'NA')
+        review_status = self.__dict__.get('review_status', 'NA')
 
         if 'nodes' in self.__dict__:
             soma_temp = self.soma
@@ -1012,7 +1017,7 @@ class CatmaidNeuron:
     @classmethod
     def from_swc(self, filename, neuron_name = None, neuron_id = None):
         """ Generate neuron object from SWC file.
-        
+
         Parameters
         ----------
         filename :      str
@@ -1021,7 +1026,7 @@ class CatmaidNeuron:
                         Name to use for the neuron. If not provided, will use
                         filename
         neuron_id :     int, optional
-                        Unique identifier (essentially skeleton ID). If not 
+                        Unique identifier (essentially skeleton ID). If not
                         provided, will generate one from scratch.
 
         Returns
@@ -1060,7 +1065,7 @@ class CatmaidNeuron:
             str(neuron_id),
             nodes,
             connectors,
-            {},            
+            {},
             ]],
                 columns=['neuron_name', 'skeleton_id',
                          'nodes', 'connectors', 'tags'],
@@ -1074,79 +1079,79 @@ class CatmaidNeuron:
         return CatmaidNeuron(df)
 
 class CatmaidNeuronList:
-    """ Compilations of :class:`~pymaid.CatmaidNeuron` that allow quick 
-    access to neurons' attributes/functions. They are designed to work in many 
-    ways much like a pandas.DataFrames by, for example, supporting ``.ix[ ]``, 
-    ``.itertuples()``, ``.empty`` or ``.copy()``.  
+    """ Compilations of :class:`~pymaid.CatmaidNeuron` that allow quick
+    access to neurons' attributes/functions. They are designed to work in many
+    ways much like a pandas.DataFrames by, for example, supporting ``.ix[ ]``,
+    ``.itertuples()``, ``.empty`` or ``.copy()``.
 
     Notes
     -----
-    CatmaidNeuronList can be minimally constructed from just skeleton IDs. 
-    Other parameters (nodes, connectors, neuron name, annotations, etc.) 
-    will then be retrieved from the server 'on-demand'. 
+    CatmaidNeuronList can be minimally constructed from just skeleton IDs.
+    Other parameters (nodes, connectors, neuron name, annotations, etc.)
+    will then be retrieved from the server 'on-demand'.
 
-    The easiest way to get a CatmaidNeuronList is by using 
+    The easiest way to get a CatmaidNeuronList is by using
     :func:`~pymaid.get_neuron` (see examples).
 
     Manually, a CatmaidNeuronList can constructed from a pandas DataFrame (df)
-    containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name, 
+    containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name,
     df.tags for a set of neurons.
 
     Parameters
     ----------
-    x                 
+    x
                         Data to construct neuron from. Can be either:
 
-                        1. skeleton ID(s)                        
+                        1. skeleton ID(s)
                         2. CatmaidNeuronList (will create a deep copy)
                         3. pandas DataFrame
     remote_instance :   CatmaidInstance, optional
-                        Storing this makes it more convenient to retrieve e.g. 
+                        Storing this makes it more convenient to retrieve e.g.
                         neuron annotations, review status, etc.
     meta_data :         dict, optional
                         Any additional data
     make_copy :         boolean, optional
-                        If true, DataFrames are copied [.copy()] before being 
-                        assigned to the neuron object to prevent 
-                        backpropagation of subsequent changes to the data. 
-                        Default = True   
+                        If true, DataFrames are copied [.copy()] before being
+                        assigned to the neuron object to prevent
+                        backpropagation of subsequent changes to the data.
+                        Default = True
 
     Attributes
     ----------
-    skeleton_id :       np.array of str                        
-    neuron_name :       np.array of str                        
+    skeleton_id :       np.array of str
+    neuron_name :       np.array of str
     nodes :             ``pandas.DataFrame``
                         Merged treenode table.
     connectors :        ``pandas.DataFrame``
-                        Merged connector table.    
+                        Merged connector table.
     tags :              np.array of dict
                         Treenode tags
     annotations :       np.array of list
     partners :          pd.DataFrame
-                        Connectivity table for these neurons.                 
+                        Connectivity table for these neurons.
     graph :             np.array of ``networkx`` graph objects
-    igraph :            np.array of ``igraph`` graph objects                        
-    review_status :     np.array of int                        
-    n_connectors :      np.array of int                        
-    n_presynapses :     np.array of int                        
-    n_postsynapses :    np.array of int                        
-    n_branch_nodes :    np.array of int                        
-    n_end_nodes :       np.array of int                        
-    n_open_ends :       np.array of int                        
-    cable_length :      np.array of float 
-                        Cable lengths in micrometers [um]    
-    soma :              np.array of treenode_ids                        
+    igraph :            np.array of ``igraph`` graph objects
+    review_status :     np.array of int
+    n_connectors :      np.array of int
+    n_presynapses :     np.array of int
+    n_postsynapses :    np.array of int
+    n_branch_nodes :    np.array of int
+    n_end_nodes :       np.array of int
+    n_open_ends :       np.array of int
+    cable_length :      np.array of float
+                        Cable lengths in micrometers [um]
+    soma :              np.array of treenode_ids
     root :              np.array of treenode_ids
     n_cores :           int
                         Number of cores to use. Default is os.cpu_count()-1
     _use_parallel :     bool (default=True)
                         If True, will use parallel threads. Should be slightly
                         up to a lot faster depending of the numbers of cores.
-                        Switch off if you experience performance issues.    
+                        Switch off if you experience performance issues.
 
     Examples
     --------
-    >>> # Initialize with just a Skeleton ID 
+    >>> # Initialize with just a Skeleton ID
     >>> nl = pymaid.CatmaidNeuronList( [ 123456, 45677 ] )
     >>> # Add CatmaidInstance to neurons in neuronlist
     >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token)
@@ -1179,8 +1184,8 @@ class CatmaidNeuronList:
         self.n_cores = max(1, os.cpu_count())
 
         # If below parameter is True, most calculations will be parallelized
-        # which speeds them up quite a bit. Unfortunately, this uses A TON of 
-        # memory - for large lists this might make your system run out of 
+        # which speeds them up quite a bit. Unfortunately, this uses A TON of
+        # memory - for large lists this might make your system run out of
         # memory. In these cases, leave this property at False
         self._use_parallel = _use_parallel
         self._use_threading = True
@@ -1190,7 +1195,7 @@ class CatmaidNeuronList:
 
         if remote_instance is None:
             try:
-                remote_instance = x.remote_instance 
+                remote_instance = x.remote_instance
             except:
                 if 'remote_instance' in sys.modules:
                     remote_instance = sys.modules['remote_instance']
@@ -1218,8 +1223,8 @@ class CatmaidNeuronList:
             self.neurons = list(x)
         else:
             raise TypeError(
-                'Unable to generate CatmaidNeuronList from %s' % str(type(x)))                
-        
+                'Unable to generate CatmaidNeuronList from %s' % str(type(x)))
+
         # Now convert into CatmaidNeurons if necessary
         to_convert = []
         for i, n in enumerate(self.neurons):
@@ -1232,8 +1237,8 @@ class CatmaidNeuronList:
 
                     futures = e.map( CatmaidNeuron, [ n[0] for n in to_convert ]  )
 
-                    converted = [ n for n in tqdm(futures, total=len(to_convert), 
-                                                  desc='Making neurons', 
+                    converted = [ n for n in tqdm(futures, total=len(to_convert),
+                                                  desc='Making neurons',
                                                   disable=module_logger.getEffectiveLevel()>=40 ) ]
 
                     for i, c in enumerate(to_convert):
@@ -1252,7 +1257,7 @@ class CatmaidNeuronList:
 
     def _convert_helper(self, x):
         """ Helper function to convert x to CatmaidNeuron."""
-        return CatmaidNeuron( x[0], remote_instance=x[1])   
+        return CatmaidNeuron( x[0], remote_instance=x[1])
 
     def summary(self, n=None):
         """ Get summary over all neurons in this NeuronList.
@@ -1264,12 +1269,12 @@ class CatmaidNeuronList:
 
         Returns
         -------
-        pandas DataFrame  
+        pandas DataFrame
 
         """
         d = []
         for n in self.neurons[:n]:
-            neuron_name = n.__dict__.get('neuron_name', 'NA')            
+            neuron_name = n.__dict__.get('neuron_name', 'NA')
             review_status = n.__dict__.get('review_status', 'NA')
 
             if 'nodes' in n.__dict__:
@@ -1288,10 +1293,10 @@ class CatmaidNeuronList:
         return self.__repr__()
 
     def __repr__(self):
-        return '{0} of {1} neurons \n {2}'.format(type(self), len(self.neurons), str(self.summary()) )    
+        return '{0} of {1} neurons \n {2}'.format(type(self), len(self.neurons), str(self.summary()) )
 
     def __iter__(self):
-        """ Iterator instanciates a new class everytime it is called. 
+        """ Iterator instanciates a new class everytime it is called.
         This allows the use of nested loops on the same neuronlist object.
         """
         class prange_iter:
@@ -1325,13 +1330,13 @@ class CatmaidNeuronList:
         elif key == 'partners':
             return self.get_partners()
         elif key == 'skeleton_id':
-            return np.array([n.skeleton_id for n in self.neurons])        
+            return np.array([n.skeleton_id for n in self.neurons])
         elif key in ['nodes','connectors','presynapses','postsynapses','gap_junctions']:
             self.get_skeletons(skip_existing=True)
             return pd.concat([ getattr(n, key) for n in self.neurons], axis=0, ignore_index=True)
         elif key == '_remote_instance':
             all_instances = [
-                n._remote_instance for n in self.neurons if n._remote_instance != None]            
+                n._remote_instance for n in self.neurons if n._remote_instance != None]
 
             if len(set(all_instances)) > 1:
                 # Note that multiprocessing causes remote_instances to be pickled
@@ -1342,7 +1347,7 @@ class CatmaidNeuronList:
                 raise Exception(
                     'No remote_instance found. Use .set_remote_instance() to assign one to all neurons.')
             else:
-                return all_instances[0]        
+                return all_instances[0]
         elif key == 'review_status':
             self.get_review(skip_existing=True)
             return np.array([n.review_status for n in self.neurons])
@@ -1440,39 +1445,35 @@ class CatmaidNeuronList:
         resample_to :           int
                                 Resolution in nm to resample neurons to.
         inplace :               bool, optional
-                                If False, a downsampled COPY of this 
+                                If False, a downsampled COPY of this
                                 CatmaidNeuronList is returned.
 
         See Also
         --------
         :func:`~pymaid.resample_neuron`
                 Base function - see for details.
-        """                
+        """
 
         x = self
         if not inplace:
-            x = x.copy() 
-
-        _set_loggers('ERROR')
+            x = x.copy()
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,resample_to) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,resample_to) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._resample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
-            pool.join()  
+            pool.join()
         else:
             for n in tqdm(x.neurons, desc='Resampling', disable=module_logger.getEffectiveLevel()>=40):
                 n.resample(resample_to=resample_to, inplace=True)
-            
-        _set_loggers('INFO')
 
         if not inplace:
             return x
 
     def _resample_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
+        """ Helper function to parallelise basic operations."""
         x[0].resample(resample_to=x[1],inplace=True)
         return x[0]
 
@@ -1482,46 +1483,42 @@ class CatmaidNeuronList:
         Parameters
         ----------
         factor :                int, optional
-                                Factor by which to downsample the neurons. 
+                                Factor by which to downsample the neurons.
                                 Default = 5
         preserve_cn_treenodes : bool, optional
-                                If True, treenodes that have connectors are 
+                                If True, treenodes that have connectors are
                                 preserved.
         inplace :               bool, optional
-                                If False, a downsampled COPY of this 
+                                If False, a downsampled COPY of this
                                 CatmaidNeuronList is returned.
 
         See Also
         --------
         :func:`~pymaid.downsample_neuron`
                 Base function - see for details.
-        """                
+        """
 
         x = self
         if not inplace:
-            x = x.copy() 
-
-        _set_loggers('ERROR')
+            x = x.copy()
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,factor,preserve_cn_treenodes) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,factor,preserve_cn_treenodes) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._downsample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
-            pool.join()  
+            pool.join()
         else:
             for n in tqdm(x.neurons, desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40):
                 n.downsample(factor=factor, preserve_cn_treenodes=preserve_cn_treenodes, inplace=True)
-            
-        _set_loggers('INFO')
 
         if not inplace:
             return x
 
     def _downsample_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
-        x[0].downsample(factor=x[1],preserve_cn_treenodes=preserve_cn_treenodes,inplace=True)                
+        """ Helper function to parallelise basic operations."""
+        x[0].downsample(factor=x[1],preserve_cn_treenodes=preserve_cn_treenodes,inplace=True)
         return x[0]
 
     def reroot(self, new_root, inplace=True):
@@ -1533,7 +1530,7 @@ class CatmaidNeuronList:
                     Either treenode IDs or node tag(s). If not a list, the
                     same tag is used to reroot all neurons.
         inplace :   bool, optional
-                    If False, a rerooted COPY of this CatmaidNeuronList is 
+                    If False, a rerooted COPY of this CatmaidNeuronList is
                     returned.
 
         See Also
@@ -1546,7 +1543,7 @@ class CatmaidNeuronList:
         >>> # Reroot all neurons to soma
         >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
         >>> nl.reroot( nl.soma )
-        """       
+        """
 
         if not isinstance(new_root, (list,np.ndarray)):
             new_root = [new_root] * len(self.neurons)
@@ -1556,7 +1553,7 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy() 
+            x = x.copy()
 
         # Silence loggers (except Errors)
         morpholevel = morpho.module_logger.getEffectiveLevel()
@@ -1566,10 +1563,10 @@ class CatmaidNeuronList:
         graph.module_logger.setLevel('ERROR')
         morpho.module_logger.setLevel('ERROR')
         graph_utils.module_logger.setLevel('ERROR')
-        
+
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,new_root[i]) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,new_root[i]) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._reroot_helper, combinations, chunksize=10 ), total=len(combinations), desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
@@ -1587,47 +1584,43 @@ class CatmaidNeuronList:
             return x
 
     def _reroot_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
-        x[0].reroot(x[1], inplace=True)                
+        """ Helper function to parallelise basic operations."""
+        x[0].reroot(x[1], inplace=True)
         return x[0]
 
     def prune_distal_to(self, tag, inplace=True):
-        """Cut off nodes distal to given node. 
+        """Cut off nodes distal to given node.
 
         Parameters
         ----------
         node :      node tag
                     A (unique) tag at which to cut the neurons
         inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    If False, a pruned COPY of this CatmaidNeuronList is
                     returned.
 
         """
         x = self
         if not inplace:
-            x = x.copy() 
-
-        _set_loggers('ERROR')
+            x = x.copy()
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._prune_distal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
-            pool.join()   
+            pool.join()
         else:
             for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
                 n.prune_distal_to( tag, inplace=True )
 
-        _set_loggers('INFO')   
-
         if not inplace:
-            return x     
+            return x
 
     def _prune_distal_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
-        x[0].prune_distal_to(x[1], inplace=True)                
+        """ Helper function to parallelise basic operations."""
+        x[0].prune_distal_to(x[1], inplace=True)
         return x[0]
 
     def prune_proximal_to(self, tag, inplace=True):
@@ -1638,35 +1631,31 @@ class CatmaidNeuronList:
         node :      node tag
                     A (unique) tag at which to cut the neurons
         inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    If False, a pruned COPY of this CatmaidNeuronList is
                     returned.
 
         """
         x = self
         if not inplace:
-            x = x.copy() 
-
-        _set_loggers('ERROR')
+            x = x.copy()
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._prune_proximal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
-            pool.join() 
+            pool.join()
         else:
             for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
                 n.prune_proximal_to(tag, inplace=True)
-
-        _set_loggers('INFO')        
 
         if not inplace:
             return x
 
     def _prune_proximal_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
-        x[0].prune_proximal_to(x[1], inplace=True)                
+        """ Helper function to parallelise basic operations."""
+        x[0].prune_proximal_to(x[1], inplace=True)
         return x[0]
 
     def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
@@ -1676,30 +1665,28 @@ class CatmaidNeuronList:
         Parameters
         ----------
         to_prune :  {int, list, range}, optional
-                    Strahler indices to prune. 
+                    Strahler indices to prune.
                     1. ``to_prune = 1`` removes all leaf branches
                     2. ``to_prune = [1,2]`` removes indices 1 and 2
-                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3  
-                    4. ``to_prune = -1`` removes everything but the highest index 
+                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3
+                    4. ``to_prune = -1`` removes everything but the highest index
         inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    If False, a pruned COPY of this CatmaidNeuronList is
                     returned.
 
         See Also
         --------
         :func:`pymaid.prune_by_strahler`
-                    Basefunction - see for details and examples. 
+                    Basefunction - see for details and examples.
 
         """
         x = self
         if not inplace:
-            x = x.copy() 
-
-        _set_loggers('ERROR')
+            x = x.copy()
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,to_prune) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,to_prune) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._prune_strahler_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
@@ -1708,14 +1695,12 @@ class CatmaidNeuronList:
             for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
                 n.prune_by_strahler(to_prune=to_prune, inplace=True)
 
-        _set_loggers('INFO')
-
         if not inplace:
             return x
 
     def _prune_strahler_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
-        x[0].prune_by_strahler(to_prune=x[1], inplace=True)                
+        """ Helper function to parallelise basic operations."""
+        x[0].prune_by_strahler(to_prune=x[1], inplace=True)
         return x[0]
 
     def prune_by_longest_neurite(self, n=1, reroot_to_soma=False, inplace=True):
@@ -1726,10 +1711,10 @@ class CatmaidNeuronList:
         n :                 int, optional
                             Number of longest neurites to preserve.
         reroot_to_soma :    bool, optional
-                            If True, neurons will be rerooted to their somas 
+                            If True, neurons will be rerooted to their somas
                             before pruning.
         inplace :           bool, optional
-                            If False, a pruned COPY of this CatmaidNeuronList 
+                            If False, a pruned COPY of this CatmaidNeuronList
                             is returned.
 
         See Also
@@ -1740,13 +1725,11 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy() 
-
-        _set_loggers('ERROR')
+            x = x.copy()
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,reroot_to_soma) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,reroot_to_soma) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._prune_neurite_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
 
             pool.close()
@@ -1755,14 +1738,12 @@ class CatmaidNeuronList:
             for neuron in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
                 neuron.prune_by_longest_neurite(n, reroot_to_soma=reroot_to_soma, inplace=True)
 
-        _set_loggers('INFO')
-
         if not inplace:
             return x
 
     def _prune_neurite_helper(self, x):
-        """ Helper function to parallelise basic operations."""    
-        x[0].prune_by_longest_neurite(x[1], n, inplace=True)                
+        """ Helper function to parallelise basic operations."""
+        x[0].prune_by_longest_neurite(x[1], n, inplace=True)
         return x[0]
 
     def prune_by_volume(self, v, mode='IN', inplace=True):
@@ -1775,7 +1756,7 @@ class CatmaidNeuronList:
         mode :      {'IN','OUT'}, optional
                     If 'IN', part of the neuron inside the volume(s) is kept.
         inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is 
+                    If False, a pruned COPY of this CatmaidNeuronList is
                     returned.
 
 
@@ -1783,20 +1764,18 @@ class CatmaidNeuronList:
         --------
         :func:`~pymaid.in_volume`
                 Basefunction - see for details and examples.
-        """ 
-        
+        """
+
         x = self
         if not inplace:
-            x = x.copy()       
-        
-        if not isinstance(v, Volume):            
-            v = fetch.get_volume(v, combine_vols=True) 
+            x = x.copy()
 
-        _set_loggers('ERROR')
+        if not isinstance(v, Volume):
+            v = fetch.get_volume(v, combine_vols=True)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,v,mode) for i,n in enumerate(x.neurons) ]   
+            combinations = [ (n,v,mode) for i,n in enumerate(x.neurons) ]
             x.neurons = list(tqdm( pool.imap( x._prune_by_volume_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning' , disable=module_logger.getEffectiveLevel()>=40))
 
             pool.close()
@@ -1804,8 +1783,6 @@ class CatmaidNeuronList:
         else:
             for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
                 n.prune_by_volume(v, mode=mode, inplace=True)
-
-        _set_loggers('INFO')
 
         if not inplace:
             return x
@@ -1847,10 +1824,10 @@ class CatmaidNeuronList:
                 to_update, remote_instance=self._remote_instance).set_index('skeleton_id')
             for n in self.neurons:
                 if str(n.skeleton_id) in re:
-                    n.review_status = re.ix[str(n.skeleton_id)].percent_reviewed            
+                    n.review_status = re.ix[str(n.skeleton_id)].percent_reviewed
 
     def get_annotations(self, skip_existing=False):
-        """Get/update annotations for neurons."""     
+        """Get/update annotations for neurons."""
         if skip_existing:
             to_update = [
                 n.skeleton_id for n in self.neurons if 'annotations' not in n.__dict__]
@@ -1860,7 +1837,7 @@ class CatmaidNeuronList:
         if to_update:
             annotations = fetch.get_annotations( to_update, remote_instance=self._remote_instance )
             for n in self.neurons:
-                if str(n.skeleton_id) in annotations: 
+                if str(n.skeleton_id) in annotations:
                     n.annotations = annotations[ str(n.skeleton_id) ]
 
     def get_names(self, skip_existing=False):
@@ -1876,7 +1853,7 @@ class CatmaidNeuronList:
                 self.skeleton_id, remote_instance=self._remote_instance)
             for n in self.neurons:
                 if str(n.skeleton_id) in names:
-                    n.neuron_name = names[str(n.skeleton_id)]                
+                    n.neuron_name = names[str(n.skeleton_id)]
 
     def _generate_segments(self):
         """ Helper function to use multiprocessing to generate segments for all
@@ -1888,10 +1865,10 @@ class CatmaidNeuronList:
             to_retrieve = [ n for n in self.neurons if 'segments' not in n.__dict__ ]
             to_retrieve_ix = [ i for i,n in enumerate(self.neurons) if 'segments' not in n.__dict__ ]
 
-            pool = mp.Pool(self.n_cores)        
+            pool = mp.Pool(self.n_cores)
             update = list(tqdm( pool.imap( self._generate_segments_helper, to_retrieve, chunksize=10 ), total=len(to_retrieve), desc='Gen. segments', disable=module_logger.getEffectiveLevel()>=40 ))
             pool.close()
-            pool.join()        
+            pool.join()
 
             for ix,n in zip(to_retrieve_ix,update):
                 self.neurons[ ix ] = n
@@ -1901,19 +1878,19 @@ class CatmaidNeuronList:
                     _ = n.segments
 
     def _generate_segments_helper(self, x):
-        """ Helper function to parallelise basic operations."""   
-        if 'segments' not in x.__dict__:         
-            _ = x.segments        
-        return x      
+        """ Helper function to parallelise basic operations."""
+        if 'segments' not in x.__dict__:
+            _ = x.segments
+        return x
 
     def reload(self):
         """ Update neuron skeletons from server."""
         self.get_skeletons(skip_existing=False)
 
     def get_skeletons(self, skip_existing=False):
-        """Helper function to fill in/update skeleton data of neurons.         
-        Updates ``.nodes``, ``.connectors``, ``.tags``, ``.date_retrieved`` and 
-        ``.neuron_name``. Will also generate new graph representation to match 
+        """Helper function to fill in/update skeleton data of neurons.
+        Updates ``.nodes``, ``.connectors``, ``.tags``, ``.date_retrieved`` and
+        ``.neuron_name``. Will also generate new graph representation to match
         nodes/connectors.
         """
 
@@ -1925,7 +1902,7 @@ class CatmaidNeuronList:
         if to_update:
             skdata = fetch.get_neuron(
                 [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
-            for n in tqdm(to_update, desc='Processing neurons', disable=module_logger.getEffectiveLevel()>=40):                
+            for n in tqdm(to_update, desc='Processing neurons', disable=module_logger.getEffectiveLevel()>=40):
 
                 n.nodes = skdata.loc[str(n.skeleton_id),'nodes']
                 n.connectors = skdata.loc[str(n.skeleton_id),'connectors']
@@ -1940,7 +1917,7 @@ class CatmaidNeuronList:
                 n._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
-        """Assign remote_instance to all neurons. Provide either existing 
+        """Assign remote_instance to all neurons. Provide either existing
         CatmaidInstance OR your credentials.
 
         Parameters
@@ -1966,18 +1943,18 @@ class CatmaidNeuronList:
             n._remote_instance = remote_instance
 
     def plot3d(self, **kwargs):
-        """Plot neuron in 3D.   
+        """Plot neuron in 3D.
 
         Parameters
         ---------
         **kwargs
                 Keyword arguments will be passed to plot3d().
-                See ``help(pymaid.plot3d)`` for a list of keywords.     
+                See ``help(pymaid.plot3d)`` for a list of keywords.
 
         See Also
         --------
-        :func:`~pymaid.plot3d` 
-                Base function called to generate 3d plot.               
+        :func:`~pymaid.plot3d`
+                Base function called to generate 3d plot.
         """
 
         if 'remote_instance' not in kwargs:
@@ -1991,14 +1968,14 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        **kwargs        
-                Keyword arguments will be passed to plot2d(). See 
+        **kwargs
+                Keyword arguments will be passed to plot2d(). See
                 ``help(pymaid.plot3d)`` for a list of accepted keywords.
 
         See Also
         --------
-        :func:`~pymaid.plot2d` 
-                Base function called to generate 2d plot                      
+        :func:`~pymaid.plot2d`
+                Base function called to generate 2d plot
         """
         self.get_skeletons(skip_existing=True)
         return plotting.plot2d(self, **kwargs)
@@ -2016,8 +1993,8 @@ class CatmaidNeuronList:
         Returns
         -------
         :class:`pymaid.CatmaidNeuronList`
-                    Neurons that have given annotation(s).                  
-        """ 
+                    Neurons that have given annotation(s).
+        """
 
         if not isinstance(x, (list, np.ndarray)):
             x = [ x ]
@@ -2068,7 +2045,7 @@ class CatmaidNeuronList:
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        module_logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))    
+        module_logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
 
     def itertuples(self):
         """Helper class to mimic ``pandas.DataFrame`` ``itertuples()``."""
@@ -2078,8 +2055,8 @@ class CatmaidNeuronList:
         """Sort neurons by given value. See .summary() for valid keys."""
         summary = self.summary().sort_values(key).reset_index(drop=True)
         new_order = { s : i for i, s in enumerate(summary.skeleton_id.tolist()) }
-        self.neurons = sorted( self.neurons, 
-                               key = lambda x : new_order[x.skeleton_id], 
+        self.neurons = sorted( self.neurons,
+                               key = lambda x : new_order[x.skeleton_id],
                                reverse= ascending==False )
 
     def __copy__(self):
@@ -2097,7 +2074,7 @@ class CatmaidNeuronList:
         return self.summary(n=n)
 
     def remove_duplicates(self, inplace=False):
-        """Removes duplicate neurons from list. Based on skeleton IDs."""        
+        """Removes duplicate neurons from list. Based on skeleton IDs."""
         if inplace:
             x = self
         else:
@@ -2106,7 +2083,7 @@ class CatmaidNeuronList:
         x.neurons = []
         for n in self.neurons:
             if n.skeleton_id not in x.skeleton_id:
-                x.neurons.append(n)        
+                x.neurons.append(n)
 
         if not inplace:
             return x
@@ -2123,7 +2100,7 @@ def _set_loggers(level='ERROR'):
 
 class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow
-    indexing similar to pandas DataFrames using df.ix[0]. This is really 
+    indexing similar to pandas DataFrames using df.ix[0]. This is really
     just a helper to allow code to operate on CatmaidNeuron the same way
     it would on DataFrames.
     """
@@ -2153,12 +2130,12 @@ class _SkidIndexer():
         except:
             raise Exception('Can only index skeleton IDs')
 
-        sel = [n for n in self.obj if str(n.skeleton_id) == str(skid) ]
+        sel = [ n for n in self.obj if str(n.skeleton_id) == str(skid) ]
 
         if len( sel ) == 0:
             raise ValueError('No neuron with skeleton ID {0}'.format(skid))
         else:
-            return sel[0]            
+            return sel[0]
 
 class Dotprops(pd.DataFrame):
     """ Class to hold dotprops. This is essentially a pandas DataFrame - we
@@ -2178,12 +2155,12 @@ class Dotprops(pd.DataFrame):
 
 
 class Volume(dict):
-    """ Class to hold CATMAID meshes. This is essentially a dictionary with a 
-    few additional perks (see below). 
+    """ Class to hold CATMAID meshes. This is essentially a dictionary with a
+    few additional perks (see below).
 
     Important
     ---------
-    Due to this being a subclass of ``dict``, using 
+    Due to this being a subclass of ``dict``, using
     ``isinstance(Volume, dict)`` will return ``True``!
 
     See Also
@@ -2271,28 +2248,28 @@ class Volume(dict):
         self['vertices'] = vec + cn
 
     def plot3d(self, **kwargs):
-        """Plot neuron using pymaid.plot3d().  
+        """Plot neuron using pymaid.plot3d().
 
         Parameters
-        ----------      
+        ----------
         **kwargs
-                Will be passed to plot3d() 
-                See help(pymaid.plot3d) for a list of keywords      
+                Will be passed to plot3d()
+                See help(pymaid.plot3d) for a list of keywords
 
         See Also
         --------
-        :func:`pymaid.plot3d` 
-                    Function called to generate 3d plot   
+        :func:`pymaid.plot3d`
+                    Function called to generate 3d plot
 
         Examples
         --------
-        >>> vol = pymaid.get_volume('v13.LH_R')        
+        >>> vol = pymaid.get_volume('v13.LH_R')
         >>> vol.plot3d( color = (255,0,0) )
         """
 
         if 'color' in kwargs:
             self['color'] = kwargs['color']
-        
+
         return plotting.plot3d(self, **kwargs)
 
     def to_trimesh(self):
@@ -2316,10 +2293,10 @@ class Volume(dict):
         Delaunay and shapely.
 
         Parameters
-        ----------        
+        ----------
         alpha:      float, optional
-                    Alpha value to influence the gooeyness of the border. 
-                    Smaller numbers don't fall inward as much as larger 
+                    Alpha value to influence the gooeyness of the border.
+                    Smaller numbers don't fall inward as much as larger
                     numbers. Too large, and you lose everything!
         view :      {'xy','xz','yz'}, optional
                     Determines if frontal, lateral or top view.
@@ -2342,28 +2319,28 @@ class Volume(dict):
             edge_points.append(coords[ [i, j] ])
 
         accepted_views = ['xy','xz','yz']
-        
+
 
         try:
             from shapely.ops import cascaded_union, polygonize
             import shapely.geometry as geometry
         except:
-            raise ImportError('This function needs the <shapely> package.')        
+            raise ImportError('This function needs the <shapely> package.')
 
-        if view in['xy','yx']:               
+        if view in['xy','yx']:
             coords = self.vertices[:,[0,1]]
             if invert_y:
                 coords[:,1] = coords[:,1] * -1
-                
-        elif view in ['xz', 'zx']:       
+
+        elif view in ['xz', 'zx']:
             coords = self.vertices[:,[0,2]]
-        elif view in ['yz', 'zy']:        
-            coords = self.vertices[:,[1,2]]  
+        elif view in ['yz', 'zy']:
+            coords = self.vertices[:,[1,2]]
             if invert_y:
                 coords[:,0] = coords[:,0] * -1
         else:
-            raise ValueError('View {0} unknown. Please use either: {1}'.format(view, accepted_views))      
-                           
+            raise ValueError('View {0} unknown. Please use either: {1}'.format(view, accepted_views))
+
         tri = scipy.spatial.Delaunay(coords)
         edges = set()
         edge_points = []
@@ -2383,7 +2360,7 @@ class Volume(dict):
             # Area of triangle by Heron's formula
             area = math.sqrt(s*(s-a)*(s-b)*(s-c))
             circum_r = a*b*c/(4.0*area)
-            # Here's the radius filter.            
+            # Here's the radius filter.
             if circum_r < 1.0/alpha:
                 add_edge(edges, edge_points, coords, ia, ib)
                 add_edge(edges, edge_points, coords, ib, ic)
@@ -2391,7 +2368,7 @@ class Volume(dict):
 
         m = geometry.MultiLineString(edge_points)
         triangles = list(polygonize(m))
-        concave_hull = cascaded_union(triangles)        
+        concave_hull = cascaded_union(triangles)
 
         return list(concave_hull.exterior.coords)
 

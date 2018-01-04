@@ -24,7 +24,7 @@ import logging
 
 from pymaid import core, fetch
 
-import networkx as nx 
+import networkx as nx
 
 try:
     import igraph
@@ -52,7 +52,7 @@ def network2nx(x, remote_instance=None, threshold=1):
 
     Parameters
     ----------
-    x                  
+    x
                         Catmaid Neurons as:
                          1. list of skeleton IDs (int or str)
                          2. list of neuron names (str, exact match)
@@ -60,14 +60,14 @@ def network2nx(x, remote_instance=None, threshold=1):
                          4. CatmaidNeuronList object
                          5. Adjacency matrix (pd.DataFrame, rows=sources,
                             columns=targets)
-    remote_instance :   CATMAID instance, optional 
-                        Either pass directly to function or define globally 
+    remote_instance :   CATMAID instance, optional
+                        Either pass directly to function or define globally
                         as 'remote_instance'.
     threshold :         int, optional
                         Connections weaker than this will be excluded .
 
     Returns
-    ------- 
+    -------
     networkx.DiGraph
                         NetworkX representation of the network.
 
@@ -81,7 +81,7 @@ def network2nx(x, remote_instance=None, threshold=1):
     >>> nx.draw(g)
     >>> plt.show()
     >>> # Plot with neuron names
-    >>> labels = nx.get_node_attributes(g, 'neuron_name')  
+    >>> labels = nx.get_node_attributes(g, 'neuron_name')
     >>> nx.draw(g, labels=labels, with_labels=True)
     >>> plt.show()
     >>> # Plot with layout
@@ -98,14 +98,14 @@ def network2nx(x, remote_instance=None, threshold=1):
 
     if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str )):
         remote_instance = fetch._eval_remote_instance(remote_instance)
-        skids = fetch.eval_skids(x, remote_instance=remote_instance)                       
+        skids = fetch.eval_skids(x, remote_instance=remote_instance)
 
         # Fetch edges
         edges = fetch.get_edges(skids, remote_instance=remote_instance)
         # Reformat into networkx format
         edges = [[ str(e.source_skid), str(e.target_skid), {'weight': e.weight} ]
-                          for e in edges[edges.weight >= threshold].itertuples()]        
-    elif isinstance(x, pd.DataFrame):        
+                          for e in edges[edges.weight >= threshold].itertuples()]
+    elif isinstance(x, pd.DataFrame):
         skids = list(set( x.columns.tolist() + x.index.tolist() ))
         # Generate edge list
         edges = [ [ str(s), str(t), { 'weight': x.loc[s,t] } ] for s in x.index.values for t in x.columns.values if x.loc[s,t] >= threshold ]
@@ -113,7 +113,7 @@ def network2nx(x, remote_instance=None, threshold=1):
         raise ValueError('Unable to process data of type "{0}"'.format(type(x)))
 
     # Generate node dictionary
-    names = fetch.get_names(skids, remote_instance=remote_instance)  
+    names = fetch.get_names(skids, remote_instance=remote_instance)
     nodes = [ [ str(s), { 'neuron_name' : names[s] } ] for s in skids ]
 
     # Generate graph and assign custom properties
@@ -122,7 +122,7 @@ def network2nx(x, remote_instance=None, threshold=1):
     g.add_edges_from(edges)
 
     return g
-    
+
 
 def network2igraph(x, remote_instance=None, threshold=1):
     """ Generates iGraph graph for neuron connectivity. Requires iGraph to be
@@ -130,7 +130,7 @@ def network2igraph(x, remote_instance=None, threshold=1):
 
     Parameters
     ----------
-    x                  
+    x
                         Catmaid Neurons as:
                          1. list of skeleton IDs (int or str)
                          2. list of neuron names (str, exact match)
@@ -138,14 +138,14 @@ def network2igraph(x, remote_instance=None, threshold=1):
                          4. CatmaidNeuronList object
                          5. Adjacency matrix (pd.DataFrame, rows=sources,
                             columns=targets)
-    remote_instance :   CATMAID instance, optional 
-                        Either pass directly to function or define globally 
+    remote_instance :   CATMAID instance, optional
+                        Either pass directly to function or define globally
                         as 'remote_instance'.
     threshold :         int, optional
                         Connections weaker than this will be excluded .
 
     Returns
-    ------- 
+    -------
     igraph.Graph(directed=True)
                         NetworkX representation of the network.
 
@@ -169,7 +169,7 @@ def network2igraph(x, remote_instance=None, threshold=1):
 
     if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str )):
         remote_instance = fetch._eval_remote_instance(remote_instance)
-        skids = fetch.eval_skids(x, remote_instance=remote_instance) 
+        skids = fetch.eval_skids(x, remote_instance=remote_instance)
 
         indices = { int(s): i for i,s in enumerate(skids) }
 
@@ -179,7 +179,7 @@ def network2igraph(x, remote_instance=None, threshold=1):
         # Reformat into igraph format
         edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
                           for e in edges[edges.weight >= threshold].itertuples()]
-        weight = edges[ edges.weight >= threshold ].weight.tolist()   
+        weight = edges[ edges.weight >= threshold ].weight.tolist()
     elif isinstance(x, pd.DataFrame):
         skids = list(set( x.columns.tolist() + x.index.tolist() ))
         # Generate edge list
@@ -212,9 +212,9 @@ def neuron2nx(x):
     -------
     networkx.DiGraph
                 NetworkX representation of the neuron. Returns list of graphs
-                if x is multiple neurons. 
+                if x is multiple neurons.
 
-    """ 
+    """
 
     if isinstance(x, ( pd.DataFrame, core.CatmaidNeuronList)):
         return [neuron2nx(x.loc[i]) for i in range(x.shape[0])]
@@ -228,14 +228,14 @@ def neuron2nx(x):
     # Collect edges
     edges = x.nodes[~x.nodes.parent_id.isnull()][['treenode_id','parent_id']].values
     # Collect weight
-    weights = np.sqrt( np.sum( (nodes.loc[ edges[:,0], ['x','y','z'] ].values.astype(int) 
-                                - nodes.loc[edges[:,1], ['x','y','z'] ].values.astype(int) )**2, axis=1) ) 
+    weights = np.sqrt( np.sum( (nodes.loc[ edges[:,0], ['x','y','z'] ].values.astype(int)
+                                - nodes.loc[edges[:,1], ['x','y','z'] ].values.astype(int) )**2, axis=1) )
     # Generate weight dictionary
     edge_dict = np.array( [ { 'weight' : w } for w in weights ] )
     # Add weights to dictionary
     edges = np.append( edges, edge_dict.reshape( len( edges ), 1 ), axis=1)
     # Create empty directed Graph
-    g = nx.DiGraph()    
+    g = nx.DiGraph()
     # Add nodes (in case we have disconnected nodes)
     g.add_nodes_from( x.nodes.treenode_id.values )
     # Add edges
@@ -284,7 +284,7 @@ def neuron2igraph(x):
     parent_ids = nodes[~nodes.parent_id.isnull()].parent_id.values
     nodes['temp_index'] = nodes.index  # add temporary index column
     parent_index = nodes.set_index('treenode_id').loc[parent_ids,
-        'temp_index'].values    
+        'temp_index'].values
 
     # Generate list of edges based on index of vertices
     elist = list(zip(tn_index_with_parent, parent_index))
@@ -293,7 +293,7 @@ def neuron2igraph(x):
     g = igraph.Graph(elist, n=len(vlist), directed=True)
 
     g.vs['node_id'] = nodes.treenode_id.tolist()
-    g.vs['parent_id'] = nodes.parent_id.tolist()   
+    g.vs['parent_id'] = nodes.parent_id.tolist()
 
     # Generate weights by calculating edge lengths = distance between nodes
     tn_coords = nodes.loc[[e[0] for e in elist], ['x', 'y', 'z']].values
@@ -306,25 +306,25 @@ def neuron2igraph(x):
 
 
 def dist_from_root(data, synapses_only=False):
-    """ Get geodesic distance to root in nano meters (nm) for all treenodes. 
+    """ Get geodesic distance to root in nano meters (nm) for all treenodes.
 
     Parameters
     ----------
     data :            {graph object, pandas.DataFrame, CatmaidNeuron}
                       Holds the skeleton data.
     synapses_only :   bool, optional
-                      If True, only distances for nodes with synapses will be 
+                      If True, only distances for nodes with synapses will be
                       returned (only makes sense if input is a Graph).
 
     Returns
-    -------     
-    dict             
-                      Only if ``data`` is a graph object. 
+    -------
+    dict
+                      Only if ``data`` is a graph object.
                       Format ``{node_id : distance_to_root }``
 
-    pandas DataFrame 
-                      Only if ``data`` is a pandas DataFrame:. With 
-                      ``df.nodes.dist_to_root`` holding the distances to root. 
+    pandas DataFrame
+                      Only if ``data`` is a pandas DataFrame:. With
+                      ``df.nodes.dist_to_root`` holding the distances to root.
 
     """
 
@@ -349,7 +349,7 @@ def dist_from_root(data, synapses_only=False):
     distance_matrix = g.shortest_paths_dijkstra(mode='All', weights='weight')
 
     if synapses_only:
-        nodes = [ (v.index, v['node_id']) 
+        nodes = [ (v.index, v['node_id'])
                  for v in g.vs.select(_node_id_in=data.connectors.treenode_id )]
     else:
         nodes = [(v.index, v['node_id']) for v in g.vs]
