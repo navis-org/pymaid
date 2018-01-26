@@ -3029,7 +3029,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
         2
         3
 
-           n_postsynapses  n_presynapses pre_contributors  n_nodes
+           n_postsynapses  n_presynapses pre_contributors  n_nodes review_contributors
         1
         2
         3
@@ -3062,7 +3062,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
         x = [x]
 
     columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',  'pre_contributors',
-               'n_postsynapses', 'post_contributors', 'multiuser_review_minutes', 'construction_minutes', 'min_review_minutes']
+               'n_postsynapses', 'post_contributors', 'review_contributors' , 'multiuser_review_minutes', 'construction_minutes', 'min_review_minutes']
 
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
@@ -3088,6 +3088,8 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
             'pre_contributors']]) for st in stats for u in st['pre_contributors']}
         post_contributors = {user_list.ix[int(u)].login: sum([st['post_contributors'][u] for st in stats if u in st[
             'post_contributors']]) for st in stats for u in st['post_contributors']}
+        review_contributors = {user_list.ix[int(u)].login: sum([st['review_contributors'][u] for st in stats if u in st[
+            'review_contributors']]) for st in stats for u in st['review_contributors']}
 
         df = pd.Series([
             x,
@@ -3097,6 +3099,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
             pre_contributors,
             sum([st['n_post'] for st in stats]),
             post_contributors,
+            review_contributors,
             sum([st['multiuser_review_minutes'] for st in stats]),
             sum([st['construction_minutes'] for st in stats]),
             sum([st['min_review_minutes'] for st in stats])
@@ -3123,6 +3126,8 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
             stats[i]['n_post'],
             {user_list.ix[int(u)].login: stats[i]['post_contributors'][u]
                 for u in stats[i]['post_contributors']},
+            {user_list.ix[int(u)].login: stats[i]['review_contributors'][u]
+                for u in stats[i]['review_contributors']},
             stats[i]['multiuser_review_minutes'],
             stats[i]['construction_minutes'],
             stats[i]['min_review_minutes']
@@ -3463,7 +3468,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
                             nanometer ('NM') or in pixels/slices ('PIXEL').
     resolution :            tuple of floats, optional
                             x/y/z resolution in nm (default = ( 4, 4, 50 ) )
-                            used to transform to nm if limits are given in
+                            Used to transform to nm if limits are given in
                             pixels.
 
     Returns
@@ -3583,7 +3588,8 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
                         Only applicable if ``users`` is provided. If multiple
                         users are provided contribution is calculated across
                         all users. Minimum contribution does NOT take start
-                        and end dates into account!
+                        and end dates into account! This is applied AFTER
+                        intersecting!
     min_size :          int, optional
                         Minimum size (in nodes) for neurons to be returned.
                         The lower this value, the longer it will take to
@@ -3616,17 +3622,6 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
     ...                          volumes='LH_R')
 
     """
-
-    def _contribution_helper(skids):
-        """ Helper to test if users have contributed more than X nodes to
-        neuron.
-
-        Returns
-        -------
-        Filtered list of skeleton IDs
-        """
-        nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
-        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(users)].shape[0] > minimum_cont]
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -3730,10 +3725,6 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
             by_users += remote_instance.fetch(remote_get_list_url)
 
-        # This step is actually SUPER WASTEFUL - we should save the skeletondata and return it alongside the skids
-        if minimum_cont:
-            by_users = _contribution_helper( by_users )
-
         sets_of_skids.append( set( by_users ) )
 
     # Get skids by reviewer
@@ -3815,6 +3806,11 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
         module_logger.info('Filtering neurons for somas...')
         nl.get_skeletons(skip_existing=True)
         nl = nl[ nl.soma != None ]
+
+    if users and minimum_cont:
+        nl.get_skeletons(skip_existing=True)
+        nl = core.CatmaidNeuronList( [ n for n in nl if n.nodes[n.nodes.creator_id.isin(users)].shape[0] >= minimum_cont ],
+                                        remote_instance=remote_instance )
 
     if nl.empty:
         module_logger.warning('No neurons matching the search parameters were found')
@@ -4342,7 +4338,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     return g, [[g.vs[i]['node_id'] for i in p] for p in all_paths]
 
 
-def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6), combine_vols=True):
+def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6), combine_vols=False):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of
     vertices and faces.
 
@@ -4390,16 +4386,17 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
     remote_instance = _eval_remote_instance(remote_instance)
 
     if isinstance(volume_name, list):
+        vols =  { v : get_volume( v, remote_instance=remote_instance, color=color )
+                    for v in tqdm( volume_name, desc='Volumes',
+                                   disable=module_logger.getEffectiveLevel()>=40)  }
         if combine_vols:
-            return core.Volume.combine( [ get_volume( v, remote_instance=remote_instance, color=color )
-                                        for v in volume_name ], color = color )
-        else:
-            return { v : get_volume( v, remote_instance=remote_instance, color=color ) for v in volume_name }
+            return core.Volume.combine( list( vols.values() ), color = color )
+        return vols
+    else:
+        module_logger.info('Retrieving volume <%s>' % volume_name)
 
     if not isinstance(volume_name, (str, type(None))):
         raise TypeError('Volume name must be str')
-
-    module_logger.info('Retrieving volume <%s>' % volume_name)
 
     # First, get volume ID
     get_volumes_url = remote_instance._get_volumes()
