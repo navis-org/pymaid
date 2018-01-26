@@ -54,28 +54,28 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList} 
+    x :                 {CatmaidNeuron,CatmaidNeuronList}
                              Neuron(s) to downsample.
-    resampling_factor :      int 
+    resampling_factor :      int
                              Factor by which to reduce the node count.
-    inplace :                bool, optional   
-                             If True, will modify original neuron. If False, a 
+    inplace :                bool, optional
+                             If True, will modify original neuron. If False, a
                              downsampled copy is returned.
     preserve_cn_treenodes :  bool, optional
-                             If True, treenodes that have connectors are 
+                             If True, treenodes that have connectors are
                              preserved.
     preserve_tag_treenodes : bool, optional
-                             If True, treenodes with tags are preserved.    
+                             If True, treenodes with tags are preserved.
 
     Returns
     -------
     x
                          Downsampled Pandas Dataframe or CatmaidNeuron object
-    """    
+    """
     if isinstance(x, core.CatmaidNeuronList):
         results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace) for i in range(x.shape[0]) ]
         if not inplace:
-            return core.CatmaidNeuronList( results )    
+            return core.CatmaidNeuronList( results )
     elif not isinstance(x, core.CatmaidNeuron):
         module_logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
@@ -85,17 +85,17 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
 
     # Prepare nodes for subsetting
     nodes = x.nodes.set_index('treenode_id')
-    
+
     # Iterate over segments
     for i,seg in enumerate(tqdm(x.segments, desc='Working on segments')):
         # Get length of this segment
-        this_length = graph_utils.dist_between( x, seg[0], seg[-1] )        
-        
+        this_length = graph_utils.dist_between( x, seg[0], seg[-1] )
+
         if this_length < resample_to or len(seg) <= 3:
             continue
 
         # Get new number of points on the spline
-        n_nodes = int(this_length / resample_to)        
+        n_nodes = int(this_length / resample_to)
 
         # Get all coordinates of all nodes in this segment
         coords = nodes.loc[ seg, ['x','y','z'] ].values
@@ -111,7 +111,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
             continue
 
         # Interpolate to new resolution
-        new_coords = scipy.interpolate.splev(np.linspace(0,1,n_nodes), tck)  
+        new_coords = scipy.interpolate.splev(np.linspace(0,1,n_nodes), tck)
 
         # Change back into x/y/z
         new_coords = np.array( new_coords ).T.round()
@@ -119,13 +119,13 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
         # Now that we have new coordinates, we need to "rewire" the neuron
         # First, add new treenodes (we're starting at the distal node!) and
         # discard every treenode but the first and the last
-        
-        max_tn_id = x.nodes.treenode_id.max() + 1        
+
+        max_tn_id = x.nodes.treenode_id.max() + 1
         new_ids = seg[:1] + [ max_tn_id + i  for i in range( len(new_coords) - 2 ) ] + seg[-1:]
 
         new_nodes = pd.DataFrame( [ [ tn, pn, None , co[0], co[1], co[2], -1, 5, 'slab' ] for tn, pn,co in zip( new_ids[:-1], new_ids[1:], new_coords[:-1] ) ],
                                   columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z', 'radius', 'confidence', 'type'] )
-        new_nodes.loc[0, 'type'] = x.nodes.set_index('treenode_id').loc[ seg[0], 'type' ]       
+        new_nodes.loc[0, 'type'] = x.nodes.set_index('treenode_id').loc[ seg[0], 'type' ]
 
         # Remove old treenodes
         x.nodes = x.nodes[ ~x.nodes.treenode_id.isin( seg[:-1] ) ]
@@ -139,7 +139,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
         return x
 
 def resample_neuron(x, resample_to, method='linear', inplace=False):
-    """ Resamples neuron(s) to given resolution. Preserves root, leafs, 
+    """ Resamples neuron(s) to given resolution. Preserves root, leafs,
     branchpoints. Tags, connectors and radii > 0 are mapped onto the closest
     new treenode. Columns "confidence" and "creator" of the treenode table
     are currently discarded.
@@ -151,16 +151,16 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList} 
+    x :                 {CatmaidNeuron,CatmaidNeuronList}
                         Neuron(s) to resample.
     resample_to :       int
                         New resolution in nanometer.
     method :            str, optional
                         See `scipy.interpolate.interp1d` for possible options.
                         By default, we're using linear interpolation.
-    inplace :           bool, optional   
-                        If True, will modify original neuron. If False, a 
-                        resampled copy is returned. 
+    inplace :           bool, optional
+                        If True, will modify original neuron. If False, a
+                        resampled copy is returned.
 
     Returns
     -------
@@ -171,17 +171,17 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     --------
     :func:`pymaid.downsample_neuron`
                         This function reduces the number of nodes instead of
-                        resample to certain resolution. Usefull if you are 
-                        just after some simplification e.g. for speeding up 
-                        your calculations or you want to preserve more of a 
+                        resample to certain resolution. Usefull if you are
+                        just after some simplification e.g. for speeding up
+                        your calculations or you want to preserve more of a
                         neuron's strucutre.
-    """   
+    """
 
     if isinstance(x, core.CatmaidNeuronList):
-        results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace) 
+        results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace)
                         for i in trange(x.shape[0], desc='Resampl. neurons', disable=module_logger.getEffectiveLevel()>=40 ) ]
         if not inplace:
-            return core.CatmaidNeuronList( results )    
+            return core.CatmaidNeuronList( results )
     elif not isinstance(x, core.CatmaidNeuron):
         module_logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
@@ -193,12 +193,12 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     locs = nodes[['x','y','z']]
 
     new_nodes = []
-    max_tn_id = x.nodes.treenode_id.max() + 1 
+    max_tn_id = x.nodes.treenode_id.max() + 1
 
     # Iterate over segments
     for i,seg in enumerate(tqdm(x.segments, desc='Proc. segments', disable=module_logger.getEffectiveLevel()>=40 )):
         coords = locs.loc[ seg ].values.astype(float)
-        
+
         # vecs between subsequently measured points
         vecs = np.diff(coords.T)
 
@@ -213,7 +213,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
         # Coords of interpolation
         n_nodes = int(path[-1] / resample_to)
-        interp_coords = np.linspace(path[0], path[-1], n_nodes) 
+        interp_coords = np.linspace(path[0], path[-1], n_nodes)
 
         # Interpolation func for each axis with the path
         sampleX = scipy.interpolate.interp1d(path, coords[:,0], kind=method)
@@ -227,15 +227,15 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
         # Generate new coordinates
         new_coords = np.array([xnew, ynew, znew]).T.round()
-               
+
         # Generate new ids
-        new_ids = seg[:1] + [ max_tn_id + i  for i in range( len(new_coords) - 2 ) ] + seg[-1:]        
+        new_ids = seg[:1] + [ max_tn_id + i  for i in range( len(new_coords) - 2 ) ] + seg[-1:]
 
         # Keep track of new nodes
         new_nodes += [ [ tn, pn, None , co[0], co[1], co[2], -1, 5, ] for tn, pn,co in zip( new_ids[:-1], new_ids[1:], new_coords ) ]
 
         # Increase max index
-        max_tn_id += len(new_ids)        
+        max_tn_id += len(new_ids)
 
     # Add root node(s)
     root = x.root
@@ -251,10 +251,10 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
                                )
 
     # Convert columns to appropriate dtypes
-    dtypes = {'treenode_id':int, 'parent_id':object, 'x':int, 'y':int, 'z':int, 
+    dtypes = {'treenode_id':int, 'parent_id':object, 'x':int, 'y':int, 'z':int,
               'radius':int, 'confidence':int}
 
-    for k, v in dtypes.items():        
+    for k, v in dtypes.items():
         new_nodes[k] = new_nodes[k].astype(v)
 
     # Remove duplicate treenodes (branch points)
@@ -289,9 +289,9 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     # 2. Get closest neighbours
     distances = scipy.spatial.distance.cdist( old_tn_position, new_nodes[['x','y','z']].values )
     min_ix = np.argmin(distances, axis=1)
-    # 3. Map radii onto 
+    # 3. Map radii onto
     new_nodes.loc[ min_ix, 'radius'] = x.nodes.loc[ x.nodes.radius > 0, 'radius' ].values
-   
+
     # Set nodes
     x.nodes = new_nodes
 
@@ -302,35 +302,40 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
         return x
 
 def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_treenodes=True, preserve_tag_treenodes=False):
-    """ Downsamples neuron(s) by a given factor. Preserves root, leafs, 
+    """ Downsamples neuron(s) by a given factor. Preserves root, leafs,
     branchpoints by default. Preservation of treenodes with synapses can
     be toggled.
 
     Parameters
     ----------
-    skdata :                 {CatmaidNeuron,CatmaidNeuronList} 
+    skdata :                 {CatmaidNeuron,CatmaidNeuronList}
                              Neuron(s) to downsample.
-    resampling_factor :      int 
+    resampling_factor :      int
                              Factor by which to reduce the node count.
-    inplace :                bool, optional   
-                             If True, will modify original neuron. If False, a 
+    inplace :                bool, optional
+                             If True, will modify original neuron. If False, a
                              downsampled copy is returned.
     preserve_cn_treenodes :  bool, optional
-                             If True, treenodes that have connectors are 
+                             If True, treenodes that have connectors are
                              preserved.
     preserve_tag_treenodes : bool, optional
-                             If True, treenodes with tags are preserved.    
+                             If True, treenodes with tags are preserved.
 
     Returns
     -------
     skdata
-                             Downsampled Pandas Dataframe or CatmaidNeuron 
+                             Downsampled Pandas Dataframe or CatmaidNeuron
                              object.
+
+    Notes
+    -----
+    Use `float('inf')` as `resampling_factor` and `preserve_cn_treenodes=False`
+    to get a neuron consisting only of root, branch and end points.
 
     See Also
     --------
     :func:`pymaid.resample_neuron`
-                             This function resamples a neuron to given 
+                             This function resamples a neuron to given
                              resolution.
     """
 
@@ -358,7 +363,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
         module_logger.warning('Unable to downsample: no nodes in neuron')
         return df
 
-    module_logger.info('Preparing to downsample neuron...')
+    module_logger.debug('Preparing to downsample neuron...')
 
     list_of_parents = {
         n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
@@ -366,26 +371,26 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     if 'type' not in df.nodes:
         graph_utils.classify_nodes(df)
 
-    selection = df.nodes.type != 'slab'    
+    selection = df.nodes.type != 'slab'
 
     if preserve_cn_treenodes:
         selection = selection | df.nodes.treenode_id.isin(df.connectors.treenode_id)
 
     if preserve_tag_treenodes:
         with_tags = [ t for l in df.tags.values() for t in l ]
-        selection = selection | df.nodes.treenode_id.isin( with_tags )    
+        selection = selection | df.nodes.treenode_id.isin( with_tags )
 
     fix_points = df.nodes[ selection ].treenode_id.values
 
     # Add soma node
-    if not isinstance( df.soma, type(None) ) and df.soma not in fix_points:   
+    if not isinstance( df.soma, type(None) ) and df.soma not in fix_points:
         fix_points = np.append( fix_points, df.soma )
 
     # Walk from all fix points to the root - jump N nodes on the way
     new_parents = {}
 
-    module_logger.info('Sampling neuron down by factor of %i' %
-                       resampling_factor)
+    module_logger.debug('Sampling neuron down by factor of {0}'.format(resampling_factor))
+
     for en in fix_points:
         this_node = en
 
@@ -393,13 +398,15 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
             stop = False
             new_p = list_of_parents[this_node]
             if new_p != None:
-                for i in range(resampling_factor):
+                i = 0
+                while i < resampling_factor:
                     if new_p in fix_points:
                         new_parents[this_node] = new_p
                         stop = True
                         break
                     else:
                         new_p = list_of_parents[new_p]
+                    i += 1
 
                 if stop is True:
                     break
@@ -408,22 +415,22 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
                     this_node = new_p
             else:
                 new_parents[this_node] = None
-                break    
-    new_nodes = df.nodes[ df.nodes.treenode_id.isin( list(new_parents.keys()) ) ].copy()           
+                break
+    new_nodes = df.nodes[ df.nodes.treenode_id.isin( list(new_parents.keys()) ) ].copy()
     new_nodes.loc[:,'parent_id'] = [new_parents[tn] for tn in new_nodes.treenode_id]
 
     # We have to temporarily set parent of root node from 1 to an integer
     root_ix = new_nodes[new_nodes.parent_id.isnull()].index
     new_nodes.loc[root_ix, 'parent_id'] = 0
     # first convert everything to int
-    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(int)      
+    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(int)
     # then back to object so that we can add a 'None'
-    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(object)  
-    
+    new_nodes.loc[:,'parent_id'] = new_nodes.parent_id.values.astype(object)
+
     # Reassign parent_id None to root node
     new_nodes.loc[root_ix, 'parent_id'] = None
-    
-    module_logger.info('Nodes before/after: %i/%i ' %
+
+    module_logger.debug('Nodes before/after: %i/%i ' %
                        (len(df.nodes), len(new_nodes)))
 
     df.nodes = new_nodes
