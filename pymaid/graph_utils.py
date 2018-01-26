@@ -314,6 +314,148 @@ def dist_between(x, a, b):
                                                     weight='weight') )
 
 
+def find_main_branchpoint(x, reroot_to_soma=False):
+    """ Returns the branch point at which the two largest branches converge.
+
+    Parameters
+    ----------
+    x :                 {CatmaidNeuron, CatmaidNeuronList}
+                        May contain multiple neurons.
+    reroot_to_soma :    bool, optional
+                        If True, neuron will be rerooted to soma.
+
+    Returns
+    -------
+    treenode ID
+
+    """
+
+    # Make a copy
+    x = x.copy()
+
+    if isinstance( x, core.CatmaidNeuronList ) and len(x) > 1:
+        return np.array( [ find_main_branchpoint(n, reroot_to_soma=reroot_to_soma) for n in x ]  )
+    elif isinstance( x, core.CatmaidNeuronList ) and len(x) == 1:
+        x = x[0]
+    elif not isinstance( x, (core.CatmaidNeuron, core.CatmaidNeuronList) ):
+        raise TypeError('Must provide CatmaidNeuron/List, not "{0}"'.format(type(x)))
+
+    g = graph.neuron2nx( x )
+
+    # First, find longest path
+    longest = nx.dag_longest_path(g)
+
+    # Remove longest path
+    g.remove_nodes_from( longest )
+
+    # Find second longst path
+    sc_longest = nx.dag_longest_path(g)
+
+    # Parent of the last node in sc_longest is the common branch point
+    bp = list( x.graph.successors( sc_longest[-1] ) )[0]
+
+    return bp
+
+def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
+    """ Splits neuron into fragments.
+
+    Notes
+    -----
+    Cuts are based on longest neurites: the first cut is made where the second
+    largest neurite merges onto the largest neurite, the second cut is made
+    where the third largest neurite merges into either of the first fragments
+    and so on.
+
+    Parameters
+    ----------
+    x :                 {CatmaidNeuron,CatmaidNeuronList}
+                        May contain only a single neuron.
+    n :                 int, optional
+                        Number of fragments to split into. Must be >1.
+    min_size :          int, optional
+                        Minimum size of fragment in um to be cut off. If too
+                        small, will stop cutting. This takes only the longest
+                        path in each fragment into account!
+    reroot_to_soma :    bool, optional
+                        If True, neuron will be rerooted to soma.
+
+    Returns
+    -------
+    CatmaidNeuronList
+
+    Examples
+    --------
+    >>> x = pymaid.get_neuron('16')
+    >>> # Cut into two fragments
+    >>> cut1 = pymaid.split_into_fragments(x, n=2)
+    >>> # Cut into fragments of >10 um size
+    >>> cut2 = pymaid.split_into_fragments(x, n=1000000000, min_size=10)
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        pass
+    elif isinstance(x, core.CatmaidNeuronList):
+        if x.shape[0] == 1:
+            x = x[0]
+        else:
+            module_logger.error(
+                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
+            raise Exception
+    else:
+        raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
+
+    if n < 2:
+        raise ValueError('Number of fragments must be at least 2.')
+
+    if reroot_to_soma and x.soma:
+        x.reroot( x.soma )
+
+    # Collect treenodes of the n longest neurites
+    tn_to_preserve = []
+    fragments = []
+    for i in range(n):
+        if tn_to_preserve:
+            # Generate fresh graph
+            g = graph.neuron2nx( x )
+
+            # Remove nodes that we have already preserved
+            g.remove_nodes_from( tn_to_preserve )
+        else:
+            g = x.graph
+
+        # Get path
+        longest_path = nx.dag_longest_path(g)
+
+        # Check if fragment is still long enough
+        if min_size:
+            this_length = sum( [ v/1000 for k, v in nx.get_edge_attributes(x.graph, 'weight').items() if k[1] in longest_path ] )
+            if this_length <= min_size:
+                break
+
+        tn_to_preserve += longest_path
+        fragments.append( longest_path )
+
+    # Next, make some virtual cuts and get the complement of treenodes for each fragment
+    graphs = [ x.graph.copy() ]
+    for fr in fragments[1:]:
+        this_g = nx.bfs_tree( x.graph, fr[-1], reverse=True )
+
+        graphs.append( this_g )
+
+    # Next, we need to remove treenodes that are in subsequent graphs from those graphs
+    for i, g in enumerate(graphs):
+        for g2 in graphs[i+1:]:
+            g.remove_nodes_from( g2.nodes )
+
+    # Now make neurons
+    nl = core.CatmaidNeuronList( [ subset_neuron(x, g, clear_temp=True) for g in graphs ] )
+
+    # Rename neurons
+    for i,n in enumerate(nl):
+        n.neuron_name += '_{}'.format(i)
+
+    return nl
+
 def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     """ Returns a neuron consisting of the longest neurite(s) based on
     geodesic distance.
