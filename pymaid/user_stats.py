@@ -14,15 +14,15 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" This module contains functions to retrieve user statistics for sets of 
+""" This module contains functions to retrieve user statistics for sets of
 neurons.
 
 Examples
 --------
 >>> import pymaid
->>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 
-...                                      'HTTP_USER' , 
-...                                      'HTTP_PASSWORD', 
+>>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' ,
+...                                      'HTTP_USER' ,
+...                                      'HTTP_PASSWORD',
 ...                                      'TOKEN' )
 >>> skeleton_ids = pymaid.get_skids_by_annotation('Hugin')
 >>> cont = pymaid.get_user_contributions( skeleton_ids )
@@ -45,10 +45,10 @@ Examples
 ...
 >>> # Plot contributions as pie chart
 >>> import plotly
->>> fig = { "data" : [ { "values" : time_inv.total.tolist(), 
-...         "labels" : time_inv.user.tolist(), 
-...         "type" : "pie" } ] } 
->>> plotly.offline.plot(fig) 
+>>> fig = { "data" : [ { "values" : time_inv.total.tolist(),
+...         "labels" : time_inv.user.tolist(),
+...         "type" : "pie" } ] }
+>>> plotly.offline.plot(fig)
 """
 
 # TODOs
@@ -78,14 +78,14 @@ if len( module_logger.handlers ) == 0:
 __all__ = ['get_user_contributions','get_time_invested','get_user_actions']
 
 def get_user_contributions(x, remote_instance=None):
-    """ Takes a list of neurons and returns nodes and synapses contributed 
+    """ Takes a list of neurons and returns nodes and synapses contributed
     by each user.
 
     Notes
     -----
     This is essentially a wrapper for :func:`~pymaid.get_contributor_statistics`
-    - if you are also interested in e.g. construction time, review time, etc. 
-    you may want to consider using :func:`~pymaid.get_contributor_statistics` 
+    - if you are also interested in e.g. construction time, review time, etc.
+    you may want to consider using :func:`~pymaid.get_contributor_statistics`
     instead.
 
     Parameters
@@ -106,21 +106,41 @@ def get_user_contributions(x, remote_instance=None):
         DataFrame in which each row represents a user
 
         >>> df
-        ...   user nodes presynapses  postsynapses
+        ...   user nodes presynapses  postsynapses nodes_reviewed
         ... 0
         ... 1
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> # Get contributors for a single neuron
+    >>> cont = pymaid.get_user_contributions(2333007)
+    >>> # Get top 10 (by node contribution)
+    >>> top10 = cont.iloc[:10].set_index('user')
+    >>> # Plot as bar chart
+    >>> ax = top10.plot(kind='bar')
+    >>> plt.show()
+
+    >>> # Plot relative contributions
+    >>> cont = pymaid.get_user_contributions(2333007)
+    >>> cont = cont.set_index('user')
+    >>> # Normalise
+    >>> cont_rel = cont / cont.sum(axis=0).values
+    >>> # Plot contributors with >5% node contributions
+    >>> ax = cont_rel[ cont_rel.nodes > .05 ].plot(kind='bar')
+    >>> plt.show()
 
     See Also
     --------
     :func:`~pymaid.get_contributor_statistics`
-                           Gives you more basic info on neurons of interest 
+                           Gives you more basic info on neurons of interest
                            such as total reconstruction/review time.
     """
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
 
-    skids = fetch.eval_skids(x, remote_instance)    
-    
+    skids = fetch.eval_skids(x, remote_instance)
+
     cont = fetch.get_contributor_statistics(
         skids, remote_instance, separate=False)
 
@@ -130,7 +150,8 @@ def get_user_contributions(x, remote_instance=None):
     stats = {
         'nodes': {u: 0 for u in all_users},
         'presynapses': {u: 0 for u in all_users},
-        'postsynapses': {u: 0 for u in all_users}
+        'postsynapses': {u: 0 for u in all_users},
+        'nodes_reviewed': {u: 0 for u in all_users}
     }
 
     for u in cont.node_contributors:
@@ -138,13 +159,15 @@ def get_user_contributions(x, remote_instance=None):
     for u in cont.pre_contributors:
         stats['presynapses'][u] = cont.pre_contributors[u]
     for u in cont.post_contributors:
-        stats['postsynapses'][u] = cont.post_contributors[u]    
+        stats['postsynapses'][u] = cont.post_contributors[u]
+    for u in cont.review_contributors:
+        stats['nodes_reviewed'][u] = cont.review_contributors[u]
 
-    return pd.DataFrame([[ u, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses']).sort_values('nodes', ascending=False).reset_index(drop=True)
+    return pd.DataFrame([[ u, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u], stats['nodes_reviewed'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses', 'nodes_reviewed']).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=True, connectors=True, mode='SUM', max_inactive_time=3):
-    """ Takes a list of neurons and calculates the time individual users 
+    """ Takes a list of neurons and calculates the time individual users
     have spent working on this set of neurons.
 
     Parameters
@@ -158,28 +181,28 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
                         4. CatmaidNeuron or CatmaidNeuronList object
 
                         If you pass skeleton data (i.e. CatmaidNeurons), this
-                        data is used to calculate time invested. You can 
-                        exploit this to get time invested into a given 
-                        compartment of a neurons, e.g. by pruning it to a 
+                        data is used to calculate time invested. You can
+                        exploit this to get time invested into a given
+                        compartment of a neurons, e.g. by pruning it to a
                         corresponding volume.
     remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
     minimum_actions :   int, optional
-                        Minimum number of actions per minute to be counted as 
+                        Minimum number of actions per minute to be counted as
                         active.
     treenodes :         bool, optional
                         If False, treenodes will not be taken into account
     connectors :        bool, optional
                         If False, connectors will not be taken into account
     mode :              {'SUM','OVER_TIME','ACTIONS'}, optional
-                        (1) 'SUM' will return total time invested (in minutes) 
-                            per user. 
-                        (2) 'OVER_TIME' will return minutes invested/day over 
-                            time. 
-                        (3) 'ACTIONS' will return actions 
+                        (1) 'SUM' will return total time invested (in minutes)
+                            per user.
+                        (2) 'OVER_TIME' will return minutes invested/day over
+                            time.
+                        (3) 'ACTIONS' will return actions
                             (node/connectors placed/edited) per day.
     max_inactive_time : int, optional
-                        Maximal time inactive in minutes. 
+                        Maximal time inactive in minutes.
 
     Returns
     -------
@@ -191,28 +214,28 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         ... user1
         ... user2
 
-        If ``mode='OVER_TIME'`` or ``mode='ACTIONS'``: 
+        If ``mode='OVER_TIME'`` or ``mode='ACTIONS'``:
 
         >>> df
         ...       date date date ...
         ... user1
         ... user2
 
-        For `OVER_TIME`, values respresent minutes invested on that day. For 
-        `ACTIONS`, values represent actions (creation, edition, review) on that 
+        For `OVER_TIME`, values respresent minutes invested on that day. For
+        `ACTIONS`, values represent actions (creation, edition, review) on that
         day.
 
 
     Important
     ---------
-    Creation/Edition/Review times can overlap! This is why total time spent 
+    Creation/Edition/Review times can overlap! This is why total time spent
     is not just creation + edition + review.
 
-    Please note that this does currently not take placement of postsynaptic 
+    Please note that this does currently not take placement of postsynaptic
     nodes or creation of connector links into account!
 
-    Be aware of the ``minimum_actions`` parameter: at low settings even 
-    a single actions (e.g. connecting a node) will add considerably to time 
+    Be aware of the ``minimum_actions`` parameter: at low settings even
+    a single actions (e.g. connecting a node) will add considerably to time
     invested. To keep total reconstruction time comparable to what Catmaid
     calculates, you should consider about 10 actions/minute (= a click every
     6 seconds) and ``max_inactive_time`` of 3 mins.
@@ -224,19 +247,19 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
     Examples
     --------
-    Plot pie chart of contributions per user using Plotly. This example 
+    Plot pie chart of contributions per user using Plotly. This example
     assumes that you have already imported and set up pymaid.
 
-    >>> import plotly    
+    >>> import plotly
     >>> stats = pymaid.get_time_invested( skids, remote_instance )
     >>> # Use plotly to generate pie chart
-    >>> fig = { "data" : [ { "values" : stats.total.tolist(), 
-    ...         "labels" : stats.user.tolist(), "type" : "pie" } ] } 
-    >>> plotly.offline.plot(fig)    
+    >>> fig = { "data" : [ { "values" : stats.total.tolist(),
+    ...         "labels" : stats.user.tolist(), "type" : "pie" } ] }
+    >>> plotly.offline.plot(fig)
 
     Plot reconstruction efforts over time
 
-    >>> stats = pymaid.get_time_invested( skids, mode='OVER_TIME' )    
+    >>> stats = pymaid.get_time_invested( skids, mode='OVER_TIME' )
     >>> # Plot time invested over time
     >>> stats.T.plot()
     >>> # Plot cumulative time invested over time
@@ -247,7 +270,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     """
 
     if mode not in ['SUM','OVER_TIME','ACTIONS']:
-        raise ValueError('Unknown mode "%s"' % str(mode))    
+        raise ValueError('Unknown mode "%s"' % str(mode))
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
 
@@ -281,15 +304,15 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
             connector_ids += n.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = fetch.get_node_user_details( 
+    node_details = fetch.get_node_user_details(
         node_ids + connector_ids, remote_instance=remote_instance )
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = pd.DataFrame( 
+    creation_timestamps = pd.DataFrame(
         node_details[['user', 'creation_time']].values, columns=['user', 'timestamp'])
 
-    # Dataframe for edition times 
-    edition_timestamps = pd.DataFrame( 
+    # Dataframe for edition times
+    edition_timestamps = pd.DataFrame(
         node_details[['editor', 'edition_time']].values, columns=['user', 'timestamp'])
 
     # Generate dataframe for reviews
@@ -300,7 +323,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
     # Merge all timestamps
     all_timestamps = pd.concat(
-        [creation_timestamps, edition_timestamps, review_timestamps], axis=0)    
+        [creation_timestamps, edition_timestamps, review_timestamps], axis=0)
 
     all_timestamps.sort_values('timestamp', inplace=True)
 
@@ -333,7 +356,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 
     elif mode == 'ACTIONS':
         all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
-        all_ts.columns = ['all_users'] 
+        all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
         for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
@@ -350,11 +373,11 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         #Then remove the minutes that have less
         minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
         #Now group by hour
-        all_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()       
+        all_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
-        # Get total time spent        
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):            
+        # Get total time spent
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
             minutes_counting = ( all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions )
             minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
             this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
@@ -375,7 +398,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     users :           {list}, optional
                       List of users (logins) for which to return timestamps.
     neurons :         {list of skeleton IDs, CatmaidNeuron/List}, optional
-                      Neurons for which to return timestamps. If None, will find 
+                      Neurons for which to return timestamps. If None, will find
                       neurons by user.
     start_date :      {tuple, datetime.date}, optional
     end_date :        {tuple, datetime.date}, optional
@@ -386,11 +409,11 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     ---------
     This function does return most but not all user actions:
 
-    1. The API endpoint used for finding neurons worked on by a given user 
-       (:func:`~pymaid.find_neurons`) does not return single-node neurons. 
-       Hence, placing e.g. postsynaptic nodes is not taken into account. 
-    2. Connecting a node to a connector is not taken into account as there is 
-       no API endpoint for getting timestamps of the creation of connector 
+    1. The API endpoint used for finding neurons worked on by a given user
+       (:func:`~pymaid.find_neurons`) does not return single-node neurons.
+       Hence, placing e.g. postsynaptic nodes is not taken into account.
+    2. Connecting a node to a connector is not taken into account as there is
+       no API endpoint for getting timestamps of the creation of connector
        links.
 
     Return
@@ -415,7 +438,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
 
     >>> # Plot day-by-day activity
     >>> ax = plt.subplot()
-    >>> ax.scatter(actions.timestamp.date.tolist(), 
+    >>> ax.scatter(actions.timestamp.date.tolist(),
     ...            actions.timestamp.time.tolist(),
     ...            marker='_')
 
@@ -432,15 +455,15 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     user_dict = user_list.login.to_dict()
 
     if isinstance(neurons, type(None)):
-        neurons = fetch.find_neurons(   users=users, 
-                                        from_date=start_date, to_date=end_date, 
+        neurons = fetch.find_neurons(   users=users,
+                                        from_date=start_date, to_date=end_date,
                                         reviewed_by=users,
                                         remote_instance=remote_instance)
         # Get skeletons
         neurons.get_skeletons()
     elif not isinstance(neurons, (core.CatmaidNeuron,core.CatmaidNeuronList)):
         neurons = fetch.get_neuron(neurons)
-    
+
     if not isinstance(end_date, (datetime.date, type(None))):
         end_date = datetime.date(*end_date)
 
@@ -451,10 +474,10 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     connector_ids = neurons.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = fetch.get_node_user_details( 
+    node_details = fetch.get_node_user_details(
         node_ids + connector_ids, remote_instance=remote_instance )
 
-    # Extract timestamps   
+    # Extract timestamps
     # Dataframe for creation (i.e. the actual generation of the nodes)
     creation_timestamps = node_details[['user', 'creation_time']]
     creation_timestamps['action'] = 'creation'
@@ -462,7 +485,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
 
     # Dataframe for edition times
     edition_timestamps = node_details[['editor', 'edition_time']]
-    edition_timestamps['action'] = 'edition'    
+    edition_timestamps['action'] = 'edition'
     edition_timestamps.columns = ['user', 'timestamp','action']
 
     # Generate dataframe for reviews
