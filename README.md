@@ -1,5 +1,5 @@
 pymaid
-====== 
+======
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 Tested with CATMAID latest release version 2017.10.02 - if you are working with older versions you may experience incompatibilities due to API changes.
 
@@ -22,36 +22,36 @@ PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed instructions. For the impatient:
 
 I recommend using [Python Packaging Index (PIP)](https://pypi.python.org/pypi) to install pymaid.
-First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in terminal:  
+First, get [PIP](https://pip.pypa.io/en/stable/installing/) and then run in terminal:
 
-`pip install git+git://github.com/schlegelp/pymaid@master`  
+`pip install git+git://github.com/schlegelp/pymaid@master`
 
 This command should also work to update the package.
 
 If your default distribution is Python 2, you have to explicitly tell [PIP](https://pip.pypa.io/en/stable/installing/) to install for Python 3:
 
-`pip3 install git+git://github.com/schlegelp/pymaid@master`  
+`pip3 install git+git://github.com/schlegelp/pymaid@master`
 
-**Attention** 
+**Attention**
 
 On Windows, the dependencies (i.e. Numpy, Pandas and SciPy) will likely fail to install automatically. Your best bet is to get a Python distribution that already includes them (e.g. [Anaconda](https://www.continuum.io/downloads)). Also: one of the dependencies, `pyoctree`, requires `numpy` to already be on the system to install properly. If pip fails with `ImportError: No module named 'numpy'`, you have to manually install numpy using `pip install numpy` and then retry installing pymaid.
 
 #### External libraries used:
 Installing via [PIP](https://pip.pypa.io/en/stable/installing/) should install all essential dependencies. You may run into problems on Windows though. In that case, you need to install dependencies manually. Here is a list of dependencies (check out `install_requires` in [setup.py](https://raw.githubusercontent.com/schlegelp/PyMaid/master/setup.py) for version info):
 
-Must have: 
+Must have:
 
 - [Pandas](http://pandas.pydata.org/)
-- [NetworkX](https://networkx.github.io) 
+- [NetworkX](https://networkx.github.io)
 - [SciPy](http://www.scipy.org)
-- [Numpy](http://www.scipy.org) 
+- [Numpy](http://www.scipy.org)
 - [Matplotlib](http://www.matplotlib.org)
 - [vispy](http://vispy.org/) - this also requires one of the supported backend. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
 - [Plotly](http://plot.ly)
 - [tqdm](https://pypi.python.org/pypi/tqdm)
 - [pypng](https://pythonhosted.org/pypng/)
 
-Optional: 
+Optional:
 
 - [iGraph](http://www.igraph.org) - graph library written C++ (faster). PyMaid will try using this over NetworkX if available.
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
@@ -64,7 +64,7 @@ Optional:
 ```python
 import pymaid
 
-# Initialize Catmaid instance 
+# Initialize Catmaid instance
 myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
 
 # Initialize a single neuron with just its skeleton ID
@@ -102,7 +102,7 @@ branch_points = nl[0].nodes[ nl[0].nodes.type == 'branch' ].treenode_id
 nl.plot3d()
 
 # Clear 3D viewer
-plot.clear3d()
+pymaid.clear3d()
 ```
 
 ### Cluster neurons based on their synapse placement
@@ -144,7 +144,7 @@ http://www.cell.com/abstract/S0092-8674(13)01476-1
 *The connectome of a decision-making neural network.*
 Jarrell TA, Wang Y, Bloniarz AE, Brittin CA, Xu M, Thomson JN, Albertson DG, Hall DH, Emmons SW.
 http://science.sciencemag.org/content/337/6093/437.long
-3. **Comparison of neurons based on synapse distribution**: eLife. doi: 10.7554/eLife.16799 
+3. **Comparison of neurons based on synapse distribution**: eLife. doi: 10.7554/eLife.16799
 *Synaptic transmission parallels neuromodulation in a central food-intake circuit.*
 Schlegel P, Texada MJ, Miroschnikow A, Schoofs A, Hückesfeld S, Peters M, … Pankratz MJ.
 https://elifesciences.org/content/5/e16799
