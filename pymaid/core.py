@@ -292,6 +292,11 @@ class CatmaidNeuron:
             return self.get_igraph()
         elif key == 'graph':
             return self.get_graph_nx()
+        elif key == 'simple':
+            self.simple = self.downsample( float('inf'),
+                                           preserve_cn_treenodes=False,
+                                           inplace=False )
+            return self.simple
         elif key == 'dps':
             return self.get_dps()
         elif key == 'nodes_geodesic_distance_matrix':
@@ -425,14 +430,14 @@ class CatmaidNeuron:
 
     def _clear_temp_attr(self, exclude=[]):
         """Clear temporary attributes."""
-        temp_att = ['igraph','graph','segments','nodes_geodesic_distance_matrix','dps']
+        temp_att = ['igraph','graph','segments','nodes_geodesic_distance_matrix','dps','simple']
         for a in [at for at in temp_att if at not in exclude]:
             try:
                 delattr(self, a)
             except:
                 pass
 
-        temp_node_cols = ['flow_centrality','type']
+        temp_node_cols = ['flow_centrality','type', 'strahler_index']
 
         # Remove temporary node values
         for c in [col for col in temp_node_cols if col not in exclude]:
@@ -1363,7 +1368,10 @@ class CatmaidNeuronList:
         elif key == 'empty':
             return len(self.neurons) == 0
         else:
-            raise AttributeError('Attribute "%s" not found' % key)
+            if False not in [ key in n.__dict__ for n in self.neurons ]:
+                return np.array([ getattr(n,key) for n in self.neurons ])
+            else:
+                raise AttributeError('Attribute "%s" not found' % key)
 
     def __contains__(self, x):
         return x in self.neurons or str(x) in self.skeleton_id or x in self.neuron_name
@@ -2125,17 +2133,27 @@ class _SkidIndexer():
         module_logger = logger
 
     def __getitem__(self, skid):
-        try:
-            int(skid)
-        except:
-            raise Exception('Can only index skeleton IDs')
+        if not isinstance(skid, (list, np.ndarray, tuple)):
+            skid = [skid]
 
-        sel = [ n for n in self.obj if str(n.skeleton_id) == str(skid) ]
+        # Turn everything into strings
+        skid = [str(s) for s in skid]
+
+        # Check if everything can be a string
+        for s in skid:
+            try:
+                int(s)
+            except:
+                raise Exception('Can only index skeleton ID(s), not "{0}"'.format(s))
+
+        sel = [ n for n in self.obj if str(n.skeleton_id) in skid ]
 
         if len( sel ) == 0:
-            raise ValueError('No neuron with skeleton ID {0}'.format(skid))
-        else:
+            raise ValueError('No neuron with skeleton ID(s) {0}'.format(skid))
+        elif len(sel) == 1:
             return sel[0]
+        else:
+            return CatmaidNeuronList(sel)
 
 class Dotprops(pd.DataFrame):
     """ Class to hold dotprops. This is essentially a pandas DataFrame - we
@@ -2220,6 +2238,11 @@ class Volume(dict):
         return np.array( [ self.vertices.min(axis=0), self.vertices.max(axis=0) ]  ).T
 
     @property
+    def center(self):
+        """ Returns center of mass."""
+        return np.mean( self.vertices(), axis=0 )
+
+    @property
     def vertices(self):
         return np.array( self['vertices'] )
 
@@ -2288,7 +2311,7 @@ class Volume(dict):
 
         return trimesh.Trimesh( vertices = self['vertices'], faces=self['faces'] )
 
-    def to_2d(self, alpha=0.00017, view='xy',invert_y = False):
+    def to_2d(self, alpha=0.00017, view='xy', invert_y=False):
         """ Computes the 2d alpha shape (concave hull) this volume. Uses Scipy
         Delaunay and shapely.
 
