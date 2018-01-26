@@ -1,11 +1,11 @@
-__version__ = "0.73"
+__version__ = "0.74"
 
 import logging
 
 # Set up logging
 module_logger = logging.getLogger('pymaid_init')
 module_logger.setLevel(logging.INFO)
-if len( module_logger.handlers ) == 0:    
+if len( module_logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
@@ -15,7 +15,7 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-# Flatten namespace by importing contents of all modules of pymaid 
+# Flatten namespace by importing contents of all modules of pymaid
 
 try:
     from pymaid.fetch import *
@@ -57,7 +57,7 @@ try:
     from pymaid.graph import *
 except Exception as error:
     module_logger.warning(str(error))
-    module_logger.warning('Error importing pymaid.graph:\n' + str(error))  
+    module_logger.warning('Error importing pymaid.graph:\n' + str(error))
 
 try:
     from pymaid.graph_utils import *
