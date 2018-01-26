@@ -583,6 +583,65 @@ def cut_neuron(x, cut_node, g=None):
 
     return dist, prox
 
+def subset_neuron( x, subset, clear_temp=True ):
+    """ Subsets a neuron to a set of treenodes.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron
+    subset :        {np.ndarray, NetworkX.Graph}
+                    Treenodes to subset the neuron to
+    clear_temp :    bool, optional
+                    If True, will reset temporary attributes (graph, node
+                    classification). In general, you should leave this at True.
+
+    Returns
+    -------
+    CatmaidNeuron
+
+    See Also
+    --------
+    :func:`~pymaid.cut_neuron`
+            Cut neuron at specific point.
+
+    """
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Can only process data of type "CatmaidNeuron", not "{0}"'.format(type(x)))
+
+    if isinstance(subset, np.ndarray):
+        pass
+    elif isinstance(subset, list):
+        subset = np.array(subset)
+    elif isinstance(subset, (nx.DiGraph, nx.Graph)):
+        subset = subset.nodes
+    else:
+        raise TypeError('Can only process data of type "np.ndarray" or "nx.DiGraph", not "{0}"'.format(type(subset)))
+
+    # Make a copy of the neuron (this is the actual bottleneck of the function: ~70% of time)
+    x = x.copy()
+
+    # Filter treenodes
+    x.nodes = x.nodes[ x.nodes.treenode_id.isin( subset ) ]
+
+    # Make sure that there are root nodes
+    x.nodes.loc[ ~x.nodes.parent_id.isin( x.nodes.treenode_id.astype(object) ), 'parent_id' ] = None
+
+    # Filter connectors
+    x.connectors = x.connectors[ x.connectors.treenode_id.isin( subset ) ]
+
+    # Filter tags
+    x.tags = { t : [ tn for tn in x.tags[t] if tn in subset ] for t in x.tags }
+
+    # Remove empty tags
+    x.tags = { t : x.tags[t] for t in x.tags if x.tags[t] }
+
+    # Clear temporary attributes
+    if clear_temp:
+        x._clear_temp_attr()
+
+    return x
+
 def generate_list_of_childs(x):
     """ Returns list of childs
 
