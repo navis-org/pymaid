@@ -600,3 +600,56 @@ def generate_list_of_childs(x):
 
     return { n : [ e[0] for e in x.graph.in_edges(n) ] for n in x.graph.nodes }
 
+def node_label_sorting(x):
+    """ Returns treenodes ordered by node label sorting according to Cuntz
+    et al., PLoS Computational Biology (2010).
+
+    Parameters
+    ----------
+    x :         {CatmaidNeuron}
+
+    Returns
+    -------
+    list
+        [ root, treenode_id, treenode_id, ... ]
+    """
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Need CatmaidNeuron, got "{0}"'.format(type(x)))
+
+    if len(x.root) > 1:
+        raise ValueError('Unable to process multi-root neurons!')
+
+    # Get relevant branch points
+    term = x.nodes[x.nodes.type=='end'].treenode_id.values
+
+    # Get distance from all branch_points
+    dist_mat = geodesic_matrix(x, tn_ids = term, directed=True  )
+    # Set distance between unreachable points to None
+    dist_mat[dist_mat == float('inf')] = None
+
+    # Get starting points and sort by longest path to a terminal
+    curr_points = sorted( list( x.simple.graph.predecessors(x.root[0]) ),
+                           key= lambda n : dist_mat[n].max(),
+                           reverse=True )
+
+    # Walk from root along towards terminals, prioritising longer branches
+    nodes_walked = [ ]
+    while curr_points:
+        nodes_walked.append( curr_points.pop(0) )
+        if nodes_walked[-1] in term:
+            pass
+        else:
+            new_points = sorted( list( x.simple.graph.predecessors( nodes_walked[-1] ) ),
+                           key= lambda n : dist_mat[n].max(),
+                           reverse=True )
+            curr_points = new_points + curr_points
+
+    # Translate into segments
+    node_list =[ x.root[0] ]
+    for n in nodes_walked:
+        node_list += [ seg for seg in x.segments if seg[0] == n ][0][:-1]
+
+    return node_list
+
+
+
