@@ -19,16 +19,16 @@ array([1590, 1180, 1035, 1106, 1215, 1183, 1059, 1870, 1747, 1296,  836,
 >>> df = nl.summary()
 >>> df.head()
                       neuron_name skeleton_id  n_nodes  n_connectors  \
-0      PN glomerulus DA1 27296 BH       27295     9969           463   
-1      PN glomerulus DA1 57312 LK       57311     4874           420   
-2  PN glomerulus DA1 57324 LK JSL       57323     4584           433   
-3      PN glomerulus DA1 57354 GA       57353     4873           317   
-4      PN glomerulus DA1 57382 ML       57381     7727           358   
-   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma  
-0             211          218         58   1590.676253            NA  True  
-1             156          163        105   1180.597489            NA  True  
-2             120          127         59   1035.076853            NA  True  
-3              90           95         53   1106.768757            NA  True  
+0      PN glomerulus DA1 27296 BH       27295     9969           463
+1      PN glomerulus DA1 57312 LK       57311     4874           420
+2  PN glomerulus DA1 57324 LK JSL       57323     4584           433
+3      PN glomerulus DA1 57354 GA       57353     4873           317
+4      PN glomerulus DA1 57382 ML       57381     7727           358
+   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma
+0             211          218         58   1590.676253            NA  True
+1             156          163        105   1180.597489            NA  True
+2             120          127         59   1035.076853            NA  True
+3              90           95         53   1106.768757            NA  True
 4             153          162         71   1215.920594            NA  True
 
 
@@ -90,8 +90,11 @@ Manipulation
 	~pymaid.reroot_neuron
 	~pymaid.stitch_neurons
 	~pymaid.split_axon_dendrite
+    ~pymaid.split_into_fragments
 	~pymaid.longest_neurite
 	~pymaid.prune_by_strahler
+    ~pymaid.subset_neuron
+    ~pymaid.average_neurons
 
 Resampling
 ----------
@@ -109,10 +112,11 @@ Analysis
     ~pymaid.arbor_confidence
     ~pymaid.bending_flow
     ~pymaid.calc_cable
+    ~pymaid.classify_nodes
+    ~pymaid.find_main_branchpoint
     ~pymaid.flow_centrality
     ~pymaid.segregation_index
     ~pymaid.strahler_index
-    ~pymaid.classify_nodes
 
 Distances
 ---------

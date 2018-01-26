@@ -6,7 +6,7 @@ Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networ
 .. note::
    If you are experiencing issues when using vispy
    as backend, you should try installing the dev
-   version (currently 0.5.0dev0) directly from 
+   version (currently 0.5.0dev0) directly from
    `Github <https://github.com/vispy/vispy>`_.
    The version installed from PIP is 0.4.0.
 
@@ -21,9 +21,9 @@ This uses matplotlib to generate 2D plots. The big advantage is that you can sav
 
 >>> import pymaid
 >>> import matplib.pyplot as plt
->>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
-...                              'HTTP_USER' , 
-...                              'HTTP_PASSWORD', 
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org',
+...                              'HTTP_USER' ,
+...                              'HTTP_PASSWORD',
 ...                              'TOKEN' )
 >>> nl = pymaid.CatmaidNeuronList([123456, 567890])
 >>> # Plot using standard parameters
@@ -54,9 +54,9 @@ Plotting volumes
 For 3D plots, we are using either Vispy or Plotly to render neurons and volumes. The default backend is Vispy.
 
 >>> import pymaid
->>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
-...                              'HTTP_USER' , 
-...                              'HTTP_PASSWORD', 
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org',
+...                              'HTTP_USER' ,
+...                              'HTTP_PASSWORD',
 ...                              'TOKEN' )
 >>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot using standard parameters
@@ -88,7 +88,7 @@ By default, calling :func:`~pymaid.plot3d` uses the vispy backend and does not p
 >>> poff.plot( fig )
 
 .. note::
-   Vispy itself uses either one of these backends: 
+   Vispy itself uses either one of these backends:
    Qt, GLFW,SDL2, Wx, or Pyglet. By default, pymaid
    installs and sets PyQt5 as vispy's backend. If
    you need to change that use e.g. ``vispy.use(app='PyQt4')``
@@ -107,15 +107,15 @@ Adding volumes
 :func:`~pymaid.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
 
 >>> import pymaid
->>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
-...                              'HTTP_USER' , 
-...                              'HTTP_PASSWORD', 
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org',
+...                              'HTTP_USER' ,
+...                              'HTTP_PASSWORD',
 ...                              'TOKEN' )
 >>> nl = pymaid.CatmaidNeuronList([123456, 567890], remote_instance = rm)
 >>> # Plot volumes without specifying color
 >>> nl.plot3d( ['v13.LH_R', 'v13_LH_L'] )
 >>> # Provide colors
->>> vols = [ pymaid.get_volume('v13.LH_R', color=(255,0,0,.5)),			
+>>> vols = [ pymaid.get_volume('v13.LH_R', color=(255,0,0,.5)),
 ...  		 pymaid.get_volume('v13.LH_L', color=(0,255,0,.5)) ]
 >>> nl.plot3d( vols )
 
@@ -136,9 +136,9 @@ Plotting Networks
 
 >>> import pymaid
 >>> import plotly.offline as poff
->>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org', 
-...                              'HTTP_USER' , 
-...                              'HTTP_PASSWORD', 
+>>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org',
+...                              'HTTP_USER' ,
+...                              'HTTP_PASSWORD',
 ...                              'TOKEN' )
 >>> pns = pymaid.get_skids_by_annotation('PN right')
 >>> partners = pymaid.get_partners( pns )
@@ -152,10 +152,11 @@ Reference
 .. autosummary::
     :toctree: generated/
 
-    ~pymaid.plot3d 
-    ~pymaid.plot2d 
+    ~pymaid.plot3d
+    ~pymaid.plot2d
+    ~pymaid.plot1d
     ~pymaid.plot_network
-    ~pymaid.clear3d 
-    ~pymaid.close3d 
+    ~pymaid.clear3d
+    ~pymaid.close3d
+    ~pymaid.get_canvas
     ~pymaid.screenshot
-    

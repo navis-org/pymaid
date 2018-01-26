@@ -10,7 +10,8 @@ Graphs
     :toctree: generated/
 
     ~pymaid.neuron2nx
-    ~pymaid.neuron2igraph   
+    ~pymaid.neuron2igraph
+    ~pymaid.neuron2KDTree
     ~pymaid.network2nx
     ~pymaid.network2igraph
 
