@@ -73,9 +73,10 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     threshold :          int, optional
                          Only partners with >= this synapses are considered.
                          Default = 1. Attention: this might impair proper
-                         comparison: e.g. neuronA and neuronB connect to neuronC
-                         with 1 and 3 synapses, respectively. If threshold=2,
-                         then connection from A to C will be ignored!
+                         comparison: e.g. neuron A and neuron B connect to
+                         neuron C with 1 and 3 synapses, respectively. If
+                         threshold = 2, then connection from A to C will be
+                         ignored!
     min_nodes :          int, optional
                          Minimum number of nodes for a partners to be
                          considered. Default = 2
@@ -88,8 +89,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                          similarity
     connectivity_table : pd.DataFrame, optional
                          Connectivity table, e.g. from
-                         :func:`~pymaid.get_partners`. Filters still
-                         apply!
+                         :func:`~pymaid.get_partners`. Filters still apply!
 
     Returns
     -------
