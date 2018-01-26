@@ -1078,5 +1078,109 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
     stitched_n._clear_temp_attr()
 
     return stitched_n
+def average_neurons( x, limit=10, base_neuron=None):
+	""" Takes a list of neurons and computes the average using nearest
+	neighbours.
+
+	Notes
+	-----
+	This is a very simple implementation which may give odd results if used
+	on complex neurons. Works fine on e.g. backbones or tracts.
+
+	Parameters
+	----------
+	x :             CatmaidNeuronList
+					Neurons to be averaged.
+	limit :         int, optional
+					Max distance for nearest neighbour search. In microns.
+	base_neuron :   {skeleton_ID, CatmaidNeuron}, optional
+					Neuron to use as template for averaging. If not provided,
+					the first neuron in the list is used as template!
+
+	Returns
+	-------
+	CatmaidNeuron
+
+	Examples
+	--------
+	>>> # Get a bunch of neurons
+	>>> da1 = pymaid.get_neurons('annotation:glomerulus DA1 right')
+	>>> # Prune down to longest neurite
+	>>> da1.reroot(da1.soma)
+	>>> da1_pr = da1.prune_by_longest_neurite(inplace=False)
+	>>> # Make average
+	>>> da1_avg = pymaid.average_neurons(da1_pr)
+	>>> # Plot
+	>>> da1.plot3d()
+	>>> da1_avg.plot3d()
+	"""
+
+	if not isinstance(x, core.CatmaidNeuronList):
+		raise TypeError('Need CatmaidNeuronList, got "{0}"'.format(type(x)))
+
+
+	if len(x) < 2:
+		raise ValueError('Need at least 2 neurons to average!')
+
+	#Generate KDTrees for each neuron
+	for n in x:
+		n.tree = graph.neuron2KDTree( n, tree_type='c', data='treenodes' )
+
+	# Set base for average: we will use this neurons treenodes to query the KDTrees
+	if isinstance(base_neuron, core.CatmaidNeuron):
+		base_neuron = base_neuron.copy()
+	elif isinstance(base_neuron, int):
+		base_neuron = x.skid[base_neuron].copy
+	elif isinstance(base_neuron, type(None)):
+		base_neuron = x[0].copy()
+	else:
+		raise ValueError('Unable to interpret base_neuron of type "{0}"'.format(type(base_neuron)))
+
+	base_nodes = base_neuron.nodes[['x','y','z']].values
+	other_neurons = x[1:]
+
+	# Make sure these stay 2-dimensional arrays -> will add a colum for each "other" neuron
+	base_x = base_nodes[:,0:1]
+	base_y = base_nodes[:,1:2]
+	base_z = base_nodes[:,2:3]
+
+	# For each "other" neuron, collect nearest neighbour coordinates
+	for n in other_neurons:
+		nn_dist, nn_ix = n.tree.query( base_nodes, k=1, distance_upper_bound = limit * 1000 )
+
+		# Translate indices into coordinates
+		# First, make empty array
+		this_coords = np.zeros( ( len(nn_dist), 3 ) )
+		# Set coords without a nearest neighbour within distances to "None"
+		this_coords[ nn_dist == float('inf') ] = None
+		# Fill in coords of nearest neighbours
+		this_coords[ nn_dist != float('inf') ] = n.tree.data[ nn_ix[ nn_dist != float('inf') ] ]
+		# Add coords to base coords
+		base_x = np.append( base_x, this_coords[:,0:1] , axis=1 )
+		base_y = np.append( base_y, this_coords[:,1:2] , axis=1 )
+		base_z = np.append( base_z, this_coords[:,2:3] , axis=1 )
+
+	# Calculate means
+	mean_x = np.mean( base_x, axis=1)
+	mean_y = np.mean( base_y, axis=1)
+	mean_z = np.mean( base_z, axis=1)
+
+	# If any of the base coords has NO nearest neighbour within limit whatsoever,
+	# the average of that row will be "nan" -> in this case we will fall back to
+	# the base coordinate
+	mean_x[ np.isnan(mean_x)  ] = base_nodes[ np.isnan(mean_x) ,0]
+	mean_y[ np.isnan(mean_y)  ] = base_nodes[ np.isnan(mean_y) ,1]
+	mean_z[ np.isnan(mean_z)  ] = base_nodes[ np.isnan(mean_z) ,2]
+
+	# Change coordinates accordingly
+	base_neuron.nodes.loc[:,'x'] = mean_x
+	base_neuron.nodes.loc[:,'y'] = mean_y
+	base_neuron.nodes.loc[:,'z'] = mean_z
+
+	return base_neuron
+
+
+
+
 
 
