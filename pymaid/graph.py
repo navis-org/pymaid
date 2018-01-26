@@ -19,6 +19,7 @@
 
 import numpy as np
 import pandas as pd
+import scipy.spatial
 
 import logging
 
@@ -44,7 +45,8 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted(['network2nx','network2igraph','neuron2igraph','dist_from_root','neuron2nx'])
+__all__ = sorted(['network2nx','network2igraph','neuron2igraph',
+                  'dist_from_root','neuron2nx','neuron2KDTree'])
 
 
 def network2nx(x, remote_instance=None, threshold=1):
@@ -395,3 +397,52 @@ def _find_all_paths(g, start, end, mode = 'OUT', maxlen = None):
         for e in end:
             all_paths.extend(find_all_paths_aux(adjlist, s, e, [], maxlen))
     return all_paths
+
+def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
+    """ Turns a neuron into scipy.spatial.cKDTree.
+
+    Parameters
+    ----------
+    x :         single CatmaidNeuron
+    tree_type : {'c','normal'}, optional
+                Type of KDTree:
+                  1. 'c' = scipy.spatial.cKDTree (faster)
+                  2. 'normal' = scipy.spatial.KDTree (more functions)
+    data :      {'treenodes', 'connectors'}, optional
+                Data to use to generate tree.
+    **kwargs
+                Keyword arguments passed at KDTree initialization.
+
+
+    Returns
+    -------
+    scipy.spatial.cKDTree or scipy.spatial.KDTree
+
+    """
+
+    if tree_type not in ['c','normal']:
+        raise ValueError('"tree_type" needs to be either "c" or "normal"')
+
+    if data not in ['treenodes','connectors']:
+        raise ValueError('"data" needs to be either "treenodes" or "connectors"')
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if len(x) == 1:
+            x = x[0]
+        else:
+            raise ValueError('Need a single CatmaidNeuron')
+    elif not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Need CatmaidNeuron, got "{0}"'.format(type(x)))
+
+    if data == 'treenodes':
+        d = x.nodes[['x','y','z']].values
+    else:
+        d = x.connectors[['x','y','z']].values
+
+    if tree_type == 'c':
+        return scipy.spatial.cKDTree( data = d, **kwargs )
+    else:
+        return scipy.spatial.KDTree( data = d, **kwargs )
+
+
+
