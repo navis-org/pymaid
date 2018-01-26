@@ -46,9 +46,9 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted([ 'classify_nodes','cut_neuron', 'longest_neurite',
-            'reroot_neuron', 'distal_to', 'dist_between',
-            'generate_list_of_childs','geodesic_matrix'])
+__all__ = sorted([ 'classify_nodes','cut_neuron', 'longest_neurite', 'split_into_fragments',
+            'reroot_neuron', 'distal_to', 'dist_between', 'find_main_branchpoint',
+            'generate_list_of_childs','geodesic_matrix', 'subset_neuron','node_label_sorting'])
 
 def _generate_segments(x, append=True):
     """ Generate linear segments for a given neuron.
@@ -159,7 +159,7 @@ def distal_to(x, a=None, b=None):
     Returns
     -------
     bool
-            If a and b are single treenode IDs respectively
+            If a and b are single treenode IDs respectively.
     pd.DataFrame
             If a and/or b are lists of treenode IDs. Columns and rows (index)
             represent treenode IDs. Neurons *a* are rows, neurons *b* are
@@ -258,7 +258,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False):
     if not isinstance(tn_ids, type(None)):
         tn_ids = set(tn_ids)
         tn_indices = tuple(i for i,node in enumerate(nodeList) if node in tn_ids)
-        ix = tn_ids
+        ix = [ nodeList[i] for i in tn_indices ]
     else:
         tn_indices = None
         ix = nodeList
@@ -298,7 +298,9 @@ def dist_between(x, a, b):
         else:
             raise ValueError('Need a single CatmaidNeuron')
     elif isinstance( x, core.CatmaidNeuron ):
-        pass
+        g = x.graph
+    elif isinstance( x, nx.DiGraph):
+        g = x
     else:
         raise ValueError('Unable to process data of type {0}'.format(type(x)))
 
@@ -307,7 +309,6 @@ def dist_between(x, a, b):
         _ = int(b)
     except:
         raise ValueError('a, b need to be treenode IDs')
-
 
     return int( nx.algorithms.shortest_path_length( g.to_undirected(as_view=True),
                                                     a, b,
@@ -457,18 +458,17 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
     return nl
 
 def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
-    """ Returns a neuron consisting of the longest neurite(s) based on
+    """ Returns a neuron consisting of only the longest neurite(s) based on
     geodesic distance.
 
     Parameters
     ----------
     x :                 {CatmaidNeuron,CatmaidNeuronList}
-                        May contain multiple neurons.
+                        May contain only a single neuron.
     n :                 int, optional
-                        Number of longest neurites to retain.
+                        Number of longest neurites to preserve.
     reroot_to_soma :    bool, optional
-                        If True, neuron will be rerooted to soma. Soma is the
-                        node with >1000 radius.
+                        If True, neuron will be rerooted to soma.
     inplace :           bool, optional
                         If False, copy of the neuron will be trimmed down to
                         longest neurite and returned.
@@ -477,19 +477,27 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     -------
     pandas.DataFrame/CatmaidNeuron object
                    Contains only node data of the longest neurite
+
+    See Also
+    --------
+    :func:`~pymaid.split_into_fragments`
+            Split neuron into fragments based on longest neurites.
     """
 
     if isinstance(x, core.CatmaidNeuron):
-        x = x
+        pass
     elif isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] == 1:
-            x = x.loc[0]
+            x = x[0]
         else:
             module_logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
+
+    if n < 1:
+        raise ValueError('Number of longest neurites to preserve must be at least 1.')
 
     if not inplace:
         x = x.copy()
@@ -650,6 +658,8 @@ def cut_neuron(x, cut_node, g=None):
     --------
     :func:`~pymaid.CatmaidNeuron.prune_distal_to`
     :func:`~pymaid.CatmaidNeuron.prune_proximal_to`
+    :func:`~pymaid.subset_neuron`
+            Returns a neuron consisting of a subset of its treenodes.
 
     """
 
@@ -678,23 +688,18 @@ def cut_neuron(x, cut_node, g=None):
         else:
             cut_node = x.tags[cut_node][0]
 
-    # Get subgraphs consisting of nodes proximal/distal to cut node
-    prox_graph = nx.bfs_tree( x.graph, cut_node )
+    # Get subgraphs consisting of nodes distal to cut node
     dist_graph = nx.bfs_tree( x.graph, cut_node, reverse=True )
 
     # bfs_tree does not preserve 'weight' -> need to subset original graph by those nodes
-    prox_graph = x.graph.subgraph( prox_graph.nodes )
     dist_graph = x.graph.subgraph( dist_graph.nodes )
+    prox_graph = x.graph.subgraph( [ n for n in x.graph.nodes if n not in dist_graph.nodes ] + [cut_node] )
     # ATTENTION: prox/dist_graph contain pointers to the original graph
     # -> changes to structure don't but changes to attributes will propagate back
 
     # Generate new neurons (this is the actual bottleneck of the function: ~70% of time)
-    dist = x.copy()
-    prox = x.copy()
-
-    # Filter treenodes
-    dist.nodes = dist.nodes[ dist.nodes.treenode_id.isin( dist_graph.nodes ) ]
-    prox.nodes = prox.nodes[ prox.nodes.treenode_id.isin( prox_graph.nodes ) ]
+    dist =  subset_neuron( x, dist_graph, clear_temp=False )
+    prox = subset_neuron( x, prox_graph, clear_temp=False )
 
     # Change new root for dist
     dist.nodes.loc[ dist.nodes.treenode_id == cut_node, 'parent_id' ] = None
@@ -702,18 +707,6 @@ def cut_neuron(x, cut_node, g=None):
 
     # Change cut node to end node for prox
     prox.nodes.loc[ prox.nodes.treenode_id == cut_node, 'type' ] = 'end'
-
-    # Filter connectors
-    dist.connectors = dist.connectors[ dist.connectors.treenode_id.isin( dist_graph.nodes ) ]
-    prox.connectors = prox.connectors[ prox.connectors.treenode_id.isin( prox_graph.nodes ) ]
-
-    # Filter tags
-    dist.tags = { t : [ tn for tn in dist.tags[t] if tn in dist_graph.nodes ] for t in dist.tags }
-    prox.tags = { t : [ tn for tn in prox.tags[t] if tn in prox_graph.nodes ] for t in prox.tags }
-
-    # Remove empty tags
-    dist.tags = { t : dist.tags[t] for t in dist.tags if dist.tags[t] }
-    prox.tags = { t : prox.tags[t] for t in prox.tags if prox.tags[t] }
 
     # Reassign graphs
     dist.graph = dist_graph
