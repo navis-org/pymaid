@@ -208,6 +208,14 @@ class CatmaidInstance:
         """ Use to parse url for retrieving stack infos. """
         return self.djangourl("/" + str(self.project_id) + "/stack/" + str(sid) + "/info")
 
+    def _get_projects_url(self):
+        """ Use to get list of available projects on server. Does not need postdata."""
+        return self.djangourl("/projects/")
+
+    def _get_stacks_url(self):
+        """ Use to get list of available image stacks for the project. Does not need postdata."""
+        return self.djangourl("/" + str(self.project_id) + "/stacks")
+
     def _get_treenode_info_url(self, tn_id):
         """ Use to parse url for retrieving treenode infos. Needs empty post!"""
         return self.djangourl("/" + str(self.project_id) + "/treenodes/" + str(tn_id) + "/info")
@@ -1268,12 +1276,11 @@ def get_names(x, remote_instance=None):
     return(names)
 
 
-def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
+def get_node_user_details(x, remote_instance=None, chunk_size=10000):
     """ Retrieve user info for a list of treenode and/or connectors.
 
     Parameters
     ----------
-    treenode_ids :      list
     x :                 {list, CatmaidNeuron/List}
                         List of treenode ids (can also be connector ids!).
                         If CatmaidNeuron/List will get only treenodes.
@@ -1299,24 +1306,27 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
 
 
     """
-
-    if type(treenode_ids) != type(list()):
-        treenode_ids = [treenode_ids]
+    if isinstance(x, (core.CatmaidNeuron,core.CatmaidNeuronList)):
+        node_ids = x.nodes.treenode_id.values
+    elif not isinstance(x, (list, tuple, np.ndarray)):
+        node_ids = [x]
+    else:
+        node_ids = x
 
     remote_instance = _eval_remote_instance(remote_instance)
 
     module_logger.info(
-        'Retrieving details for %i nodes...' % len(treenode_ids))
+        'Retrieving details for %i nodes...' % len(node_ids))
 
     remote_nodes_details_url = remote_instance._get_node_info_url()
 
     data = dict()
 
-    with tqdm(total=len(treenode_ids), disable=module_logger.getEffectiveLevel()>=40, desc='Nodes') as pbar:
-        for ix in range(0, len(treenode_ids), chunk_size):
+    with tqdm(total=len(node_ids), disable=module_logger.getEffectiveLevel()>=40, desc='Nodes') as pbar:
+        for ix in range(0, len(node_ids), chunk_size):
             get_node_details_postdata = dict()
 
-            for k, tn in enumerate(treenode_ids[ix:ix + chunk_size]):
+            for k, tn in enumerate(node_ids[ix:ix + chunk_size]):
                 key = 'node_ids[%i]' % k
                 get_node_details_postdata[key] = tn
 
