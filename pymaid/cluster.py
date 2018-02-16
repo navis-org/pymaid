@@ -31,6 +31,9 @@ import json
 
 from pymaid import fetch, core, plotting
 
+import matplotlib as mpl
+from scipy.cluster.hierarchy import set_link_color_palette
+
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
@@ -147,7 +150,6 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         module_logger.info(
             'Filtering connectivity. %i entries before filtering' % (connectivity.shape[0]))
 
-        if include_skids:
         if not isinstance(include_skids, type(None)):
             connectivity = connectivity[
                 connectivity.skeleton_id.isin(fetch.eval_skids(include_skids, remote_instance=remote_instance))]
@@ -776,20 +778,30 @@ class clust_results:
         if not fig:
             fig = plt.figure()
 
+        dn_kwargs = {'leaf_rotation':90,
+                     'above_threshold_color':'k'}
+        dn_kwargs.update(kwargs)
+
         dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
                                           color_threshold=color_threshold,
                                           labels=labels,
-                                          leaf_rotation=90,
-                                          **kwargs)
+                                          **dn_kwargs)
         module_logger.info(
             'Use matplotlib.pyplot.show() to render dendrogram.')
+
+        ax = plt.gca()
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+
+        plt.tight_layout()
 
         if return_dendrogram:
             return dn
         else:
             return fig
 
-    def plot_matrix2(self, labels=None, **kwargs):
+    def plot_matrix2(self, **kwargs):
         """ Plot distance matrix and dendrogram using seaborn. This package
         needs to be installed manually.
 
