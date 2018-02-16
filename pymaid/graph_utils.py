@@ -728,7 +728,8 @@ def subset_neuron( x, subset, clear_temp=True ):
                     Treenodes to subset the neuron to
     clear_temp :    bool, optional
                     If True, will reset temporary attributes (graph, node
-                    classification). In general, you should leave this at True.
+                    classification, etc. ). In general, you should leave this
+                    at True.
 
     Returns
     -------

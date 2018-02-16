@@ -1274,7 +1274,9 @@ def get_node_user_details(treenode_ids, remote_instance=None, chunk_size=10000):
     Parameters
     ----------
     treenode_ids :      list
+    x :                 {list, CatmaidNeuron/List}
                         List of treenode ids (can also be connector ids!).
+                        If CatmaidNeuron/List will get only treenodes.
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     chunk_size :        int, optional

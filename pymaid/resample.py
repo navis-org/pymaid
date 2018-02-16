@@ -139,7 +139,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
         return x
 
 def resample_neuron(x, resample_to, method='linear', inplace=False):
-    """ Resamples neuron(s) to given resolution. Preserves root, leafs,
+    """ Resamples neuron(s) to given NM resolution. Preserves root, leafs,
     branchpoints. Tags, connectors and radii > 0 are mapped onto the closest
     new treenode. Columns "confidence" and "creator" of the treenode table
     are currently discarded.
@@ -149,12 +149,14 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     This generates an entirely new set of treenode IDs! Those will be unique
     within a neuron, but you may encounter duplicates across neurons.
 
+    Also: be aware that high-resolution neurons will use A LOT of memory.
+
     Parameters
     ----------
     x :                 {CatmaidNeuron,CatmaidNeuronList}
                         Neuron(s) to resample.
     resample_to :       int
-                        New resolution in nanometer.
+                        New resolution in NANOMETER.
     method :            str, optional
                         See `scipy.interpolate.interp1d` for possible options.
                         By default, we're using linear interpolation.
