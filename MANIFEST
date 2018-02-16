@@ -13,4 +13,5 @@ pymaid/morpho.py
 pymaid/plotting.py
 pymaid/resample.py
 pymaid/rmaid.py
+pymaid/tiles.py
 pymaid/user_stats.py
