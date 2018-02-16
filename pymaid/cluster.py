@@ -50,8 +50,8 @@ __all__ = sorted([  'cluster_by_connectivity',
 
 
 def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True,
-                            threshold=1, include_skids=[], exclude_skids=[], min_nodes=2,
-                            similarity='vertex_normalized', connectivity_table=None):
+                            threshold=1, include_skids=None, exclude_skids=None, min_nodes=2,
+                            similarity='vertex_normalized', connectivity_table=None, cluster_kws={}):
     """ Calculate connectivity similarity.
 
     Parameters
@@ -143,18 +143,16 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         connectivity = connectivity_table[ ( connectivity_table.num_nodes >= min_nodes ) &
                                            ( connectivity_table.total >= threshold ) ]
 
-    # Filter direction
-    # connectivity = connectivity[ connectivity.relation.isin(directions) ]
-
-    if include_skids or exclude_skids:
+    if not isinstance( include_skids, type(None) ) or not isinstance(exclude_skids, type(None)):
         module_logger.info(
             'Filtering connectivity. %i entries before filtering' % (connectivity.shape[0]))
 
         if include_skids:
+        if not isinstance(include_skids, type(None)):
             connectivity = connectivity[
                 connectivity.skeleton_id.isin(fetch.eval_skids(include_skids, remote_instance=remote_instance))]
 
-        if exclude_skids:
+        if not isinstance(exclude_skids, type(None)):
             connectivity = connectivity[
                 ~connectivity.skeleton_id.isin(fetch.eval_skids(exclude_skids, remote_instance=remote_instance))]
 
@@ -163,7 +161,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
     # Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)!
     # This is AFTER filtering! Total number of partners can be altered!
-    number_of_partners = {n: {'upstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'upstream')].shape[0],
+    number_of_partners = { n: {'upstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'upstream')].shape[0],
                               'downstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'downstream')].shape[0]
                               }
                           for n in neurons}
@@ -175,7 +173,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
     matching_scores = {}
 
-    if similarity == 'vertex_normalized':
+    if similarity in ['vertex_normalized','vertex']:
         vertex_score = True
     else:
         vertex_score = False
@@ -193,7 +191,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         if this_cn.shape[0] == 0:
             module_logger.warning('No %s partners found: filtered?' % d)
 
-        combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB]) for nA in neurons for nB in neurons ]
+        combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB],cluster_kws) for nA in neurons for nB in neurons ]
 
         pool = mp.Pool()
         matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d, disable=module_logger.getEffectiveLevel()>=40, smoothing=0 ))
@@ -245,7 +243,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
 def _unpack_connectivity_helper(x):
     """Helper function to unpack values from pool"""
-    return _calc_connectivity_matching_index( x[0], x[1], x[2], vertex_score=x[3], nA_cn=x[4], nB_cn=x[5]  )
+    return _calc_connectivity_matching_index( x[0], x[1], x[2], vertex_score=x[3], nA_cn=x[4], nB_cn=x[5], **x[6]  )
 
 def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_threshold=1, min_nodes=1, **kwargs):
     """ Calculates and returns various matching indices between two neurons.
@@ -339,8 +337,8 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     # C1 determines how negatively a case where one edge is much stronger than another is punished
     # C2 determines the point where the similarity switches from negative to
     # positive
-    C1 = 0.5
-    C2 = 1
+    C1 = kwargs.get('C1', 0.5)
+    C2 = kwargs.get('C2', 1)
     vertex_similarity = 0
     max_score = 0
     similarity_indices = {}
@@ -358,8 +356,13 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
         this_max = np.max(this_cn, axis=1)
         this_min = np.min(this_cn, axis=1)
 
-        # Keep track of max possible score
-        max_score = this_max.sum()
+        # The max possible score is when both synapse counts are the same:
+        # in which case score = max(x,y) - C1 * max(x,y) * e^(-C2 * max(x,y))
+        max_score = this_max - C1 * this_max * np.exp( - C2 * this_max )
+
+        # The smallest possible score is when either synapse count is 0:
+        # in which case score = -C1 * max(a,b)
+        min_score = -C1 * this_max
 
         # Implement: f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
         v_sim = this_min - C1 * this_max * np.exp( - C2 * this_min )
@@ -367,11 +370,11 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
         # Sum over all partners
         vertex_similarity = v_sim.sum()
 
+        similarity_indices['vertex'] = vertex_similarity
+
         try:
             similarity_indices['vertex_normalized'] = (
-                vertex_similarity + C1 * max_score) / ((1 + C1) * max_score)
-            # Reason for (1+C1) is that by increasing vertex_similarity first
-            # by C1*max_score, we also increase the maximum reachable value
+                vertex_similarity - min_score.sum() ) / (max_score.sum() - min_score.sum())
         except:
             similarity_indices['vertex_normalized'] = 0
 
