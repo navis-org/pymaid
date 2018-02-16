@@ -139,7 +139,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 				Cable in micrometers [um]
 
 	skdata
-				If return_skdata = True. Neuron object with
+				If `return_skdata==True`. Neuron object with
 				``nodes.parent_dist`` containing the distances to parent.
 	"""
 
@@ -160,9 +160,6 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 	else:
 		raise Exception('Unable to interpret data of type', type(skdata))
 
-	# Copy node data too
-	df.nodes = df.nodes.copy()
-
 	# Catch single-node neurons
 	if df.nodes.shape[0] == 1:
 		if return_skdata:
@@ -174,23 +171,20 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 	if smoothing > 1:
 		df = downsample_neuron(df, smoothing)
 
-	if df.nodes.index.name != 'treenode_id':
-		df.nodes.set_index('treenode_id', inplace=True)
-
 	# Calculate distance to parent for each node
 	nodes = df.nodes[~df.nodes.parent_id.isnull()]
-	tn_coords = nodes[['x', 'y', 'z']].reset_index()
-	parent_coords = df.nodes.loc[[n for n in nodes.parent_id.tolist()],
-		['x', 'y', 'z']].reset_index()
+	tn_coords = nodes[['x', 'y', 'z']].values
+
+	# Ready treenode table to be indexes by treenode_id
+	this_tn = df.nodes.set_index('treenode_id')
+	parent_coords = this_tn.loc[nodes.parent_id.values,
+		['x', 'y', 'z']].values
 
 	# Calculate distances between nodes and their parents
-	w = np.sqrt(np.sum(
-		(tn_coords[['x', 'y', 'z']] - parent_coords[['x', 'y', 'z']]) ** 2, axis=1))
-
-	df.nodes.reset_index(inplace=True)
+	w = np.sqrt( np.sum( (tn_coords - parent_coords) ** 2, axis=1))
 
 	if return_skdata:
-		df.nodes['parent_dist'] = [v / 1000 for v in list(w)]
+		df.nodes.loc[ ~df.nodes.parent_id.isnull() ,'parent_dist'] = w / 1000
 		return df
 
 	# #Remove nan value (at parent node) and return sum of all distances
