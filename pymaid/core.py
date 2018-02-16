@@ -1019,6 +1019,52 @@ class CatmaidNeuron:
                                 'n_open_ends', 'cable_length', 'review_status', 'soma']
                          )
 
+    def to_swc(self, filename):
+        """ Generate SWC file from this neuron.
+
+        Parameters
+        ----------
+        filename :      str
+
+        Returns
+        -------
+        Nothing
+        """
+
+        # Make copy of nodes
+        this_tn = self.nodes.copy()
+
+        # Add an index column
+        this_tn.loc[:,'index'] = list(range( this_tn.shape[0] ))
+
+        # Make a dictionary
+        this_tn = this_tn.set_index('treenode_id')
+        parent_index = { r.parent_id : this_tn.loc[r.parent_id,'index'] for r in self.nodes[~self.nodes.parent_id.isnull()].itertuples() }
+        parent_index[None] = -1
+
+        # Generate table consisting of PointNo Label X Y Z Radius Parent
+        swc = this_tn[['index','x','y','z', 'radius']]
+        # Set Label column to 0
+        swc['Label'] = 0
+        # Add parents
+        swc['Parent'] = [ parent_index[tn] for tn in this_tn.parent_id.values ]
+        # Adjust column titles
+        swc.columns = ['PointNo','X','Y','Z','Radius','Label','Parent']
+        # Reorder columns
+        swc = swc[['PointNo','Label','X','Y','Z','Radius','Parent']]
+        # Radius to microns
+        swc['Radius'] /= 1000
+
+        with open(filename, 'w') as file:
+            # Write header
+            file.write('# SWC format file\n')
+            file.write('# based on specifications at http://research.mssm.edu/cnic/swc.html\n')
+            file.write('# Created by pymaid (https://github.com/schlegelp/PyMaid)\n')
+            file.write('# PointNo Label X Y Z Radius Parent\n')
+            writer = csv.writer(file, delimiter=' ')
+            writer.writerows( swc.values )
+
+
     @classmethod
     def from_swc(self, filename, neuron_name = None, neuron_id = None):
         """ Generate neuron object from SWC file.
