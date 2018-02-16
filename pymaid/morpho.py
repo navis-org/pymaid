@@ -45,7 +45,7 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = sorted([ 'calc_cable','strahler_index', 'prune_by_strahler','stitch_neurons','arbor_confidence',
 			'split_axon_dendrite',  'bending_flow', 'flow_centrality',
-			'segregation_index', 'to_dotproduct', 'average_neurons'])
+			'segregation_index', 'to_dotproduct', 'average_neurons', 'tortuosity'])
 
 def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
 	""" Calculates confidence for each treenode by walking from root to leafs
@@ -1214,7 +1214,92 @@ def average_neurons( x, limit=10, base_neuron=None):
 	return base_neuron
 
 
+def tortuosity( x, seg_length=10, skip_remainder=False):
+	""" Calculates tortuosity for a neurons. See Stepanyants et al., Neuron
+	(2004) for detailed explanation. Briefly, tortuosity index T is defined
+	as the ratio of the branch segment length `L` (`seg_length`) to the
+	geometrical distance `R` between its ends.
 
+	Note
+	----
+	If you want to make sure that segments are as close to length `L` as
+	possible, consider resampling the neuron using :func:`pymaid.resample`.
 
+	Parameters
+	----------
+	x :					{CatmaidNeuron,CatmaidNeuronList}
+	seg_length : 		{int, float, list}, optional
+						Segment length(s) L in microns [um]. Please note that
+						this is only a guidance and actual segment length is
+						restricted by the neuron's resolution.
+	skip_remainder :	bool, optional
+						Segments can turn out to be smaller than desired if a
+						branch point or end point is hit before `seg_length`
+						is reached. If `skip_remainder` is True, these will be
+						ignored.
+
+	Returns
+	-------
+	tortuosity :		{float, np.array, pandas.DataFrame}
+						If x is CatmaidNeuronList, will return DataFrame.
+						If x is single CatmaidNeuron, will return either a
+						single float (if) or a
+
+	"""
+
+	# TODO:
+	# - try as angles between dotproduct vectors
+	#
+
+	if isinstance(x, core.CatmaidNeuronList):
+		if not isinstance(seg_length, (list, np.ndarray, tuple)):
+			seg_length = [seg_length]
+		return pd.DataFrame( [ tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=module_logger.getEffectiveLevel()>=40 ) ],
+							 index=x.skeleton_id, columns=seg_length ).T
+
+	if not isinstance(x, core.CatmaidNeuron):
+		raise TypeError('Need CatmaidNeuron, got {0}'.format(type(x)))
+
+	if isinstance(seg_length, (list, np.ndarray)):
+		return [ tortuosity(x, l) for l in seg_length ]
+
+	if seg_length <= 0:
+		raise ValueError('Segment length must be >0.')
+
+	# We will collect coordinates and do distance calculations later
+	start_tn = []
+	end_tn = []
+	L = []
+
+	# Go over all segments
+	for seg in x.segments:
+		# Collect distances between treenodes (in microns)
+		dist = np.array( [ x.graph.edges[ ( c, p  ) ]['weight'] for c,p in zip(seg[:-1],seg[1:]) ] ) / 1000
+		# Walk the segment, collect stretches of length `seg_length`
+		cut_ix = [0]
+		for i, tn in enumerate( seg ):
+			if sum( dist[ cut_ix[-1]:i ] ) > seg_length:
+				cut_ix.append( i )
+
+		# If the last node is not a cut node
+		if cut_ix[-1] < i and not skip_remainder:
+			cut_ix.append(i)
+
+		# Translate into treenode IDs
+		if len(cut_ix) > 1:
+			L += [ sum( dist[s:e] ) for s,e in zip( cut_ix[:-1], cut_ix[1:] ) ]
+			start_tn += [ seg[n] for n in cut_ix[:-1] ]
+			end_tn += [ seg[n] for n in cut_ix[1:] ]
+
+	# Now geometric calculate distances
+	tn_table = x.nodes.set_index('treenode_id')
+	start_co = tn_table.loc[ start_tn, ['x','y','z'] ].values
+	end_co = tn_table.loc[ end_tn, ['x','y','z'] ].values
+	R = np.linalg.norm( start_co - end_co, axis=1 ) / 1000
+
+	# Get tortousity
+	T = np.array(L) / R
+
+	return T.mean()
 
 
