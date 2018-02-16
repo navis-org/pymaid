@@ -277,7 +277,8 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     _ACCEPTED_KWARGS = ['remote_instance','connectors','connectors_only',
                         'ax','color','view','scalebar','cn_mesh_colors',
-                        'linewidth','cn_size','group_neurons', 'scatter_kws']
+                        'linewidth','cn_size','group_neurons', 'scatter_kws',
+                        'figsize']
     wrong_kwargs = [ a for a in kwargs if a not in _ACCEPTED_KWARGS ]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS) ))
@@ -338,9 +339,9 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     if not ax:
         if method=='2d':
-            fig, ax = plt.subplots(figsize=(8, 8))
+            fig, ax = plt.subplots(figsize= kwargs.get('figsize', (8, 8) ) )
         elif method in ['3d','3d_complex']:
-            fig = plt.figure(figsize=plt.figaspect(1)*1.5)
+            fig = plt.figure(figsize= kwargs.get('figsize', plt.figaspect(1)*1.5) )
             ax = fig.gca(projection='3d')
             # Set projection to orthogonal
             proj3d.persp_transformation = _orthogonal_proj
@@ -350,6 +351,10 @@ def plot2d(x, method='2d', *args, **kwargs):
         ax.set_aspect('equal')
     else:
         fig = None #we don't really need this
+        if method in ['3d','3d_complex'] and ax.name != '3d':
+            raise TypeError('Axis must be 3d.')
+        elif method == '2d' and ax.name == '3d':
+            raise TypeError('Axis must be 2d.')
 
     if volumes:
         for v in volumes:
@@ -464,19 +469,32 @@ def plot2d(x, method='2d', *args, **kwargs):
     if points:
         for p in points:
             if method == '2d':
+                default_settings = dict(
+                            c = 'black',
+                            alpha = 1,
+                            zorder = 4,
+                            edge_color = 'none',
+                            s = 1
+                                )
+                default_settings.update(scatter_kws)
+                default_settings = _fix_default_dict(default_settings)
+
                 ax.scatter(p[:,0],
                            p[:,1] *-1,
-                           c=scatter_kws.get('color','black'),
-                           alpha=1,
-                           zorder=4,
-                           edgecolor='none',
-                           s=scatter_kws.get('size',1))
+                           **default_settings)
             elif method in ['3d','3d_complex']:
+                default_settings = dict(
+                            c = 'black',
+                            s = 1,
+                            depthshade = False,
+                            edgecolor='none'
+                                )
+                default_settings.update(scatter_kws)
+                default_settings = _fix_default_dict(default_settings)
+
                 ax.scatter(p[:,0], p[:,2], p[:,1] * -1,
-                           c=scatter_kws.get('color','black'),
-                           s=scatter_kws.get('size',1),
-                           depthshade=False,
-                           edgecolor='none')
+                           **default_settings
+                           )
 
             coords = p
             coords[:,1] *= -1
@@ -558,6 +576,21 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     return fig, ax
 
+
+def _fix_default_dict(x):
+    """ Consolidates duplicate settings in e.g. scatter kwargs when 'c' and
+    'color' is provided.
+    """
+
+    # The first entry is the "survivor"
+    duplicates = [ ['color','c'], ['size','s'] ]
+
+    for dupl in duplicates:
+        if sum([ v in x for v in dupl ]) > 1:
+            to_delete = [ v for v in dupl if v in x ][1:]
+            _ = [ x.pop(v) for v in to_delete ]
+
+    return x
 
 def _segments_to_coords(x, segments, modifier=(1,1,1)):
     """Turns lists of treenode_ids into coordinates
