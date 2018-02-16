@@ -1067,7 +1067,8 @@ class CatmaidNeuron:
 
     @classmethod
     def from_swc(self, filename, neuron_name = None, neuron_id = None):
-        """ Generate neuron object from SWC file.
+        """ Generate neuron object from SWC file. This import is following
+        format specified here: http://research.mssm.edu/cnic/swc.html
 
         Parameters
         ----------
@@ -1102,11 +1103,11 @@ class CatmaidNeuron:
                 if not row[0].startswith('#'):
                     data.append(row)
 
-        # Remove empty entries and generade nodes dataframe
+        # Remove empty entries and generate nodes DataFrame
         nodes = pd.DataFrame([ [ float(e) for e in row if e != '' ] for row in data ],
                             columns = ['treenode_id','label','x','y','z','radius','parent_id'], dtype=object )
 
-        # Bring from um into nm space
+        # Bring radius from um into nm space
         nodes[['x','y','z','radius']] *= 1000
 
         connectors = pd.DataFrame([], columns = ['treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'], dtype=object )
@@ -1126,6 +1127,18 @@ class CatmaidNeuron:
         # Placeholder for graph representations of neurons
         df['igraph'] = None
         df['graph'] = None
+
+        # Convert data to respective dtypes
+        dtypes = {'treenode_id':int, 'parent_id':object,
+                  'creator_id':int, 'relation':int,
+                  'connector_id':int, 'x':int, 'y':int, 'z':int,
+                  'radius':int, 'confidence':int}
+
+        for k, v in dtypes.items():
+            for t in ['nodes','connectors']:
+                for i in range(df.shape[0]):
+                    if k in df.loc[i,t]:
+                        df.loc[i,t][k] = df.loc[i,t][k].astype(v)
 
         return CatmaidNeuron(df)
 
