@@ -120,17 +120,6 @@ class CatmaidNeuron:
     Using a CatmaidNeuron to initialise a CatmaidNeuron will automatically
     make a copy.
 
-    Parameters
-    ----------
-    x                   {skeletonID, CatmaidNeuron}
-                        Data to construct neuron from.
-    remote_instance :   CatmaidInstance, optional
-                        Storing this makes it more convenient to retrieve e.g.
-                        neuron annotations, review status, etc.
-    meta_data :         dict, optional
-                        any additional data
-
-
     Attributes
     ----------
     skeleton_id :       str
@@ -214,6 +203,18 @@ class CatmaidNeuron:
     """
 
     def __init__(self, x, remote_instance=None, meta_data=None):
+        """ Initialize CatmaidNeuron.
+
+        Parameters
+        ----------
+        x                   {skeletonID, CatmaidNeuron}
+                            Data to construct neuron from.
+        remote_instance :   CatmaidInstance, optional
+                            Storing this makes it more convenient to retrieve
+                            e.g. neuron annotations, review status, etc.
+        meta_data :         dict, optional
+                            any additional data
+        """
         if isinstance(x, (pd.DataFrame, CatmaidNeuronList)):
             if x.shape[0] == 1:
                 x = x.ix[0]
@@ -1158,27 +1159,8 @@ class CatmaidNeuronList:
     :func:`~pymaid.get_neuron` (see examples).
 
     Manually, a CatmaidNeuronList can constructed from a pandas DataFrame (df)
-    containing: df.nodes, df.connectors, df.skeleton_id, df.neuron_name,
+    consisting of: df.nodes, df.connectors, df.skeleton_id, df.neuron_name,
     df.tags for a set of neurons.
-
-    Parameters
-    ----------
-    x
-                        Data to construct neuron from. Can be either:
-
-                        1. skeleton ID(s)
-                        2. CatmaidNeuronList (will create a deep copy)
-                        3. pandas DataFrame
-    remote_instance :   CatmaidInstance, optional
-                        Storing this makes it more convenient to retrieve e.g.
-                        neuron annotations, review status, etc.
-    meta_data :         dict, optional
-                        Any additional data
-    make_copy :         boolean, optional
-                        If true, DataFrames are copied [.copy()] before being
-                        assigned to the neuron object to prevent
-                        backpropagation of subsequent changes to the data.
-                        Default = True
 
     Attributes
     ----------
@@ -1244,6 +1226,27 @@ class CatmaidNeuronList:
     """
 
     def __init__(self, x, remote_instance=None, make_copy=True, _use_parallel=False):
+        """ Initialize CatmaidNeuronList.
+
+        Parameters
+        ----------
+        x
+                            Data to construct neuron from. Can be either:
+
+                            1. skeleton ID(s)
+                            2. CatmaidNeuronList (will create a deep copy)
+                            3. pandas DataFrame
+        remote_instance :   CatmaidInstance, optional
+                            Storing this makes it more convenient to retrieve
+                            e.g. neuron annotations, review status, etc.
+        meta_data :         dict, optional
+                            Any additional data
+        make_copy :         boolean, optional
+                            If true, DataFrames are copied [.copy()] before
+                            being assigned to the neuron object to prevent
+                            backpropagation of subsequent changes to the data.
+        """
+
         # Set number of cores
         self.n_cores = max(1, os.cpu_count())
 
