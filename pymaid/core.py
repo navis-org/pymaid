@@ -67,6 +67,10 @@ also allow quick access to other PyMaid functions:
 import datetime
 import logging
 import pandas as pd
+
+import collections
+import six
+
 import numpy as np
 import math
 import datetime
@@ -790,8 +794,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        if not isinstance( node, (list, np.ndarray) ):
-            node = [node]
+        node = _make_iterable(node, force_type=None)
 
         for n in node:
             dist, prox = graph_utils.cut_neuron(x, n)
@@ -1144,7 +1147,7 @@ class CatmaidNeuron:
         return CatmaidNeuron(df)
 
 class CatmaidNeuronList:
-    """ Compilations of :class:`~pymaid.CatmaidNeuron` that allow quick
+    """ Compilation of :class:`~pymaid.CatmaidNeuron` that allow quick
     access to neurons' attributes/functions. They are designed to work in many
     ways much like a pandas.DataFrames by, for example, supporting ``.ix[ ]``,
     ``.itertuples()``, ``.empty`` or ``.copy()``.
@@ -1277,7 +1280,7 @@ class CatmaidNeuronList:
             # This has to be made a copy otherwise changes in the list will
             # backpropagate
             self.neurons = [n for n in x.neurons]
-        elif isinstance(x, (list, np.ndarray)):
+        elif _is_iterable(x):
             # If x is a list of mixed objects we need to unpack/flatten that
             # E.g. x = [CatmaidNeuronList, CatmaidNeuronList, CatmaidNeuron, skeletonID ]
 
@@ -1439,7 +1442,7 @@ class CatmaidNeuronList:
         return x in self.neurons or str(x) in self.skeleton_id or x in self.neuron_name
 
     def __getitem__(self, key):
-        if isinstance(key, str):
+        if isinstance(key, six.string_types):
             if key.startswith('annotation:'):
                 skids = fetch.eval_skids(
                     key, remote_instance=self._remote_instance)
@@ -1447,7 +1450,9 @@ class CatmaidNeuronList:
             else:
                 subset = [
                     n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
-        elif isinstance(key, list):
+        elif isinstance(key, np.ndarray) and key.dtype == 'bool':
+            subset = [n for i, n in enumerate(self.neurons) if key[i]]
+        elif _is_iterable(key):
             if True in [isinstance(k, str) for k in key]:
                 subset = [n for i, n in enumerate(self.neurons) if True in [
                     k == n.neuron_name for k in key] or True in [k == n.skeleton_id for k in key]]
@@ -1455,8 +1460,6 @@ class CatmaidNeuronList:
                 subset = [n for i, n in enumerate(self.neurons) if key[i]]
             else:
                 subset = [self.neurons[i] for i in key]
-        elif isinstance(key, np.ndarray) and key.dtype == 'bool':
-            subset = [n for i, n in enumerate(self.neurons) if key[i]]
         else:
             subset = self.neurons[key]
 
@@ -1470,28 +1473,30 @@ class CatmaidNeuronList:
         raise AttributeError('No neuron matching the search critera.')
 
     def __add__(self, to_add):
-        if isinstance(to_add, list):
+        if isinstance(to_add, CatmaidNeuron):
+            return CatmaidNeuronList(self.neurons + [to_add], make_copy=self.copy_on_subset)
+        elif isinstance(to_add, CatmaidNeuronList):
+            return CatmaidNeuronList(self.neurons + to_add.neurons, make_copy=self.copy_on_subset)
+        elif _is_iterable(to_add):
             if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
                 return CatmaidNeuronList(self.neurons + to_add, make_copy=self.copy_on_subset)
             else:
                 return CatmaidNeuronList( self.neurons + [CatmaidNeuron[n] for n in to_add], make_copy=self.copy_on_subset)
-        elif isinstance(to_add, CatmaidNeuron):
-            return CatmaidNeuronList(self.neurons + [to_add], make_copy=self.copy_on_subset)
-        elif isinstance(to_add, CatmaidNeuronList):
-            return CatmaidNeuronList(self.neurons + to_add.neurons, make_copy=self.copy_on_subset)
         else:
-            module_logger.error('Unable to add data of type %s.' %
-                              str(type(to_add)))
+            raise TypeError('Unable to add data of type {0}'.format(type(to_add)))
 
     def __sub__(self, to_sub):
-        if isinstance(to_sub, str) or isinstance(to_sub, int):
+        if isinstance(to_sub, (str,int)):
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub], make_copy=self.copy_on_subset)
-        elif isinstance(to_sub, list):
-            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub], make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
             return CatmaidNeuronList([n for n in self.neurons if n != to_sub], make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub], make_copy=self.copy_on_subset)
+        elif _is_iterable(to_sub):
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub], make_copy=self.copy_on_subset)
+        else:
+            raise TypeError('Unable to substract data of type {0}'.format(type(to_sub)))
+
 
     def sum(self):
         """Returns sum numeric and boolean values over all neurons. """
@@ -1615,7 +1620,7 @@ class CatmaidNeuronList:
         >>> nl.reroot( nl.soma )
         """
 
-        if not isinstance(new_root, (list,np.ndarray)):
+        if not _is_iterable(new_root):
             new_root = [new_root] * len(self.neurons)
 
         if len(new_root) != len(self.neurons):
@@ -2066,8 +2071,7 @@ class CatmaidNeuronList:
                     Neurons that have given annotation(s).
         """
 
-        if not isinstance(x, (list, np.ndarray)):
-            x = [ x ]
+        x = _make_iterable(x, force_type=None)
 
         if not intersect:
             selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in x for a in an ] ]
@@ -2167,6 +2171,29 @@ def _set_loggers(level='ERROR'):
     graph_utils.module_logger.setLevel(level)
     module_logger.setLevel(level)
 
+def _make_iterable(x, force_type=None):
+    """ Helper function. Turns x into a np.ndarray, if it isn't already. For
+    dicts, keys will be turned into array.
+    """
+    if not isinstance(x, collections.Iterable) or isinstance(x, six.string_types):
+        x = [ x ]
+
+    if isinstance(x, dict):
+        x = list(x)
+
+    if force_type:
+        return np.array( x ).astype(force_type)
+    else:
+        return np.array( x )
+
+def _is_iterable(x):
+    """ Helper function. Returns True if x is an iterable but not str or
+    dictionary.
+    """
+    if isinstance(x, collections.Iterable) and not isinstance( x, six.string_types ):
+        return True
+    else:
+        return False
 
 class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow
@@ -2195,19 +2222,10 @@ class _SkidIndexer():
         module_logger = logger
 
     def __getitem__(self, skid):
-        if not isinstance(skid, (list, np.ndarray, tuple)):
-            skid = [skid]
+        # Turn into list and force strings
+        skid = _make_iterable(skid, force_type=str)
 
-        # Turn everything into strings
-        skid = [str(s) for s in skid]
-
-        # Check if everything can be a string
-        for s in skid:
-            try:
-                int(s)
-            except:
-                raise Exception('Can only index skeleton ID(s), not "{0}"'.format(s))
-
+        # Get objects that match in skid
         sel = [ n for n in self.obj if str(n.skeleton_id) in skid ]
 
         if len( sel ) == 0:
@@ -2279,10 +2297,11 @@ class Volume(dict):
         if isinstance(x, dict):
             x = list(x.values())
 
-        if not isinstance(x, list):
-            raise TypeError('x must be list of volumes')
-        elif False in [ isinstance(v, Volume) for v in x ]:
-            raise TypeError('x must be list of volumes')
+        if not isinstance(x, collections.Iterable):
+            raise TypeError('Input must be list of volumes')
+
+        if False in [ isinstance(v, Volume) for v in x ]:
+            raise TypeError('Input must be list of volumes')
 
         vertices = []
         faces = []
@@ -2317,7 +2336,7 @@ class Volume(dict):
                 Resizing factor
         """
 
-        if not isinstance(self['vertices'], np.ndarray):
+        if not isinstance( self['vertices'], np.ndarray ):
             self['vertices'] = np.array(self['vertices'])
 
         # Get the center
