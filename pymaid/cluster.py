@@ -616,20 +616,6 @@ class clust_results:
     """ Class to handle, analyze and plot similarity/distance matrices.
     Contains thin wrappers for ``scipy.cluster``.
 
-    Parameters
-    ----------
-    mat :       {np.array, pandas.DataFrame}
-                Distance matrix
-    labels :    list, optional
-                labels for matrix
-    mat_type :  {'distance','similarity'}, default = 'distance'
-                Sets the type of input matrix:
-                  - 'similarity' = high values are more similar
-                  - 'distance' = low values are more similar
-
-                The "missing" matrix type will be computed. For clustering,
-                plotting, etc. distance matrices are used.
-
     Attributes
     ----------
     dist_mat :  Distance matrix (0=similar, 1=dissimilar)
@@ -658,6 +644,22 @@ class clust_results:
     _PERM_MAT_TYPES = ['similarity', 'distance']
 
     def __init__(self, mat, labels=None, mat_type='distance'):
+        """ Initialize class instance.
+
+        Parameters
+        ----------
+        mat :       {np.array, pandas.DataFrame}
+                    Distance matrix
+        labels :    list, optional
+                    labels for matrix
+        mat_type :  {'distance','similarity'}, default = 'distance'
+                    Sets the type of input matrix:
+                      - 'similarity' = high values are more similar
+                      - 'distance' = low values are more similar
+
+                    The "missing" matrix type will be computed. For clustering,
+                    plotting, etc. distance matrices are used.
+        """
         if mat_type not in clust_results._PERM_MAT_TYPES:
             raise ValueError('Matrix type "{0}" unkown.'.format(mat_type) )
 
@@ -816,7 +818,10 @@ class clust_results:
         ax.spines['top'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
 
-        plt.tight_layout()
+        try:
+            plt.tight_layout()
+        except:
+            pass
 
         if return_dendrogram:
             return dn
