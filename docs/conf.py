@@ -36,7 +36,7 @@ MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'pylab', 'bpy', 'pyoctre
                 'matplotlib.externals.six.moves', 'networkx', 'nx',
                 'matplotlib.collections','matplotlib.collections.PolyCollection', 'matplotlib.lines', 'matplotlib.patches', 'matplotlib.colors',
                 'mpl_toolkits.mplot3d','mpl_toolkits.mplot3d.proj3d','matplotlib.colors', 'mpl_toolkits.mplot3d.art3d',
-                'mpl_toolkits.mplot3d.art3d.Line3DCollection',
+                'mpl_toolkits.mplot3d.art3d.Line3DCollection','imageio',
                 'mlines','mpatches','mcollections','proj3d','mcl','Line3DCollection',
                 'vispy','seaborn','vispy.geometry', 'vispy.gloo.util', 'vispy.gloo.util._screenshot']
 for mod_name in MOCK_MODULES:

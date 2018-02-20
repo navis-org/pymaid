@@ -6,18 +6,18 @@ Pymaid contains functions for 2D and 3D plotting of neurons, synapses and networ
 .. note::
    If you are experiencing issues when using vispy
    as backend, you should try installing the dev
-   version (currently 0.5.0dev0) directly from
+   version (currently 0.6.0dev0) directly from
    `Github <https://github.com/vispy/vispy>`_.
-   The version installed from PIP is 0.4.0.
+   The version installed from PIP is 0.5.2.
 
 Plotting Neurons
 ================
 
-Neuron objects, :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList`, as well as nblast results, :class:`~pymaid.rmaid.nbl_results`, have built-in modules that call :func:`~pymaid.plot3d` or :func:`~pymaid.plot2d`.
+Neuron objects, :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList`, as well as nblast results, :class:`~pymaid.rmaid.nbl_results`, have built-in methods that call :func:`~pymaid.plot3d` or :func:`~pymaid.plot2d`.
 
 2D Plotting
 -----------
-This uses matplotlib to generate 2D plots. The big advantage is that you can save these plots as vector graphics. Unfortunately, matplotlib's capabilities regarding 3D data are limited. The main problem is that depth (z) is at most simulated by trying to layer objects according to their z-order rather than doing proper rendering. You have several options to deal with this: see `method` parameter in :func:`pymaid.plot2d`. It is important to be aware of this issue as e.g. neuron A might be plotted in front of neuron B even though it is spatially behind it. The more busy your figure, the more likely this is to happen.
+This uses matplotlib to generate 2D plots. The big advantage is that you can save these plots as vector graphics. Unfortunately, matplotlib's capabilities regarding 3D data are limited. The main problem is that depth (z) is at most simulated by trying to layer objects according to their z-order rather than doing proper rendering. You have several options to deal with this: see `method` parameter in :func:`pymaid.plot2d`. It is important to be aware of this issue as e.g. neuron A might be plotted in front of neuron B even though it is actually spatially behind it. The more busy your plot and the more neurons intertwine, the more likely this is to happen.
 
 >>> import pymaid
 >>> import matplib.pyplot as plt
@@ -105,6 +105,7 @@ Adding volumes
 ++++++++++++++
 
 :func:`~pymaid.plot3d` allows plotting of volumes (e.g. neuropil meshes). It's very straight forward to use meshes directly from you Catmaid Server:
+there is a custom class for Catmaid Volumes, :class:`pymaid.Volume` which has some neat methods - check out its reference.
 
 >>> import pymaid
 >>> rm = pymaid.CatmaidInstance( 'www.your.catmaid-server.org',
@@ -160,3 +161,4 @@ Reference
     ~pymaid.close3d
     ~pymaid.get_canvas
     ~pymaid.screenshot
+    ~pymaid.Volume
