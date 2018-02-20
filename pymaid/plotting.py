@@ -747,7 +747,7 @@ def plot3d(x, *args, **kwargs):
     width :           int, default=600
     height :          int, default=600
                       Use to define figure/window size.
-    title :           str, default='Neuron plot'
+    title :           str, default=None
                       Plot title (for plotly only!)
     fig_autosize :    bool, default=False
                       For plotly only! Autoscale figure size.
@@ -1398,7 +1398,7 @@ def plot3d(x, *args, **kwargs):
     alpha_range = kwargs.get('alpha_range', False)
 
     # Parameters for figure
-    pl_title = kwargs.get('title', 'Neuron Plot')
+    pl_title = kwargs.get('title', None)
     width = kwargs.get('width', 600)
     height = kwargs.get('height', 600)
     fig_autosize = kwargs.get('fig_autosize', False)
