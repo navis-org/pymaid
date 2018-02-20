@@ -25,7 +25,9 @@ import scipy.spatial
 import colorsys
 from tqdm import tqdm
 import sys
-import multiprocessing as mp
+
+from concurrent.futures import ThreadPoolExecutor
+
 import os
 import json
 
@@ -97,8 +99,8 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     Returns
     -------
     :func:`pymaid.clust_results`
-                         Holds similarity (!) matrix and contains wrappers to plot
-                         dendograms.
+                         Custom cluster results class holding the distance
+                         matrix and contains wrappers e.g. to plot dendograms.
 
     Examples
     --------
@@ -195,10 +197,12 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
         combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB],cluster_kws) for nA in neurons for nB in neurons ]
 
-        pool = mp.Pool()
-        matching_indices = list(tqdm( pool.imap( _unpack_connectivity_helper, combinations, chunksize=10 ), total=len(combinations), desc=d, disable=module_logger.getEffectiveLevel()>=40, smoothing=0 ))
-        pool.close()
-        pool.join()
+        with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
+            futures = e.map( _unpack_connectivity_helper, combinations  )
+
+            matching_indices = [ n for n in tqdm(futures, total=len(combinations),
+                                                          desc=d,
+                                                          disable=module_logger.getEffectiveLevel()>=40 ) ]
 
         for i,v in enumerate(combinations):
             matching_scores[d].loc[ v[0],v[1] ] = matching_indices[i][similarity]
@@ -401,7 +405,7 @@ def _unpack_synapse_helper(x):
     """Helper function to unpack values from pool."""
     return _calc_synapse_similarity( x[0], x[1], x[2], x[3], x[4] )
 
-def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=True):
+def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000, restrict_cn=None):
     """ Calculates synapses similarity score.
 
     Notes
@@ -414,16 +418,13 @@ def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=
 
     Parameters
     ----------
-    (neuronA, neuronB) :    CatmaidNeuron
-    sigma :                 int, optional
-                            Distance in nanometer that is considered to be
-                            "close"
-    omega :                 int, optional
-                            Radius in nanometer over which to calculate
-                            synapse density
-    mu_score :              bool, optional
-                            If True, score is calculated as mean between A->B
-                            and B->A comparison.
+    (cnA, cnB) :    CatmaidNeuron connector tables
+    sigma :         int, optional
+                    Distance in nanometer that is considered to be
+                    "close"
+    omega :         int, optional
+                    Radius in nanometer over which to calculate
+                    synapse density
 
     Returns
     -------
@@ -432,16 +433,24 @@ def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=
 
     all_values = []
 
+    # Get the connector types that we want to compare between neuron A and B
+    if isinstance( restrict_cn, type(None) ):
+        # If no restrictions, get all cn types in neuron A
+        cn_to_check = cnA.relation.unique()
+    else:
+        # Intersect restricted connectors and actually available types
+        cn_to_check = set( cnA.relation.unique() ) & set( restrict_cn )
+
     # Iterate over all types of connectors
-    for r in neuronA.connectors.relation.unique():
+    for r in cn_to_check:
         # Skip if either neuronA or neuronB don't have this synapse type
-        if neuronB.connectors[ neuronB.connectors.relation == r ].empty:
-            all_values += [0] * neuronA.connectors[ neuronA.connectors.relation == r ].shape[0]
+        if cnB[ cnB.relation == r ].empty:
+            all_values += [0] * cnA[ cnA.relation == r ].shape[0]
             continue
 
         #Get inter-neuron matrix
-        dist_mat = scipy.spatial.distance.cdist(  neuronA.connectors[ neuronA.connectors.relation == r ][['x','y','z']],
-                                            neuronB.connectors[ neuronB.connectors.relation == r ][['x','y','z']] )
+        dist_mat = scipy.spatial.distance.cdist(  cnA[ cnA.relation == r ][['x','y','z']],
+                                                  cnB[ cnB.relation == r ][['x','y','z']] )
 
         #Get index of closest synapse in neuron B
         closest_ix = np.argmin(dist_mat,axis=1)
@@ -450,9 +459,9 @@ def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=
         closest_dist = dist_mat.min(axis=1)
 
         #Get intra-neuron matrices for synapse density checking
-        distA = scipy.spatial.distance.pdist( neuronA.connectors[ neuronA.connectors.relation == r ][['x','y','z']] )
+        distA = scipy.spatial.distance.pdist( cnA[ cnA.relation == r ][['x','y','z']] )
         distA = scipy.spatial.distance.squareform(distA)
-        distB = scipy.spatial.distance.pdist( neuronB.connectors[ neuronB.connectors.relation == r ][['x','y','z']] )
+        distB = scipy.spatial.distance.pdist( cnB[ cnB.relation == r ][['x','y','z']] )
         distB = scipy.spatial.distance.squareform(distB)
 
         #Calculate number of synapses closer than OMEGA. This does count itself!
@@ -466,12 +475,9 @@ def _calc_synapse_similarity(neuronA, neuronB, sigma=2000, omega=2000, mu_score=
 
     score = sum(all_values)/len(all_values)
 
-    if mu_score:
-        return ( score +  _calc_synapse_similarity(neuronB, neuronA, sigma=sigma, omega=omega, mu_score=False))/2
-    else:
-        return score
+    return score
 
-def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remote_instance=None):
+def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restrict_cn=None, remote_instance=None):
     """ Clusters neurons based on their synapse placement.
 
     Notes
@@ -500,6 +506,14 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
     mu_score :          bool, optional
                         If True, score is calculated as mean between A->B and
                         B->A comparison.
+    restrict_cn :       {int, list, None}, optional
+                        Restrict to given connector types:
+                            - 0: presynapses
+                            - 1: postsynapses
+                            - 2: gap junctions
+                            - 3: abutting connectors
+                        If None, will use all connectors. Use either single
+                        integer or list (e.g. [0,1] to restrict to synapses).
     remote_instance :   CatmaidInstance, optional
                         Need to provide if neurons (x) are only skids or
                         annotation(s).
@@ -507,7 +521,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
     Returns
     -------
     :class:`~pymaid.clust_results`
-                Class that contains distance matrix and methods to plot
+                Object that contains distance matrix and methods to plot
                 dendrograms.
     """
 
@@ -524,24 +538,32 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, remot
     else:
         neurons = x
 
+    # If single value, turn into list
+    if not isinstance(restrict_cn, ( type(None), list, set, np.ndarray )):
+        restrict_cn = [ restrict_cn ]
+
     sim_matrix = pd.DataFrame(
         np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, columns=neurons.skeleton_id)
 
-    pool = mp.Pool()
-    combinations = [ (nA,nB,sigma,omega,mu_score) for nA in neurons for nB in neurons ]
+    combinations = [ (nA.connectors,nB.connectors,sigma,omega,restrict_cn) for nA in neurons for nB in neurons ]
+    comb_skids = [ (nA.skeleton_id,nB.skeleton_id) for nA in neurons for nB in neurons ]
 
-    scores = list(tqdm( pool.imap( _unpack_synapse_helper, combinations, chunksize=10 ), total=len(combinations), desc='Processing', disable=module_logger.getEffectiveLevel()>=40 ))
+    with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
+        futures = e.map( _unpack_synapse_helper, combinations  )
 
-    pool.close()
-    pool.join()
+        scores = [ n for n in tqdm(futures, total=len(combinations),
+                                   desc='Processing',
+                                   disable=module_logger.getEffectiveLevel()>=40 ) ]
 
     for i,v in enumerate(combinations):
-        sim_matrix.loc[ v[0].skeleton_id,v[1].skeleton_id ] = scores[i]
+        sim_matrix.loc[ comb_skids[i][0], comb_skids[i][1] ] = scores[i]
+
+    if mu_score:
+        sim_matrix = (sim_matrix + sim_matrix.T) / 2
 
     res = clust_results(sim_matrix, mat_type='similarity', labels = [ neurons.skid[ str(s) ].neuron_name for s in sim_matrix.columns ])
     res.neurons = neurons
 
-    print('\n') #This is necessary - otherwise tqdm characters stay on the last line
     return res
 
 
