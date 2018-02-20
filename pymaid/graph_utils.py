@@ -747,7 +747,7 @@ def subset_neuron( x, subset, clear_temp=True ):
 
     if isinstance(subset, np.ndarray):
         pass
-    elif isinstance(subset, list):
+    elif isinstance(subset, (list,set)):
         subset = np.array(subset)
     elif isinstance(subset, (nx.DiGraph, nx.Graph)):
         subset = subset.nodes
