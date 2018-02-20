@@ -78,7 +78,7 @@ from copy import copy, deepcopy
 import csv
 import sys
 import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import scipy
 import networkx as nx
 
