@@ -63,8 +63,6 @@ import random
 import math
 from colorsys import hsv_to_rgb
 
-from pymaid import morpho, graph, core, fetch, connectivity, graph_utils
-
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
 if len( module_logger.handlers ) == 0:
@@ -237,6 +235,8 @@ def plot2d(x, method='2d', *args, **kwargs):
     >>> # Tilted top view
     >>> ax.azim = -135
     >>> ax.elev = 45
+    >>> # Move camera closer (will make image bigger)
+    >>> ax.dist = 5
 
 
     Returns
@@ -285,7 +285,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     _ACCEPTED_KWARGS = ['remote_instance','connectors','connectors_only',
                         'ax','color','view','scalebar','cn_mesh_colors',
                         'linewidth','cn_size','group_neurons', 'scatter_kws',
-                        'figsize']
+                        'figsize', 'linestyle']
     wrong_kwargs = [ a for a in kwargs if a not in _ACCEPTED_KWARGS ]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS) ))
@@ -316,6 +316,7 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     linewidth = kwargs.get('linewidth', .5)
     cn_size = kwargs.get('cn_size', 1)
+    linestyle = kwargs.get('linestyle','-')
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
 
@@ -344,19 +345,24 @@ def plot2d(x, method='2d', *args, **kwargs):
     elif (skdata.shape[0] + _dotprops.shape[0])>0:
         raise ValueError('Unable to interpret colors of type "{0}"'.format(type(color)))
 
+    # Make sure axes are projected orthogonally
+    if method in ['3d','3d_complex']:
+        proj3d.persp_transformation = _orthogonal_proj
+
     if not ax:
-        if method=='2d':
+        if method =='2d':
             fig, ax = plt.subplots(figsize= kwargs.get('figsize', (8, 8) ) )
         elif method in ['3d','3d_complex']:
             fig = plt.figure(figsize= kwargs.get('figsize', plt.figaspect(1)*1.5) )
             ax = fig.gca(projection='3d')
             # Set projection to orthogonal
-            proj3d.persp_transformation = _orthogonal_proj
             # This sets front view
             ax.azim = -90
             ax.elev = 0
         ax.set_aspect('equal')
     else:
+        if not isinstance(ax, mpl.axes.Axes):
+            raise TypeError('Ax must be of type <mpl.axes.Axes>, not <{0}>'.format(type(ax)))
         fig = None #we don't really need this
         if method in ['3d','3d_complex'] and ax.name != '3d':
             raise TypeError('Axis must be 3d.')
@@ -392,7 +398,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 lim.append( verts.min(axis=0) )
 
     # Create lines from segments
-    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0])):
+    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0], leave=False)):
         this_color = colormap[ neuron.skeleton_id ]
 
         if not connectors_only:
@@ -406,7 +412,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 # make that line discontinuous there
                 coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
 
-                this_line = mlines.Line2D( coords[:,0], coords[:,1], lw=linewidth, alpha=.9, color=this_color,
+                this_line = mlines.Line2D( coords[:,0], coords[:,1], lw=linewidth, ls=linestyle,alpha=.9, color=this_color,
                                     label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
 
                 ax.add_line(this_line)
@@ -421,7 +427,8 @@ def plot2d(x, method='2d', *args, **kwargs):
                 if method == '3d':
                     lc = Line3DCollection( [ c[:,[0,2,1]] for c in coords ], color = this_color,
                                            label=neuron.neuron_name,
-                                           lw=linewidth)
+                                           lw=linewidth,
+                                           linestyle=linestyle)
                     if group_neurons:
                         lc.set_gid( neuron.neuron_name )
                     ax.add_collection3d( lc )
@@ -429,7 +436,8 @@ def plot2d(x, method='2d', *args, **kwargs):
                 elif method =='3d_complex':
                     for c in coords:
                         lc = Line3DCollection( [c[:,[0,2,1]] ], color = this_color,
-                                               lw=linewidth )
+                                               lw=linewidth,
+                                               linestyle=linestyle )
                         if group_neurons:
                             lc.set_gid( neuron.neuron_name )
                         ax.add_collection3d( lc )
