@@ -59,8 +59,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     Important
     ---------
-    This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_ 
-    which is only an optional dependency of PyMaid. If pyoctree is not 
+    This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_
+    which is only an optional dependency of PyMaid. If pyoctree is not
     installed, we will fall back to using scipy ConvexHull instead of ray
     casting. This is slower and may give wrong positives for concave meshes!
 
@@ -69,15 +69,15 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     x :               {list of tuples, CatmaidNeuron, CatmaidNeuronList}
 
                       1. List/np array -  ``[ ( x,y,z ), ( ... ) ]``
-                      2. DataFrame - needs to have 'x','y','z' columns                      
+                      2. DataFrame - needs to have 'x','y','z' columns
 
-    volume :          {str, list of str, core.Volume} 
+    volume :          {str, list of str, core.Volume}
                       Name of the CATMAID volume to test OR core.Volume dict
-                      as returned by e.g. :func:`~pymaid.get_volume()`    
+                      as returned by e.g. :func:`~pymaid.get_volume()`
     inplace :         bool, optional
-                      If False, a copy of the original DataFrames/Neuron is 
-                      returned. Does only apply to CatmaidNeuron or 
-                      CatmaidNeuronList objects. Does apply if multiple 
+                      If False, a copy of the original DataFrames/Neuron is
+                      returned. Does only apply to CatmaidNeuron or
+                      CatmaidNeuronList objects. Does apply if multiple
                       volumes are provided
     mode :            {'IN','OUT'}, optional
                       If 'IN', parts of the neuron that are within the volume
@@ -92,10 +92,10 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
                       return parts of the neuron (nodes and connectors) that
                       are within the volume
     list of bools
-                      If input is list or DataFrame, returns boolean: ``True`` 
+                      If input is list or DataFrame, returns boolean: ``True``
                       if in volume, ``False`` if not
     dict
-                      If multiple volumes are provided as list of strings, 
+                      If multiple volumes are provided as list of strings,
                       results will be returned as dict of above returns.
 
     Examples
@@ -114,18 +114,18 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     >>> # Plot graph
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
-    >>> df = pd.DataFrame( list( cable.values() ), 
+    >>> df = pd.DataFrame( list( cable.values() ),
     ...                    index = list( cable.keys() )
     ...                   )
     >>> df.boxplot()
     >>> plt.show()
 
-    """        
+    """
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
 
     if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
-        #Turn into dict 
+        #Turn into dict
         if not isinstance(volume, dict):
             volume = { v['name'] : v for v in volume }
 
@@ -136,7 +136,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
         return data
 
     if isinstance(volume, str):
-        volume = fetch.get_volume(volume, remote_instance)        
+        volume = fetch.get_volume(volume, remote_instance)
 
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].as_matrix()
@@ -165,16 +165,16 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
         n.nodes.reset_index(inplace=True,drop=True)
         n.connectors.reset_index(inplace=True,drop=True)
 
-        # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node 
+        # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node
         # We have to fix the nodes that lost their parents
-        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() ), 
+        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() ),
                           'parent_id' ] = None
 
         n._clear_temp_attr()
 
         if not inplace:
             return n
-        else: 
+        else:
             return
 
     elif isinstance(x, core.CatmaidNeuronList):
@@ -191,19 +191,19 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
         else:
             return
     else:
-        points = x    
+        points = x
 
-    try:        
-        return _in_volume_ray( points, volume )        
+    try:
+        return _in_volume_ray( points, volume )
     except:
         module_logger.warning('Package pyoctree not found. Falling back to ConvexHull.')
         return _in_volume_convex( points, volume, approximate=False )
 
 def _in_volume_ray(points, volume):
-    """ Uses pyoctree's raycsasting to test if points are within a given 
-    CATMAID volume.    
-    """    
-    
+    """ Uses pyoctree's raycsasting to test if points are within a given
+    CATMAID volume.
+    """
+
     if 'pyoctree' in volume:
         # Use store octree if available
         tree = volume['pyoctree']
@@ -217,14 +217,14 @@ def _in_volume_ray(points, volume):
     # Generate rays for points
     mx = np.array(volume['vertices']).max(axis=0)
     mn = np.array(volume['vertices']).min(axis=0)
-    
+
     rayPointList = np.array(
                 [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # by those that occur "above" the point
     intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
-                         2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList, 
+                         2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList,
                                                                            desc='Calc. intersections',
                                                                            disable=module_logger.getEffectiveLevel()>=40
                                                                         ))]
@@ -236,10 +236,10 @@ def _in_volume_ray(points, volume):
 def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the cloud would change the
-    convex hull. 
+    convex hull.
     """
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)    
+    remote_instance = fetch._eval_remote_instance(remote_instance)
 
     if type(volume) == type(str()):
         volume = fetch.get_volume(volume, remote_instance)
