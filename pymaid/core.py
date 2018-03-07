@@ -2060,7 +2060,7 @@ class CatmaidNeuronList:
         self.get_skeletons(skip_existing=True)
         return plotting.plot2d(self, **kwargs)
 
-    def has_annotation(self, x, intersect=False ):
+    def has_annotation(self, x, intersect=False, partial=False ):
         """Filter neurons by their annotations.
 
         Parameters
@@ -2069,6 +2069,8 @@ class CatmaidNeuronList:
                         Annotation(s) to filter for
         intersect :     bool, optional
                         If True, neuron must have ALL provided annotations.
+        partial :       bool, optional
+                        If True, allow partial match of annotation.
 
         Returns
         -------
@@ -2078,10 +2080,16 @@ class CatmaidNeuronList:
 
         x = _make_iterable(x, force_type=None)
 
-        if not intersect:
-            selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in x for a in an ] ]
+        if not partial:
+            if not intersect:
+                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in x for a in an ] ]
+            else:
+                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in x for a in an ] ]
         else:
-            selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in x for a in an ] ]
+            if not intersect:
+                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in a_x for ax_x in x for a in an ] ]
+            else:
+                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in a_x for ax_ in x for a in an ] ]
 
         if not selection:
             raise ValueError('No neurons with matching annotation(s) found')
