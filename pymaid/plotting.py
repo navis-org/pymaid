@@ -17,6 +17,7 @@
 """ Module contains functions to plot neurons in 2D and 3D.
 """
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -33,7 +34,13 @@ import png
 
 import networkx as nx
 
+from pymaid import morpho, graph, core, fetch, connectivity, graph_utils, utils
+
 from tqdm import tqdm
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 import plotly.plotly as py
 import plotly.offline as pyoff

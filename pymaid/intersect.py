@@ -24,9 +24,14 @@ import pandas as pd
 import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
-from tqdm import tqdm
 
-from pymaid import fetch, core
+from pymaid import fetch, core, utils
+
+from tqdm import tqdm
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 # Set up logging
 module_logger = logging.getLogger(__name__)

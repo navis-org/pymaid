@@ -77,7 +77,6 @@ import datetime
 import random
 import json
 import os
-from tqdm import tqdm
 from copy import copy, deepcopy
 import csv
 import sys
@@ -86,7 +85,13 @@ from concurrent.futures import ThreadPoolExecutor
 import scipy
 import networkx as nx
 
-from pymaid import graph, morpho, fetch, plotting, graph_utils, resample, intersect
+from pymaid import graph, morpho, fetch, plotting, graph_utils, resample, intersect, utils
+
+from tqdm import tqdm, trange
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 __all__ = ['CatmaidNeuron','CatmaidNeuronList','Dotprops','Volume']
 

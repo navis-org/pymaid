@@ -58,11 +58,17 @@ import logging
 import re
 import pandas as pd
 import numpy as np
-from tqdm import tqdm, trange
 import sys
 import os
 
-from pymaid import core, morpho, graph
+from pymaid import core, morpho, graph, utils
+
+from tqdm import tqdm, trange
+
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 __all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_skeleton',
             'get_3D_skeletons','get_annotation_details','get_annotation_id',

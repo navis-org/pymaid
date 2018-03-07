@@ -23,9 +23,13 @@ import pandas as pd
 import numpy as np
 import scipy
 import scipy.interpolate
-from tqdm import tqdm, trange
+from pymaid import core, graph_utils, utils
 
-from pymaid import core, graph_utils
+from tqdm import tqdm, trange
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 # Set up logging
 module_logger = logging.getLogger(__name__)

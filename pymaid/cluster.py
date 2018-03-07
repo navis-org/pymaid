@@ -23,7 +23,6 @@ import logging
 import scipy.cluster
 import scipy.spatial
 import colorsys
-from tqdm import tqdm
 import sys
 
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +30,13 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 
-from pymaid import fetch, core, plotting
+from pymaid import fetch, core, plotting, utils
+
+from tqdm import tqdm
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 import matplotlib as mpl
 from scipy.cluster.hierarchy import set_link_color_palette

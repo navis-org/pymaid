@@ -24,10 +24,16 @@ import logging
 import pandas as pd
 import numpy as np
 import scipy
-from tqdm import tqdm, trange
-import itertools
 
-from pymaid import fetch, core, graph_utils, graph
+from pymaid import fetch, core, graph_utils, graph, utils
+
+from tqdm import tqdm, trange
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
+
+import itertools
 
 # Set up logging
 module_logger = logging.getLogger(__name__)

@@ -22,7 +22,13 @@ import sys
 import os
 import gc
 
+from pymaid import fetch, core, utils
+
 from tqdm import trange, tqdm
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
 
 import pandas as pd
 import numpy as np

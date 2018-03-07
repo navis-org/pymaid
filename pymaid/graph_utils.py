@@ -24,13 +24,18 @@ import time
 import logging
 import pandas as pd
 import numpy as np
-from tqdm import tqdm, trange
 import networkx as nx
 
 from scipy.sparse import csgraph
 
+from pymaid import graph, core, utils
 
-from pymaid import graph, core
+from tqdm import tqdm, trange
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
+
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
