@@ -4410,10 +4410,9 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
         if combine_vols:
             return core.Volume.combine( list( vols.values() ), color = color )
         return vols
-    else:
-        module_logger.info('Retrieving volume <%s>' % volume_name)
-
-    if not isinstance(volume_name, (str, type(None))):
+    elif isinstance(volume_name, type(None)):
+        module_logger.info('Retrieving list of available volumes.')
+    elif not isinstance(volume_name, str):
         raise TypeError('Volume name must be str')
 
     # First, get volume ID
