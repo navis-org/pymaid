@@ -52,12 +52,12 @@ for mod_name in MOCK_MODULES:
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    'nbsphinx',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
     #'sphinx.ext.viewcode',
     'sphinx.ext.napoleon'
-    #'numpydoc',
-    'nbsphinx',
+    #'numpydoc'
 ]
 
 # generate autosummary pages
