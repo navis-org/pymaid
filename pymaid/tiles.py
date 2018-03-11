@@ -35,8 +35,6 @@ import numpy as np
 import scipy
 import math
 
-from pymaid import fetch, core
-
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
@@ -61,8 +59,20 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-def crop_neuron(x, output ,dimensions=(400,400), interpolate_virtual=True, remote_instance=None):
+def crop_neuron(x, output, dimensions=(1000,1000), interpolate_z_res=40, remote_instance=None):
     """ Crops EM tiles following a neuron's segments.
+
+    Parameters
+    ----------
+    x :                  {core.CatmaidNeuron}
+    output :             str
+                         File or folder.
+    dimensions :         tuple of int, optional
+                         Dimensions of square to cut out in nanometers.
+    interpolate_z_res :  {int, None}, optional
+                         If not none, will interpolate in Z direction to given
+                         resolution. Use this to interpolate virtual nodes.
+    remote_instance :    pymaid.CatmaidInstance, optional
     """
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
@@ -84,6 +94,36 @@ def crop_neuron(x, output ,dimensions=(400,400), interpolate_virtual=True, remot
     for seg in x.segments:
         # Get treenode coordinates
         center_coords = this_tn.loc[ seg, ['x','y','z'] ].values
+
+        # If a z resolution for interpolation is given, interpolate virtual nodes
+        if interpolate_z_res:
+            interp_coords = center_coords[0:1]
+            # Go over all treenode -> parent pairs
+            for i, (co, next_co) in enumerate( zip(center_coords[:-1], center_coords[1:]) ):
+                # If nodes are more than interpolate_z_res nm away from another
+                if math.fabs(co[2] - next_co[2]) >= (2*interpolate_z_res):
+                    # Get steps we would expect to be there
+                    steps = int( math.fabs(co[2] - next_co[2]) / interpolate_z_res )
+
+                    # If we're going anterior, we need to inverse step size
+                    if co[2] < next_co[2]:
+                        step_size = interpolate_z_res
+                    else:
+                        step_size = -interpolate_z_res
+
+                    # Interpolate coordinates
+                    new_co = [ ( co[0] + int((next_co[0]-co[0])/steps * (i+1)),
+                                 co[1] + int((next_co[1]-co[1])/steps * (i+1)),
+                                 z  )
+                                 for i,z in enumerate(range( co[2] + step_size, next_co[2], step_size )) ]
+
+                    # Track new coordinates
+                    interp_coords = np.append( interp_coords, new_co, axis=0 )
+                # Add next coordinate
+                interp_coords = np.append( interp_coords, [ next_co ], axis=0 )
+            # Use interpolated coords
+            center_coords = interp_coords
+
         # Turn into bounding boxes: left, right, top, bottom, z
         bbox = np.array( [[ co[0]-dimensions[0]/2,
                               co[0]+dimensions[0]/2,
@@ -100,7 +140,7 @@ def crop_neuron(x, output ,dimensions=(400,400), interpolate_virtual=True, remot
                      coords='NM',
                      remote_instance=remote_instance )
 
-    job.generate_img()
+    #job.generate_img()
 
     return job
 
@@ -124,13 +164,10 @@ class LoadTiles:
                   Zoom level
     coords :      {'NM','PIXEL'}, optional
                   Format of t/l/w/h/z. Can be pixel or nanometers.
-    mode :        {'AUTO','GREEDY','SAFE'}, optional
-                  Defines how tiles are being loaded:
-                    - GREEDY: All tiles are loaded at once -> memory heavy
-                    - SAFE:   Loads tiles up to 1Gb of memory at a time.
-                    - AUTO:   Will use "GREEDY" up to 2Gb of anticipated memory
-                              usage.
-
+    mem_lim :     int, optional
+                  Memory limit in megabytes for loading tiles. This restricts
+                  the number of tiles that can be simultaneously loaded into
+                  memory.
     """
 
     # TODOs
@@ -140,7 +177,7 @@ class LoadTiles:
     # 3. Code clean up
     # 4. Add second mode that loads sections sequentially, saves them and discards tiles: slower but memory efficient
 
-    def __init__(self, bbox, zoom_level=0, coords='NM', mem_lim=2000, remote_instance=None):
+    def __init__(self, bbox, zoom_level=0, coords='NM', mem_lim=4000, remote_instance=None):
         """ Initialise class.
         """
         if coords not in ['PIXEL','NM']:
@@ -173,7 +210,7 @@ class LoadTiles:
 
         memory_est = self.estimate_memory()
 
-        module_logger.info('Estimated memory usage for loading all required tiles: {0:.2f} Mb'.format(memory_est))
+        module_logger.info('Estimated memory usage for loading all required at once tiles: {0:.2f} Mb'.format(memory_est))
 
     def estimate_memory(self):
         """ Estimates memory [Mb] consumption of loading all tiles."""
@@ -218,6 +255,8 @@ class LoadTiles:
 
         # Memory size per tile in byte
         self.bytes_per_tile = self.tile_width ** 2 * 8
+
+        module_logger.info('Fastest image mirror: {0}'.format( self.mirror_url) )
 
     def bboxes2imgcoords(self):
         """ Converts bounding box(es) to coordinates for individual images.
@@ -335,7 +374,7 @@ class LoadTiles:
         data = { co : None for co in tiles }
         threads = {}
         threads_closed = []
-        for i, coords in tqdm(enumerate(tiles), leave=False, desc='Preparing' ):
+        for i, coords in enumerate(tiles):
             url = self._get_tile_url( *coords )
             t = _retrieveTileThreaded(url)
             t.start()
@@ -392,13 +431,17 @@ class LoadTiles:
                 del tiles[t]
             gc.collect()
 
-            tiles_to_get = [ t for t in remaining_tiles if t not in tiles ][ : max_safe_tiles]
-
             # Check if we're still missing tiles
-            tiles_to_get += [ t for t in im['tiles_to_load'] if t not in tiles_to_get and t not in tiles ]
+            missing_tiles = [ t for t in im['tiles_to_load'] if t not in tiles ]
 
-            # Get missing tiles
-            tiles.update( self._get_tiles( tiles_to_get ) )
+            if len(tiles) == 0 or len(missing_tiles) > 0:
+                tiles_to_get = [ t for t in remaining_tiles if t not in tiles ][ : max_safe_tiles ] + missing_tiles
+            else:
+                tiles_to_get = []
+
+            if tiles_to_get:
+                # Get missing tiles
+                tiles.update( self._get_tiles( tiles_to_get ) )
 
             # Generate empty array
             im_dim = np.array([
@@ -412,9 +455,9 @@ class LoadTiles:
                     # Paste this tile onto our canvas
                     img[k*self.tile_width : (k+1)*self.tile_width, i*self.tile_width : (i+1)*self.tile_width] = tiles[ ( ix_x, ix_y, im['tile_z'] ) ]
 
-            # Remove borders
-            cropped_img = img[ im['px_border_top'] : -im['px_border_bot'],
-                          im['px_border_left'] : -im['px_border_right']]
+            # Remove borders and create a copy (otherwise we will not be able to clear the original tile)
+            cropped_img = np.array( img[ im['px_border_top'] : -im['px_border_bot'],
+                                    im['px_border_left'] : -im['px_border_right']] )
 
             # Add slice
             images.append(cropped_img)
