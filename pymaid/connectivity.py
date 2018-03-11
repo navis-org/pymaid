@@ -410,7 +410,51 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
 
     return matrix.astype(int)
 
-def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None):
+def _edges_from_connectors(a, b=None, remote_instance=None):
+    """ Generates list of edges between two sets of neurons from their
+    connector data. Attention: this is UNIDIRECTIONAL (a->b)!
+
+    Parameters
+    ----------
+    a, b :      {core.CatmaidNeuron, core.CatmaidNeuronList, skeleton IDs}
+                Either a or b HAS to be a neuron object.
+                If b = None, will use b = a.
+    """
+
+    if not isinstance(a, (core.CatmaidNeuronList, core.CatmaidNeuron)) and \
+       not isinstance(b, (core.CatmaidNeuronList, core.CatmaidNeuron)):
+       raise ValueError('Either neuron a or b has to be a neuron object.')
+
+    if isinstance(b, type(None)):
+        b = a
+
+    cn_between = fetch.get_connectors_between(a,b, remote_instance=remote_instance)
+
+    if isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        cn_a = a.connectors.connector_id.values
+        cn_between = cn_between[cn_between.connector_id.isin(cn_a)]
+        skids_a = utils._make_iterable(a.skeleton_id)
+    else:
+        skids_a = utils._make_iterable(a)
+
+    if isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        cn_b = b.connectors.connector_id.values
+        cn_between = cn_between[cn_between.connector_id.isin(cn_b)]
+        skids_b = utils._make_iterable(b.skeleton_id)
+    else:
+        skids_b = utils._make_iterable(b)
+
+    # Count source -> target connectors
+    edges = cn_between.groupby(['source_neuron','target_neuron']).count()
+
+    # Melt into edge list
+    edges = edges.reset_index().iloc[:, :3]
+    edges.columns = ['source_skid','target_skid','weight']
+
+    return edges
+
+
+def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None, use_connectors=False):
     """ Generate adjacency matrix for synaptic connections between neuronsA
     -> neuronsB (unidirectional!).
 
@@ -441,6 +485,10 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                         ``{'Group1': [skid1,skid2], 'Group2' : [..], .. }``
     col_groups :        dict, optional
                         See row_groups
+    use_connectors :    bool, optional
+                        If True AND n_a or n_b are CatmaidNeuron(s), use
+                        restrict adjacency matrix to their connectors. Use if
+                        e.g. you've pruned neurons.
 
     Returns
     -------
@@ -489,7 +537,11 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     module_logger.info('Retrieving and filtering connectivity...')
 
-    edges = fetch.get_edges(neurons, remote_instance=remote_instance)
+    if use_connectors and (isinstance(n_a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or isinstance(n_b, (core.CatmaidNeuron, core.CatmaidNeuronList))):
+        edges = _edges_from_connectors(n_a, n_b, remote_instance=remote_instance)
+    else:
+        edges = fetch.get_edges(neurons, remote_instance=remote_instance)
+
 
     if row_groups or col_groups:
         rows_grouped = {str(n): g for g in row_groups for n in row_groups[g]}
@@ -601,8 +653,8 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
 
     not_found = []
     for row in row_groups:
-        not_found += [ r for r in row_groups[row]
-                      if r not in mat.index.tolist()]
+        not_found += [r for r in row_groups[row]
+                       if r not in mat.index.tolist()]
         clean_row_groups[row] = [r for r in row_groups[
             row] if r in mat.index.tolist()]
     for col in col_groups:
