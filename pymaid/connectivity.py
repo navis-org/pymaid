@@ -139,20 +139,20 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
             cn_data = downstream
 
     elif datatype == 'adjacency_matrix':
-        cn_data = fetch.get_connectors_between( x.index.tolist(),
+        cn_data = fetch.get_connectors_between(  x.index.tolist(),
                                                  x.columns.tolist(),
                                                  directional=True,
                                                  remote_instance=remote_instance )
 
         # Now filter connectors
         if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            cn_data = cn_data[ cn_data.connector_id.isin( x.connectors ) ]
-        elif isinstance( restrict_to, core.CatmaidNeuron ):
+            cn_data = cn_data[ cn_data.connector_id.isin( restrict_to.connectors ) ]
+        elif isinstance( restrict_to, core.Volume ):
             cn_data = cn_data[ intersect.in_volume( cn_data.connector_loc.values , restrict_to ) ]
 
     if cn_data.empty:
         module_logger.warning('No connectivity left after filtering')
-        return
+        #return
 
     # Reconstruct connectivity data:
     # Collect edges
@@ -181,16 +181,19 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
         return adj_mat
 
     # Generate connectivity table by subsetting adjacency matrix to our neurons of interest
-    all_upstream = adj_mat[ adj_mat[ neurons ].sum(axis=1) > 0 ][ neurons ]
+    us_neurons = [ n for n in neurons if n in adj_mat.columns ]
+    all_upstream = adj_mat[ adj_mat[ us_neurons ].sum(axis=1) > 0 ][ us_neurons ]
     all_upstream['skeleton_id'] = all_upstream.index
     all_upstream['relation'] = 'upstream'
 
-    all_downstream = adj_mat.T[ adj_mat.T[ neurons ].sum(axis=1) > 0 ][ neurons ]
+    ds_neurons = [ n for n in neurons if n in adj_mat.T.columns ]
+    all_downstream = adj_mat.T[ adj_mat.T[ ds_neurons ].sum(axis=1) > 0 ][ ds_neurons ]
     all_downstream['skeleton_id'] = all_downstream.index
     all_downstream['relation'] = 'downstream'
 
     # Merge tables
     df = pd.concat( [all_upstream,all_downstream], axis=0, ignore_index=True )
+    remaining_neurons = [ n for n in neurons if n in df.columns ]
 
     # Remove neurons that were not in the original data - under certain
     # circumstances, neurons can sneak back in
@@ -200,10 +203,10 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
     aux = x.set_index('skeleton_id')[['neuron_name','num_nodes']].to_dict()
     df['num_nodes'] = [ aux['num_nodes'][s] for s in df.skeleton_id.tolist() ]
     df['neuron_name'] = [ aux['neuron_name'][s] for s in df.skeleton_id.tolist() ]
-    df['total'] = df[neurons].sum(axis=1)
+    df['total'] = df[remaining_neurons].sum(axis=1)
 
     # Reorder columns
-    df = df[[ 'neuron_name', 'skeleton_id', 'num_nodes', 'relation','total'] + neurons ]
+    df = df[[ 'neuron_name', 'skeleton_id', 'num_nodes', 'relation','total'] + remaining_neurons ]
 
     df.sort_values(['relation','total'], inplace=True, ascending=False)
     df.type = 'connectivity_table'
