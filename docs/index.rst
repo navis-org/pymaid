@@ -44,8 +44,8 @@ Table of Contents
 .. toctree::
    :maxdepth: 1 
    
-   source/install
-   source/intro   
+   source/install   
+   source/intro.ipynb   
    source/neurons
    source/fetching_data
    source/plotting
@@ -54,8 +54,7 @@ Table of Contents
    source/blender     
    source/rmaid_doc   
    source/user_stats   
-   source/troubleshooting
-   source/nblasting.ipynb
+   source/troubleshooting   
    examples/examples_index  
 
 
