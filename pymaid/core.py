@@ -68,9 +68,6 @@ import datetime
 import logging
 import pandas as pd
 
-import collections
-import six
-
 import numpy as np
 import math
 import datetime
@@ -84,6 +81,8 @@ import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 import scipy
 import networkx as nx
+
+import six
 
 from pymaid import graph, morpho, fetch, plotting, graph_utils, resample, intersect, utils
 
@@ -799,7 +798,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        node = _make_iterable(node, force_type=None)
+        node = utils._make_iterable(node, force_type=None)
 
         for n in node:
             dist, prox = graph_utils.cut_neuron(x, n)
@@ -1285,7 +1284,7 @@ class CatmaidNeuronList:
             # This has to be made a copy otherwise changes in the list will
             # backpropagate
             self.neurons = [n for n in x.neurons]
-        elif _is_iterable(x):
+        elif utils._is_iterable(x):
             # If x is a list of mixed objects we need to unpack/flatten that
             # E.g. x = [CatmaidNeuronList, CatmaidNeuronList, CatmaidNeuron, skeletonID ]
 
@@ -1313,14 +1312,14 @@ class CatmaidNeuronList:
                     futures = e.map( CatmaidNeuron, [ n[0] for n in to_convert ]  )
 
                     converted = [ n for n in tqdm(futures, total=len(to_convert),
-                                                  desc='Making neurons',
+                                                  desc='Make nrn',
                                                   disable=module_logger.getEffectiveLevel()>=40 ) ]
 
                     for i, c in enumerate(to_convert):
                         self.neurons[ c[2] ] = converted[ i ]
 
             else:
-                for n in tqdm(to_convert, desc='Making neurons', disable=module_logger.getEffectiveLevel()>=40):
+                for n in tqdm(to_convert, desc='Make nrn', disable=module_logger.getEffectiveLevel()>=40):
                     self.neurons[ n[2] ] = CatmaidNeuron(
                             n[0], remote_instance=remote_instance)
 
@@ -1369,6 +1368,9 @@ class CatmaidNeuronList:
 
     def __repr__(self):
         return '{0} of {1} neurons \n {2}'.format(type(self), len(self.neurons), str(self.summary()) )
+
+    def _repr_html_(self):
+        return self.summary()._repr_html_()
 
     def __iter__(self):
         """ Iterator instanciates a new class everytime it is called.
@@ -1433,7 +1435,7 @@ class CatmaidNeuronList:
                 re = fetch.get_annotations(
                     to_retrieve, remote_instance=self._remote_instance)
                 for n in [n for n in self.neurons if 'annotations' not in n.__dict__]:
-                    n.annotations = re[str(n.skeleton_id)]
+                    n.annotations = re.get( str(n.skeleton_id), [] )
             return np.array([n.annotations for n in self.neurons])
         elif key == 'empty':
             return len(self.neurons) == 0
@@ -1457,7 +1459,7 @@ class CatmaidNeuronList:
                     n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
         elif isinstance(key, np.ndarray) and key.dtype == 'bool':
             subset = [n for i, n in enumerate(self.neurons) if key[i]]
-        elif _is_iterable(key):
+        elif utils._is_iterable(key):
             if True in [isinstance(k, str) for k in key]:
                 subset = [n for i, n in enumerate(self.neurons) if True in [
                     k == n.neuron_name for k in key] or True in [k == n.skeleton_id for k in key]]
@@ -1482,7 +1484,7 @@ class CatmaidNeuronList:
             return CatmaidNeuronList(self.neurons + [to_add], make_copy=self.copy_on_subset)
         elif isinstance(to_add, CatmaidNeuronList):
             return CatmaidNeuronList(self.neurons + to_add.neurons, make_copy=self.copy_on_subset)
-        elif _is_iterable(to_add):
+        elif utils._is_iterable(to_add):
             if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
                 return CatmaidNeuronList(self.neurons + to_add, make_copy=self.copy_on_subset)
             else:
@@ -1497,7 +1499,7 @@ class CatmaidNeuronList:
             return CatmaidNeuronList([n for n in self.neurons if n != to_sub], make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub], make_copy=self.copy_on_subset)
-        elif _is_iterable(to_sub):
+        elif utils._is_iterable(to_sub):
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub], make_copy=self.copy_on_subset)
         else:
             raise TypeError('Unable to substract data of type {0}'.format(type(to_sub)))
@@ -1625,7 +1627,7 @@ class CatmaidNeuronList:
         >>> nl.reroot( nl.soma )
         """
 
-        if not _is_iterable(new_root):
+        if not utils._is_iterable(new_root):
             new_root = [new_root] * len(self.neurons)
 
         if len(new_root) != len(self.neurons):
@@ -1918,7 +1920,7 @@ class CatmaidNeuronList:
             annotations = fetch.get_annotations( to_update, remote_instance=self._remote_instance )
             for n in self.neurons:
                 if str(n.skeleton_id) in annotations:
-                    n.annotations = annotations[ str(n.skeleton_id) ]
+                    n.annotations = annotations.get( str(n.skeleton_id), [] )
 
     def get_names(self, skip_existing=False):
         """ Use to get/update neuron names."""
@@ -2066,30 +2068,48 @@ class CatmaidNeuronList:
         Parameters
         ----------
         x :             {str, list of str}
-                        Annotation(s) to filter for
+                        Annotation(s) to filter for. Use tilde (~) as prefix
+                        to look for neurons WITHOUT given annotation(s).
         intersect :     bool, optional
                         If True, neuron must have ALL provided annotations.
+                        Applies to include and exclude (~ prefix) annotations
+                        separately.
         partial :       bool, optional
                         If True, allow partial match of annotation.
 
         Returns
         -------
         :class:`pymaid.CatmaidNeuronList`
-                    Neurons that have given annotation(s).
+                        Neurons that have given annotation(s).
         """
 
-        x = _make_iterable(x, force_type=None)
+        inc, exc = utils._eval_conditions(x)
+
+        if not inc and not exc:
+            raise ValueError('Must provide at least a single annotation')
 
         if not partial:
             if not intersect:
-                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in x for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in inc for a in an ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in exc for a in an ] ]
             else:
-                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in x for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in inc for a in an ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in exc for a in an ] ]
         else:
             if not intersect:
-                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in a_x for ax_x in x for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in a_x for ax_x in inc for a in an ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in a_x for ax_x in exc for a in an ] ]
             else:
-                selection = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in a_x for ax_ in x for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in a_x for ax_ in inc for a in an ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in a_x for ax_ in exc for a in an ] ]
+
+        # Open selection if no inclusive or exclusive annotations given
+        if not inc:
+            inc_sel = [ n for n in self.neurons ]
+        if not exc:
+            exc_sel = []
+
+        selection = [ n for n in inc_sel if n not in exc_sel ]
 
         if not selection:
             raise ValueError('No neurons with matching annotation(s) found')
@@ -2175,39 +2195,6 @@ class CatmaidNeuronList:
         if not inplace:
             return x
 
-
-def _set_loggers(level='ERROR'):
-    """Helper function to set levels for all associated module loggers."""
-    morpho.module_logger.setLevel(level)
-    graph.module_logger.setLevel(level)
-    plotting.module_logger.setLevel(level)
-    graph_utils.module_logger.setLevel(level)
-    module_logger.setLevel(level)
-
-def _make_iterable(x, force_type=None):
-    """ Helper function. Turns x into a np.ndarray, if it isn't already. For
-    dicts, keys will be turned into array.
-    """
-    if not isinstance(x, collections.Iterable) or isinstance(x, six.string_types):
-        x = [ x ]
-
-    if isinstance(x, dict):
-        x = list(x)
-
-    if force_type:
-        return np.array( x ).astype(force_type)
-    else:
-        return np.array( x )
-
-def _is_iterable(x):
-    """ Helper function. Returns True if x is an iterable but not str or
-    dictionary.
-    """
-    if isinstance(x, collections.Iterable) and not isinstance( x, six.string_types ):
-        return True
-    else:
-        return False
-
 class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow
     indexing similar to pandas DataFrames using df.ix[0]. This is really
@@ -2236,7 +2223,7 @@ class _SkidIndexer():
 
     def __getitem__(self, skid):
         # Turn into list and force strings
-        skid = _make_iterable(skid, force_type=str)
+        skid = utils._make_iterable(skid, force_type=str)
 
         # Get objects that match in skid
         sel = [ n for n in self.obj if str(n.skeleton_id) in skid ]
@@ -2310,7 +2297,7 @@ class Volume(dict):
         if isinstance(x, dict):
             x = list(x.values())
 
-        if not isinstance(x, collections.Iterable):
+        if not isinstance(x, utils._is_iterable):
             raise TypeError('Input must be list of volumes')
 
         if False in [ isinstance(v, Volume) for v in x ]:
