@@ -65,6 +65,9 @@ from pymaid import core, morpho, graph, utils
 
 from tqdm import tqdm, trange
 
+# We need to keep this because tqdm_notebook is only a wrapper (type "function")
+tqdm_class = tqdm
+
 if utils.is_jupyter():
     from tqdm import tqdm_notebook, tnrange
     tqdm = tqdm_notebook
@@ -447,7 +450,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/labels/stats")
 
 
-def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Fetching', external_pbar=None, disable_pbar=False):
+def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external_pbar=None, disable_pbar=False):
     """ Retrieve a list of urls in parallel using threads.
 
     Parameters
@@ -498,7 +501,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Fetching', ext
     start = cur_time = time.time()
     joined = 0
 
-    if isinstance( external_pbar, tqdm ):
+    if isinstance( external_pbar, tqdm_class ):
         pbar = external_pbar
     else:
         pbar = tqdm(total=len(threads), desc=desc, disable=module_logger.getEffectiveLevel()>=40 or disable_pbar)
@@ -691,7 +694,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         get_merge_history = get_merge_history == 1
 
     # Start a progress bar
-    with tqdm(total=len(x), desc='Fetching neurons', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(x), desc='Get neurons', disable=module_logger.getEffectiveLevel()>=40) as pbar:
         collection = []
         # Go over requested neurons in batches of 100s
         for ix in range(0, len(x), 100 ):
@@ -1454,7 +1457,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
         remote_nodes_list_url = remote_instance._get_skeleton_nodes_url(skid)
         urls.append(remote_nodes_list_url)
 
-    node_list = _get_urls_threaded(urls, remote_instance, desc='Fetching tables')
+    node_list = _get_urls_threaded(urls, remote_instance, desc='Get tbls')
 
     module_logger.info(
         '%i treenodes retrieved. Creating table...' % sum( [len( nl[0] ) for nl in node_list] ) )
@@ -1996,7 +1999,7 @@ def get_user_annotations(x, remote_instance=None):
 
     # Get data
     annotations = [e['aaData'] for e in _get_urls_threaded(
-        url_list, remote_instance, post_data=postdata, desc='Fetching annotations')]
+        url_list, remote_instance, post_data=postdata, desc='Get annot')]
 
     # Add user login
     for i, u in enumerate(ids):
@@ -2086,7 +2089,7 @@ def get_annotation_details(x, remote_instance=None):
 
     # Get data
     annotations = [e['aaData'] for e in _get_urls_threaded(
-        url_list, remote_instance, post_data=postdata, desc='Fetching annotations')]
+        url_list, remote_instance, post_data=postdata, desc='Get annot')]
 
     # Get user list
     user_list = get_user_list(remote_instance).set_index('id')
@@ -2350,7 +2353,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                          )
 
     results = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='Fetching names')
+        urls, remote_instance, post_data=post_data, desc='Get nms')
 
     match = []
     for i, r in enumerate(results):
@@ -2517,7 +2520,7 @@ def get_treenode_info(x, remote_instance=None):
 
     urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]
 
-    data = _get_urls_threaded(urls, remote_instance, desc='Fetching info')
+    data = _get_urls_threaded(urls, remote_instance, desc='Get info')
 
     df = pd.DataFrame([[treenode_ids[i]] + list(n.values()) for i, n in enumerate(data)],
                       columns=['treenode_id'] + list(data[0].keys())
@@ -2827,7 +2830,7 @@ def get_segments(x, remote_instance=None):
         post_data.append({'placeholder': 0})
 
     rdata = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='Fetching segments')
+        urls, remote_instance, post_data=post_data, desc='Get segs')
 
     if len(x) > 1:
         return { x[i] : [ [ tn['id'] for tn in arb['sequence']  ] for arb in rdata[i] ] for i in range(len(x)) }
@@ -2881,7 +2884,7 @@ def get_review_details(x, remote_instance=None):
         post_data.append({'placeholder': 0})
 
     rdata = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='Fetching review stats')
+        urls, remote_instance, post_data=post_data, desc='Get rev stats')
 
     for i, neuron in enumerate(rdata):
         # There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
@@ -3131,7 +3134,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
             remote_instance._get_contributions_url() for s in x]
 
         stats = _get_urls_threaded(
-            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='Fetching contributions')
+            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='Get contrib.')
 
         df = pd.DataFrame([[
             s,
@@ -3233,7 +3236,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if user:
         if len(user) > 1:
             skid_list = list()
-            for u in tqdm(user, desc='Fetching users', disable=module_logger.getEffectiveLevel()>=40):
+            for u in tqdm(user, desc='Get usrs', disable=module_logger.getEffectiveLevel()>=40):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=u,
                                              node_count=node_count,
@@ -3253,7 +3256,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if reviewed_by:
         if len(reviewed_by) > 1:
             skid_list = list()
-            for u in tqdm(reviewed_by, desc='Fetching reviewers', disable=module_logger.getEffectiveLevel()>=40):
+            for u in tqdm(reviewed_by, desc='Get revs', disable=module_logger.getEffectiveLevel()>=40):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=user,
                                              node_count=node_count,
@@ -3561,7 +3564,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
     return data
 
 def find_neurons( names=None, annotations=None, volumes=None, users=None,
-                  from_date=None, to_date=None, reviewed_by=None,
+                  from_date=None, to_date=None, reviewed_by=None, skids=None,
                   intersect=False, partial_match=False, only_soma=False,
                   min_size=1, minimum_cont=None, remote_instance=None):
     """ Find neurons matching given search criteria. Returns a CatmaidNeuronList.
@@ -3592,6 +3595,9 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
                         Format: [year, month, day]. Return neurons created
                         before this date. This works ONLY if also querying by
                         ``users`` or ``reviewed_by``!
+    skids :             list of skids, optional
+                        Can be a list of skids or pandas object with
+                        "skeleton_id" columns.
     intersect :         bool, optional
                         If multiple search parameters are provided, this
                         parameter determines if neurons have to meet all of
@@ -3675,6 +3681,12 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
     # Now go over all parameters and get sets of skids
     sets_of_skids = []
 
+    if not isinstance(skids, type(None)):
+        skids = eval_skids(skids)
+        if not isinstance(skids, (list, set, np.ndarray)):
+            skids = [ skids ]
+        sets_of_skids.append( set(skids) )
+
     # Get skids by name
     if names:
         urls = [ remote_instance._get_annotated_url() for n in names ]
@@ -3683,7 +3695,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
                        for n in names ]
 
         results = _get_urls_threaded(
-            urls, remote_instance, post_data=post_data, desc='Fetching names')
+            urls, remote_instance, post_data=post_data, desc='Get names')
 
         this_name = []
         for i, r in enumerate(results):
@@ -3715,7 +3727,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
         module_logger.debug(
             'Retrieving skids for annotationed neurons')
 
-        for an_id in tqdm(annotation_ids.values(), desc='Fetching annotations', disable=module_logger.getEffectiveLevel()>=40):
+        for an_id in tqdm(annotation_ids.values(), desc='Get annot', disable=module_logger.getEffectiveLevel()>=40):
             annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                                'range_length': 500, 'with_annotations': False}
             remote_annotated_url = remote_instance._get_annotated_url()
@@ -3727,7 +3739,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
     # Get skids by user
     if users:
         by_users = []
-        for u in tqdm(users, desc='Fetching by users', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(users, desc='Get by usr', disable=module_logger.getEffectiveLevel()>=40):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['created_by'] = u
 
@@ -3747,7 +3759,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by reviewer
     if reviewed_by:
-        for u in tqdm(reviewed_by, desc='Fetching by reviewers', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(reviewed_by, desc='Get by revs', disable=module_logger.getEffectiveLevel()>=40):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['reviewed_by'] = u
 
@@ -3766,7 +3778,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     # Get by volume
     if volumes:
-        for v in tqdm(volumes, desc='Fetching by volumes', disable=module_logger.getEffectiveLevel()>=40):
+        for v in tqdm(volumes, desc='Get by vols', disable=module_logger.getEffectiveLevel()>=40):
             if not isinstance(v, core.Volume):
                 vol = get_volume(v, remote_instance)
             else:
@@ -3777,7 +3789,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
             sets_of_skids.append( set(temp) )
 
     # Get neurons by size if only min_size and no other no parameters were provided
-    if False not in [ isinstance(param,type(None)) for param in [ names, annotations, volumes, users, reviewed_by ] ]:
+    if False not in [ isinstance(param,type(None)) for param in [ names, annotations, volumes, users, reviewed_by, skids ] ]:
         # Make sure people don't accidentally request ALL neurons in the dataset
         if min_size <= 1:
             answer = ""
@@ -3788,7 +3800,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
                 module_logger.info('Query cancelled')
                 return
 
-        module_logger.info('Fetching all neurons with at least {0} nodes'.format(min_size))
+        module_logger.info('Get all neurons with at least {0} nodes'.format(min_size))
         get_skeleton_list_GET_data = {'nodecount_gt': min_size}
         remote_get_list_url = remote_instance._get_list_skeletons_url()
         remote_get_list_url += '?%s' % urllib.parse.urlencode(
@@ -4615,6 +4627,8 @@ def eval_skids(x, remote_instance=None):
             skids = x.skeleton_id.tolist()
         else:
             raise ValueError('Unable to extract skeleton ID from Pandas series {0}'.format(x))
+    elif isinstance(x, type(None)):
+        return None
     else:
         module_logger.error(
             'Unable to extract x from type %s' % str(type(x)))
