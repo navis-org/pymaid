@@ -55,7 +55,8 @@ Table of Contents
    source/rmaid_doc   
    source/user_stats   
    source/troubleshooting
-   examples/examples_index   
+   source/nblasting.ipynb
+   examples/examples_index  
 
 
 Indices and tables
