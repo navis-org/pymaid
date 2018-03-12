@@ -55,6 +55,7 @@ extensions = [
     'nbsphinx',
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
+    'IPython.sphinxext.ipython_console_highlighting'
     #'sphinx.ext.viewcode',
     'sphinx.ext.napoleon'
     #'numpydoc'
