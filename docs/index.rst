@@ -48,7 +48,7 @@ Table of Contents
    source/intro.ipynb   
    source/neurons
    source/fetching_data
-   source/plotting
+   source/plotting.ipynb
    source/morph_analysis
    source/connectivity_analysis
    source/blender     
