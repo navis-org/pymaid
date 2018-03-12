@@ -86,6 +86,7 @@ Misc
 .. autosummary::
     :toctree: generated/
 
+    ~pymaid.CatmaidInstance
     ~pymaid.url_to_coordinates
     ~pymaid.get_review
     ~pymaid.get_review_details
