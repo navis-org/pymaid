@@ -1578,9 +1578,10 @@ def plot_network(x, *args, **kwargs):
                       6. NetworkX Graph
     remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids.
-    layout :          function, default = 'nx.spring_layout'
+    layout :          {str, function}, default = nx.spring_layout
                       Layout function. See https://networkx.github.io/documentation/latest/reference/drawing.html
-                      for available layouts.
+                      for available layouts. Use either the function directly
+                      or its name.
     syn_cutoff :      int, default=False
                       If provided, connections will be maxed at this value.
     syn_threshold :   int, default=0
@@ -1618,7 +1619,11 @@ def plot_network(x, *args, **kwargs):
     """
 
     remote_instance = kwargs.get('remote_instance', None)
+
     layout = kwargs.get('layout', nx.spring_layout)
+
+    if isinstance(layout, str):
+        layout = getattr(nx, layout)
 
     syn_cutoff = kwargs.get('syn_cutoff', None)
     syn_threshold = kwargs.get('syn_threshold', 1)
@@ -1627,6 +1632,7 @@ def plot_network(x, *args, **kwargs):
 
     label_nodes = kwargs.get('label_nodes', True)
     label_edges = kwargs.get('label_edges', True)
+    label_hover = kwargs.get('label_hover', True)
 
     node_labels = kwargs.get('node_labels', [])
     node_hover_text = kwargs.get('node_hover_text', [])
@@ -1695,7 +1701,10 @@ def plot_network(x, *args, **kwargs):
             ay=pos[e[0]][1],
             axref='x',
             ayref='y',
-            standoff=10
+            standoff=10,
+            startstandoff=10,
+            opacity=.7
+
         ))
 
         if label_edges:
@@ -1738,7 +1747,7 @@ def plot_network(x, *args, **kwargs):
     nodes = go.Scatter(dict(
         x=np.vstack( pos.values() )[:,0],
         y=np.vstack( pos.values() )[:,1],
-        text=[node_hover_text[ n ] for n in g.nodes ],
+        text=[node_hover_text[ n ] for n in g.nodes ] if label_hover else None,
         mode='markers',
         hoverinfo='text',
         marker=dict(
