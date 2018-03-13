@@ -78,7 +78,7 @@ __all__ = ['plot3d','plot2d','plot1d','plot_network','clear3d','close3d','screen
 
 
 def screenshot(file='screenshot.png', alpha=True):
-    """ Saves a screenshot of active 3D canvas.
+    """ Saves a screenshot of active Vispy 3D canvas.
 
     Parameters
     ----------
@@ -1107,7 +1107,7 @@ def plot3d(x, *args, **kwargs):
         # Generate sphere for somas
         fib_points = _fibonacci_sphere(samples=30)
 
-        module_logger.info('Generating traces...')
+        module_logger.debug('Generating traces...')
 
         for i, neuron in enumerate(skdata.itertuples()):
             module_logger.debug('Working on neuron %s' %
@@ -1289,7 +1289,7 @@ def plot3d(x, *args, **kwargs):
             )
             )
 
-        module_logger.info('Tracing done.')
+        module_logger.debug('Tracing done.')
 
         # Now add neuropils:
         for v in volumes_data:
@@ -1364,7 +1364,7 @@ def plot3d(x, *args, **kwargs):
 
         fig = dict(data=trace_data, layout=layout)
 
-        module_logger.info('Done. Plotted %i nodes and %i connectors' % (sum([n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only] + [
+        module_logger.debug('Done. Plotted %i nodes and %i connectors' % (sum([n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only] + [
                            n.points.shape[0] for n in dotprops.itertuples()]), sum([n.connectors.shape[0] for n in skdata.itertuples() if connectors or connectors_only])))
         module_logger.info(
             'Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
@@ -1552,7 +1552,7 @@ def plot3d(x, *args, **kwargs):
         morpho.module_logger.setLevel('INFO')
         module_logger.debug('Downsampling finished.')
     elif skdata.shape[0] > 100:
-        module_logger.info(
+        module_logger.debug(
             'Large dataset detected. Consider using the <downsampling> parameter if you encounter bad performance.')
 
     if backend == 'plotly':
