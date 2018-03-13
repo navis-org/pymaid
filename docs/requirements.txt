@@ -1,4 +1,4 @@
 ###### Requirements without Version Specifiers ######
 numpydoc
-ipykernel
+nbsphinx
 ipykernel
