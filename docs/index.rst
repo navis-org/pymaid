@@ -49,7 +49,7 @@ Table of Contents
    source/neurons
    source/fetching_data
    source/plotting.ipynb
-   source/morph_analysis
+   source/morph_analysis.ipynb
    source/connectivity_analysis
    source/blender     
    source/rmaid_doc   

@@ -226,6 +226,7 @@ def _in_volume_ray(points, volume):
     intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
                          2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList,
                                                                            desc='Intersecting',
+                                                                           leave=False,
                                                                            disable=module_logger.getEffectiveLevel()>=40
                                                                         ))]
 
