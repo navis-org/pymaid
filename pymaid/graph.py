@@ -108,7 +108,13 @@ def network2nx(x, remote_instance=None, threshold=1):
         edges = [[ str(e.source_skid), str(e.target_skid), {'weight': e.weight} ]
                           for e in edges[edges.weight >= threshold].itertuples()]
     elif isinstance(x, pd.DataFrame):
-        skids = list(set( x.columns.tolist() + x.index.tolist() ))
+        # Get skids (we have to account for the fact that some might not be skids)
+        skids = []
+        for s in list(set( x.columns.tolist() + x.index.tolist() )):
+            try:
+                skids.append(int(s))
+            except:
+                pass
         # Generate edge list
         edges = [ [ str(s), str(t), { 'weight': x.loc[s,t] } ] for s in x.index.values for t in x.columns.values if x.loc[s,t] >= threshold ]
     else:
@@ -116,7 +122,7 @@ def network2nx(x, remote_instance=None, threshold=1):
 
     # Generate node dictionary
     names = fetch.get_names(skids, remote_instance=remote_instance)
-    nodes = [ [ str(s), { 'neuron_name' : names[s] } ] for s in skids ]
+    nodes = [ [ str(s), { 'neuron_name' : names.get(s,s) } ] for s in skids ]
 
     # Generate graph and assign custom properties
     g = nx.DiGraph()
