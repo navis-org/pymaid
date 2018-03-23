@@ -5,6 +5,7 @@ pymaid/b3d.py
 pymaid/cluster.py
 pymaid/connectivity.py
 pymaid/core.py
+pymaid/cytoscape.py
 pymaid/fetch.py
 pymaid/graph.py
 pymaid/graph_utils.py
@@ -15,3 +16,4 @@ pymaid/resample.py
 pymaid/rmaid.py
 pymaid/tiles.py
 pymaid/user_stats.py
+pymaid/utils.py

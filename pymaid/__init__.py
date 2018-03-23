@@ -1,4 +1,4 @@
-__version__ = "0.75"
+__version__ = "0.76"
 
 import logging
 
@@ -82,3 +82,9 @@ try:
 except Exception as error:
     module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.connectivity:\n' + str(error))
+
+try:
+    from pymaid.utils import set_loggers, set_pbars
+except Exception as error:
+    module_logger.warning(str(error))
+    module_logger.warning('Error importing pymaid.utils:\n' + str(error))
