@@ -1078,15 +1078,28 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
 
         return stitched_n
 
-    if tn_to_stitch and not isinstance(tn_to_stitch, (list, np.ndarray)):
-        tn_to_stitch = [ tn_to_stitch ]
-        tn_to_stitch = [ str(tn) for tn in tn_to_stitch ]
+    # Fix potential problems with tn_to_stitch
+    if not isinstance(tn_to_stitch, type(None)):
+        if not isinstance(tn_to_stitch, (list, np.ndarray)):
+            tn_to_stitch = [ tn_to_stitch ]
 
-    for nB in neurons[1:]:
+        # Make sure we're working with integers
+        tn_to_stitch = [ int(tn) for tn in tn_to_stitch ]
+
+    for i, nB in enumerate( neurons[1:] ):
         #First find treenodes to connect
-        if tn_to_stitch and set(tn_to_stitch) & set(stitched_n.nodes.treenode_id) and set(tn_to_stitch) & set(nB.nodes.treenode_id):
-            treenodesA = stitched_n.nodes.set_index('treenode_id').loc[ tn_to_stitch ].reset_index()
-            treenodesB = nB.nodes.set_index('treenode_id').loc[ tn_to_stitch ].reset_index()
+        if not isinstance( tn_to_stitch, type(None)):
+            if set(tn_to_stitch) & set(stitched_n.nodes.treenode_id):
+                treenodesA = stitched_n.nodes.set_index('treenode_id').loc[ tn_to_stitch ].reset_index()
+            else:
+                module_logger.warning('None of the nodes in tn_to_stitch were found in the first {0} stitched neurons. Falling back to all nodes!'.format(i+1))
+                treenodesA = stitched_n.nodes
+
+            if set(tn_to_stitch) & set(nB.nodes.treenode_id):
+                treenodesB = nB.nodes.set_index('treenode_id').loc[ tn_to_stitch ].reset_index()
+            else:
+                module_logger.warning('None of the nodes in tn_to_stitch were found in neuron #{0}. Falling back to all nodes!'.format(nB.skeleton_id))
+                treenodesB = nB.nodes
         elif method == 'LEAFS':
             treenodesA = stitched_n.nodes[ stitched_n.nodes.type.isin(['end','root']) ].reset_index()
             treenodesB = nB.nodes[ nB.nodes.type.isin(['end','root']) ].reset_index()
@@ -1095,15 +1108,15 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
             treenodesB = nB.nodes
 
         #Calculate pairwise distances
-        dist = scipy.spatial.distance.cdist( treenodesA[['x','y','z']].values,
+        dist = scipy.spatial.distance.cdist(  treenodesA[['x','y','z']].values,
                                               treenodesB[['x','y','z']].values,
                                               metric='euclidean' )
 
         #Get the closest treenodes
-        tnA = treenodesA.loc[ dist.argmin(axis=0)[0] ].treenode_id
-        tnB = treenodesB.loc[ dist.argmin(axis=1)[0] ].treenode_id
+        tnA = treenodesA.iloc[ dist.argmin(axis=0)[0] ].treenode_id
+        tnB = treenodesB.iloc[ dist.argmin(axis=1)[0] ].treenode_id
 
-        module_logger.info('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
+        module_logger.debug('Stitching treenodes %s and %s' % ( str(tnA), str(tnB) ))
 
         #Reroot neuronB onto the node that will be stitched
         nB.reroot( tnB )
