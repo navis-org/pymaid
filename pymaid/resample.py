@@ -426,6 +426,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
             else:
                 new_parents[this_node] = None
                 break
+
     new_nodes = df.nodes[ df.nodes.treenode_id.isin( list(new_parents.keys()) ) ].copy()
     new_nodes.loc[:,'parent_id'] = [new_parents[tn] for tn in new_nodes.treenode_id]
 
@@ -447,6 +448,8 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     # This is essential -> otherwise e.g. graph.neuron2graph will fail
     df.nodes.reset_index(inplace=True, drop=True)
+
+    df._clear_temp_attr()
 
     if not inplace:
         return df
