@@ -343,7 +343,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     elif isinstance(color,(list,tuple)):
         colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}
     elif isinstance(color,str):
-        color = tuple( [ int(c *255) for c in mcl.to_rgb(color) ] )
+        color = tuple( [ c for c in mcl.to_rgb(color) ] )
         colormap = {n: color for n in skdata.skeleton_id.tolist()}
     elif (skdata.shape[0] + _dotprops.shape[0])>0:
         raise ValueError('Unable to interpret colors of type "{0}"'.format(type(color)))
