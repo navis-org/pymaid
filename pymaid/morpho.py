@@ -53,6 +53,10 @@ __all__ = sorted([ 'calc_cable','strahler_index', 'prune_by_strahler','stitch_ne
 			'split_axon_dendrite',  'bending_flow', 'flow_centrality',
 			'segregation_index', 'to_dotproduct', 'average_neurons', 'tortuosity'])
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
+
 def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
 	""" Calculates confidence for each treenode by walking from root to leafs
 	starting with a confidence of 1. Each time a low confidence edge is
@@ -108,7 +112,7 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
 	nodes = x.nodes.set_index('treenode_id')
 	nodes.loc[x.root,'arbor_confidence'] = 1
 
-	with tqdm(total=len(x.segments),desc='Calc confidence', disable=module_logger.getEffectiveLevel()>=40 ) as pbar:
+	with tqdm(total=len(x.segments),desc='Calc confidence', disable=pbar_hide, leave=pbar_leave ) as pbar:
 		for r in x.root:
 			for c in loc[r]:
 				walk_to_leafs(c)
@@ -1260,7 +1264,7 @@ def tortuosity( x, seg_length=10, skip_remainder=False):
 	if isinstance(x, core.CatmaidNeuronList):
 		if not isinstance(seg_length, (list, np.ndarray, tuple)):
 			seg_length = [seg_length]
-		return pd.DataFrame( [ tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=module_logger.getEffectiveLevel()>=40 ) ],
+		return pd.DataFrame( [ tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=pbar_hide, leave=pbar_leave ) ],
 							 index=x.skeleton_id, columns=seg_length ).T
 
 	if not isinstance(x, core.CatmaidNeuron):

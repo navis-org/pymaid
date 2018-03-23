@@ -54,6 +54,10 @@ except:
 
 __all__ = sorted([ 'in_volume'])
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
+
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     """ Test if points are within a given CATMAID volume.
 
@@ -130,7 +134,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
             volume = { v['name'] : v for v in volume }
 
         data = dict()
-        for v in tqdm(volume, desc='Volumes', disable=module_logger.getEffectiveLevel()>=40):
+        for v in tqdm(volume, desc='Volumes', disable=pbar_hide, leave=pbar_leave):
             data[v] = in_volume(
                 x, volume[v], remote_instance=remote_instance, inplace=False, mode=mode)
         return data
@@ -227,7 +231,7 @@ def _in_volume_ray(points, volume):
                          2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList,
                                                                            desc='Intersecting',
                                                                            leave=False,
-                                                                           disable=module_logger.getEffectiveLevel()>=40
+                                                                           disable=pbar_hide
                                                                         ))]
 
     # Count odd intersection

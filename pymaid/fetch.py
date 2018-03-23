@@ -100,6 +100,10 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
+
 class CatmaidInstance:
     """ Class giving access to a CATMAID instance. Holds base url,
     credentials and fetches data. You can either pass this object to
@@ -504,7 +508,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
     if isinstance( external_pbar, tqdm_class ):
         pbar = external_pbar
     else:
-        pbar = tqdm(total=len(threads), desc=desc, disable=module_logger.getEffectiveLevel()>=40 or disable_pbar)
+        pbar = tqdm(total=len(threads), desc=desc, disable=pbar_hide or disable_pbar, leave=pbar_leave)
 
     # Save start value of pbar (in case we have an external pbar)
     pbar_start = pbar.n
@@ -532,7 +536,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
         raise
     finally:
         # Close pbar if it is not an external pbar
-        if not external_pbar:
+        if isinstance( external_pbar, type(None)):
             pbar.close()
 
     if cur_time > (start + time_out):
@@ -694,7 +698,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         get_merge_history = get_merge_history == 1
 
     # Start a progress bar
-    with tqdm(total=len(x), desc='Get neurons', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(x), desc='Get neurons', disable=pbar_hide, leave=pbar_leave) as pbar:
         collection = []
         # Go over requested neurons in batches of 100s
         for ix in range(0, len(x), 100 ):
@@ -864,7 +868,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
     skdata = []
 
-    for s in tqdm(x, desc='Retrieving arbors', disable=module_logger.getEffectiveLevel()>=40):
+    for s in tqdm(x, desc='Retrieving arbors', disable=pbar_hide, leave=pbar_leave):
         # Create URL for retrieving example skeleton from server
         remote_compact_arbor_url = remote_instance._get_compact_arbor_url(
             s, node_flag, connector_flag, tag_flag)
@@ -1007,7 +1011,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     adj_mat = pd.DataFrame( np.zeros(( len(unique_skids), len(unique_skids) )),
                             columns=unique_skids, index=unique_skids )
 
-    for i, e in enumerate(tqdm(unique_edges, disable=module_logger.getEffectiveLevel()>=40, desc='Adj. matrix')):
+    for i, e in enumerate(tqdm(unique_edges, disable=pbar_hide, desc='Adj. matrix', leave=pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.loc[ str(e[0]), str(e[1]) ] = counts[i]
 
@@ -1331,7 +1335,7 @@ def get_node_user_details(x, remote_instance=None, chunk_size=10000):
 
     data = dict()
 
-    with tqdm(total=len(node_ids), disable=module_logger.getEffectiveLevel()>=40, desc='Nodes') as pbar:
+    with tqdm(total=len(node_ids), disable=pbar_hide, desc='Nodes', leave=pbar_leave) as pbar:
         for ix in range(0, len(node_ids), chunk_size):
             get_node_details_postdata = dict()
 
@@ -1392,7 +1396,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
 
     data = []
 
-    with tqdm(total=len(treenode_ids), disable=module_logger.getEffectiveLevel()>=40, desc='Nodes') as pbar:
+    with tqdm(total=len(treenode_ids), disable=pbar_hide, desc='Nodes', leave=pbar_leave) as pbar:
         for ix in range(0, len(treenode_ids), chunk_size):
             urls = [ remote_instance._get_skid_from_tnid( tn ) for tn in treenode_ids[ix:ix + chunk_size] ]
 
@@ -1464,7 +1468,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     all_tables = []
 
-    for i,nl in enumerate( tqdm(node_list, desc='Creating table') ):
+    for i,nl in enumerate( tqdm(node_list, desc='Creating table', leave=pbar_leave) ):
         if include_details:
             tag_dict = {n[0]: [] for n in nl[0]}
             reviewer_dict = {n[0]: [] for n in nl[0]}
@@ -1700,7 +1704,7 @@ def get_connector_details(x, remote_instance=None):
     DATA_UPLOAD_MAX_NUMBER_FIELDS = 50000
 
     connectors = []
-    with tqdm(total=len(connector_ids), desc='CN details', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(connector_ids), desc='CN details', disable=pbar_hide, leave=pbar_leave) as pbar:
         for b in range( 0, len( connector_ids ), DATA_UPLOAD_MAX_NUMBER_FIELDS):
             get_connectors_postdata = {}
             for i, s in enumerate(connector_ids[b:b+DATA_UPLOAD_MAX_NUMBER_FIELDS]):
@@ -1868,7 +1872,7 @@ def get_review(x, remote_instance=None):
 
     CHUNK_SIZE = 1000
 
-    with tqdm(total=len(x), disable=module_logger.getEffectiveLevel()>=40, desc='Rev. status') as pbar:
+    with tqdm(total=len(x), disable=pbar_hide, desc='Rev. status', leave=pbar_leave) as pbar:
         for j in range(0,len(x),CHUNK_SIZE):
             get_review_postdata = {}
 
@@ -2334,9 +2338,11 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     """
 
+    """
     module_logger.warning(
             "Deprecationwarning: get_skids_by_name() is deprecated, use find_neurons() instead."
         )
+    """
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -2390,10 +2396,11 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
                             ``[skid1, skid2, skid3 ]``
     """
 
-
+    """
     module_logger.warning(
             "Deprecationwarning: get_skids_by_annotation() is deprecated, use find_neurons() instead."
         )
+    """
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -3088,7 +3095,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
     if not separate:
-        with tqdm(total=len(x), desc='Contr. stats', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+        with tqdm(total=len(x), desc='Contr. stats', disable=pbar_hide, leave=pbar_leave) as pbar:
             stats = []
             for j in range(0, len(x), _split):
                 pbar.update(j)
@@ -3217,9 +3224,11 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
         return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
 
+    """
     module_logger.warning(
             "Deprecationwarning: get_neuron_list() is deprecated, use find_neurons() instead."
         )
+    """
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -3236,7 +3245,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if user:
         if len(user) > 1:
             skid_list = list()
-            for u in tqdm(user, desc='Get usrs', disable=module_logger.getEffectiveLevel()>=40):
+            for u in tqdm(user, desc='Get usrs', disable=pbar_hide, leave=pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=u,
                                              node_count=node_count,
@@ -3256,7 +3265,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if reviewed_by:
         if len(reviewed_by) > 1:
             skid_list = list()
-            for u in tqdm(reviewed_by, desc='Get revs', disable=module_logger.getEffectiveLevel()>=40):
+            for u in tqdm(reviewed_by, desc='Get revs', disable=pbar_hide, leave=pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=user,
                                              node_count=node_count,
@@ -3413,7 +3422,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         rounds = [(start_date, end_date)]
 
     data = []
-    for r in tqdm(rounds, desc='Retrieving history', disable=module_logger.getEffectiveLevel()>=40):
+    for r in tqdm(rounds, desc='Retrieving history', disable=pbar_hide, leave=pbar_leave):
         get_history_GET_data = {'self.project_id': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
@@ -3727,7 +3736,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
         module_logger.debug(
             'Retrieving skids for annotationed neurons')
 
-        for an_id in tqdm(annotation_ids.values(), desc='Get annot', disable=module_logger.getEffectiveLevel()>=40):
+        for an_id in tqdm(annotation_ids.values(), desc='Get annot', disable=pbar_hide, leave=pbar_leave):
             annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                                'range_length': 500, 'with_annotations': False}
             remote_annotated_url = remote_instance._get_annotated_url()
@@ -3739,7 +3748,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
     # Get skids by user
     if users:
         by_users = []
-        for u in tqdm(users, desc='Get by usr', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(users, desc='Get by usr', disable=pbar_hide, leave=pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['created_by'] = u
 
@@ -3759,7 +3768,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by reviewer
     if reviewed_by:
-        for u in tqdm(reviewed_by, desc='Get by revs', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(reviewed_by, desc='Get by revs', disable=pbar_hide, leave=pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['reviewed_by'] = u
 
@@ -3778,7 +3787,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     # Get by volume
     if volumes:
-        for v in tqdm(volumes, desc='Get by vols', disable=module_logger.getEffectiveLevel()>=40):
+        for v in tqdm(volumes, desc='Get by vols', disable=pbar_hide, leave=pbar_leave):
             if not isinstance(v, core.Volume):
                 vol = get_volume(v, remote_instance)
             else:
@@ -3906,9 +3915,11 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
 
     """
 
+    """
     module_logger.warning(
             "Deprecationwarning: get_neurons_in_volume() is deprecated, use find_neurons() instead."
         )
+    """
 
     remote_instance = _eval_remote_instance(remote_instance)
 
@@ -4011,7 +4022,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kw
     boxes = _subset_volume( bbox, max_vol = 50**3 )
 
     node_list = []
-    with tqdm(desc='Retr. nodes in box volume', total=len(boxes)) as pbar:
+    with tqdm(desc='Retr. nodes in box volume', total=len(boxes), leave=pbar_leave, disable=pbar_hide) as pbar:
         while boxes.any():
             pbar.total = len(boxes)
             new_boxes = np.empty((0,3,2))
@@ -4418,7 +4429,7 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
     if isinstance(volume_name, list):
         vols =  { v : get_volume( v, remote_instance=remote_instance, color=color )
                     for v in tqdm( volume_name, desc='Volumes',
-                                   disable=module_logger.getEffectiveLevel()>=40)  }
+                                   disable=pbar_hide, leave=pbar_leave)  }
         if combine_vols:
             return core.Volume.combine( list( vols.values() ), color = color )
         return vols

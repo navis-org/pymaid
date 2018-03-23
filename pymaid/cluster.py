@@ -58,6 +58,9 @@ __all__ = sorted([  'cluster_by_connectivity',
                     'cluster_by_synapse_placement','cluster_xyz',
                     'clust_results'])
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
 
 def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True,
                             threshold=1, include_skids=None, exclude_skids=None, min_nodes=2,
@@ -207,7 +210,8 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
             matching_indices = [ n for n in tqdm(futures, total=len(combinations),
                                                           desc=d,
-                                                          disable=module_logger.getEffectiveLevel()>=40 ) ]
+                                                          disable=pbar_hide,
+                                                          leave=pbar_leave ) ]
 
         for i,v in enumerate(combinations):
             matching_scores[d].loc[ v[0],v[1] ] = matching_indices[i][similarity]
@@ -558,7 +562,8 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
 
         scores = [ n for n in tqdm(futures, total=len(combinations),
                                    desc='Processing',
-                                   disable=module_logger.getEffectiveLevel()>=40 ) ]
+                                   disable=pbar_hide,
+                                   leave=pbar_leave ) ]
 
     for i,v in enumerate(combinations):
         sim_matrix.loc[ comb_skids[i][0], comb_skids[i][1] ] = scores[i]

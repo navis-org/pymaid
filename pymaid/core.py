@@ -107,6 +107,9 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
 
 class CatmaidNeuron:
     """ Catmaid neuron object holding neuron data (nodes, connectors, name,
@@ -1313,13 +1316,14 @@ class CatmaidNeuronList:
 
                     converted = [ n for n in tqdm(futures, total=len(to_convert),
                                                   desc='Make nrn',
-                                                  disable=module_logger.getEffectiveLevel()>=40 ) ]
+                                                  disable=pbar_hide,
+                                                  leave=pbar_leave ) ]
 
                     for i, c in enumerate(to_convert):
                         self.neurons[ c[2] ] = converted[ i ]
 
             else:
-                for n in tqdm(to_convert, desc='Make nrn', disable=module_logger.getEffectiveLevel()>=40):
+                for n in tqdm(to_convert, desc='Make nrn', disable=pbar_hide, leave=pbar_leave):
                     self.neurons[ n[2] ] = CatmaidNeuron(
                             n[0], remote_instance=remote_instance)
 
@@ -1543,12 +1547,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,resample_to) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._resample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._resample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Resampling', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(x.neurons, desc='Resampling', disable=pbar_hide, leave=pbar_leave):
                 n.resample(resample_to=resample_to, inplace=True)
 
         if not inplace:
@@ -1587,12 +1591,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,factor,preserve_cn_treenodes) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._downsample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._downsample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Downsampling', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(x.neurons, desc='Downsampling', disable=pbar_hide, leave=pbar_leave):
                 n.downsample(factor=factor, preserve_cn_treenodes=preserve_cn_treenodes, inplace=True)
 
         if not inplace:
@@ -1649,12 +1653,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,new_root[i]) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._reroot_helper, combinations, chunksize=10 ), total=len(combinations), desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._reroot_helper, combinations, chunksize=10 ), total=len(combinations), desc='Rerooting', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
-            for i, n in enumerate( tqdm(x.neurons, desc='Rerooting', disable=module_logger.getEffectiveLevel()>=40) ):
+            for i, n in enumerate( tqdm(x.neurons, desc='Rerooting', disable=pbar_hide, leave=pbar_leave) ):
                 n.reroot( new_root[i], inplace=True )
 
         # Reset logger level to previous state
@@ -1689,12 +1693,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._prune_distal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._prune_distal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
                 n.prune_distal_to( tag, inplace=True )
 
         if not inplace:
@@ -1724,12 +1728,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,tag) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._prune_proximal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._prune_proximal_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
                 n.prune_proximal_to(tag, inplace=True)
 
         if not inplace:
@@ -1769,12 +1773,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,to_prune) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._prune_strahler_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._prune_strahler_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
                 n.prune_by_strahler(to_prune=to_prune, inplace=True)
 
         if not inplace:
@@ -1812,12 +1816,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,reroot_to_soma) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._prune_neurite_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=module_logger.getEffectiveLevel()>=40 ))
+            x.neurons = list(tqdm( pool.imap( x._prune_neurite_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
-            for neuron in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+            for neuron in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
                 neuron.prune_by_longest_neurite(n, reroot_to_soma=reroot_to_soma, inplace=True)
 
         if not inplace:
@@ -1858,12 +1862,12 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [ (n,v,mode) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._prune_by_volume_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning' , disable=module_logger.getEffectiveLevel()>=40))
+            x.neurons = list(tqdm( pool.imap( x._prune_by_volume_helper, combinations, chunksize=10 ), total=len(combinations), desc='Pruning' , disable=pbar_hide, leave=pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
                 n.prune_by_volume(v, mode=mode, inplace=True)
 
         if not inplace:
@@ -1948,14 +1952,14 @@ class CatmaidNeuronList:
             to_retrieve_ix = [ i for i,n in enumerate(self.neurons) if 'segments' not in n.__dict__ ]
 
             pool = mp.Pool(self.n_cores)
-            update = list(tqdm( pool.imap( self._generate_segments_helper, to_retrieve, chunksize=10 ), total=len(to_retrieve), desc='Gen. segments', disable=module_logger.getEffectiveLevel()>=40 ))
+            update = list(tqdm( pool.imap( self._generate_segments_helper, to_retrieve, chunksize=10 ), total=len(to_retrieve), desc='Gen. segments', disable=pbar_hide, leave=pbar_leave ))
             pool.close()
             pool.join()
 
             for ix,n in zip(to_retrieve_ix,update):
                 self.neurons[ ix ] = n
         else:
-            for n in tqdm(self.neurons, desc='Gen. segments', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(self.neurons, desc='Gen. segments', disable=pbar_hide, leave=pbar_leave):
                 if 'segments' not in n.__dict__:
                     _ = n.segments
 
@@ -1984,7 +1988,7 @@ class CatmaidNeuronList:
         if to_update:
             skdata = fetch.get_neuron(
                 [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
-            for n in tqdm(to_update, desc='Processing neurons', disable=module_logger.getEffectiveLevel()>=40):
+            for n in tqdm(to_update, desc='Processing neurons', disable=pbar_hide, leave=pbar_leave):
 
                 n.nodes = skdata.loc[str(n.skeleton_id),'nodes']
                 n.connectors = skdata.loc[str(n.skeleton_id),'connectors']
@@ -2071,9 +2075,9 @@ class CatmaidNeuronList:
                         Annotation(s) to filter for. Use tilde (~) as prefix
                         to look for neurons WITHOUT given annotation(s).
         intersect :     bool, optional
-                        If True, neuron must have ALL provided annotations.
-                        Applies to include and exclude (~ prefix) annotations
-                        separately.
+                        If True, neuron must have/not have ALL provided
+                        annotations. Applies to include and exclude (~ prefix)
+                        annotations separately.
         partial :       bool, optional
                         If True, allow partial match of annotation.
 

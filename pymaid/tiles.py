@@ -59,12 +59,17 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
+
 def crop_neuron(x, output, dimensions=(1000,1000), interpolate_z_res=40, remote_instance=None):
     """ Crops EM tiles following a neuron's segments.
 
     Parameters
     ----------
-    x :                  {core.CatmaidNeuron}
+    x :                  {pymaid.CatmaidNeuron}
+                         Neuron to cut out.
     output :             str
                          File or folder.
     dimensions :         tuple of int, optional
@@ -168,6 +173,26 @@ class LoadTiles:
                   Memory limit in megabytes for loading tiles. This restricts
                   the number of tiles that can be simultaneously loaded into
                   memory.
+
+    Examples
+    --------
+    >>> # Generate the job
+    >>> job = pymaid.tiles.LoadTiles( [ 119000, 124000,
+    ...                                 36000, 42000,
+    ...                                 4050 ],
+    ...                               coords = 'PIXEL',
+    ...                               remote_instance=rm)
+    >>> # Load, stich and crop the required EM image tiles
+    >>> job.generate_img()
+    >>> # Render image
+    >>> ax = job.render_im(slider=False, figsize=(12,12))
+    >>> # Add treenodes
+    >>> job.render_nodes(ax, treenodes=True, connectors=False)
+    >>> # Add scalebar
+    >>> job.scalebar(size=1000, ax=ax, label=False)
+    >>> # Show
+    >>> plt.show()
+
     """
 
     # TODOs
@@ -210,7 +235,7 @@ class LoadTiles:
 
         memory_est = self.estimate_memory()
 
-        module_logger.info('Estimated memory usage for loading all required at once tiles: {0:.2f} Mb'.format(memory_est))
+        module_logger.info('Estimated memory usage: {0:.2f} Mb'.format(memory_est))
 
     def estimate_memory(self):
         """ Estimates memory [Mb] consumption of loading all tiles."""
@@ -383,8 +408,8 @@ class LoadTiles:
         # Initialise progress bar
         pbar = tqdm(total=len(threads),
                     desc='Loading tiles',
-                    disable=module_logger.getEffectiveLevel()>=40,
-                    leave=False)
+                    disable=pbar_hide,
+                    leave=pbar_leave)
 
         # Save start value of pbar (in case we have an external pbar)
         pbar_start = pbar.n
@@ -421,7 +446,7 @@ class LoadTiles:
 
         # Assemble tiles into the requested images
         images = []
-        for l, im in enumerate( tqdm(self.image_coords, 'Stitching') ):
+        for l, im in enumerate( tqdm(self.image_coords, 'Stitching', leave=pbar_leave, disable=pbar_hide) ):
             # Get a list of all tiles that remain to be used and are not currently part of the tiles
             remaining_tiles = [ t for img in self.image_coords[l:] for t in img['tiles_to_load'] ]
 
@@ -542,9 +567,9 @@ class LoadTiles:
                         Map connector ID to color.
         ec :            {str, tuple, dict}
                         Edge color.
-        skid_include :  list, optional
+        skid_include :  list of int, optional
                         List of skeleton IDs to include.
-        cn_include :    list, optional
+        cn_include :    list of int, optional
                         List of connector IDs to include.
         tn_kws :        dict, optional
                         Keywords passed on to matplotlib.pyplot.scatter for
@@ -592,12 +617,22 @@ class LoadTiles:
                                         (self.connectors.y <= slice_info['nm_bot'])
                                             ]
 
+        module_logger.debug('Retrieved {0} treenodes and {1} connectors'.format(
+                                                                                self.nodes.shape[0],
+                                                                                self.connectors.shape[0]
+                                                                                ))
+
 
         # Filter if provided
         if len(skid_include) > 0:
             self.nodes = self.nodes[ self.nodes.skeleton_id.isin( skid_include ) ]
         if len(cn_include) > 0:
             self.connectors = self.connectors[ self.connectors.skeleton_id.isin( node_include ) ]
+
+        module_logger.debug('{0} treenodes and {1} connectors after filtering'.format(
+                                                                                self.nodes.shape[0],
+                                                                                self.connectors.shape[0]
+                                                                                ))
 
         # Calculate pixel coords:
         # 1. Offset
@@ -724,10 +759,13 @@ class LoadTiles:
 
         return pd.concat( [nodes,virtual_nodes], axis=0, ignore_index=True )
 
-    def render_im(self, slider=True, **kwargs):
-        """ Shows image slices with a slider."""
+    def render_im(self, slider=False, ax=None, **kwargs):
+        """ Draw image slices with a slider."""
 
-        fig, ax = plt.subplots(**kwargs)
+        if isinstance(ax, type(None)):
+            fig, ax = plt.subplots(**kwargs)
+            ax.set_aspect('equal')
+
         plt.subplots_adjust(bottom=0.25)
 
         mpl_img = ax.imshow(self.img[:,:,0], cmap='gray')

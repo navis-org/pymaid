@@ -46,8 +46,11 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-
 __all__ = sorted([ 'filter_connectivity','cable_overlap','predict_connectivity', 'adjacency_matrix','group_matrix'])
+
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
 
 def filter_connectivity( x, restrict_to, remote_instance=None):
     """ Filters connectivity data by volume or skeleton data. Use this e.g. to
@@ -168,7 +171,7 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
                             columns=unique_skids, index=unique_skids )
 
     # Fill in values
-    for i, e in enumerate(tqdm(unique_edges, disable=module_logger.getEffectiveLevel()>=40, desc='Adj. matrix')):
+    for i, e in enumerate(tqdm(unique_edges, disable=pbar_hide, desc='Adj. matrix', leave=pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.at[ str(e[0]), str(e[1]) ] = counts[i]
 
@@ -265,7 +268,7 @@ def cable_overlap(a, b, dist=2, method='min' ):
 
     matrix = pd.DataFrame( np.zeros(( a.shape[0], b.shape[0] )), index=a.skeleton_id, columns=b.skeleton_id )
 
-    with tqdm(total=len(a), desc='Calc. overlap', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(a), desc='Calc. overlap', disable=pbar_hide, leave=pbar_leave) as pbar:
         # Keep track of KDtrees
         trees = {}
         for nA in a:
@@ -389,7 +392,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     n_std = kwargs.get('n_std', 2 )
     dist_threshold = distances.mean() + n_std * distances.std()
 
-    with tqdm(total=len(b), desc='Predicting', disable=module_logger.getEffectiveLevel()>=40) as pbar:
+    with tqdm(total=len(b), desc='Predicting', disable=pbar_hide, leave=pbar_leave) as pbar:
         for nB in b:
             # Create cKDTree for nB
             tree = scipy.spatial.cKDTree( nB.nodes[['x','y','z']].values, leafsize=10 )

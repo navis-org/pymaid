@@ -48,6 +48,10 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = sorted([ 'downsample_neuron','resample_neuron'])
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
+
 def _resample_neuron_spline(x, resample_to, inplace=False):
     """ Resamples neuron(s) by given resolution. Uses spline interpolation.
 
@@ -91,7 +95,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
     nodes = x.nodes.set_index('treenode_id')
 
     # Iterate over segments
-    for i,seg in enumerate(tqdm(x.segments, desc='Working on segments')):
+    for i,seg in enumerate(tqdm(x.segments, desc='Working on segments', disable=pbar_hide, leave=pbar_leave)):
         # Get length of this segment
         this_length = graph_utils.dist_between( x, seg[0], seg[-1] )
 
@@ -185,7 +189,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
     if isinstance(x, core.CatmaidNeuronList):
         results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace)
-                        for i in trange(x.shape[0], desc='Resampl. neurons', disable=module_logger.getEffectiveLevel()>=40 ) ]
+                        for i in trange(x.shape[0], desc='Resampl. neurons', disable=pbar_hide, leave=pbar_leave ) ]
         if not inplace:
             return core.CatmaidNeuronList( results )
     elif not isinstance(x, core.CatmaidNeuron):
@@ -202,7 +206,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     max_tn_id = x.nodes.treenode_id.max() + 1
 
     # Iterate over segments
-    for i,seg in enumerate(tqdm(x.segments, desc='Proc. segments', disable=module_logger.getEffectiveLevel()>=40 )):
+    for i,seg in enumerate(tqdm(x.segments, desc='Proc. segments', disable=pbar_hide, leave=False )):
         coords = locs.loc[ seg ].values.astype(float)
 
         # vecs between subsequently measured points
@@ -348,7 +352,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     if isinstance(skdata, pd.DataFrame):
         return pd.DataFrame([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
     elif isinstance(skdata, core.CatmaidNeuronList):
-        return core.CatmaidNeuronList([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
+        return core.CatmaidNeuronList([downsample_neuron(n, resampling_factor, inplace=inplace) for n in skdata])
     elif isinstance(skdata, pd.Series):
         if not inplace:
             df = skdata.copy()

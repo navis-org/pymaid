@@ -76,6 +76,9 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = ['plot3d','plot2d','plot1d','plot_network','clear3d','close3d','screenshot','get_canvas']
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active Vispy 3D canvas.
@@ -398,7 +401,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 lim.append( verts.min(axis=0) )
 
     # Create lines from segments
-    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0], leave=False)):
+    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0], leave=False, disable=pbar_hide)):
         this_color = colormap[ neuron.skeleton_id ]
 
         if not connectors_only:
@@ -1885,7 +1888,7 @@ def plot1d( x, ax=None, color=None, **kwargs):
                      })
 
     max_x = []
-    for ix,n in enumerate( tqdm(x, desc='Processing') ):
+    for ix,n in enumerate( tqdm(x, desc='Processing', disable=pbar_hide, leave=pbar_leave) ):
         if isinstance(color, dict):
             this_c = color[n.skeleton_id]
         else:

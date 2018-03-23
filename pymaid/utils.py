@@ -50,6 +50,35 @@ def set_loggers(level='INFO'):
     pymaid.user_stats.module_logger.setLevel(level)
     pymaid.connectivity.module_logger.setLevel(level)
 
+def set_pbars(hide=None, leave=None):
+    """ Set global progress bar behaviours.
+
+    Parameters
+    ----------
+    hide :      bool, optional
+                Set to True to hide all progress bars.
+    leave :     bool, optional
+                Set to False to clear progress bars after they have finished.
+
+    Returns
+    -------
+    Nothing
+
+    """
+
+    mods = [ pymaid.morpho, pymaid.graph, pymaid.graph_utils, pymaid.core,
+             pymaid.fetch, pymaid.resample, pymaid.intersect, pymaid.cluster,
+             pymaid.user_stats, pymaid.connectivity, pymaid.plotting ]
+
+    if isinstance(hide, bool):
+        for m in mods:
+            m.pbar_hide = hide
+
+    if isinstance(leave, bool):
+        for m in mods:
+            m.pbar_leave = leave
+
+
 def _make_iterable(x, force_type=None):
     """ Helper function. Turns x into a np.ndarray, if it isn't already. For
     dicts, keys will be turned into array.

@@ -82,6 +82,10 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = ['get_user_contributions','get_time_invested','get_user_actions']
 
+# Default settings for progress bars
+pbar_hide = False
+pbar_leave = True
+
 def get_user_contributions(x, remote_instance=None):
     """ Takes a list of neurons and returns nodes and synapses contributed
     by each user.
@@ -341,19 +345,19 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         }
 
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
             stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get reconstruction time spent
-        for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=pbar_hide, leave=pbar_leave):
             stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get edition time spent
-        for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=pbar_hide, leave=pbar_leave):
             stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get time spent reviewing
-        for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=pbar_hide, leave=pbar_leave):
             stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
@@ -364,7 +368,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
             this_ts = all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
             this_ts.columns=[ user_list.ix[u].login ]
 
@@ -382,7 +386,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=module_logger.getEffectiveLevel()>=40):
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
             minutes_counting = ( all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions )
             minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
             this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
