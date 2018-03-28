@@ -1328,10 +1328,10 @@ class CatmaidNeuronList:
                             n[0], remote_instance=remote_instance)
 
         # Add indexer class
-        self.ix = _IXIndexer(self.neurons, module_logger)
+        self.ix = _IXIndexer(self.neurons)
 
         # Add skeleton ID indexer class
-        self.skid = _SkidIndexer(self.neurons, module_logger)
+        self.skid = _SkidIndexer(self.neurons)
 
     def _convert_helper(self, x):
         """ Helper function to convert x to CatmaidNeuron."""
@@ -2193,8 +2193,13 @@ class CatmaidNeuronList:
 
         x.neurons = []
         for n in self.neurons:
-            if n.skeleton_id not in x.skeleton_id:
+            if not set([n.skeleton_id]) & set( x.skeleton_id ):
                 x.neurons.append(n)
+
+        # We have to reassign the Indexer classes here
+        # For some reason the neuron list does not propagate
+        x.ix = _IXIndexer(x.neurons)
+        x.skid = _SkidIndexer(x.neurons)
 
         if not inplace:
             return x
@@ -2206,9 +2211,8 @@ class _IXIndexer():
     it would on DataFrames.
     """
 
-    def __init__(self, obj, logger=None):
+    def __init__(self, obj):
         self.obj = obj
-        module_logger = logger
 
     def __getitem__(self, key):
         if isinstance(key, int) or isinstance(key, slice):
@@ -2221,9 +2225,8 @@ class _SkidIndexer():
     indexing. This allows you to get a neuron by its skeleton ID.
     """
 
-    def __init__(self, obj, logger=None):
+    def __init__(self, obj):
         self.obj = obj
-        module_logger = logger
 
     def __getitem__(self, skid):
         # Turn into list and force strings
