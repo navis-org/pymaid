@@ -76,6 +76,11 @@ else:
     except:
         raise ImportError('Unable to import configuration file.')
 
+print('Running tests with')
+print('Server:', config_test.server_url)
+print('Test SKIDs:', config_test.test_skids)
+print('Test annotations:', config_test.test_annotations)
+print('Test volume:', config_test.test_volume)
 
 class TestPymaid(unittest.TestCase):
     """Test pymaid.pymaid """
