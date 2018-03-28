@@ -511,7 +511,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
         pbar = tqdm(total=len(threads), desc=desc, disable=pbar_hide or disable_pbar, leave=pbar_leave)
 
     # Save start value of pbar (in case we have an external pbar)
-    pbar_start = pbar.n
+    pbar_start = getattr(pbar, 'n', None)
 
     # Try statement makes sure that we can close the pbar even if fetching fails
     try:
@@ -527,8 +527,9 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
             cur_time = time.time()
 
             #Update progress bar
-            p_delta = len(threads_closed) - (pbar.n - pbar_start)
-            pbar.update( p_delta  )
+            if pbar_start:
+                p_delta = len(threads_closed) - (pbar.n - pbar_start)
+                pbar.update( p_delta  )
 
             module_logger.debug('Closing Threads: %i ( %is until time out )' % (
                 len(threads_closed), round(time_out - (cur_time - start))))
