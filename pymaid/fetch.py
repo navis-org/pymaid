@@ -1220,7 +1220,7 @@ def get_partners(x, remote_instance=None, threshold=1,
 
     df['total'] = df[ x ].sum(axis=1).values
 
-    df.sort_values('total', inplace=True, ascending=False)
+    df.sort_values(['relation','total'], inplace=True, ascending=False)
 
     if filt:
         if not isinstance(filt, (list, np.ndarray)):
@@ -4635,7 +4635,7 @@ def eval_skids(x, remote_instance=None):
         if x.name == 'skeleton_id':
             return x.tolist()
         elif 'skeleton_id' in x:
-            skids = x.skeleton_id.tolist()
+            return [ x.skeleton_id ]
         else:
             raise ValueError('Unable to extract skeleton ID from Pandas series {0}'.format(x))
     elif isinstance(x, type(None)):
