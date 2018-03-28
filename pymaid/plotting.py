@@ -366,7 +366,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     else:
         if not isinstance(ax, mpl.axes.Axes):
             raise TypeError('Ax must be of type <mpl.axes.Axes>, not <{0}>'.format(type(ax)))
-        fig = None #we don't really need this
+        fig = ax.get_figure()
         if method in ['3d','3d_complex'] and ax.name != '3d':
             raise TypeError('Axis must be 3d.')
         elif method == '2d' and ax.name == '3d':
@@ -394,7 +394,9 @@ def plot2d(x, method='2d', *args, **kwargs):
                 # Add alpha
                 if len(c) == 3:
                     c = ( c[0],c[1],c[2],.1 )
-                ts = ax.plot_trisurf( verts[:,0],verts[:,2],v['faces'], verts[:,1], label=v['name'], color=c)
+                ts = ax.plot_trisurf( verts[:,0], verts[:,2], v['faces'],
+                                      verts[:,1], label=v['name'],
+                                      color=c)
                 ts.set_gid( v['name'] )
                 # Keep track of limits
                 lim.append( verts.max(axis=0) )
@@ -415,14 +417,17 @@ def plot2d(x, method='2d', *args, **kwargs):
                 # make that line discontinuous there
                 coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
 
-                this_line = mlines.Line2D( coords[:,0], coords[:,1], lw=linewidth, ls=linestyle,alpha=.9, color=this_color,
-                                    label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
+                this_line = mlines.Line2D( coords[:,0], coords[:,1],
+                                           lw=linewidth, ls=linestyle,
+                                           alpha=.9, color=this_color,
+                                           label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
 
                 ax.add_line(this_line)
 
                 for n in soma.itertuples():
-                    s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius, alpha=.9,
-                                        fill=True, color=this_color, zorder=4, edgecolor='none')
+                    s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius,
+                                         alpha=.9, fill=True, fc=this_color,
+                                         zorder=4, edgecolor='none')
                     ax.add_patch(s)
 
             elif method in ['3d','3d_complex']:
