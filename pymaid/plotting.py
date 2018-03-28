@@ -836,7 +836,8 @@ def plot3d(x, *args, **kwargs):
             view = canvas.central_widget.add_view()
 
             # Add camera
-            view.camera = scene.TurntableCamera()
+            # view.camera = scene.TurntableCamera()
+            view.camera = scene.ArcballCamera()
 
             # Set camera range
             view.camera.set_range((min_x * vispy_scale_factor, max_x * vispy_scale_factor),
@@ -855,7 +856,8 @@ def plot3d(x, *args, **kwargs):
 
 
                 # Add camera
-                view.camera = scene.TurntableCamera()
+                #view.camera = scene.TurntableCamera()
+                view.camera = scene.ArcballCamera()
 
                 # Set camera range
                 view.camera.set_range((min_x * vispy_scale_factor, max_x * vispy_scale_factor),
