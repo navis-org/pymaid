@@ -1,11 +1,10 @@
 language: python
-python:  
-  - "3.3"
-  - "3.4"
-  - "3.5"
-  - "3.6"
+python:
+  - "3.5"  
 # command to install dependencies
 install:
   - pip install .
+  - pip install pyoctree # additional requirement for fast intersections
+  - pip install shapely # additiona requirement for 2d shapes
 # command to run tests
 script: pytest
