@@ -82,6 +82,9 @@ from concurrent.futures import ThreadPoolExecutor
 import scipy
 import networkx as nx
 
+import matplotlib.pyplot as plt
+import io
+
 import six
 
 from pymaid import graph, morpho, fetch, plotting, graph_utils, resample, intersect, utils
@@ -998,6 +1001,33 @@ class CatmaidNeuron:
 
     def __repr__(self):
         return str(self.summary())
+
+    def _repr_html_(self):
+        frame = self.summary().to_frame()
+        frame.columns = ['']
+        return self._gen_svg_thumbnail() + frame._repr_html_()
+
+    def _gen_svg_thumbnail(self):
+        # Store some previous states
+        prev_level = plotting.module_logger.getEffectiveLevel()
+        prev_pbar = plotting.pbar_hide
+        prev_int = plt.isinteractive()
+
+        plt.ioff() # turn off interactive mode
+        plotting.module_logger.setLevel('WARNING')
+        plotting.pbar_hide = True
+        fig=plt.figure(figsize=(2,2))
+        ax = fig.add_subplot(111)
+        fig, ax = self.plot2d(connectors=False, ax=ax)
+        output = io.StringIO()
+        fig.savefig(output,format='svg')
+
+        if prev_int:
+            plt.ion() # turn on interactive mode
+        plotting.module_logger.setLevel(prev_level)
+        plotting.pbar_hide = prev_pbar
+        _ = plt.clf()
+        return output.getvalue()
 
     def __add__(self, to_add):
         if isinstance(to_add, list):
