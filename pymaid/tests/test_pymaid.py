@@ -63,10 +63,10 @@ if False not in [v in os.environ for v in required_variables]:
     config_test = conf()
 
     for v in ['server_url', 'http_user', 'http_pw', 'token', 'test_volume']:
-        setattr(config_test, v, os.environ[v].split(',')) 
+        setattr(config_test, v, os.environ[v]) 
 
     for v in ['test_skids', 'test_annotations']:
-        setattr(config_test, v, os.environ[v]) 
+        setattr(config_test, v, os.environ[v].split(',')) 
 else:
     missing = [v for v in required_variables if v not in os.environ]
     print('Missing some environment variables:', ','.join(missing))
@@ -75,12 +75,6 @@ else:
         import config_test
     except:
         raise ImportError('Unable to import configuration file.')
-
-print('Running tests with')
-print('Server:', config_test.server_url)
-print('Test SKIDs:', config_test.test_skids)
-print('Test annotations:', config_test.test_annotations)
-print('Test volume:', config_test.test_volume)
 
 class TestPymaid(unittest.TestCase):
     """Test pymaid.pymaid """
