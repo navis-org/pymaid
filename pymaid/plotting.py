@@ -927,10 +927,10 @@ def plot3d(x, *args, **kwargs):
                     # a scale factor
                     t = scene.visuals.Line(pos=np.array(segments) * vispy_scale_factor,
                                            color=list(neuron_color),
-                                           width=2,
+                                           width=linewidth, # Can only be used with method 'agg'
                                            connect='segments',
                                            antialias=False,
-                                           method='gl') #method can also be 'agg'
+                                           method='gl') # method can also be 'agg' -> has to use connect='strip'
                     view.add(t)
 
                 if by_strahler or by_confidence:
@@ -985,10 +985,10 @@ def plot3d(x, *args, **kwargs):
 
                         t = scene.visuals.Line(pos=np.array(segments) * vispy_scale_factor,
                                                color=color,
-                                               width=2,
+                                               width=linewidth, # Can only be used with method 'agg'
                                                connect='segments',
                                                antialias=False,
-                                               method='gl') #method can also be 'agg'
+                                               method='gl') #method can also be 'agg' -> has to use connect='strip'
                         view.add(t)
 
         for neuron in dotprops.itertuples():
@@ -1157,7 +1157,7 @@ def plot3d(x, *args, **kwargs):
                                                mode='lines',
                                                line=dict(
                                                    color=c,
-                                                   width=5
+                                                   width=linewidth
                                                ),
                                                name=neuron_name,
                                                legendgroup=neuron_name,
@@ -1392,24 +1392,26 @@ def plot3d(x, *args, **kwargs):
     by_strahler = kwargs.get('by_strahler', False)
     by_confidence = kwargs.get('by_confidence', False)
     cn_mesh_colors = kwargs.get('cn_mesh_colors', False)
+    linewidth = kwargs.get('linewidth', 2)
     connectors_only = kwargs.get('connectors_only', False)
     use_neuron_color = kwargs.get('use_neuron_color', False)
 
     scatter_kws = kwargs.get('scatter_kws', {})
     syn_lay_new = kwargs.get('synapse_layout',  {})
-    syn_lay = {0: {
-        'name': 'Presynapses',
-        'color': (255, 0, 0)
-    },
-        1: {
-        'name': 'Postsynapses',
-        'color': (0, 0, 255)
-    },
-        2: {
-        'name': 'Gap junctions',
-        'color': (0, 255, 0)
-    },
-        'display': 'lines' #'mpatches.Circles'
+    syn_lay = {
+                0: {
+                'name': 'Presynapses',
+                'color': (255, 0, 0)
+            },
+                1: {
+                'name': 'Postsynapses',
+                'color': (0, 0, 255)
+            },
+                2: {
+                'name': 'Gap junctions',
+                'color': (0, 255, 0)
+            },
+                'display': 'lines' #'mpatches.Circles'
     }
     syn_lay.update(syn_lay_new)
 
