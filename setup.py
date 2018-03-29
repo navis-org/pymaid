@@ -43,19 +43,19 @@ setup(
 
     install_requires=[
         "networkx>=2.0",
-        "scipy>=0.18.1",        
-        "numpy>=1.12.1",
-        "matplotlib>=2.0.0",
-        "plotly>=2.0.6",
-        "pandas>=0.20.1",
-        "vispy>=0.4.0",
+        "scipy>=1.0.0",        
+        "numpy>=1.13.0",
+        "matplotlib>=2.1.0",
+        "plotly>=2.4.0",
+        "pandas>=0.21.0",
+        "vispy>=0.5.0",
         "tqdm>=4.14.0",
         "pyqt5",
         "pypng"
         #"rpy2>=2.8.5", #This throws an error when no R is installed on the system 
     ],
 
-    python_requires='>=3',
+    python_requires='>=3.4',
 
     zip_safe = False
 )
