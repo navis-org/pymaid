@@ -295,8 +295,9 @@ class TestPlot(unittest.TestCase):
 
     def test_plot3d_plotly(self):
         self.assertIsNotNone(self.nl.plot3d(backend='plotly'))        
-        self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))        
+        self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))                
         self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol], backend='plotly'))
+        
 
     def test_plot2d(self):
         self.assertIsNotNone(self.nl.plot2d(method='2d'))
@@ -307,9 +308,9 @@ class TestPlot(unittest.TestCase):
         pymaid.close3d()
         plt.clf()
 
-class TestUserStats(unittest.TestCase):
+#class TestUserStats(unittest.TestCase):
     """Test pymaid.user_stats """
-
+    """
     def setUp(self):
         self.rm = pymaid.CatmaidInstance(
             config_test.server_url,
@@ -317,12 +318,11 @@ class TestUserStats(unittest.TestCase):
             config_test.http_pw,
             config_test.token,
             logger_level='ERROR')
-
      
     def test_time_invested(self):
         self.assertIsInstance(pymaid.get_time_invested(
             config_test.test_skids[0], remote_instance=self.rm), pd.DataFrame)
-    """
+    
     
     def test_user_contributions(self):
         self.assertIsInstance(pymaid.get_user_contributions(
