@@ -7,4 +7,4 @@ install:
   - pip install pyoctree # additional requirement for fast intersections
   - pip install shapely # additiona requirement for 2d shapes
 # command to run tests
-script: pytest --fulltrace
+script: pytest --verbose

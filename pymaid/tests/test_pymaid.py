@@ -287,7 +287,7 @@ class TestPlot(unittest.TestCase):
 
         self.vol = pymaid.get_volume( config_test.test_volume )
 
-    """
+    
 
     def test_plot3d_vispy(self):
         self.assertIsNotNone(self.nl.plot3d(backend='vispy'))
@@ -308,6 +308,7 @@ class TestPlot(unittest.TestCase):
         self.assertIsNotNone(self.nl.plot2d(method='3d_complex'))
         self.assertIsNotNone(self.nl.plot2d(method='3d'))
 
+    """
     def tearDown(self):
         pymaid.close3d()
         plt.clf()
