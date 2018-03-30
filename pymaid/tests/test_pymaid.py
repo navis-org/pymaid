@@ -9,7 +9,7 @@ as environment variables or in a config_test.py file
     #Http user
     http_user = ''
 
-    #Http pw
+    #Http password
     http_pw = ''
 
     #Auth token
@@ -23,6 +23,8 @@ as environment variables or in a config_test.py file
 
     # Test CATMAID volume
     test_volume = ''
+
+If you use environmental variables, give lists as comma-separated string.
 
 
 Examples
@@ -285,6 +287,8 @@ class TestPlot(unittest.TestCase):
 
         self.vol = pymaid.get_volume( config_test.test_volume )
 
+    """
+
     def test_plot3d_vispy(self):
         self.assertIsNotNone(self.nl.plot3d(backend='vispy'))
         pymaid.close3d()
@@ -307,6 +311,10 @@ class TestPlot(unittest.TestCase):
     def tearDown(self):
         pymaid.close3d()
         plt.clf()
+
+    """
+
+    
 
 #class TestUserStats(unittest.TestCase):
     """Test pymaid.user_stats """
