@@ -287,7 +287,17 @@ class TestPlot(unittest.TestCase):
 
         self.vol = pymaid.get_volume( config_test.test_volume )
 
-    
+    def test_plot3d_plotly(self):
+        self.assertIsNotNone(self.nl.plot3d(backend='plotly'))        
+        self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))                
+        self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol], backend='plotly'))
+
+    """
+    def test_plot2d(self):
+        self.assertIsNotNone(self.nl.plot2d(method='2d'))
+        self.assertIsNotNone(self.nl.plot2d(method='3d_complex'))
+        self.assertIsNotNone(self.nl.plot2d(method='3d'))
+    """
 
     def test_plot3d_vispy(self):
         self.assertIsNotNone(self.nl.plot3d(backend='vispy'))
@@ -296,18 +306,6 @@ class TestPlot(unittest.TestCase):
         pymaid.close3d()
         self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol], backend='vispy'))
         pymaid.close3d()
-
-    def test_plot3d_plotly(self):
-        self.assertIsNotNone(self.nl.plot3d(backend='plotly'))        
-        self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))                
-        self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol], backend='plotly'))
-        
-
-    def test_plot2d(self):
-        self.assertIsNotNone(self.nl.plot2d(method='2d'))
-        #self.assertIsNotNone(self.nl.plot2d(method='3d_complex'))
-        #self.assertIsNotNone(self.nl.plot2d(method='3d'))
-
     
     def tearDown(self):
         pymaid.close3d()

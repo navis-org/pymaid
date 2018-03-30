@@ -97,7 +97,7 @@ nodes = nl[0].nodes
 # Get coordinates of all connectors
 coords = nl[0].connectors[ ['x','y','z'] ].as_matrix()
 
-# Get all branch oints:
+# Get all branch points:
 branch_points = nl[0].nodes[ nl[0].nodes.type == 'branch' ].treenode_id
 
 # Plot neuron -> see help(pymaid.plot3d) for accepted kwargs
