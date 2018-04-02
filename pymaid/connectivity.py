@@ -340,8 +340,11 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
                 Method to use for calculations. Currently only one implemented.
     **kwargs :  Arbitrary keyword arguments.
                 1. For method = 'possible_contacts':
+                    - `dist` to set distance between connectors and treenodes
+                      manually.
                     - `stdev` to set number of standard-deviations of average
                       distance. Default = 2.
+
 
     Notes
     -----
@@ -391,16 +394,26 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     # First let's calculate at what distance synapses are being made
     cn_between = fetch.get_connectors_between(a,b, remote_instance=remote_instance)
 
-    cn_locs = np.vstack(cn_between.connector_loc.values)
-    tn_locs = np.vstack(cn_between.treenode2_loc.values)
+    if kwargs.get('dist', None):
+        distances = kwargs.get('dist')
+    elif cn_between.shape[0] > 0:
+        module_logger.warning('No ')
+        cn_locs = np.vstack(cn_between.connector_loc.values)
+        tn_locs = np.vstack(cn_between.treenode2_loc.values)
 
-    distances = np.sqrt ( np.sum((cn_locs  - tn_locs) ** 2, axis=1) )
+        distances = np.sqrt ( np.sum((cn_locs  - tn_locs) ** 2, axis=1) )
 
-    module_logger.info('Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(),distances.std()))
+        module_logger.info('Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(), distances.std()))    
+    else:
+        module_logger.warning('No existing connectors to calculate average \
+                               connector->treenode distance found. Falling \
+                               back to default of 1um. Use <stdev> argument\
+                               to set manually.')
+        distances = 1000
 
     # Calculate distances threshold
     n_std = kwargs.get('n_std', 2 )
-    dist_threshold = distances.mean() + n_std * distances.std()
+    dist_threshold = np.mean( distances ) + n_std * np.std( distances )
 
     with tqdm(total=len(b), desc='Predicting', disable=pbar_hide, leave=pbar_leave) as pbar:
         for nB in b:
