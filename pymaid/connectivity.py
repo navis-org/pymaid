@@ -149,7 +149,7 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
 
         # Now filter connectors
         if isinstance(restrict_to, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            cn_data = cn_data[ cn_data.connector_id.isin( restrict_to.connectors ) ]
+            cn_data = cn_data[ cn_data.connector_id.isin( restrict_to.connectors.connector_id.values ) ]
         elif isinstance( restrict_to, core.Volume ):
             cn_data = cn_data[ intersect.in_volume( cn_data.connector_loc.values , restrict_to ) ]
 
@@ -161,10 +161,15 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
     # Collect edges
     edges = cn_data[['source_neuron','target_neuron']].values
 
-    # Turn individual edges into synaptic connections
-    unique_edges, counts = np.unique( edges, return_counts=True, axis=0 )
-    unique_skids = np.unique(edges).astype(str)
-    unique_edges=unique_edges.astype(str)
+    if edges.shape[0] > 0:
+        # Turn individual edges into synaptic connections
+        unique_edges, counts = np.unique( edges, return_counts=True, axis=0 )
+        unique_skids = np.unique(edges).astype(str)
+        unique_edges=unique_edges.astype(str)
+    else:
+        unique_edges = []
+        counts = []
+        unique_skids = []
 
     # Create empty adj_mat
     adj_mat = pd.DataFrame( np.zeros(( len(unique_skids), len(unique_skids) )),
@@ -176,12 +181,17 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
         adj_mat.at[ str(e[0]), str(e[1]) ] = counts[i]
 
     if datatype == 'adjacency_matrix':
-        adj_mat.datatype = 'adjacency_matrix'
-        # Bring into original format
-        adj_mat = adj_mat.loc[ x.index, x.columns ]
-        # If we dropped any columns/rows because they didn't contain connectivity, we have to fill them now
-        adj_mat.fillna(0, inplace=True)
-        return adj_mat
+        # Make a copy of original adjaceny matrix
+        x = x.copy()
+        x.datatype = 'adjacency_matrix'
+
+        # Set everything to 0
+        x[:] = 0
+
+        # Update from filtered connectivity
+        x.update( adj_mat )
+
+        return x
 
     # Generate connectivity table by subsetting adjacency matrix to our neurons of interest
     us_neurons = [ n for n in neurons if n in adj_mat.columns ]
