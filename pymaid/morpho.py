@@ -723,7 +723,7 @@ def segregation_index(x, centrality_method='centrifugal'):
 
         # This will leave the proximal split with the primary neurite but
         # since that should not have synapses, we don't care at this point.
-        x = core.CatmaidNeuronList( cut_neuron( temp, child ) )
+        x = core.CatmaidNeuronList( list( graph_utils.cut_neuron( temp, child ) ) )
 
     # Calculate entropy for each fragment
     entropy = []
