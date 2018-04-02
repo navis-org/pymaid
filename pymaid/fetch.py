@@ -126,8 +126,7 @@ class CatmaidInstance:
                     Sets logger level (module-wide).
     time_out :      {int, None}
                     Time in seconds after which fetching data will time-out
-                    (so as to not block the system).
-                    If set to None, time-out will be max([ 30, len(requests) ]).
+                    (so as to not block the system)..
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
                     adding it as module 'remote_instance' to sys.modules.
@@ -484,7 +483,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
     threads_closed = []
 
     if remote_instance.time_out is None:
-        time_out = max([len(urls), 30])
+        time_out = float('inf')
     else:
         time_out = remote_instance.time_out
 
@@ -532,8 +531,8 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
                 p_delta = len(threads_closed) - (pbar.n - pbar_start)
                 pbar.update( p_delta  )
 
-            module_logger.debug('Closing Threads: %i ( %is until time out )' % (
-                len(threads_closed), round(time_out - (cur_time - start))))
+            module_logger.debug('Closing Threads: {0} ({1:.0f}s until time out)'.format(
+                len(threads_closed), time_out - (cur_time - start)))
     except:
         raise
     finally:
@@ -906,7 +905,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
     Important
     ---------
-    Connecivity (total number of connections) returned is restricted to
+    Connectivity (total number of connections) returned is restricted to
     that volume.
 
     Parameters
@@ -1045,8 +1044,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     review = get_review( df.skeleton_id.unique(),
                        remote_instance=remote_instance ).set_index('skeleton_id')
 
-    df['neuron_name'] = [ review.ix[ str(s) ].neuron_name for s in df.skeleton_id.tolist() ]
-    df['num_nodes'] = [ review.ix[ str(s) ].total_node_count for s in df.skeleton_id.tolist() ]
+    df['neuron_name'] = [ review.loc[ str(s), 'neuron_name' ] for s in df.skeleton_id.tolist() ]
+    df['num_nodes'] = [ review.loc[ str(s), 'total_node_count' ] for s in df.skeleton_id.tolist() ]
     df['total'] = df[x].sum(axis=1)
 
     # Filter for min size
@@ -1470,7 +1469,10 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     all_tables = []
 
-    for i,nl in enumerate( tqdm(node_list, desc='Creating table', leave=pbar_leave) ):
+    for i,nl in enumerate( tqdm(node_list, 
+                                desc='Creating table', 
+                                leave=pbar_leave, 
+                                disable=pbar_hide) ):
         if include_details:
             tag_dict = {n[0]: [] for n in nl[0]}
             reviewer_dict = {n[0]: [] for n in nl[0]}
@@ -1822,8 +1824,8 @@ def get_connectors_between(a, b, directional=True, remote_instance=None ):
 
     # Get user list and replace IDs with logins
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
-    df['creator1'] = [ user_list.ix[u].login for u in df.creator1.tolist() ]
-    df['creator2'] = [ user_list.ix[u].login for u in df.creator2.tolist() ]
+    df['creator1'] = [ user_list.loc[u, 'login'] for u in df.creator1.tolist() ]
+    df['creator2'] = [ user_list.loc[u, 'login'] for u in df.creator2.tolist() ]
 
     return df
 
@@ -1958,7 +1960,7 @@ def get_user_annotations(x, remote_instance=None):
     Parameters
     ----------
     x
-                        Users to get annotationfor. Can be either:
+                        User(s) to get annotation for. Can be either:
 
                         1. single or list of user IDs
                         2. single or list of user login names
@@ -1989,7 +1991,7 @@ def get_user_annotations(x, remote_instance=None):
     try:
         ids = [int(e) for e in x]
     except:
-        ids = [user_list.set_index('login').ix[e] for e in x]
+        ids = [user_list.set_index('login').loc[e, 'user_id'] for e in x]
 
     # This works with neuron_id NOT skeleton_id
     # neuron_id can be requested via neuron_names
@@ -2010,7 +2012,7 @@ def get_user_annotations(x, remote_instance=None):
     # Add user login
     for i, u in enumerate(ids):
         for an in annotations[i]:
-            an.append(user_list.set_index('id').ix[u].login)
+            an.append(user_list.set_index('id').loc[u,'login'])
 
     # Now flatten the list of lists
     annotations = [an for sublist in annotations for an in sublist]
@@ -2104,7 +2106,7 @@ def get_annotation_details(x, remote_instance=None):
     for i, s in enumerate(skids):
         for an in annotations[i]:
             an.insert(1, s)
-            an.append(user_list.ix[an[4]].login)
+            an.append(user_list.loc[an[4], 'login'])
 
     # Now flatten the list of lists
     annotations = [an for sublist in annotations for an in sublist]
@@ -2909,7 +2911,7 @@ def get_review_details(x, remote_instance=None):
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
     df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(0)
-    df.columns = [user_list.ix[u].login for u in df.columns]
+    df.columns = [user_list.loc[u, 'login'] for u in df.columns]
     df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.tolist()]
     df.index.name = 'treenode_id'
 
@@ -3112,13 +3114,13 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
                     remote_get_statistics_url, get_statistics_postdata))
 
         # Now generate DataFrame
-        node_contributors = {user_list.ix[int(u)].login: sum([st['node_contributors'][u] for st in stats if u in st[
+        node_contributors = {user_list.loc[int(u), 'login']: sum([st['node_contributors'][u] for st in stats if u in st[
             'node_contributors']]) for st in stats for u in st['node_contributors']}
-        pre_contributors = {user_list.ix[int(u)].login: sum([st['pre_contributors'][u] for st in stats if u in st[
+        pre_contributors = {user_list.loc[int(u), 'login']: sum([st['pre_contributors'][u] for st in stats if u in st[
             'pre_contributors']]) for st in stats for u in st['pre_contributors']}
-        post_contributors = {user_list.ix[int(u)].login: sum([st['post_contributors'][u] for st in stats if u in st[
+        post_contributors = {user_list.loc[int(u), 'login']: sum([st['post_contributors'][u] for st in stats if u in st[
             'post_contributors']]) for st in stats for u in st['post_contributors']}
-        review_contributors = {user_list.ix[int(u)].login: sum([st['review_contributors'][u] for st in stats if u in st[
+        review_contributors = {user_list.loc[int(u), 'login']: sum([st['review_contributors'][u] for st in stats if u in st[
             'review_contributors']]) for st in stats for u in st['review_contributors']}
 
         df = pd.Series([
@@ -3148,15 +3150,15 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
         df = pd.DataFrame([[
             s,
             stats[i]['n_nodes'],
-            {user_list.ix[int(u)].login: stats[i]['node_contributors'][u]
+            {user_list.loc[int(u), 'login']: stats[i]['node_contributors'][u]
                 for u in stats[i]['node_contributors']},
             stats[i]['n_pre'],
-            {user_list.ix[int(u)].login: stats[i]['pre_contributors'][u]
+            {user_list.loc[int(u), 'login']: stats[i]['pre_contributors'][u]
                 for u in stats[i]['pre_contributors']},
             stats[i]['n_post'],
-            {user_list.ix[int(u)].login: stats[i]['post_contributors'][u]
+            {user_list.loc[int(u), 'login']: stats[i]['post_contributors'][u]
                 for u in stats[i]['post_contributors']},
-            {user_list.ix[int(u)].login: stats[i]['review_contributors'][u]
+            {user_list.loc[int(u), 'login']: stats[i]['review_contributors'][u]
                 for u in stats[i]['review_contributors']},
             stats[i]['multiuser_review_minutes'],
             stats[i]['construction_minutes'],
@@ -3455,15 +3457,15 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
 
     df = pd.Series([
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_treenodes', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.ix[u].login for u in stats[
+                     index=[user_list.loc[u, 'login'] for u in stats[
                          'stats_table'].keys()],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_connectors', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.ix[u].login for u in stats[
+                     index=[user_list.loc[u, 'login'] for u in stats[
                          'stats_table'].keys()],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_reviewed_nodes', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.ix[u].login for u in stats[
+                     index=[user_list.loc[u, 'login'] for u in stats[
                          'stats_table'].keys()],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         user_list.reset_index(drop=True)
@@ -3475,7 +3477,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     nc = remote_instance.fetch( remote_instance._get_stats_node_count() )
 
     df['node_count'] = pd.Series( data = list (nc.values()),
-                                  index = [ user_list.ix[u].login for u in nc.keys() ] ).sort_values(ascending=False)
+                                  index = [ user_list.loc[u, 'login'] for u in nc.keys() ] ).sort_values(ascending=False)
 
     return df
 
