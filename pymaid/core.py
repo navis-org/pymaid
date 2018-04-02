@@ -427,7 +427,7 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
         module_logger.info('Retrieving skeleton data...')
         skeleton = fetch.get_neuron(
-            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).ix[0]
+            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).iloc[0]
 
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
@@ -576,8 +576,8 @@ class CatmaidNeuron:
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
-        self.review_status = fetch.get_review(self.skeleton_id, remote_instance).ix[
-            0].percent_reviewed
+        self.review_status = fetch.get_review(self.skeleton_id, remote_instance).loc[
+            0, 'percent_reviewed']
         return self.review_status
 
     def get_annotations(self, remote_instance=None):
@@ -1940,7 +1940,7 @@ class CatmaidNeuronList:
                 to_update, remote_instance=self._remote_instance).set_index('skeleton_id')
             for n in self.neurons:
                 if str(n.skeleton_id) in re:
-                    n.review_status = re.ix[str(n.skeleton_id)].percent_reviewed
+                    n.review_status = re.loc[str(n.skeleton_id), 'percent_reviewed']
 
     def get_annotations(self, skip_existing=False):
         """Get/update annotations for neurons."""
