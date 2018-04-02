@@ -1266,7 +1266,8 @@ def tortuosity( x, seg_length=10, skip_remainder=False):
     tortuosity :        {float, np.array, pandas.DataFrame}
                         If x is CatmaidNeuronList, will return DataFrame.
                         If x is single CatmaidNeuron, will return either a
-                        single float (if) or a
+                        single float (if single seg_length is queried) or a
+                        DataFrame (if multiple seg_lengths are queried).
 
     """
 
@@ -1277,8 +1278,10 @@ def tortuosity( x, seg_length=10, skip_remainder=False):
     if isinstance(x, core.CatmaidNeuronList):
         if not isinstance(seg_length, (list, np.ndarray, tuple)):
             seg_length = [seg_length]
-        return pd.DataFrame( [ tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=pbar_hide, leave=pbar_leave ) ],
+        df = pd.DataFrame( [ tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=pbar_hide, leave=pbar_leave ) ],
                              index=x.skeleton_id, columns=seg_length ).T
+        df.index.name = 'seg_length'
+        return df
 
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Need CatmaidNeuron, got {0}'.format(type(x)))
