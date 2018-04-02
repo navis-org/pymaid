@@ -46,7 +46,7 @@ if len( module_logger.handlers ) == 0:
     module_logger.addHandler(sh)
 
 __all__ = sorted(['network2nx','network2igraph','neuron2igraph',
-                  'dist_from_root','neuron2nx','neuron2KDTree'])
+                  'neuron2nx','neuron2KDTree'])
 
 
 def network2nx(x, remote_instance=None, threshold=1):
@@ -311,71 +311,6 @@ def neuron2igraph(x):
     g.es['weight'] = w
 
     return g
-
-
-def dist_from_root(data, synapses_only=False):
-    """ Get geodesic distance to root in nano meters (nm) for all treenodes.
-
-    Parameters
-    ----------
-    data :            {graph object, pandas.DataFrame, CatmaidNeuron}
-                      Holds the skeleton data.
-    synapses_only :   bool, optional
-                      If True, only distances for nodes with synapses will be
-                      returned (only makes sense if input is a Graph).
-
-    Returns
-    -------
-    dict
-                      Only if ``data`` is a graph object.
-                      Format ``{node_id : distance_to_root }``
-
-    pandas DataFrame
-                      Only if ``data`` is a pandas DataFrame:. With
-                      ``df.nodes.dist_to_root`` holding the distances to root.
-
-    """
-
-    if isinstance(data, igraph.Graph):
-        g = data
-    elif isinstance(data, ( pd.DataFrame, core.CatmaidNeuronList)):
-        return [dist_from_root(data.loc[i]) for i in range(data.shape[0])]
-    elif isinstance(data, (pd.Series, core.CatmaidNeuron)):
-        g = data.igraph
-        if g is None:
-            g = neuron2igraph(data)
-    else:
-        raise Exception('Unexpected data type "{0}"'.format(type(data)))
-
-    # Generate distance matrix.
-    try:
-        module_logger.info('Generating distance matrix for neuron %s #%s...' % (
-            data.neuron_name, str(data.skeleton_id)))
-    except:
-        module_logger.info('Generating distance matrix for igraph...')
-
-    distance_matrix = g.shortest_paths_dijkstra(mode='All', weights='weight')
-
-    if synapses_only:
-        nodes = [ (v.index, v['node_id'])
-                 for v in g.vs.select(_node_id_in=data.connectors.treenode_id )]
-    else:
-        nodes = [(v.index, v['node_id']) for v in g.vs]
-
-    root = [v.index for v in g.vs if v['parent_id'] == None][0]
-
-    distances_to_root = {}
-
-    for n in nodes:
-        distances_to_root[n[1]] = distance_matrix[n[0]][root]
-
-    if isinstance(data, igraph.Graph):
-        return distances_to_root
-    else:
-        data.nodes['dist_to_root'] = [distances_to_root[n]
-                                      for n in data.nodes.treenode_id.tolist()]
-        data.igraph = neuron2igraph(data)
-        return data
 
 
 def _find_all_paths(g, start, end, mode = 'OUT', maxlen = None):
