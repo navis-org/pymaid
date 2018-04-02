@@ -309,6 +309,9 @@ def dist_between(x, a, b):
     else:
         raise ValueError('Unable to process data of type {0}'.format(type(x)))
 
+    a = utils._make_non_iterable(a)
+    b = utils._make_non_iterable(b)
+
     try:
         _ = int(a)
         _ = int(b)
@@ -593,6 +596,10 @@ def reroot_neuron(x, new_root, inplace=False):
 
     if not inplace:
         x = x.copy()
+
+    # If this graph is just an (immutable) view, turn it into a full, independent graph
+    if isinstance(x.graph, nx.classes.graphviews.ReadOnlyGraph):
+        x.graph = nx.DiGraph(x.graph)
 
     g = x.graph
 
