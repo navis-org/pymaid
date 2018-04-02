@@ -94,6 +94,17 @@ def _make_iterable(x, force_type=None):
     else:
         return np.array( x )
 
+def _make_non_iterable(x):
+    """ Helper function. Turns x into non-iterable, if it isn't already. Will
+    raise error if len(x) > 1.
+    """
+    if not _is_iterable(x):
+        return x
+    elif len(x) == 1:
+        return x[0]
+    else:
+        raise ValueError('Iterable must not contain more than one entry.')
+
 def _is_iterable(x):
     """ Helper function. Returns True if x is an iterable but not str or
     dictionary.
