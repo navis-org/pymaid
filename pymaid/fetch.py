@@ -63,6 +63,7 @@ import os
 import networkx as nx
 
 from pymaid import core, morpho, graph, utils
+from pymaid.intersect import in_volume
 
 from tqdm import tqdm, trange
 
@@ -962,12 +963,10 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
         x = [x]
 
     # First, get list of connectors
-    cn_data = get_connectors(x, remote_instance=remote_instance,
-                             incoming_synapses=True, outgoing_synapses=True,
-                             abutting=False, gap_junctions=True, )
+    cn_data = get_connectors(x, remote_instance=remote_instance )
 
     # Find out which connectors are in the volume of interest
-    iv = morpho.in_volume(
+    iv = in_volume(
         cn_data[['x', 'y', 'z']], volume, remote_instance )
 
     # Get the subset of connectors within the volume
