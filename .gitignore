@@ -9,6 +9,9 @@ __pycache__/
 # Test config 
 /pymaid/tests/config_test.py
 
+# Coverage
+/pymaid/tests/htmlcov
+
 # C extensions
 *.so
 
