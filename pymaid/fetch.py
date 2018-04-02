@@ -60,6 +60,7 @@ import pandas as pd
 import numpy as np
 import sys
 import os
+import networkx as nx
 
 from pymaid import core, morpho, graph, utils
 
@@ -4299,8 +4300,8 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
 
     Returns
     -------
-    ``igraph.Graph``
-                iGraph object containing the neurons that connect
+    ``NetworkX.DiGraph``
+                Graph object containing the neurons that connect
                 sources and targets. Does only contain edges that
                 connect sources and targets!
 
@@ -4308,7 +4309,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
                 List of skeleton IDs that constitute paths from
                 sources to targets::
 
-                    [ [ source1, skid1, target1 ], [source2, skid2, target2 ], ...  ]
+                    [ [ source1, , ... , target1 ], [source2, ... , target2 ], ...  ]
 
     Important
     ---------
@@ -4318,15 +4319,16 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     Examples
     --------
     >>> # This assumes that you have already set up a Catmaid Instance
-    >>> from igraph import plot
+    >>> import networkx as nx
+    >>> import matplotlib.pyplot as plt
     >>> g, paths = pymaid.get_paths( ['annotation:glomerulus DA1'],
     ...                              ['2333007'] )
     >>> g
-    <igraph.Graph object at 0x11c857138>
+    <networkx.classes.digraph.DiGraph at 0x127d12390>
     >>> paths
     [['57381', '4376732', '2333007'], ['57323', '630823', '2333007'], ...
-    >>> plot( g, layout = g.layout("kk"),
-    ...       **{ 'edge_label' : g.es['weight'] } )
+    >>> nx.draw(g)
+    >>> plt.show()
 
     """
     remote_instance = _eval_remote_instance(remote_instance)
@@ -4355,29 +4357,23 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     # Response is just a set of skeleton IDs
     response = remote_instance.fetch(url, post=post_data)
 
-    # Turn neurons into an iGraph graph
-    g = graph.network2graph(
+    # Turn neurons into an NetworkX graph
+    g = graph.network2nx(
         response, remote_instance=remote_instance, threshold=min_synapses)
 
     # Get all paths between sources and targets
-    all_paths = graph._find_all_paths(g,
-                                               [i for i, v in enumerate(g.vs) if v[
-                                                   'node_id'] in sources],
-                                               [i for i, v in enumerate(g.vs) if v[
-                                                   'node_id'] in targets],
-                                               maxlen=n_hops
-                                               )
+    all_paths = [ p for s in sources for t in targets for p in nx.all_simple_paths(g, s, t) ]
 
-    # Delete edges that don't go from sources to targets from graph
-    edges_to_keep = set()
-    for p in all_paths:
-        for i in range(len(p) - 1):
-            edges_to_keep.add((p[i], p[i + 1]))
+    # Turn into edges
+    edges_to_keep = set( [ e for l in all_paths for e in nx.utils.pairwise( l ) ] )
 
-    g.delete_edges([(e.source, e.target)
-                    for e in g.es if (e.source, e.target) not in edges_to_keep])
+    # Remove edges
+    g.remove_edges_from( [ e for e in g.edges if e not in edges_to_keep ] )  
 
-    return g, [[g.vs[i]['node_id'] for i in p] for p in all_paths]
+    # Remove isolated nodes
+    g.remove_nodes_from( list( nx.isolates(g) ) )
+
+    return g, all_paths
 
 
 def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6), combine_vols=False):
