@@ -383,9 +383,6 @@ class TestMorpho(unittest.TestCase):
         self.assertIsInstance( pymaid.stitch_neurons(self.nl[:2],
                                                      method='LEAFS'),
                                pymaid.CatmaidNeuron )
-        self.assertIsInstance( pymaid.stitch_neurons(self.nl[:2],
-                                                     method='ALL'),
-                               pymaid.CatmaidNeuron )
 
     def test_averaging(self):
         self.assertIsInstance( pymaid.average_neurons(self.nl[:2]),
