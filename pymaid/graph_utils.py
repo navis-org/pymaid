@@ -51,9 +51,11 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted([ 'classify_nodes','cut_neuron', 'longest_neurite', 'split_into_fragments',
-            'reroot_neuron', 'distal_to', 'dist_between', 'find_main_branchpoint',
-            'generate_list_of_childs','geodesic_matrix', 'subset_neuron','node_label_sorting'])
+__all__ = sorted([ 'classify_nodes', 'cut_neuron', 'longest_neurite', 
+                   'split_into_fragments', 'reroot_neuron', 'distal_to', 
+                   'dist_between', 'find_main_branchpoint', 
+                   'generate_list_of_childs', 'geodesic_matrix', 
+                   'subset_neuron', 'node_label_sorting' ])
 
 def _generate_segments(x, append=True):
     """ Generate linear segments for a given neuron.
@@ -209,7 +211,7 @@ def distal_to(x, a=None, b=None):
                        columns=b, index=a )
 
     # Iterate over all targets
-    for nB in tqdm(b, desc='Querying paths', disable = len (b) < 1000):
+    for nB in tqdm(b, desc='Querying paths', disable = len (b) < 1000, leave=False):
         # Get all paths TO this target
         paths = nx.shortest_path_length(x.graph, source=None, target=nB)
         # Check if sources are among our targets
