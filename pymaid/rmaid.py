@@ -653,13 +653,13 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
         name_dict = x.summary().set_index('skeleton_id')[
             'neuron_name'].to_dict()
-        res = pyclust.clust_results(
+        res = pyclust.ClustResults(
             matrix, labels=[name_dict[n] for n in matrix.columns],
             mat_type='similarity')
         res.neurons = x
         return res
     else:
-        return pyclust.clust_results(matrix, mat_type='similarity')
+        return pyclust.ClustResults(matrix, mat_type='similarity')
 
 
 def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):

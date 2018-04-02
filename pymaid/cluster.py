@@ -56,7 +56,7 @@ if len( module_logger.handlers ) == 0:
 
 __all__ = sorted([  'cluster_by_connectivity',
                     'cluster_by_synapse_placement','cluster_xyz',
-                    'clust_results'])
+                    'ClustResults'])
 
 # Default settings for progress bars
 pbar_hide = False
@@ -106,7 +106,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
     Returns
     -------
-    :func:`pymaid.clust_results`
+    :func:`pymaid.ClustResults`
                          Custom cluster results class holding the distance
                          matrix and contains wrappers e.g. to plot dendograms.
 
@@ -249,7 +249,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     #dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
     #dist_matrix.index = [ neuron_names[str(n)] for n in dist_matrix.index ]
 
-    results = clust_results(dist_matrix, labels = [ neuron_names[str(n)] for n in dist_matrix.columns ], mat_type='similarity' )
+    results = ClustResults(dist_matrix, labels = [ neuron_names[str(n)] for n in dist_matrix.columns ], mat_type='similarity' )
 
     if isinstance(x, core.CatmaidNeuronList):
         results.neurons = x
@@ -529,7 +529,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
 
     Returns
     -------
-    :class:`~pymaid.clust_results`
+    :class:`~pymaid.ClustResults`
                 Object that contains distance matrix and methods to plot
                 dendrograms.
     """
@@ -571,7 +571,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
     if mu_score:
         sim_matrix = (sim_matrix + sim_matrix.T) / 2
 
-    res = clust_results(sim_matrix, mat_type='similarity', labels = [ neurons.skid[ str(s) ].neuron_name for s in sim_matrix.columns ])
+    res = ClustResults(sim_matrix, mat_type='similarity', labels = [ neurons.skid[ str(s) ].neuron_name for s in sim_matrix.columns ])
     res.neurons = neurons
 
     return res
@@ -591,7 +591,7 @@ def cluster_xyz(x, labels=None):
 
     Returns
     -------
-    :class:`pymaid.clust_results`
+    :class:`pymaid.ClustResults`
                       Contains distance matrix and methods to generate plots.
 
     Examples
@@ -619,10 +619,10 @@ def cluster_xyz(x, labels=None):
     condensed_dist_mat = scipy.spatial.distance.pdist(s, 'euclidean')
     squared_dist_mat = scipy.spatial.distance.squareform(condensed_dist_mat)
 
-    return clust_results(squared_dist_mat, labels=labels, mat_type='distance')
+    return ClustResults(squared_dist_mat, labels=labels, mat_type='distance')
 
 
-class clust_results:
+class ClustResults:
     """ Class to handle, analyze and plot similarity/distance matrices.
     Contains thin wrappers for ``scipy.cluster``.
 
@@ -630,7 +630,7 @@ class clust_results:
     ----------
     dist_mat :  Distance matrix (0=similar, 1=dissimilar)
     sim_mat :   Similarity matrix (0=dissimilar, 1=similar)
-    linkage :   Hierarchical clustering. Run :func:`pymaid.clust_results.cluster`
+    linkage :   Hierarchical clustering. Run :func:`pymaid.ClustResults.cluster`
                 to generate linkage. By default, WARD's algorithm is used.
     leafs :     list of skids
 
@@ -643,7 +643,7 @@ class clust_results:
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> # Perform all-by-all nblast
     >>> res = pymaid.nblast_allbyall( nl )
-    >>> # res is a clust_results object
+    >>> # res is a ClustResults object
     >>> res.plot_matrix()
     >>> plt.show()
     >>> # Extract 5 clusters
@@ -670,7 +670,7 @@ class clust_results:
                     The "missing" matrix type will be computed. For clustering,
                     plotting, etc. distance matrices are used.
         """
-        if mat_type not in clust_results._PERM_MAT_TYPES:
+        if mat_type not in ClustResults._PERM_MAT_TYPES:
             raise ValueError('Matrix type "{0}" unkown.'.format(mat_type) )
 
         if mat_type == 'similarity':

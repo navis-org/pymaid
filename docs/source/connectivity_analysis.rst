@@ -78,7 +78,7 @@ Clustering
 
     ~pymaid.cluster_by_connectivity
     ~pymaid.cluster_by_synapse_placement
-    ~pymaid.clust_results
+    ~pymaid.ClustResults
 
 Plotting
 --------
