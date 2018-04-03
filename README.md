@@ -3,7 +3,7 @@
 pymaid
 ======
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
-Tested with CATMAID latest release version 2017.10.02 - if you are working with older versions you may experience incompatibilities due to API changes.
+Tested with CATMAID release version 2018.02.16 - if you are working with older versions you may experience incompatibilities due to API changes.
 
 ## Documentation
 PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
