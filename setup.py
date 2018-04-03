@@ -42,12 +42,12 @@ setup(
     #setup_requires=[ 'numpy>=1.12.1' ], #pyoctree's install requires numpy to install but didn't specify that, so we have to do that for it
 
     install_requires=[
-        "networkx>=2.0",
+        "networkx>=2.1",
         "scipy>=1.0.0",        
         "numpy>=1.13.0",
         "matplotlib>=2.1.0",
         "plotly>=2.4.0",
-        "pandas>=0.21.0",
+        "pandas>=0.22.0",
         "vispy>=0.5.0",
         "tqdm>=4.14.0",
         "pyqt5",
