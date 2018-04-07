@@ -361,7 +361,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
             stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
-        return pd.DataFrame([[user_list.ix[u].login, stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
+        return pd.DataFrame([[user_list.loc[u, 'login'], stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
 
     elif mode == 'ACTIONS':
         all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
@@ -370,7 +370,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         # Get total time spent
         for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
             this_ts = all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
-            this_ts.columns=[ user_list.ix[u].login ]
+            this_ts.columns=[ user_list.loc[u, 'login'] ]
 
             all_ts = pd.concat( [all_ts, this_ts.T] )
 
@@ -391,7 +391,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
             minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
             this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
 
-            this_ts.columns=[ user_list.ix[u].login ]
+            this_ts.columns=[ user_list.loc[u, 'login'] ]
 
             all_ts = pd.concat( [all_ts, this_ts.T] )
 
