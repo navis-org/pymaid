@@ -97,7 +97,7 @@ except:
         'R library "nat" not found! Please install from within R.')
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid',
-           'data2py', 'nbl_results', 'nblast', 'nblast_allbyall'])
+           'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
 
 
 def init_rcatmaid(**kwargs):
@@ -316,7 +316,7 @@ def neuron2py(neuron, remote_instance=None):
             [n[0] for n in neuron.skid.tolist()], remote_instance)
     elif 'skid' in neuron and not remote_instance:
         neuron_names = None
-        module_logger.warning(
+        module_logger.info(
             'Please provide a remote instance if you want to add neuron name.')
     else:
         module_logger.warning(
@@ -709,9 +709,9 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     Returns
     -------
     nblast_results
-        Instance of :class:`pymaid.rmaid.nbl_results` that holds nblast
+        Instance of :class:`pymaid.rmaid.NBLASTresults` that holds nblast
         results and contains wrappers to plot/extract data. Please use
-        help(nbl_results) to learn more and see example below.
+        help(NBLASTresults) to learn more and see example below.
 
     Examples
     --------
@@ -861,10 +861,10 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     module_logger.info('Blasting done in %s seconds' %
                        round(time.time() - start_time))
 
-    return nbl_results(df, sc, scr, rn, xdp, dps, {'mirror': mirror, 'reference': reference, 'UseAlpha': UseAlpha, 'normalised': normalised, 'reverse': reverse})
+    return NBLASTresults(df, sc, scr, rn, xdp, dps, {'mirror': mirror, 'reference': reference, 'UseAlpha': UseAlpha, 'normalised': normalised, 'reverse': reverse})
 
 
-class nbl_results:
+class NBLASTresults:
     """ Class that holds nblast results and contains wrappers that allow easy
     plotting.
 
@@ -1014,13 +1014,13 @@ class nbl_results:
         if isinstance(entries, int):
             return self.db.rx(robjects.StrVector(self.results.ix[:entries - 1].gene_name.tolist()))
         elif isinstance(entries, str):
-            return self.db.rx(db.rx(entries))
-        elif isinstance(entries, list):
+            return self.db.rx(entries)
+        elif isinstance(entries, (list, np.ndarray)):
             if isinstance(entries[0], int):
                 return self.db.rx(robjects.StrVector(self.results.ix[entries].gene_name.tolist()))
             elif isinstance(entries[0], str):
                 return self.db.rx(robjects.StrVector(entries))
         else:
             module_logger.error(
-                'Unable to intepret entries provided. See help(nbl_results.plot) for details.')
+                'Unable to intepret entries provided. See help(NBLASTresults.plot) for details.')
             return None
