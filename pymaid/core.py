@@ -2127,15 +2127,15 @@ class CatmaidNeuronList:
                 inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in inc for a in an ] ]
                 exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in exc for a in an ] ]
             else:
-                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in inc for a in an ] ]
-                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in exc for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in an for a in inc ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in an for a in exc ] ]
         else:
             if not intersect:
-                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in a_x for ax_x in inc for a in an ] ]
-                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a in a_x for ax_x in exc for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a_x in a for a_x in inc for a in an ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if True in [ a_x in a for a_x in exc for a in an ] ]
             else:
-                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in a_x for ax_ in inc for a in an ] ]
-                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ a in a_x for ax_ in exc for a in an ] ]
+                inc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ True in [ a_x in a for a in an ] for a_x in inc ] ]
+                exc_sel = [ self.neurons[i] for i, an in enumerate( self.annotations ) if False not in [ True in [ a_x in a for a in an ] for a_x in exc ] ]
 
         # Open selection if no inclusive or exclusive annotations given
         if not inc:
