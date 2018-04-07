@@ -8,7 +8,7 @@ On a fundamental level, you can use every single R function from within Python. 
 
 .. note::
    The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
-   As `rpy2` installation fails if no R is installed, it is not a default 
+   As `rpy2` installation fails if no R is installed, it is not a default
    dependency and has to be installed manually *after* R has been set up.
    Also: the latest R version supported by `rpy2` appears to be 3.3.3 (Jul/2017).
 
@@ -25,7 +25,7 @@ Quickstart
 >>> # Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
 >>> n = pymaid.pymaid.get_3D_skeleton( skeleton_id, rm )
->>> # Initialize R's rcatmaid 
+>>> # Initialize R's rcatmaid
 >>> rcatmaid = rmaid.init_rcatmaid( rm )
 >>> # Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
 >>> n_r = rmaid.neuron2r( n.ix[0] )
@@ -61,7 +61,7 @@ R catmaid
 >>> rcat = rmaid.init_rcatmaid( rm )
 >>> # Check contents of that module
 >>> dir(rcat)
-['*_catmaidneuron', '+_catmaidneuron', '___NAMESPACE___', '___S3MethodsTable___', '__doc__', '__loader__', '__name__', '__package__', '__rdata__', '__rname__', '__spec__', '__version__', '_env', '_exported_names', '_packageName', '_package_statevars', '_rpy2r', '_symbol_check_after', '_symbol_r2python', '_translation', 'as_catmaidmesh', 'as_catmaidmesh_catmaidmesh', 
+['*_catmaidneuron', '+_catmaidneuron', '___NAMESPACE___', '___S3MethodsTable___', '__doc__', '__loader__', '__name__', '__package__', '__rdata__', '__rname__', '__spec__', '__version__', '_env', '_exported_names', '_packageName', '_package_statevars', '_rpy2r', '_symbol_check_after', '_symbol_r2python', '_translation', 'as_catmaidmesh', 'as_catmaidmesh_catmaidmesh',
 ...
 'read_neuron_catmaid', 'read_neurons_catmaid', 'server', 'somapos_catmaidneuron', 'summary_catmaidneuron', 'token', 'xform_catmaidneuron']
 >>> #Get neurons as R catmaidneuron
@@ -92,7 +92,7 @@ Nblasting
 >>> # Blast a neuron against default (FlyCircuit) database
 >>> nbl = rmaid.nblast( skid = 16, remote_instance = rm  )
 
-:func:`pymaid.rmaid.nblast` returns nblast results as instance of the :class:`pymaid.rmaid.nbl_results` class.
+:func:`pymaid.rmaid.nblast` returns nblast results as instance of the :class:`pymaid.rmaid.NBLASTresults` class.
 
 >>> # See contents of nblast_res object
 >>> help(nbl)
@@ -117,4 +117,5 @@ Reference
 	pymaid.rmaid.nblast_allbyall
 	pymaid.rmaid.neuron2py
 	pymaid.rmaid.neuron2r
+    pymaid.rmaid.NBLASTresults
 

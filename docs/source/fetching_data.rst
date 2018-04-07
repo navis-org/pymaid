@@ -27,6 +27,7 @@ Annotations
     ~pymaid.get_annotations
     ~pymaid.get_annotation_details
     ~pymaid.get_user_annotations
+    ~pymaid.remove_annotations
 
 Treenodes
 ----------
