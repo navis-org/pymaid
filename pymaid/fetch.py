@@ -87,7 +87,7 @@ __all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','eval_skids','
             'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
             'get_segments','delete_neuron','get_connectors_between','url_to_coordinates',
             'rename_neurons','get_label_list','find_neurons', 'get_skid_from_treenode',
-            'get_transactions'])
+            'get_transactions','remove_annotations'])
 
 # Set up logging
 module_logger = logging.getLogger(__name__)
@@ -253,6 +253,10 @@ class CatmaidInstance:
     def _get_add_annotations_url(self):
         """ Use to parse url to add annotations to skeleton IDs. """
         return self.djangourl("/" + str(self.project_id) + "/annotations/add")
+
+    def _get_remove_annotations_url(self):
+        """ Use to parse url to add annotations to skeleton IDs. """
+        return self.djangourl("/" + str(self.project_id) + "/annotations/remove")
 
     def _get_connectivity_url(self):
         """ Use to parse url for retrieving connectivity (does need post data). """
@@ -1468,9 +1472,9 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     all_tables = []
 
-    for i,nl in enumerate( tqdm(node_list, 
-                                desc='Creating table', 
-                                leave=pbar_leave, 
+    for i,nl in enumerate( tqdm(node_list,
+                                desc='Creating table',
+                                leave=pbar_leave,
                                 disable=pbar_hide) ):
         if include_details:
             tag_dict = {n[0]: [] for n in nl[0]}
@@ -1902,6 +1906,81 @@ def get_review(x, remote_instance=None):
 
     return df
 
+def remove_annotations(x, annotations, remote_instance=None):
+    """ Remove annotation(s) from a list of neuron(s)
+
+    Parameters
+    ----------
+    x
+                        Neurons to remove given annotation(s) from. Can be
+                        either:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    annotations :       list
+                        Annotation(s) to remove from neurons.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Nothing
+
+    """
+
+    remote_instance = _eval_remote_instance(remote_instance)
+
+    x = eval_skids(x, remote_instance=remote_instance)
+
+    x = utils._make_iterable(x)
+    annotations = utils._make_iterable(annotations)
+
+    # Translate into annotations ID
+    an_list = get_annotation_list().set_index('annotation')
+
+    an_ids = []
+    for a in annotations:
+        if a not in an_list.index:
+            module_logger.warning('Annotation {0} not found. Skipping.'.format(a))
+            continue
+        an_ids.append( an_list.loc[a, 'annotation_id'] )
+
+    remove_annotations_url = remote_instance._get_remove_annotations_url()
+
+    remove_annotations_postdata = {}
+
+    for i in range(len(x)):
+        # This requires neuron IDs (skeleton ID + 1)
+        key = 'entity_ids[%i]' % i
+        remove_annotations_postdata[key] = str( int(x[i]) + 1 )
+
+    for i in range(len(an_ids)):
+        key = 'annotation_ids[%i]' % i
+        remove_annotations_postdata[key] = str(an_ids[i])
+
+    if an_ids:
+        resp = remote_instance.fetch(
+            remove_annotations_url, remove_annotations_postdata)
+
+        an_list = an_list.reset_index().set_index('annotation_id')
+
+        if len(resp['deleted_annotations']) == 0:
+            module_logger.info('No annotations removed.')
+
+        for a in resp['deleted_annotations']:
+            module_logger.info('Removed "{0}" from {1} entities ({2} uses left)'\
+                                .format( an_list.loc[int(a),'annotation'],
+                                         len(resp['deleted_annotations'][a]['targetIds']),
+                                         resp['left_uses'][a]
+                                        )
+                               )
+    else:
+        module_logger.info('No annotations removed.')
+
+    return
+
 
 def add_annotations(x, annotations, remote_instance=None):
     """ Add annotation(s) to a list of neuron(s)
@@ -1909,14 +1988,14 @@ def add_annotations(x, annotations, remote_instance=None):
     Parameters
     ----------
     x
-                        Neurons to add new annotation(s). Can be either:
+                        Neurons to add new annotation(s) to. Can be either:
 
                         1. list of skeleton ID(s) (int or str)
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     annotations :       list
-                        Annotation(s) to add to neurons provided.
+                        Annotation(s) to add to neurons.
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
@@ -1929,19 +2008,16 @@ def add_annotations(x, annotations, remote_instance=None):
 
     x = eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
-    if type(annotations) != type(list()):
-        annotations = [annotations]
+    x = utils._make_iterable(x)
+    annotations = utils._make_iterable(annotations)
 
     add_annotations_url = remote_instance._get_add_annotations_url()
 
     add_annotations_postdata = {}
 
     for i in range(len(x)):
-        key = 'skeleton_ids[%i]' % i
-        add_annotations_postdata[key] = str(x[i])
+        key = 'entity_ids[%i]' % i
+        add_annotations_postdata[key] = str( int(x[i]) + 1 )
 
     for i in range(len(annotations)):
         key = 'annotations[%i]' % i
@@ -4368,7 +4444,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     edges_to_keep = set( [ e for l in all_paths for e in nx.utils.pairwise( l ) ] )
 
     # Remove edges
-    g.remove_edges_from( [ e for e in g.edges if e not in edges_to_keep ] )  
+    g.remove_edges_from( [ e for e in g.edges if e not in edges_to_keep ] )
 
     # Remove isolated nodes
     g.remove_nodes_from( list( nx.isolates(g) ) )
@@ -4554,7 +4630,7 @@ def get_annotation_list(remote_instance=None):
     return df
 
 
-def _eval_remote_instance(remote_instance):
+def _eval_remote_instance(remote_instance, raise_error=True):
     """ Evaluates remote instance and checks for globally defined remote
     instances as fall back
     """
@@ -4567,8 +4643,11 @@ def _eval_remote_instance(remote_instance):
         elif 'remote_instance' in globals():
             return globals()['remote_instance']
         else:
-            raise Exception(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            if raise_error:
+                raise Exception(
+                    'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+            else:
+                module_logger.warning('No global remote instance found.')
     return remote_instance
 
 
