@@ -2434,10 +2434,10 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
     if allow_partial is True:
         module_logger.debug(
             'Found id(s): %s (partial matches included)' % len(annotation_ids))
-    elif type(annotations) == type(list()):
+    elif isinstance( annotations, (list, np.ndarray) ):
         module_logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
             str(annotation_ids), len(annotations) - len(annotation_ids)))
-    elif type(annotations) == type(str()):
+    elif isinstance( annotations, str):
         module_logger.debug('Found id: %s | Unable to retrieve: %i' % (
             list(annotation_ids.keys())[0], 1 - len(annotation_ids)))
 
@@ -3089,8 +3089,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
 
     x = eval_skids(x, remote_instance=remote_instance)
 
-    if type(x) != type(list()):
-        x = [x]
+    x = utils._make_iterable(x)
 
     columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',  'pre_contributors',
                'n_postsynapses', 'post_contributors', 'review_contributors' , 'multiuser_review_minutes', 'construction_minutes', 'min_review_minutes']
