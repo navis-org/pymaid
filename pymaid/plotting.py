@@ -183,7 +183,9 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     Parameters
     ----------
-    x :               {skeleton IDs, core.CatmaidNeuron, core.CatmaidNeuronList, core.CatmaidVolume, np.ndarray}
+    x :               {skeleton IDs, pymaid.CatmaidNeuron,
+                       pymaid.CatmaidNeuronList, pymaid.CatmaidVolume,
+                       pymaid.Dotprops np.ndarray}
                       Objects to plot::
 
                         - int is intepreted as skeleton ID(s)
@@ -303,8 +305,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     # Keep track of limits if necessary
     lim = []
 
-    #Dotprops are currently ignored!
-    skids, skdata, _dotprops, volumes, points = _parse_objects(x)
+    skids, skdata, dotprops, volumes, points = _parse_objects(x)
 
     remote_instance = kwargs.get('remote_instance', None)
     connectors = kwargs.get('connectors', True)
@@ -321,31 +322,37 @@ def plot2d(x, method='2d', *args, **kwargs):
     cn_size = kwargs.get('cn_size', 1)
     linestyle = kwargs.get('linestyle','-')
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = fetch._eval_remote_instance(remote_instance, raise_error=False)
 
     if skids:
         skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
                                    tag_flag=0, get_history=False, get_abutting=True)
 
-    if not color and (skdata.shape[0] + _dotprops.shape[0])>0:
+    all_identifiers = []
+    if not skdata.empty:
+        all_identifiers += skdata.skeleton_id.tolist()
+    if not dotprops.empty:
+        all_identifiers +=dotprops.gene_name.tolist()
+
+    if not color and (skdata.shape[0] + dotprops.shape[0])>0:
         cm = _random_colors(
-            skdata.shape[0] + _dotprops.shape[0], color_space='RGB', color_range=1)
+            skdata.shape[0] + dotprops.shape[0], color_space='RGB', color_range=1)
         colormap = {}
 
         if not skdata.empty:
             colormap.update(
                 {str(n): cm[i] for i, n in enumerate(skdata.skeleton_id.tolist())})
-        if not _dotprops.empty:
+        if not dotprops.empty:
             colormap.update({str(n): cm[i + skdata.shape[0]]
-                             for i, n in enumerate(_dotprops.gene_name.tolist())})
+                             for i, n in enumerate(dotprops.gene_name.tolist())})
     elif isinstance(color, dict):
         colormap = {n: tuple(color[n]) for n in color}
     elif isinstance(color,(list,tuple)):
-        colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}
+        colormap = {n: tuple(color) for n in all_identifiers}
     elif isinstance(color,str):
         color = tuple( [ c for c in mcl.to_rgb(color) ] )
-        colormap = {n: color for n in skdata.skeleton_id.tolist()}
-    elif (skdata.shape[0] + _dotprops.shape[0])>0:
+        colormap = {n: color for n in all_identifiers}
+    elif (skdata.shape[0] + dotprops.shape[0])>0:
         raise ValueError('Unable to interpret colors of type "{0}"'.format(type(color)))
 
     # Make sure axes are projected orthogonally
@@ -403,7 +410,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 lim.append( verts.min(axis=0) )
 
     # Create lines from segments
-    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plotting', total=skdata.shape[0], leave=False, disable=pbar_hide)):
+    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plot neurons', total=skdata.shape[0], leave=False, disable=pbar_hide)):
         this_color = colormap[ neuron.skeleton_id ]
 
         if not connectors_only:
@@ -440,10 +447,11 @@ def plot2d(x, method='2d', *args, **kwargs):
                     if group_neurons:
                         lc.set_gid( neuron.neuron_name )
                     ax.add_collection3d( lc )
+
                 # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
                 elif method =='3d_complex':
                     for c in coords:
-                        lc = Line3DCollection( [c[:,[0,2,1]] ], color = this_color,
+                        lc = Line3DCollection( [ c[:,[0,2,1]] ], color = this_color,
                                                lw=linewidth,
                                                linestyle=linestyle )
                         if group_neurons:
@@ -488,6 +496,84 @@ def plot2d(x, method='2d', *args, **kwargs):
             coords[:,1] *= -1
             lim.append( coords.max(axis=0) )
             lim.append( coords.min(axis=0) )
+
+    for neuron in tqdm(dotprops.itertuples(), desc='Plt dotprops', total=dotprops.shape[0], leave=False, disable=pbar_hide):
+        # Prepare lines - this is based on nat:::plot3d.dotprops
+        halfvect = neuron.points[
+            ['x_vec', 'y_vec', 'z_vec']] / 2
+
+        starts = neuron.points[['x', 'y', 'z']
+                               ].as_matrix() - halfvect.as_matrix()
+        ends = neuron.points[['x', 'y', 'z']
+                             ].as_matrix() + halfvect.as_matrix()
+
+        try:
+            this_color = colormap[neuron.gene_name]
+        except:
+            this_color = (.1,.1,.1)
+
+        if method == '2d':
+            # Add None between segments
+            x_coords = [n for sublist in zip(
+                starts[:, 0] , ends[:, 0], [None] * starts.shape[0]) for n in sublist]
+            y_coords = [n for sublist in zip(
+                starts[:, 1] * -1, ends[:, 1] *-1, [None] * starts.shape[0]) for n in sublist]
+            z_coords = [n for sublist in zip(
+                starts[:, 2] , ends[:, 2], [None] * starts.shape[0]) for n in sublist]
+
+            this_line = mlines.Line2D( x_coords, y_coords,
+                                       lw=linewidth, ls=linestyle,
+                                       alpha=.9, color=this_color,
+                                       label='%s' % (neuron.gene_name) )
+
+            ax.add_line(this_line)
+
+            # Add soma
+            s = mpatches.Circle( (neuron.X, -neuron.Y), radius=2,
+                                 alpha=.9, fill=True, fc=this_color,
+                                 zorder=4, edgecolor='none')
+            ax.add_patch(s)
+        elif method in ['3d','3d_complex']:
+                # Combine coords by weaving starts and ends together
+                coords = np.empty((starts.shape[0] * 2, 3), dtype=starts.dtype)
+                coords[0::2] = starts
+                coords[1::2] = ends
+
+                # Invert y-axis
+                coords[:,1] *= -1
+
+                # For simple scenes, add whole neurons at a time -> will speed up rendering
+                if method == '3d':
+                    lc = Line3DCollection( np.split(coords[:,[0,2,1]], starts.shape[0]), color = this_color,
+                                           label=neuron.gene_name,
+                                           lw=linewidth,
+                                           linestyle=linestyle)
+                    if group_neurons:
+                        lc.set_gid( neuron.gene_name )
+                    ax.add_collection3d( lc )
+
+                # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
+                elif method =='3d_complex':
+                    for c in np.split(coords[:,[0,2,1]], starts.shape[0]):
+                        lc = Line3DCollection( [ c ], color = this_color,
+                                               lw=linewidth,
+                                               linestyle=linestyle )
+                        if group_neurons:
+                            lc.set_gid( neuron.gene_name )
+                        ax.add_collection3d( lc )
+
+                lim.append( coords.max(axis=0) )
+                lim.append( coords.min(axis=0) )
+
+                resolution = 20
+                u = np.linspace(0, 2 * np.pi, resolution)
+                v = np.linspace(0, np.pi, resolution)
+                x = 2 * np.outer(np.cos(u), np.sin(v)) + neuron.X
+                y = 2 * np.outer(np.sin(u), np.sin(v)) - neuron.Y
+                z = 2 * np.outer(np.ones(np.size(u)), np.cos(v)) + neuron.Z
+                surf = ax.plot_surface(x, z, y, color=this_color, shade=False)
+                if group_neurons:
+                    surf.set_gid( neuron.gene_name )
 
     if points:
         for p in points:
@@ -595,7 +681,7 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     plt.axis('off')
 
-    module_logger.info('Done. Use matplotlib.pyplot.show() to show plot.')
+    module_logger.debug('Done. Use matplotlib.pyplot.show() to show plot.')
 
     return fig, ax
 
