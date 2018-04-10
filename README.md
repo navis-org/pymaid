@@ -22,7 +22,7 @@ PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 
 ## Binder
 
-This repository is compatible with Binder: click on this badge [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=lab) to try out pymaid interactively in Jupyterlab hosted by (mybinder)[https://mybinder.org]!
+This repository is compatible with Binder: click on this badge [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=lab) to try out pymaid interactively in Jupyterlab hosted by [mybinder](https://mybinder.org)!
 
 ## Installation
 See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed instructions. For the impatient:
