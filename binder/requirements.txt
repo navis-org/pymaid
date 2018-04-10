@@ -1,2 +1,3 @@
+numpy
 git+git://github.com/schlegelp/pymaid@master
 pyoctree>=0.2.2
