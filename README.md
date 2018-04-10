@@ -1,4 +1,4 @@
-[![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Build Status](https://travis-ci.org/schlegelp/pyMaid.svg?branch=master)](https://travis-ci.org/schlegelp/pyMaid)
+[![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Build Status](https://travis-ci.org/schlegelp/pyMaid.svg?branch=master)](https://travis-ci.org/schlegelp/pyMaid) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=lab)
 
 pymaid
 ======
@@ -19,6 +19,10 @@ PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
 * interface with NetworkX and iGraph
 * tools to analyse user stats (e.g. time-invested, project history)
 * interface with Blender 3D
+
+## Binder
+
+This repository is compatible with Binder: click on this badge [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=lab) to try out pymaid interactively in Jupyterlab hosted by (mybinder)[https://mybinder.org]!
 
 ## Installation
 See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed instructions. For the impatient:
@@ -48,14 +52,13 @@ Must have:
 - [SciPy](http://www.scipy.org)
 - [Numpy](http://www.scipy.org)
 - [Matplotlib](http://www.matplotlib.org)
-- [vispy](http://vispy.org/) - this also requires one of the supported backend. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
+- [vispy](http://vispy.org/) - this also requires one of the supported backends. By default, [PyQt5](http://pyqt.sourceforge.net/Docs/PyQt5/installation.html) is installed.
 - [Plotly](http://plot.ly)
 - [tqdm](https://pypi.python.org/pypi/tqdm)
 - [pypng](https://pythonhosted.org/pypng/)
 
 Optional:
 
-- [iGraph](http://www.igraph.org) - graph library written C++ (faster). PyMaid will try using this over NetworkX if available.
 - [rpy2](https://rpy2.readthedocs.io/en/version_2.8.x/) - in order to use the `pymaid.rmaid` module you must setup R and install rpy2 manually.
 - [pyoctree](https://pypi.python.org/pypi/pyoctree/) - used to calculate points in volume, highly recommended.
 - [shapely](https://shapely.readthedocs.io/en/latest/) - required if you want 2D plots of CATMAID volumes.
@@ -105,31 +108,6 @@ nl.plot3d()
 
 # Clear 3D viewer
 pymaid.clear3d()
-```
-
-### Cluster neurons based on their synapse placement
-```python
-import pymaid
-import matplotlib.pyplot as plt
-
-# Initialize Catmaid instance
-remote_instance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' , 'user' , 'password', 'token' )
-
-# Retrieve 3D skeleton data for neuron of interest
-nl = pymaid.get_neuron ( [ '12345' ] )
-
-# Cluster by synapse synapse placement
-clust_res = pymaid.cluster_by_synapse_placement( ds_neuron )
-
-# Plot dendrogram
-clust_res.plot_dendrogram()
-plt.show()
-
-# Find the last two clusters (= the two largest clusters):
-clusters = clust_res.get_clusters( k=2, criterion='maxclust')
-
-# Print summary
-print('%i nodes total. Cluster 1: %i. Cluster 2: %i' % (len(clusters),len([n for n in clusters if n==1]),len([n for n in clusters if n==2])))
 ```
 
 ## License:
