@@ -457,7 +457,7 @@ class CatmaidNeuron:
         # Remove temporary node values
         for c in [col for col in temp_node_cols if col not in exclude]:
             if c in self.nodes:
-                self.nodes.drop( c, axis=1, inplace=True)
+                self.nodes.drop(c, axis=1, inplace=True)
 
         if 'classify_nodes' not in exclude:
             #Reclassify nodes
@@ -716,7 +716,7 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def downsample(self, factor=5, preserve_cn_treenodes=True, inplace=True):
+    def downsample(self, factor=5, inplace=True, **kwargs):
         """Downsample the neuron by given factor.
 
         Parameters
@@ -724,13 +724,13 @@ class CatmaidNeuron:
         factor :                int, optional
                                 Factor by which to downsample the neurons.
                                 Default = 5
-        preserve_cn_treenodes : bool, optional
-                                If True, treenodes that have connectors are
-                                preserved.
         inplace :               bool, optional
                                 If True, operation will be performed on
                                 itself. If False, operation is performed on
                                 copy which is then returned.
+        **kwargs
+                                Additional arguments passed to
+                                :func:`~pymaid.downsample_neuron`.
 
         See Also
         --------
@@ -743,7 +743,7 @@ class CatmaidNeuron:
         else:
             x = self.copy()
 
-        resample.downsample_neuron(x, factor, inplace=True, preserve_cn_treenodes=preserve_cn_treenodes)
+        resample.downsample_neuron(x, factor, inplace=True, **kwargs)
 
         # Delete outdated attributes
         x._clear_temp_attr()
@@ -1593,7 +1593,7 @@ class CatmaidNeuronList:
         x[0].resample(resample_to=x[1],inplace=True)
         return x[0]
 
-    def downsample(self, factor=5, preserve_cn_treenodes=False, inplace=True):
+    def downsample(self, factor=5, inplace=True, **kwargs):
         """Downsamples (simplifies) all neurons by given factor.
 
         Parameters
@@ -1601,12 +1601,13 @@ class CatmaidNeuronList:
         factor :                int, optional
                                 Factor by which to downsample the neurons.
                                 Default = 5
-        preserve_cn_treenodes : bool, optional
-                                If True, treenodes that have connectors are
-                                preserved.
         inplace :               bool, optional
                                 If False, a downsampled COPY of this
                                 CatmaidNeuronList is returned.
+        **kwargs
+                                Additional arguments passed to
+                                :func:`~pymaid.downsample_neuron`.
+
 
         See Also
         --------
@@ -1620,21 +1621,21 @@ class CatmaidNeuronList:
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [ (n,factor,preserve_cn_treenodes) for i,n in enumerate(x.neurons) ]
-            x.neurons = list(tqdm( pool.imap( x._downsample_helper, combinations, chunksize=10 ), total=len(combinations), desc='Downsampling', disable=pbar_hide, leave=pbar_leave ))
+            combinations = [ (n,factor,kwargs) for i,n in enumerate(x.neurons) ]
+            x.neurons = list(tqdm( pool.imap( x._downsample_helper, combinations, chunksize=10 ), desc='Downsampling', disable=pbar_hide, leave=pbar_leave ))
 
             pool.close()
             pool.join()
         else:
             for n in tqdm(x.neurons, desc='Downsampling', disable=pbar_hide, leave=pbar_leave):
-                n.downsample(factor=factor, preserve_cn_treenodes=preserve_cn_treenodes, inplace=True)
+                n.downsample(factor=factor, inplace=True, **kwargs)
 
         if not inplace:
             return x
 
     def _downsample_helper(self, x):
         """ Helper function to parallelise basic operations."""
-        x[0].downsample(factor=x[1],preserve_cn_treenodes=preserve_cn_treenodes,inplace=True)
+        x[0].downsample(factor=x[1], inplace=True, **x[2])
         return x[0]
 
     def reroot(self, new_root, inplace=True):
