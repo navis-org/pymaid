@@ -369,6 +369,11 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
         module_logger.error('Unexpected datatype: %s' % str(type(skdata)))
         raise ValueError
 
+    # If no resampling, simply return neuron
+    if resampling_factor <= 1:
+        module_logger.warning('Unable to downsample: resampling_factor must be > 1')
+        return df
+
     if df.nodes.shape[0] == 0:
         module_logger.warning('Unable to downsample: no nodes in neuron')
         return df
