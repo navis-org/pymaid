@@ -984,6 +984,10 @@ class CatmaidNeuron:
         http_pw :               str, optional
         auth_token :            str, optional
 
+        See Also
+        --------
+        :class:`~pymaid.CatmaidInstance`
+
         """
         if remote_instance:
             self._remote_instance = remote_instance
@@ -1070,6 +1074,7 @@ class CatmaidNeuron:
         Returns
         -------
         Nothing
+
         """
 
         # Make copy of nodes
@@ -2152,8 +2157,9 @@ class CatmaidNeuronList:
             return CatmaidNeuronList(selection, make_copy=self.copy_on_subset)
 
     @classmethod
-    def from_json(self, fname):
-        """ Generates NeuronList from CATMAID json file.
+    def from_selection(self, fname):
+        """ Generates NeuronList from json files generatted by CATMAID's 
+        selection table.
         """
 
         # Read data from file
@@ -2169,9 +2175,9 @@ class CatmaidNeuronList:
 
         return nl
 
-    def to_json(self, fname='selection.json'):
+    def to_selection(self, fname='selection.json'):
         """Saves neuron selection as json file which can be loaded
-        in CATMAID selection table. Uses neuron's ``.color`` attribute.
+        in CATMAID selection tables. Uses neuron's ``.color`` attribute.
 
         Parameters
         ----------
