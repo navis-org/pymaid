@@ -84,7 +84,7 @@ except Exception as error:
     module_logger.warning('Error importing pymaid.connectivity:\n' + str(error))
 
 try:
-    from pymaid.utils import set_loggers, set_pbars
+    from pymaid.utils import *
 except Exception as error:
     module_logger.warning(str(error))
     module_logger.warning('Error importing pymaid.utils:\n' + str(error))
