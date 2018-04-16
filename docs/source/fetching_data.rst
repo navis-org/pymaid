@@ -37,7 +37,7 @@ Treenodes
     ~pymaid.get_treenode_table
     ~pymaid.get_treenode_info
     ~pymaid.get_skid_from_treenode
-    ~pymaid.get_node_user_details
+    ~pymaid.get_node_details
 
 Tags
 ----

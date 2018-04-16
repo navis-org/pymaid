@@ -184,9 +184,9 @@ class TestFetch(unittest.TestCase):
                                                               config_test.test_volume ),
                                pd.DataFrame )
 
-    def test_node_user_details(self):
+    def test_node_details(self):
         n = pymaid.get_neuron( config_test.test_skids[0] )
-        self.assertIsInstance( pymaid.get_node_user_details( n.nodes.sample(100).treenode_id.values ),
+        self.assertIsInstance( pymaid.get_node_details( n.nodes.sample(100).treenode_id.values ),
                                pd.DataFrame )
 
     def test_skid_from_treenode(self):
@@ -581,9 +581,9 @@ class TestPlot(unittest.TestCase):
     """
     
 
-#class TestUserStats(unittest.TestCase):
+class TestUserStats(unittest.TestCase):
     """Test pymaid.user_stats """
-    """
+    
     def setUp(self):
         self.rm = pymaid.CatmaidInstance(
             config_test.server_url,
@@ -591,16 +591,19 @@ class TestPlot(unittest.TestCase):
             config_test.http_pw,
             config_test.token,
             logger_level='ERROR')
+
+        self.n = pymaid.get_neuron( config_test.test_skids[0], 
+                                     remote_instance=self.rm)
      
     def test_time_invested(self):
         self.assertIsInstance(pymaid.get_time_invested(
-            config_test.test_skids[0], remote_instance=self.rm), pd.DataFrame)
+            self.n.downsample(10, inplace=False), remote_instance=self.rm), pd.DataFrame)
     
     
     def test_user_contributions(self):
         self.assertIsInstance(pymaid.get_user_contributions(
             config_test.test_skids, remote_instance=self.rm), pd.DataFrame)
-    """  
+      
 
 if __name__ == '__main__':
     unittest.main()

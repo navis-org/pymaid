@@ -483,7 +483,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     connector_ids = neurons.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = fetch.get_node_user_details(
+    node_details = fetch.get_node_details(
         node_ids + connector_ids, remote_instance=remote_instance )
 
     # Extract timestamps

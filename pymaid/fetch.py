@@ -81,7 +81,7 @@ __all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','eval_skids','
             'get_connector_details','get_connectors','get_contributor_statistics',
             'get_edges','get_history','get_logs','get_names','get_neuron','get_neuron_list',
             'get_neurons','get_neurons_in_bbox','get_neurons_in_volume','get_node_tags',
-            'get_node_user_details','get_nodes_in_volume','get_partners','get_partners_in_volume',
+            'get_node_details','get_nodes_in_volume','get_partners','get_partners_in_volume',
             'get_paths','get_review','get_review_details','get_skids_by_annotation',
             'get_skids_by_name','get_treenode_info','get_treenode_table','get_user_annotations',
             'get_user_list','get_volume','has_soma','neuron_exists','delete_tags',
@@ -231,7 +231,7 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/stacks")
 
     def _get_treenode_info_url(self, tn_id):
-        """ Use to parse url for retrieving treenode infos. Needs empty post!"""
+        """ Use to parse url for retrieving skeleton info from treenodes."""
         return self.djangourl("/" + str(self.project_id) + "/treenodes/" + str(tn_id) + "/info")
 
     def _get_node_labels_url(self):
@@ -1293,14 +1293,16 @@ def get_names(x, remote_instance=None):
     return(names)
 
 
-def get_node_user_details(x, remote_instance=None, chunk_size=10000):
-    """ Retrieve user info for a list of treenode and/or connectors.
+def get_node_details(x, remote_instance=None, chunk_size=10000):
+    """ Retrieve detailed treenode info for a list of treenodes and/or 
+    connectors.
 
     Parameters
     ----------
     x :                 {list, CatmaidNeuron/List}
                         List of treenode ids (can also be connector ids!).
-                        If CatmaidNeuron/List will get only treenodes.
+                        If CatmaidNeuron/List will get both treenodes and
+                        connectors!
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     chunk_size :        int, optional
@@ -1324,7 +1326,8 @@ def get_node_user_details(x, remote_instance=None, chunk_size=10000):
 
     """
     if isinstance(x, (core.CatmaidNeuron,core.CatmaidNeuronList)):
-        node_ids = x.nodes.treenode_id.values
+        node_ids = np.append( x.nodes.treenode_id.values, 
+                              x.connectors.connector_id.values )
     elif not isinstance(x, (list, tuple, np.ndarray)):
         node_ids = [x]
     else:
