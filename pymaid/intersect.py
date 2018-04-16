@@ -159,7 +159,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
         n.nodes = n.nodes[ in_v ]
         n.connectors = n.connectors[
-            n.connectors.treenode_id.isin(n.nodes.treenode_id.tolist())]
+            n.connectors.treenode_id.isin(n.nodes.treenode_id.values)]
 
         # Fix root nodes
         n.nodes.loc[~n.nodes.parent_id.isin(
@@ -171,7 +171,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
         # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node
         # We have to fix the nodes that lost their parents
-        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.tolist() ),
+        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.values ),
                           'parent_id' ] = None
 
         n._clear_temp_attr()
