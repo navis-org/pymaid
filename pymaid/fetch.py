@@ -1149,11 +1149,7 @@ def get_partners(x, remote_instance=None, threshold=1,
 
     x = eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
-    # Make sure skids are strings from hereon
-    x = [ str(s) for s in x ]
+    x = utils._make_iterable(x, force_type=str)
 
     remote_connectivity_url = remote_instance._get_connectivity_url()
 
@@ -1165,7 +1161,7 @@ def get_partners(x, remote_instance=None, threshold=1,
         tag = 'source_skeleton_ids[{0}]'.format(i)
         connectivity_post[tag] = skid
 
-    module_logger.info('Fetching connectivity')
+    module_logger.info('Fetching connectivity table for {0} neurons'.format(len(x)))
     connectivity_data = remote_instance.fetch(
         remote_connectivity_url, connectivity_post)
 
@@ -1194,7 +1190,7 @@ def get_partners(x, remote_instance=None, threshold=1,
             connectivity_data[d].pop(n)
 
     names = get_names([n for d in connectivity_data for n in connectivity_data[
-                      d]] + x, remote_instance)
+                      d]] + list(x), remote_instance)
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
                                'num_nodes', 'relation'] + [str(s) for s in x])
@@ -3424,7 +3420,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
             reviewed :          DataFrame containing nodes reviewed.
                                 Rows = users, columns = dates
             user_details :      user-list (see pymaid.get_user_list())
-            node_counts :       Series containing nodes created by user.
+            treenodes :         DataFrame containing nodes created by user.
             }
 
     Examples
@@ -3533,6 +3529,10 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     user_list.index = user_list.index.astype(str)
 
     df = pd.Series([
+        pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_cable_length', stats['days']) for u in stats['stats_table']],
+                     index=[user_list.loc[u, 'login'] for u in stats[
+                         'stats_table'].keys()],
+                     columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_treenodes', stats['days']) for u in stats['stats_table']],
                      index=[user_list.loc[u, 'login'] for u in stats[
                          'stats_table'].keys()],
@@ -3547,14 +3547,8 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         user_list.reset_index(drop=True)
     ],
-        index=['cable', 'connector_links', 'reviewed', 'user_details']
+        index=['cable', 'treenodes', 'connector_links', 'reviewed', 'user_details']
     )
-
-    # Add node counts
-    nc = remote_instance.fetch( remote_instance._get_stats_node_count() )
-
-    df['node_count'] = pd.Series( data = list (nc.values()),
-                                  index = [ user_list.loc[u, 'login'] for u in nc.keys() ] ).sort_values(ascending=False)
 
     return df
 
