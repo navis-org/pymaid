@@ -313,7 +313,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
             connector_ids += n.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = fetch.get_node_user_details(
+    node_details = fetch.get_node_details(
         node_ids + connector_ids, remote_instance=remote_instance )
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
