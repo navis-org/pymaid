@@ -4437,7 +4437,11 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
         raise ValueError('n_hops must not be <= 0')
 
     url = remote_instance._get_graph_dps_url()
-    for h in n_hops:
+    for h in range(1, max(n_hops)+1):
+        if h == 1:
+            response +=list(sources) + list(targets)
+            continue
+
         post_data = {
             'n_hops': h,
             'min_synapses': min_synapses
@@ -4459,7 +4463,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
         response, remote_instance=remote_instance, threshold=min_synapses)
 
     # Get all paths between sources and targets
-    all_paths = [ p for s in sources for t in targets for p in nx.all_simple_paths(g, s, t, cutoff=n_hops) ]
+    all_paths = [ p for s in sources for t in targets for p in nx.all_simple_paths(g, s, t, cutoff=max(n_hops)) if len(p)-1 in n_hops ]
 
     if not return_graph:
         return all_paths
