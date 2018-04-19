@@ -4366,8 +4366,16 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
 
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
-    n_hops :            int, optional
-                        Number of hops allowed between sources and targets.
+    n_hops :            {int, list, range}, optional
+                        Number of hops allowed between sources and
+                        targets. Direct connection would be 1 hop.
+
+                        1. int, e.g. ``n_hops=3`` will return paths with
+                        EXACTLY 3 hops
+                        2. list, e.g. ``n_hops=[2,4]`` will return all
+                        paths with 2 and 4 hops
+                        3. range, e.g. ``n_hops=range(2,4)`` will be converted
+                        to a list and return paths with 2 and 3 hops.
     min_synapses :      int, optional
                         Minimum number of synpases between source and target.
     return_graph :      bool, optional
@@ -4375,6 +4383,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
     remove_isolated :   bool, optional
                         Remove isolated nodes from NetworkX Graph. Only
                         relevant if ``return_graph=True``.
+
 
     Returns
     -------
@@ -4388,7 +4397,6 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
                 If ``return_graph is`` ``True``: Graph object containing the
                 neurons that connect sources and targets. Does only contain
                 edges that connect sources and targets via max ``n_hops``!
-
 
 
     Important
@@ -4422,20 +4430,29 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
     if not isinstance(sources, (list, np.ndarray)):
         sources = [sources]
 
+    n_hops = utils._make_iterable(n_hops)
+
+    response = []
+    if min(n_hops) <= 0:
+        raise ValueError('n_hops must not be <= 0')
+
     url = remote_instance._get_graph_dps_url()
-    post_data = {
-        'n_hops': n_hops,
-        'min_synapses': min_synapses
-    }
+    for h in n_hops:
+        post_data = {
+            'n_hops': h,
+            'min_synapses': min_synapses
+        }
 
-    for i, s in enumerate(sources):
-        post_data['sources[%i]' % i] = s
+        for i, s in enumerate(sources):
+            post_data['sources[%i]' % i] = s
 
-    for i, t in enumerate(targets):
-        post_data['targets[%i]' % i] = t
+        for i, t in enumerate(targets):
+            post_data['targets[%i]' % i] = t
 
-    # Response is just a set of skeleton IDs
-    response = remote_instance.fetch(url, post=post_data)
+        # Response is just a set of skeleton IDs
+        response += remote_instance.fetch(url, post=post_data)
+
+    response = list(set(response))
 
     # Turn neurons into an NetworkX graph
     g = graph.network2nx(
