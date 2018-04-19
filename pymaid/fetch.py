@@ -1290,7 +1290,7 @@ def get_names(x, remote_instance=None):
 
 
 def get_node_details(x, remote_instance=None, chunk_size=10000):
-    """ Retrieve detailed treenode info for a list of treenodes and/or 
+    """ Retrieve detailed treenode info for a list of treenodes and/or
     connectors.
 
     Parameters
@@ -1322,7 +1322,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     """
     if isinstance(x, (core.CatmaidNeuron,core.CatmaidNeuronList)):
-        node_ids = np.append( x.nodes.treenode_id.values, 
+        node_ids = np.append( x.nodes.treenode_id.values,
                               x.connectors.connector_id.values )
     elif not isinstance(x, (list, tuple, np.ndarray)):
         node_ids = [x]
@@ -4349,7 +4349,7 @@ def get_user_list(remote_instance=None):
     return df
 
 
-def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
+def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, return_graph=False, remove_isolated=False):
     """ Retrieves paths between two sets of neurons.
 
     Parameters
@@ -4370,19 +4370,26 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
                         Number of hops allowed between sources and targets.
     min_synapses :      int, optional
                         Minimum number of synpases between source and target.
+    return_graph :      bool, optional
+                        If True, will return NetworkX Graph (see below).
+    remove_isolated :   bool, optional
+                        Remove isolated nodes from NetworkX Graph. Only
+                        relevant if ``return_graph=True``.
 
     Returns
     -------
-    ``NetworkX.DiGraph``
-                Graph object containing the neurons that connect
-                sources and targets. Does only contain edges that
-                connect sources and targets!
-
     paths :     ``list``
                 List of skeleton IDs that constitute paths from
                 sources to targets::
 
                     [ [ source1, , ... , target1 ], [source2, ... , target2 ], ...  ]
+
+    ``NetworkX.DiGraph``
+                If ``return_graph is`` ``True``: Graph object containing the
+                neurons that connect sources and targets. Does only contain
+                edges that connect sources and targets via max ``n_hops``!
+
+
 
     Important
     ---------
@@ -4435,7 +4442,10 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
         response, remote_instance=remote_instance, threshold=min_synapses)
 
     # Get all paths between sources and targets
-    all_paths = [ p for s in sources for t in targets for p in nx.all_simple_paths(g, s, t) ]
+    all_paths = [ p for s in sources for t in targets for p in nx.all_simple_paths(g, s, t, cutoff=n_hops) ]
+
+    if not return_graph:
+        return all_paths
 
     # Turn into edges
     edges_to_keep = set( [ e for l in all_paths for e in nx.utils.pairwise( l ) ] )
@@ -4443,10 +4453,11 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=2):
     # Remove edges
     g.remove_edges_from( [ e for e in g.edges if e not in edges_to_keep ] )
 
-    # Remove isolated nodes
-    g.remove_nodes_from( list( nx.isolates(g) ) )
+    if remove_isolated:
+        # Remove isolated nodes
+        g.remove_nodes_from( list( nx.isolates(g) ) )
 
-    return g, all_paths
+    return all_paths, g
 
 
 def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6), combine_vols=False):
