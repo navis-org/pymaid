@@ -721,7 +721,7 @@ class CatmaidNeuron:
         if inplace:
             x = self
         else:
-            x = self.copy()
+            x = self.copy(deepcopy=False)
 
         resample.resample_neuron(x, resample_to, inplace=True )
 
@@ -756,7 +756,7 @@ class CatmaidNeuron:
         if inplace:
             x = self
         else:
-            x = self.copy()
+            x = self.copy(deepcopy=False)
 
         resample.downsample_neuron(x, factor, inplace=True, **kwargs)
 
@@ -787,7 +787,7 @@ class CatmaidNeuron:
         if inplace:
             x = self
         else:
-            x = self.copy()
+            x = self.copy(deepcopy=False)
 
         graph_utils.reroot_neuron(x, new_root, inplace=True)
 
@@ -817,12 +817,12 @@ class CatmaidNeuron:
         if inplace:
             x = self
         else:
-            x = self.copy()
+            x = self.copy(deepcopy=False)
 
         node = utils._make_iterable(node, force_type=None)
 
         for n in node:
-            dist, prox = graph_utils.cut_neuron(x, n)
+            prox = graph_utils.cut_neuron(x, n, ret='proximal')
             x.__init__(prox, x._remote_instance, x.meta_data)
 
         # Clear temporary attributes is done by cut_neuron
@@ -852,9 +852,9 @@ class CatmaidNeuron:
         if inplace:
             x = self
         else:
-            x = self.copy()
+            x = self.copy(deepcopy=False)
 
-        dist, prox = graph_utils.cut_neuron(x, node)
+        dist = graph_utils.cut_neuron(x, node, ret='distal')
         x.__init__(dist, x._remote_instance, x.meta_data)
 
         # Clear temporary attributes is done by cut_neuron
@@ -954,13 +954,13 @@ class CatmaidNeuron:
             Base function. See for details and examples.
         """
 
+        if not isinstance(v, Volume):
+            v = fetch.get_volume(v, combine_vols=True, remote_instance=x._remote_instance)
+
         if inplace:
             x = self
         else:
             x = self.copy()
-
-        if not isinstance(v, Volume):
-            v = fetch.get_volume(v, combine_vols=True, remote_instance=x._remote_instance)
 
         intersect.in_volume(x, v, inplace=True, remote_instance=x._remote_instance, mode=mode)
 
@@ -1592,7 +1592,7 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1637,7 +1637,7 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1690,7 +1690,7 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         # Silence loggers (except Errors)
         morpholevel = morpho.module_logger.getEffectiveLevel()
@@ -1739,7 +1739,7 @@ class CatmaidNeuronList:
         """
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1774,7 +1774,7 @@ class CatmaidNeuronList:
         """
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1819,7 +1819,7 @@ class CatmaidNeuronList:
         """
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1862,7 +1862,7 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -1905,7 +1905,7 @@ class CatmaidNeuronList:
 
         x = self
         if not inplace:
-            x = x.copy()
+            x = x.copy(deepcopy=False)
 
         if not isinstance(v, Volume):
             v = fetch.get_volume(v, combine_vols=True)
@@ -2173,7 +2173,7 @@ class CatmaidNeuronList:
 
     @classmethod
     def from_selection(self, fname):
-        """ Generates NeuronList from json files generatted by CATMAID's 
+        """ Generates NeuronList from json files generatted by CATMAID's
         selection table.
         """
 
@@ -2251,7 +2251,7 @@ class CatmaidNeuronList:
         if inplace:
             x = self
         else:
-            x = self.copy()
+            x = self.copy(deepcopy=False)
 
         x.neurons = []
         for n in self.neurons:
