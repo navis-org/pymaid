@@ -130,8 +130,9 @@ def classify_nodes(x, inplace=True):
         # Get graph representation of neuron
         g = x.graph
         # Get branch and end nodes based on their degree of connectivity
-        ends = [ n for n in g.nodes if g.degree(n) == 1 ]
-        branches = [ n for n in g.nodes if g.degree(n) > 2 ]
+        deg = pd.DataFrame.from_dict( dict(g.degree()), orient='index' )
+        ends = deg[deg[0] == 1].index.values # [ n for n in g.nodes if g.degree(n) == 1 ]
+        branches = deg[deg[0] > 2].index.values # [ n for n in g.nodes if g.degree(n) > 2 ]
 
         x.nodes['type'] = 'slab'
         x.nodes.loc[ x.nodes.treenode_id.isin(ends), 'type' ] = 'end'
