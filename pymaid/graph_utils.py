@@ -51,10 +51,10 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted([ 'classify_nodes', 'cut_neuron', 'longest_neurite', 
-                   'split_into_fragments', 'reroot_neuron', 'distal_to', 
-                   'dist_between', 'find_main_branchpoint', 
-                   'generate_list_of_childs', 'geodesic_matrix', 
+__all__ = sorted([ 'classify_nodes', 'cut_neuron', 'longest_neurite',
+                   'split_into_fragments', 'reroot_neuron', 'distal_to',
+                   'dist_between', 'find_main_branchpoint',
+                   'generate_list_of_childs', 'geodesic_matrix',
                    'subset_neuron', 'node_label_sorting' ])
 
 def _generate_segments(x, append=True):
@@ -641,7 +641,7 @@ def reroot_neuron(x, new_root, inplace=False):
     else:
         return
 
-def cut_neuron(x, cut_node, g=None):
+def cut_neuron(x, cut_node, ret='both'):
     """ Split neuron at given point. Returns two new neurons.
 
     Parameters
@@ -650,6 +650,9 @@ def cut_neuron(x, cut_node, g=None):
                Must be a single neuron.
     cut_node : {int, str}
                Node ID or a tag of the node to cut.
+    ret :      {'proximal','distal','both'}, optional
+               Define which parts of the neuron to return. Use this to speed
+               up processing.
 
     Returns
     -------
@@ -677,6 +680,8 @@ def cut_neuron(x, cut_node, g=None):
             Returns a neuron consisting of a subset of its treenodes.
 
     """
+    if ret not in ['proximal', 'distal', 'both']:
+        raise ValueError('ret must be either "proximal", "distal" or "both"!')
 
     if isinstance(x, core.CatmaidNeuron):
         pass
@@ -706,32 +711,35 @@ def cut_neuron(x, cut_node, g=None):
     # Get subgraphs consisting of nodes distal to cut node
     dist_graph = nx.bfs_tree( x.graph, cut_node, reverse=True )
 
-    # bfs_tree does not preserve 'weight' -> need to subset original graph by those nodes
-    dist_graph = x.graph.subgraph( dist_graph.nodes )
-    prox_graph = x.graph.subgraph( [ n for n in x.graph.nodes if n not in dist_graph.nodes ] + [cut_node] )
-    # ATTENTION: prox/dist_graph contain pointers to the original graph
-    # -> changes to structure don't but changes to attributes will propagate back
+    if ret == 'distal' or ret == 'both':
+        # bfs_tree does not preserve 'weight' -> need to subset original graph by those nodes
+        dist_graph = x.graph.subgraph( dist_graph.nodes )
 
-    # Generate new neurons (this is the actual bottleneck of the function: ~70% of time)
-    dist =  subset_neuron( x, dist_graph, clear_temp=False )
-    prox = subset_neuron( x, prox_graph, clear_temp=False )
+        # Generate new neurons (this is the actual bottleneck of the function: ~70% of time)
+        dist = subset_neuron( x, dist_graph, clear_temp=False )
 
-    # Change new root for dist
-    dist.nodes.loc[ dist.nodes.treenode_id == cut_node, 'parent_id' ] = None
-    dist.nodes.loc[ dist.nodes.treenode_id == cut_node, 'type' ] = 'root'
+        # Change new root for dist
+        dist.nodes.loc[ dist.nodes.treenode_id == cut_node, 'parent_id' ] = None
+        dist.nodes.loc[ dist.nodes.treenode_id == cut_node, 'type' ] = 'root'
 
-    # Change cut node to end node for prox
-    prox.nodes.loc[ prox.nodes.treenode_id == cut_node, 'type' ] = 'end'
+        # Reassign graphs
+        dist.graph = dist_graph
 
-    # Reassign graphs
-    dist.graph = dist_graph
-    prox.graph = prox_graph
+        # Clear other temporary attributes
+        dist._clear_temp_attr(exclude=['graph','type','classify_nodes'])
 
-    # Clear other temporary attributes
-    dist._clear_temp_attr(exclude=['graph','type','classify_nodes'])
-    prox._clear_temp_attr(exclude=['graph','type','classify_nodes'])
+    if ret == 'proximal' or ret == 'both':
+        # bfs_tree does not preserve 'weight' -> need to subset original graph by those nodes
+        prox_graph = x.graph.subgraph( [ n for n in x.graph.nodes if n not in dist_graph.nodes ] + [cut_node] )
 
-    return dist, prox
+        # Generate new neurons (this is the actual bottleneck of the function: ~70% of time)
+        prox = subset_neuron( x, prox_graph, clear_temp=False )
+
+        # Change cut node to end node for prox
+        prox.nodes.loc[ prox.nodes.treenode_id == cut_node, 'type' ] = 'end'
+
+        # Reassign graphs
+        prox.graph = prox_graph
 
         # Clear other temporary attributes
         prox._clear_temp_attr(exclude=['graph','type','classify_nodes'])
