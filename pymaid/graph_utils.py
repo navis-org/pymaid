@@ -732,7 +732,20 @@ def cut_neuron(x, cut_node, g=None):
 
     return dist, prox
 
-def subset_neuron( x, subset, clear_temp=True ):
+        # Clear other temporary attributes
+        prox._clear_temp_attr(exclude=['graph','type','classify_nodes'])
+
+    # ATTENTION: prox/dist_graph contain pointers to the original graph
+    # -> changes to structure don't but changes to attributes will propagate back
+
+    if ret == 'both':
+        return dist, prox
+    elif ret == 'distal':
+        return dist
+    elif ret == 'proximal':
+        return prox
+
+def subset_neuron( x, subset, clear_temp=True, inplace=False):
     """ Subsets a neuron to a set of treenodes.
 
     Parameters
@@ -757,7 +770,8 @@ def subset_neuron( x, subset, clear_temp=True ):
     """
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Can only process data of type "CatmaidNeuron", not "{0}"'.format(type(x)))
+        raise TypeError('Can only process data of type "CatmaidNeuron", not\
+                         "{0}"'.format(type(x)))
 
     if isinstance(subset, np.ndarray):
         pass
@@ -766,10 +780,12 @@ def subset_neuron( x, subset, clear_temp=True ):
     elif isinstance(subset, (nx.DiGraph, nx.Graph)):
         subset = subset.nodes
     else:
-        raise TypeError('Can only process data of type "np.ndarray" or "nx.DiGraph", not "{0}"'.format(type(subset)))
+        raise TypeError('Can only process data of type "numpy.ndarray" or\
+                         "networkx.Graph", not "{0}"'.format(type(subset)))
 
-    # Make a copy of the neuron (this is the actual bottleneck of the function: ~70% of time)
-    x = x.copy()
+    # Make a copy of the neuron
+    if not inplace:
+        x = x.copy(deepcopy=False)
 
     # Filter treenodes
     x.nodes = x.nodes[ x.nodes.treenode_id.isin( subset ) ]
@@ -786,9 +802,16 @@ def subset_neuron( x, subset, clear_temp=True ):
     # Remove empty tags
     x.tags = { t : x.tags[t] for t in x.tags if x.tags[t] }
 
+    # Fix graph representation
+    x.graph = x.graph.subgraph( x.nodes.treenode_id.values )
+
+    # Reset indices of data tables
+    x.nodes.reset_index(inplace=True, drop=True)
+    x.connectors.reset_index(inplace=True, drop=True)
+
     # Clear temporary attributes
     if clear_temp:
-        x._clear_temp_attr()
+        x._clear_temp_attr(exclude=['graph'])
 
     return x
 
