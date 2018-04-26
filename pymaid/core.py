@@ -85,6 +85,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import io
 
+import copy
+
 import six
 
 from pymaid import graph, morpho, fetch, plotting, graph_utils, resample, intersect, utils
@@ -394,14 +396,27 @@ class CatmaidNeuron:
             raise AttributeError('Attribute "%s" not found' % key)
 
     def __copy__(self):
-        return self.copy()
+        return self.copy(deepcopy=False)
 
     def __deepcopy__(self):
-        return self.copy()
+        return self.copy(deepcopy=True)
 
-    def copy(self):
-        """Returns a copy of the neuron."""
-        return CatmaidNeuron(self)
+    def copy(self, deepcopy=False):
+        """Returns a copy of the neuron.
+
+        Parameters
+        ----------
+        deepcopy :  bool, optional
+                    If False, `.graph` (NetworkX DiGraph) will be returned as
+                    view - changes to nodes/edges can progagate back!
+        """
+        x = CatmaidNeuron(self.skeleton_id)
+        x.__dict__ = { k : copy.copy(v) for k,v in self.__dict__.items() }
+
+        if 'graph' in self.__dict__:
+            x.graph = self.graph.copy(as_view=deepcopy!=True)
+
+        return x
 
     def get_skeleton(self, remote_instance=None, **kwargs):
         """Get/Update skeleton data for neuron.
@@ -2208,14 +2223,24 @@ class CatmaidNeuronList:
                                reverse= ascending==False )
 
     def __copy__(self):
-        return self.copy()
+        return self.copy(deepcopy=False)
 
     def __deepcopy__(self):
-        return self.copy()
+        return self.copy(deepcopy=True)
 
-    def copy(self):
-        """Return copy of this CatmaidNeuronList."""
-        return CatmaidNeuronList(self, make_copy=True, _use_parallel=self._use_parallel)
+    def copy(self, deepcopy=False):
+        """Return copy of this CatmaidNeuronList.
+
+        Parameters
+        ----------
+        deepcopy :  bool, optional
+                    If False, `.graph` (NetworkX DiGraphs) will be returned as
+                    views - changes to nodes/edges can progagate back!
+
+        """
+        return CatmaidNeuronList([n.copy(deepcopy=deepcopy) for n in self.neurons],
+                                 make_copy=False,
+                                 _use_parallel=self._use_parallel)
 
     def head(self, n=5):
         """Return summary for top N neurons."""
