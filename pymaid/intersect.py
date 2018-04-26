@@ -25,7 +25,7 @@ import numpy as np
 import scipy
 from scipy.spatial import ConvexHull
 
-from pymaid import fetch, core, utils
+from pymaid import fetch, core, utils, graph_utils
 
 from tqdm import tqdm
 if utils.is_jupyter():
@@ -144,54 +144,25 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].as_matrix()
-
     elif isinstance(x, core.CatmaidNeuron):
-        n = x
-
-        if not inplace:
-            n = n.copy()
-
-        in_v = in_volume(n.nodes[['x', 'y', 'z']].as_matrix(), volume, mode=mode)
+        in_v = in_volume(x.nodes[['x', 'y', 'z']].as_matrix(), volume, mode=mode)
 
         # If mode is OUT, invert selection
         if mode == 'OUT':
             in_v = ~np.array(in_v)
 
-        n.nodes = n.nodes[ in_v ]
-        n.connectors = n.connectors[
-            n.connectors.treenode_id.isin(n.nodes.treenode_id.values)]
-
-        # Fix root nodes
-        n.nodes.loc[~n.nodes.parent_id.isin(
-            n.nodes.treenode_id.tolist() + [None]), 'parent_id'] = None
-
-        # Reset indices of node and connector tables (important for igraph!)
-        n.nodes.reset_index(inplace=True,drop=True)
-        n.connectors.reset_index(inplace=True,drop=True)
-
-        # Theoretically we can end up with disconnected pieces, i.e. with more than 1 root node
-        # We have to fix the nodes that lost their parents
-        n.nodes.loc[ ~n.nodes.parent_id.isin( n.nodes.treenode_id.values ),
-                          'parent_id' ] = None
-
-        n._clear_temp_attr()
+        x = graph_utils.subset_neuron( x, x.nodes[in_v].treenode_id.values, inplace=inplace )
 
         if not inplace:
-            return n
+            return x
         else:
             return
-
     elif isinstance(x, core.CatmaidNeuronList):
-        nl = x
+        for n in x:
+            n = in_volume(n, volume, inplace=inplace, mode=mode)
 
         if not inplace:
-            nl = nl.copy()
-
-        for n in nl:
-            n = in_volume(n, volume, inplace=True, mode=mode)
-
-        if not inplace:
-            return nl
+            return x
         else:
             return
     else:
