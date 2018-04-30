@@ -4528,7 +4528,7 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
 
     remote_instance = _eval_remote_instance(remote_instance)
 
-    if isinstance(volume_name, list):
+    if isinstance(volume_name, (list, np.ndarray)):
         vols =  { v : get_volume( v, remote_instance=remote_instance, color=color )
                     for v in tqdm( volume_name, desc='Volumes',
                                    disable=pbar_hide, leave=pbar_leave)  }
