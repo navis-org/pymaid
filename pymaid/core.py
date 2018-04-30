@@ -573,7 +573,7 @@ class CatmaidNeuron:
         """ Get connectivity table for this neuron."""
         if not remote_instance and not self._remote_instance:
             module_logger.error(
-                'Get_review: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
+                'Get_partners: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
@@ -1933,7 +1933,7 @@ class CatmaidNeuronList:
         """ Get connectivity table for neurons."""
         if not remote_instance and not self._remote_instance:
             module_logger.error(
-                'Get_review: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
+                'Get_partners: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
