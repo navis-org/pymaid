@@ -755,18 +755,22 @@ def cut_neuron(x, cut_node, ret='both'):
     elif ret == 'proximal':
         return prox
 
-def subset_neuron( x, subset, clear_temp=True, inplace=False):
+def subset_neuron( x, subset, clear_temp=True, keep_connectors=False, inplace=False):
     """ Subsets a neuron to a set of treenodes.
 
     Parameters
     ----------
-    x :             CatmaidNeuron
-    subset :        {np.ndarray, NetworkX.Graph}
-                    Treenodes to subset the neuron to
-    clear_temp :    bool, optional
-                    If True, will reset temporary attributes (graph, node
-                    classification, etc. ). In general, you should leave this
-                    at True.
+    x :               CatmaidNeuron
+    subset :          {np.ndarray, NetworkX.Graph}
+                      Treenodes to subset the neuron to
+    clear_temp :      bool, optional
+                      If True, will reset temporary attributes (graph, node
+                      classification, etc. ). In general, you should leave
+                      this at True.
+    keep_connectors : bool, optional
+                      If True, will not remove disconnected connectors.
+    inplace :         bool, optional
+                      If False, a copy of the neuron is returned.
 
     Returns
     -------
@@ -804,7 +808,8 @@ def subset_neuron( x, subset, clear_temp=True, inplace=False):
     x.nodes.loc[ ~x.nodes.parent_id.isin( x.nodes.treenode_id.astype(object) ), 'parent_id' ] = None
 
     # Filter connectors
-    x.connectors = x.connectors[ x.connectors.treenode_id.isin( subset ) ]
+    if not keep_connectors:
+        x.connectors = x.connectors[ x.connectors.treenode_id.isin( subset ) ]
 
     # Filter tags
     x.tags = { t : [ tn for tn in x.tags[t] if tn in subset ] for t in x.tags }
