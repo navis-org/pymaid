@@ -854,8 +854,11 @@ class CatmaidNeuron:
         else:
             x = self.copy(deepcopy=False)
 
-        dist = graph_utils.cut_neuron(x, node, ret='distal')
-        x.__init__(dist, x._remote_instance, x.meta_data)
+        node = utils._make_iterable(node, force_type=None)
+
+        for n in node:
+            dist = graph_utils.cut_neuron(x, n, ret='distal')
+            x.__init__(dist, x._remote_instance, x.meta_data)
 
         # Clear temporary attributes is done by cut_neuron
         # x._clear_temp_attr()
