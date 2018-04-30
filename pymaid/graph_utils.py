@@ -36,7 +36,6 @@ if utils.is_jupyter():
     tqdm = tqdm_notebook
     trange = tnrange
 
-
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
@@ -127,17 +126,19 @@ def classify_nodes(x, inplace=True):
         for i in trange(x.shape[0], desc='Classifying'):
             classify_nodes(x.ix[i], inplace=True)
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
-        # Get graph representation of neuron
-        g = x.graph
-        # Get branch and end nodes based on their degree of connectivity
-        deg = pd.DataFrame.from_dict( dict(g.degree()), orient='index' )
-        ends = deg[deg[0] == 1].index.values # [ n for n in g.nodes if g.degree(n) == 1 ]
-        branches = deg[deg[0] > 2].index.values # [ n for n in g.nodes if g.degree(n) > 2 ]
+        # Make sure there are nodes to classify
+        if x.nodes.shape[0] != 0:
+            # Get graph representation of neuron
+            g = x.graph
+            # Get branch and end nodes based on their degree of connectivity
+            deg = pd.DataFrame.from_dict( dict(g.degree()), orient='index' )
+            ends = deg[deg.iloc[:,0] == 1].index.values # [ n for n in g.nodes if g.degree(n) == 1 ]
+            branches = deg[deg.iloc[:,0] > 2].index.values # [ n for n in g.nodes if g.degree(n) > 2 ]
 
-        x.nodes['type'] = 'slab'
-        x.nodes.loc[ x.nodes.treenode_id.isin(ends), 'type' ] = 'end'
-        x.nodes.loc[ x.nodes.treenode_id.isin(branches), 'type' ] = 'branch'
-        x.nodes.loc[ x.nodes.parent_id.isnull(), 'type' ] = 'root'
+            x.nodes['type'] = 'slab'
+            x.nodes.loc[ x.nodes.treenode_id.isin(ends), 'type' ] = 'end'
+            x.nodes.loc[ x.nodes.treenode_id.isin(branches), 'type' ] = 'branch'
+            x.nodes.loc[ x.nodes.parent_id.isnull(), 'type' ] = 'root'
 
     else:
         raise TypeError('Unknown neuron type: %s' % str(type(x)))
