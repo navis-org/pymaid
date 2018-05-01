@@ -67,12 +67,13 @@ CatmaidNeuron-specific
 	:toctree: generated/
 
 	pymaid.CatmaidNeuron.from_swc
+	pymaid.CatmaidNeuron.to_swc
 
 CatmaidNeuronList-specific
 +++++++++++++++++++++++++++
 .. autosummary::
 	:toctree: generated/
 
-	pymaid.CatmaidNeuronList.to_json
-	pymaid.CatmaidNeuronList.from_json
+	pymaid.CatmaidNeuronList.to_selection
+	pymaid.CatmaidNeuronList.from_selection
 	pymaid.CatmaidNeuronList.has_annotation
