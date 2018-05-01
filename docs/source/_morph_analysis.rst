@@ -95,6 +95,8 @@ Manipulation
 	~pymaid.prune_by_strahler
     ~pymaid.subset_neuron
     ~pymaid.average_neurons
+    ~pymaid.remove_tagged_branches
+    ~pymaid.despike_neuron
 
 Resampling
 ----------
