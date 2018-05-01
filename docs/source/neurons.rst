@@ -39,4 +39,4 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.Catm
 Class methods
 -------------
 
-See API documentation for :ref:`neuron-reference:` for a list of class methods.
+See API documentation for :ref:`neuron-reference` for a list of class methods.
