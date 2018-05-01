@@ -2946,7 +2946,7 @@ def get_review_details(x, remote_instance=None):
 
         >>> print(df)
         treenode_id  skeleton_id  reviewer1  reviewer2  reviewer 3
-           12345       12345123     datetime    NaN      datetime
+           12345       12345123     datetime    NaT      datetime
 
 
     """
@@ -2972,7 +2972,8 @@ def get_review_details(x, remote_instance=None):
         urls, remote_instance, post_data=post_data, desc='Get rev stats')
 
     for i, neuron in enumerate(rdata):
-        # There is a small chance that nodes are counted twice but not tracking node_id speeds up this extraction a LOT
+        # There is a small chance that nodes are counted twice but not
+        # tracking node_id speeds up this extraction a LOT
         #node_ids = []
         for arbor in neuron:
             node_list += [(n['id'], x[i], n['rids'])
@@ -2984,12 +2985,16 @@ def get_review_details(x, remote_instance=None):
 
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
-    df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(0)
+    df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(np.nan)
     df.columns = [user_list.loc[u, 'login'] for u in df.columns]
     df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.tolist()]
     df.index.name = 'treenode_id'
+    df = df.reset_index(drop=False)
 
-    return df.reset_index(drop=False)
+    # Make sure we didn't count treenodes twice
+    df = df[ ~df.duplicated('treenode_id') ]
+
+    return df
 
 
 def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, search=''):
