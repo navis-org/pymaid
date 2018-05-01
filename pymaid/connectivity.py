@@ -348,11 +348,11 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
 
     Notes
     -----
-    Method ``possible_contacts`` works by (1) calculating mean distance `d`
-    (connector->treenode) at which connections between neurons A and
-    neurons B occur, (2) check for all presynapses of neurons A if they
-    are within `stdev` (default=2) standard deviations of `d` of a neurons B
-    treenode.
+    Method ``possible_contacts`` works by:
+        1. Calculating mean distance `d` (connector->treenode) at which connections
+           between neurons A and neurons B occur
+        2. Check for all presynapses of neurons A if they are within `stdev`
+           (default=2) standard deviations of `d` of a neurons B treenode.
 
 
     Returns
@@ -403,7 +403,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
 
         distances = np.sqrt ( np.sum((cn_locs  - tn_locs) ** 2, axis=1) )
 
-        module_logger.info('Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(), distances.std()))    
+        module_logger.info('Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(), distances.std()))
     else:
         module_logger.warning('No existing connectors to calculate average \
                                connector->treenode distance found. Falling \
