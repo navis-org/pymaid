@@ -142,6 +142,9 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
             cn_data = downstream
 
     elif datatype == 'adjacency_matrix':
+        if getattr(x, 'is_grouped', False):
+            raise TypeError('Adjacency matrix appears to be grouped. Unable to process that.')
+
         cn_data = fetch.get_connectors_between(  x.index.tolist(),
                                                  x.columns.tolist(),
                                                  directional=True,
@@ -480,7 +483,7 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
     return edges
 
 
-def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=1, syn_cutoff=None, use_connectors=False):
+def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=None, syn_cutoff=None, use_connectors=False):
     """ Generate adjacency matrix for synaptic connections between neuronsA
     -> neuronsB (unidirectional!).
 
@@ -503,12 +506,17 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                         If not provided, source neurons = target neurons.
     remote_instance :   CATMAID instance, optional
     syn_cutoff :        int, optional
-                        If set, will cut off synapses above given value.
+                        If set, will cut off connections above given value.
     syn_threshold :     int, optional
-                        If set, will cut off synapses below given value.
+                        If set, will ignore connections with less synapses.
     row_groups :        dict, optional
-                        Use to collapse neuronsA/B into groups:
-                        ``{'Group1': [skid1,skid2], 'Group2' : [..], .. }``
+                        Use to collapse neuronsA/B into groups. Can be either:
+                          1. `{ group name : [ neuron1, neuron2, ... ], .. }`
+                          2. `{ neuron1 : group1, neuron2 : group2, .. }`
+
+                        `syn_cutoff` and `syn_threshold` are applied BEFORE
+                        grouping!
+
     col_groups :        dict, optional
                         See row_groups
     use_connectors :    bool, optional
@@ -519,6 +527,11 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     Returns
     -------
     matrix :          ``pandas.Dataframe``
+
+    See Also
+    --------
+    :func:`~pymaid.group_matrix`
+                More fine-grained control over matrix grouping.
 
     Examples
     --------
@@ -568,43 +581,10 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     else:
         edges = fetch.get_edges(neurons, remote_instance=remote_instance)
 
-
-    if row_groups or col_groups:
-        rows_grouped = {str(n): g for g in row_groups for n in row_groups[g]}
-        cols_grouped = {str(n): g for g in col_groups for n in col_groups[g]}
-
-        # Groups are sorted alphabetically
-        neuronsA = sorted(list(row_groups.keys())) + \
-            [n for n in neuronsA if n not in list(rows_grouped.keys())]
-        neuronsB = sorted(list(col_groups.keys())) + \
-            [n for n in neuronsB if n not in list(cols_grouped.keys())]
-
-        edge_dict = {n: {} for n in neuronsA}
-        for e in edges.itertuples():
-            if str(e.source_skid) in rows_grouped:
-                source_string = rows_grouped[str(e.source_skid)]
-            elif str(e.source_skid) in neuronsA:
-                source_string = str(e.source_skid)
-            else:
-                continue
-
-            if str(e.target_skid) in cols_grouped:
-                target_string = cols_grouped[str(e.target_skid)]
-            elif str(e.target_skid) in neuronsB:
-                target_string = str(e.target_skid)
-            else:
-                continue
-
-            try:
-                edge_dict[source_string][target_string] += e.weight
-            except:
-                edge_dict[source_string][target_string] = e.weight
-
-    else:
-        edge_dict = {n: {} for n in neuronsA}
-        for e in edges.itertuples():
-            if str(e.source_skid) in neuronsA:
-                edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
+    edge_dict = {n: {} for n in neuronsA}
+    for e in edges.itertuples():
+        if str(e.source_skid) in neuronsA:
+            edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
 
     matrix = pd.DataFrame(
         np.zeros((len(neuronsA), len(neuronsB))), index=neuronsA, columns=neuronsB)
@@ -619,14 +599,21 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
             if syn_cutoff:
                 e = min(e, syn_cutoff)
 
-            if e < syn_threshold:
-                e = 0
+            if syn_threshold:
+                if e < syn_threshold:
+                    e = 0
 
             matrix.loc[ nA, nB ] = e
 
-    module_logger.info('Finished!')
-
     matrix.datatype = 'adjacency_matrix'
+
+    if col_groups or row_groups:
+        matrix = group_matrix(matrix,
+                              row_groups,
+                              col_groups,
+                              drop_ungrouped=False)
+
+    module_logger.info('Finished!')
 
     return matrix
 
