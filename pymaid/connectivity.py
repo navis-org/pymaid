@@ -631,20 +631,24 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     return matrix
 
 
-def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
+def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False, method='SUM'):
     """ Groups adjacency matrix into neuron groups.
 
     Parameters
     ----------
     mat :               {pandas.DataFrame, numpy.array}
-                        Matrix to group
+                        Matrix to group.
     row_groups :        dict, optional
-                        For pandas DataFrames members need to be column
-                        or index, for np they need to be slices indices:
-                        ``{ 'group name' : [ member1, member2, ... ], .. }``
+                        Row groups to be formed. Can be either:
+                          1. `{ group name : [ neuron1, neuron2, ... ], .. }`
+                          2. `{ neuron1 : group1, neuron2 : group2, .. }`
+                        If grouping numpy arrays, use indices!
     col_groups :        dict, optional
-                        See row_groups.
-    method :            {'AVERAGE', 'MAX', 'MIN','SUM'}
+                        Col groups. See `row_groups` for details.
+    drop_ungrouped :    bool, optional
+                        If ungrouped, neurons that are not part of a
+                        row/col_group are dropped from the matrix.
+    method :            {'AVERAGE', 'MAX', 'MIN','SUM'}, optional
                         Method by which values are collapsed into groups.
 
     Returns
@@ -653,66 +657,77 @@ def group_matrix(mat, row_groups={}, col_groups={}, method='AVERAGE'):
     """
 
     PERMISSIBLE_METHODS = ['AVERAGE','MIN','MAX','SUM']
-
     if method not in PERMISSIBLE_METHODS:
         raise ValueError('Unknown method "{0}". Please use either {1}'.format(method, ','.join(PERMISSIBLE_METHODS)))
+
+    if not row_groups and not col_groups:
+        module_logger.warning('No column/row groups provided - skipping.')
+        return mat
 
     # Convert numpy array to DataFrame
     if isinstance(mat, np.ndarray):
         mat = pd.DataFrame(mat)
+    # Make copy of original DataFrame
+    elif isinstance(mat, pd.DataFrame):
+        mat = mat.copy()
+    else:
+        raise TypeError('Can only work with numpy arrays or pandas DataFrames, got "{}"'.format(type(mat)))
+
+    # Preserve datatype
+    mat.datatype = 'adjacency_matrix'
+    # Add flag that this matrix has been grouped
+    mat.is_grouped = True
+
+    # Convert to neuron->group format if necessary
+    if col_groups and utils._is_iterable( list(col_groups.values())[0] ):
+        col_groups = { n : g for g in col_groups for n in col_groups[g] }
+    if row_groups and utils._is_iterable( list(row_groups.values())[0] ):
+        row_groups = { n : g for g in row_groups for n in row_groups[g] }
 
     # Make sure everything is string
     mat.index = mat.index.astype(str)
     mat.columns = mat.columns.astype(str)
+    col_groups = { str(k) : str(v) for k, v in col_groups.items() }
+    row_groups = { str(k) : str(v) for k, v in row_groups.items() }
 
-    if not row_groups:
-        row_groups = {r: [r] for r in mat.index.tolist()}
-    else:
-        row_groups = { r : [ str(n) for n in row_groups[r] ] for r in row_groups }
-    if not col_groups:
-        col_groups = {c: [c] for c in mat.columns.tolist()}
-    else:
-        col_groups = { c : [ str(n) for n in col_groups[c] ] for c in col_groups }
+    if row_groups:
+        # Drop non-grouped values if applicable
+        if drop_ungrouped:
+            mat = mat.loc[ mat.index.isin( row_groups.keys() ) ]
 
-    clean_col_groups = {}
-    clean_row_groups = {}
+        # Add temporary grouping column
+        mat['row_groups'] = [  row_groups.get( s, s ) for s in mat.index ]
 
-    not_found = []
-    for row in row_groups:
-        not_found += [r for r in row_groups[row]
-                       if r not in mat.index.tolist()]
-        clean_row_groups[row] = [r for r in row_groups[
-            row] if r in mat.index.tolist()]
-    for col in col_groups:
-        not_found += [c for c in col_groups[col]
-                      if c not in mat.columns.tolist()]
-        clean_col_groups[col] = [c for c in col_groups[
-            col] if c in mat.columns.tolist()]
+        if method == 'AVERAGE':
+            mat = mat.groupby('row_groups').mean()
+        elif method == 'MAX':
+            mat = mat.groupby('row_groups').max()
+        elif method == 'MIN':
+            mat = mat.groupby('row_groups').min()
+        elif method == 'SUM':
+            mat = mat.groupby('row_groups').sum()
 
-    if not_found:
-        module_logger.warning(
-            'Unable to find the following indices - will skip them: {0}'.format(','.join(list(set(not_found)))))
+    if col_groups:
+        # Transpose for grouping
+        mat = mat.T
 
-    new_mat = pd.DataFrame(np.zeros((len(clean_row_groups), len(
-        clean_col_groups))), index=clean_row_groups.keys(), columns=clean_col_groups.keys())
+        # Drop non-grouped values if applicable
+        if drop_ungrouped:
+            mat = mat.loc[ mat.index.isin( col_groups.keys() ) ]
 
-    for row in clean_row_groups:
-        for col in clean_col_groups:
-            values = [[mat.ix[r][c] for c in clean_col_groups[col]]
-                      for r in clean_row_groups[row]]
-            flat_values = [v for l in values for v in l]
-            try:
-                if method == 'AVERAGE':
-                    new_mat.ix[row][col] = sum(flat_values) / len(flat_values)
-                elif method == 'MAX':
-                    new_mat.ix[row][col] = max(flat_values)
-                elif method == 'MIN':
-                    new_mat.ix[row][col] = min(flat_values)
-                elif method == 'SUM':
-                    new_mat.ix[row][col] = sum(flat_values)
-                else:
-                    raise ValueError('Unknown method provided.')
-            except:
-                new_mat.ix[row][col] = 0
+        # Add temporary grouping column
+        mat['col_groups'] = [  col_groups.get( s, s ) for s in mat.index ]
 
-    return new_mat
+        if method == 'AVERAGE':
+            mat = mat.groupby('col_groups').mean()
+        elif method == 'MAX':
+            mat = mat.groupby('col_groups').max()
+        elif method == 'MIN':
+            mat = mat.groupby('col_groups').min()
+        elif method == 'SUM':
+            mat = mat.groupby('col_groups').sum()
+
+        # Transpose back
+        mat = mat.T
+
+    return mat
