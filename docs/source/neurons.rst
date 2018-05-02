@@ -1,4 +1,4 @@
-.. _overview-link:
+.. _overview_link:
 
 Neuron objects
 ==============
@@ -39,4 +39,41 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.Catm
 Class methods
 -------------
 
-See API documentation for :ref:`neuron-reference` for a list of class methods.
+See :class:`~pymaid.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complete list.
+
+CatmaidNeuron/List methods
+++++++++++++++++++++++++++
+.. autosummary::
+	:toctree: generated/
+
+	pymaid.CatmaidNeuron.plot3d
+	pymaid.CatmaidNeuron.plot2d
+	pymaid.CatmaidNeuron.plot_dendrogram
+	pymaid.CatmaidNeuron.prune_by_strahler
+	pymaid.CatmaidNeuron.prune_by_volume
+	pymaid.CatmaidNeuron.prune_distal_to
+	pymaid.CatmaidNeuron.prune_proximal_to
+	pymaid.CatmaidNeuron.prune_by_longest_neurite
+	pymaid.CatmaidNeuron.reroot
+	pymaid.CatmaidNeuron.reload
+	pymaid.CatmaidNeuron.summary
+	pymaid.CatmaidNeuron.resample
+	pymaid.CatmaidNeuron.downsample
+	pymaid.CatmaidNeuron.copy
+
+CatmaidNeuron-specific
+++++++++++++++++++++++
+.. autosummary::
+	:toctree: generated/
+
+	pymaid.CatmaidNeuron.from_swc
+	pymaid.CatmaidNeuron.to_swc
+
+CatmaidNeuronList-specific
++++++++++++++++++++++++++++
+.. autosummary::
+	:toctree: generated/
+
+	pymaid.CatmaidNeuronList.to_selection
+	pymaid.CatmaidNeuronList.from_selection
+	pymaid.CatmaidNeuronList.has_annotation
