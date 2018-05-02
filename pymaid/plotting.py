@@ -89,6 +89,7 @@ def screenshot(file='screenshot.png', alpha=True):
                 Filename
     alpha :     bool, optional
                 If True, alpha channel will be saved
+
     """
     if alpha:
         mode = 'RGBA'
@@ -122,6 +123,7 @@ def get_canvas():
     >>> text = scene.visuals.Text( text=cn_ids,
     ...                             pos=cn_co*scale_factor)
     >>> view.add(text)
+
     """
     try:
         return globals()['canvas'], globals()['vispy_scale_factor']
@@ -719,6 +721,7 @@ def _segments_to_coords(x, segments, modifier=(1,1,1)):
     -------
     coords :    list of tuples
                 [ (x,y,z), (x,y,z ) ]
+
     """
 
     if not isinstance( modifier, np.ndarray ):
@@ -899,7 +902,8 @@ def plot3d(x, *args, **kwargs):
     >>> # This plots two neuronlists, two volumes and a single neuron
     >>> pymaid.plot3d( [ nl1, nl2, vol, 'v13.AL_R', 233007 ] )
     >>> # Pass kwargs
-    >>> pymaid.plot3d(nl1, connectors=True, clear3d=True, )
+    >>> pymaid.plot3d(nl1, connectors=True, clear3d=True)
+
     """
 
     def _plot3d_vispy():
@@ -1698,8 +1702,7 @@ def plot_network(x, *args, **kwargs):
                       Plot neuron labels.
     label_edges :     bool, default=True
                       Plot edge labels.
-    width :           int, default=800
-    height :          int, default=800
+    width,height :    int, default=800
                       Figure width and height.
     node_hover_text : dict
                       Provide custom hover text for neurons:
@@ -1713,7 +1716,7 @@ def plot_network(x, *args, **kwargs):
     -------
     fig : plotly dict
        Use for example ``plotly.offline.plot(fig, filename='plot.html')`` to
-       generate html file and open it webbrowser
+       generate html file and open it webbrowser.
 
     """
 
@@ -1958,11 +1961,12 @@ def plot1d( x, ax=None, color=None, **kwargs):
     cmap :      {tuple, dict}
                 Color. If dict must map skeleton ID to color.
     **kwargs
-                Will be passed to matplotlib.patches.Rectangle
+                Will be passed to ``matplotlib.patches.Rectanglez``.
 
     Returns
     -------
     matplotlib.ax
+
     """
 
     if isinstance(x, core.CatmaidNeuronList):

@@ -62,7 +62,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList}
+    x :                     {CatmaidNeuron,CatmaidNeuronList}
                              Neuron(s) to downsample.
     resampling_factor :      int
                              Factor by which to reduce the node count.
@@ -78,7 +78,8 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
     Returns
     -------
     x
-                         Downsampled Pandas Dataframe or CatmaidNeuron object
+                         Downsampled Pandas Dataframe or CatmaidNeuron object.
+
     """
     if isinstance(x, core.CatmaidNeuronList):
         results = [ resample_neuron(x.loc[i], resample_to, inplace=inplace) for i in range(x.shape[0]) ]
@@ -164,7 +165,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     x :                 {CatmaidNeuron,CatmaidNeuronList}
                         Neuron(s) to resample.
     resample_to :       int
-                        New resolution in NANOMETER.
+                        New resolution in NANOMETERS.
     method :            str, optional
                         See `scipy.interpolate.interp1d` for possible options.
                         By default, we're using linear interpolation.
@@ -184,7 +185,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
                         resample to certain resolution. Usefull if you are
                         just after some simplification e.g. for speeding up
                         your calculations or you want to preserve more of a
-                        neuron's strucutre.
+                        neuron's structure.
+
     """
 
     if isinstance(x, core.CatmaidNeuronList):
@@ -347,6 +349,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     :func:`pymaid.resample_neuron`
                              This function resamples a neuron to given
                              resolution.
+
     """
 
     if isinstance(skdata, pd.DataFrame):

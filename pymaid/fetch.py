@@ -15,7 +15,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" Low-level wrappers to request data from Catmaid server
+""" This module contains functions to request data from Catmaid server.
 
 Examples
 --------
@@ -42,8 +42,6 @@ annotations                                     False
 igraph                                          False
 tags                                             True
 dtype: object
->>> # Get skeleton IDs of all neurons above a given size
->>>
 
 """
 
@@ -127,7 +125,7 @@ class CatmaidInstance:
                     Sets logger level (module-wide).
     time_out :      {int, None}
                     Time in seconds after which fetching data will time-out
-                    (so as to not block the system)..
+                    (so as to not block the system).
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
                     adding it as module 'remote_instance' to sys.modules.
@@ -152,6 +150,7 @@ class CatmaidInstance:
     >>> neuron_list = pymaid.get_neuron ( skeleton_id , myInstance )
     >>> # Print summary
     >>> print(neuron_list)
+
     """
 
     def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger_level='INFO', time_out=None, set_global=True):
@@ -481,6 +480,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
     -------
     data
                         Data retrieved for each url -> order is kept!
+
     """
 
     data = [None for u in urls]
@@ -562,7 +562,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
 
 
 class _retrieveUrlThreaded(threading.Thread):
-    """ Class to retrieve a URL by threading
+    """ Class to retrieve a URL by threading.
     """
 
     def __init__(self, url, remote_instance, post_data=None):
@@ -926,7 +926,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     volume :            {str, list of str, core.Volume }
                         Name of the CATMAID volume to test OR volume dict with
                         {'vertices':[],'faces':[]} as returned by e.g.
-                        :func:`~pymaid.get_volume()`
+                        :func:`~pymaid.get_volume()`.
     remote_instance :   CATMAID instance
                         If not passed directly, will try using global.
     threshold :         int, optional
@@ -936,7 +936,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
                         neurons!
     min_size :          int, optional
                         Minimum node count of partner
-                        (default = 2 -> hide single-node partner)
+                        (default = 2 -> hide single-node partner).
 
     Returns
     -------
@@ -957,7 +957,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     See Also
     --------
     :func:`~pymaid.get_neurons_in_volume`
-            Get all neurons within given volume
+            Get all neurons within given volume.
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1136,6 +1137,7 @@ def get_partners(x, remote_instance=None, threshold=1,
                     Use if you need an adjacency matrix instead of a table.
     :func:`~pymaid.get_partners_in_volume`
                     Use if you only want connectivity within a given volume.
+
     """
 
     def _constructor_helper(entry, skid):
@@ -1262,6 +1264,7 @@ def get_names(x, remote_instance=None):
     -------
     dict
                     ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1319,7 +1322,6 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
         ...   editor  reviewers  review_times
         ... 0
         ... 1
-
 
     """
     if isinstance(x, (core.CatmaidNeuron,core.CatmaidNeuronList)):
@@ -1836,7 +1838,7 @@ def get_connectors_between(a, b, directional=True, remote_instance=None ):
     return df
 
 def get_review(x, remote_instance=None):
-    """ Retrieve review status for a set of neurons
+    """ Retrieve review status for a set of neurons.
 
     Parameters
     ----------
@@ -2462,7 +2464,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
 
 def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=False, intersect=False):
-    """ Retrieve the all neurons annotated with given annotation(s)
+    """ Retrieve the all neurons annotated with given annotation(s).
 
     Parameters
     ----------
@@ -2477,8 +2479,9 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
     Returns
     -------
-    list :
+    list 
                             ``[skid1, skid2, skid3 ]``
+
     """
 
     """
@@ -2565,6 +2568,7 @@ def neuron_exists(x, remote_instance=None):
                         True if skeleton exists, False if not. If multiple
                         neurons are queried, returns a dict
                         ``{ skid1 : True, skid2 : False, ... }``
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2627,7 +2631,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     Parameters
     ----------
     node_ids
-                        single or list of treenode or connector IDs
+                        Single or list of treenode or connector IDs.
     node_type :         {'TREENODE','CONNECTOR'}
                         Set which node type of IDs you have provided as they use
                         different API endpoints!
@@ -2698,6 +2702,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     Returns
     -------
     server response
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2954,7 +2959,6 @@ def get_review_details(x, remote_instance=None):
         >>> print(df)
         treenode_id  skeleton_id  reviewer1  reviewer2  reviewer 3
            12345       12345123     datetime    NaT      datetime
-
 
     """
 
@@ -3457,6 +3461,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     >>> hist.cable.values.sum()
     >>> # Get number of active (non-zero) users
     >>> active_users = hist.cable.astype(bool).sum(axis=0)
+
     """
 
     def _constructor_helper(data, key, days):
@@ -4164,6 +4169,7 @@ def _subset_volume(bbox, max_vol=None):
     Returns
     -------
     subvolumes :    np.ndarray
+
     """
 
     # Unpack variables
@@ -4341,6 +4347,7 @@ def get_user_list(remote_instance=None):
     >>> d = user_list.set_index('id').T.to_dict()
     >>> d[22]['first_name']
     ... Michaela
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -4394,7 +4401,6 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
                         Remove isolated nodes from NetworkX Graph. Only
                         relevant if ``return_graph=True``.
 
-
     Returns
     -------
     paths :     ``list``
@@ -4407,7 +4413,6 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
                 If ``return_graph=True``: Graph object containing the
                 neurons that connect sources and targets. Does only contain
                 edges that connect sources and targets via max ``n_hops``!
-
 
     Important
     ---------
@@ -4714,6 +4719,7 @@ def eval_skids(x, remote_instance=None):
     -------
     list of str
                     List containing skeleton IDs as strings.
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -4836,8 +4842,9 @@ def eval_node_ids(x, connectors=True, treenodes=True):
 
     Returns
     -------
-    list of str
-                    list containing node as strings
+    list
+                    List containing nodes as strings.
+
     """
 
     if isinstance(x, (int, np.int64, np.int32, np.int)):
@@ -4916,6 +4923,7 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
     -------
     {str or list of str}
                 URL(s) to the coordinates provided.
+
     """
 
     def gen_url(c, stid, nid, sid ):
@@ -4993,6 +5001,7 @@ def rename_neurons( x, new_names, remote_instance=None, no_prompt=False ):
     Returns
     -------
     Nothing
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -5113,7 +5122,6 @@ def get_transactions(range_start=None, range_length=2500, remote_instance=None):
             2  1            404899164        151     dacksa
             3  1            404899163        151     dacksa
             4  1            404899162        151     dacksa
-
 
     """
 

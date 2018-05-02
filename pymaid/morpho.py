@@ -77,7 +77,8 @@ def arbor_confidence(x, confidences=(1,0.9,0.6,0.4,0.2), inplace=True):
 
     Returns
     -------
-    Adds ``arbor_confidence`` column in neuron.nodes.
+    Adds ``arbor_confidence`` column in ``neuron.nodes``.
+
     """
 
     def walk_to_leafs( this_node, this_confidence=1 ):
@@ -153,6 +154,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
     skdata
                 If ``return_skdata==True``. Neuron object with
                 ``nodes.parent_dist`` containing the distances to parent.
+
     """
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
@@ -303,6 +305,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, m
     if ``inplace=True``
                         Returns copy of original neuron with new column
                         ``strahler_index``.
+
     """
 
     module_logger.debug('Calculating Strahler indices...')
@@ -463,7 +466,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
                       (1) ``to_prune=1`` removes all leaf branches
                       (2) ``to_prune=[1,2]`` removes indices 1 and 2
                       (3) ``to_prune=range(1,4)`` removes indices 1, 2 and 3
-                      (4) ``to_prune=s-1`` removes everything but the highest
+                      (4) ``to_prune=-1`` removes everything but the highest
                           index
     reroot_soma :   bool, optional
                     If True, neuron will be rerooted to its soma
@@ -480,6 +483,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False, 
     -------
     pymaid.CatmaidNeuron/List
                     Pruned neuron.
+
     """
 
     if isinstance(x, core.CatmaidNeuron):
@@ -707,6 +711,7 @@ def segregation_index(x, centrality_method='centrifugal'):
     -------
     H :                 float
                         Segregation Index (SI)
+
     """
 
     if not isinstance(x, (core.CatmaidNeuron,core.CatmaidNeuronList)):
@@ -1042,6 +1047,7 @@ def stitch_neurons( *x, tn_to_stitch=None, method='ALL'):
     Returns
     -------
     core.CatmaidNeuron
+
     """
 
     if method not in ['LEAFS', 'ALL', 'NONE', None]:

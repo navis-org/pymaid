@@ -125,6 +125,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     >>> # Plot a dendrogram
     >>> fig = res.plot_dendrogram()
     >>> plt.show()
+    
     """
 
     if remote_instance is None:
@@ -322,6 +323,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     |                           is much stronger than another is punished
     |                           C2 determines the point where the similarity
     |                           switches from negative to positive
+
     """
 
     if min_nodes > 1:
@@ -440,6 +442,7 @@ def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000, restrict_cn=None)
     Returns
     -------
     synapse_similarity_score
+
     """
 
     all_values = []
@@ -536,6 +539,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
     :class:`~pymaid.ClustResults`
                 Object that contains distance matrix and methods to plot
                 dendrograms.
+
     """
 
     if not isinstance(x, core.CatmaidNeuronList):
@@ -588,7 +592,7 @@ def cluster_xyz(x, labels=None):
     Parameters
     ----------
     x :             pandas.DataFrame
-                    Must contain ``x``,``y``,``z`` columns
+                    Must contain ``x``,``y``,``z`` columns.
     labels :        list of str, optional
                     Labels for each leaf of the dendrogram
                     (e.g. connector ids).
@@ -609,6 +613,7 @@ def cluster_xyz(x, labels=None):
     >>> rs = pymaid.cluster_xyz(n.connectors, labels=n.connectors.connector_id.tolist())
     >>> rs.plot_matrix()
     >>> plt.show()
+
     """
 
     # Generate numpy array containing x, y, z coordinates
@@ -663,9 +668,9 @@ class ClustResults:
         Parameters
         ----------
         mat :       {np.array, pandas.DataFrame}
-                    Distance matrix
+                    Distance or similarity matrix.
         labels :    list, optional
-                    labels for matrix
+                    Labels for matrix.
         mat_type :  {'distance','similarity'}, default = 'distance'
                     Sets the type of input matrix:
                       - 'similarity' = high values are more similar
@@ -673,6 +678,7 @@ class ClustResults:
 
                     The "missing" matrix type will be computed. For clustering,
                     plotting, etc. distance matrices are used.
+
         """
         if mat_type not in ClustResults._PERM_MAT_TYPES:
             raise ValueError('Matrix type "{0}" unkown.'.format(mat_type) )
@@ -712,6 +718,7 @@ class ClustResults:
                         If True, self.labels will be returned. If False, will
                         use either columns (if matrix is pandas DataFrame)
                         or indices (if matrix is np.ndarray)
+
         """
 
         if isinstance(self.dist_mat, pd.DataFrame):
@@ -727,7 +734,8 @@ class ClustResults:
         This (very very briefly) compares (correlates) the actual pairwise
         distances of all your samples to those implied by the hierarchical
         clustering. The closer the value is to 1, the better the clustering
-        preserves the original distances,
+        preserves the original distances.
+
         """
 
         return scipy.cluster.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
@@ -742,6 +750,7 @@ class ClustResults:
         cluster it is merged with, divided by the dissimilarity of the merger
         in the final step of the algorithm. The agglomerative coefficient is
         the average of all 1 - m(i).
+
         """
 
         # Turn into pandas DataFrame for fancy indexing
@@ -774,6 +783,7 @@ class ClustResults:
         method :    str, optional
                     Clustering method (see scipy.cluster.hierarchy.linkage
                     for reference)
+
         """
 
         # Use condensed distance matrix - otherwise clustering thinks we are
@@ -798,14 +808,15 @@ class ClustResults:
                             Labels in order of original observation or
                             dictionary with mapping original labels
         kwargs
-                            Passed to `scipy.cluster.hierarchy.dendrogram()`
+                            Passed to ``scipy.cluster.hierarchy.dendrogram()``
 
         Returns
         -------
         matplotlib.figure
-                            If `return_dendrogram` is False.
+                            If ``return_dendrogram=False`.
         sciyp.cluster.hierarchy.dendrogram
-                            If `return_dendrogram` is True.
+                            If ``return_dendrogram=True``.
+
         """
 
         if isinstance( labels, type(None)):
@@ -856,6 +867,7 @@ class ClustResults:
         Returns
         -------
         seaborn.clustermap
+
         """
 
         try:
@@ -888,6 +900,7 @@ class ClustResults:
         Returns
         -------
         matplotlib figure
+
         """
 
         # Compute and plot first dendrogram for all nodes.
@@ -947,6 +960,7 @@ class ClustResults:
         --------
         :func:`pymaid.plot.plot3d`
                     Function called to generate 3d plot
+
         """
 
         if 'neurons' not in self.__dict__:
@@ -977,6 +991,7 @@ class ClustResults:
         --------
         :func:`pymaid.plot.plot3d`
                     Function called to generate 3d plot
+
         """
 
         cmap = self.get_colormap(k=k, criterion=criterion)
@@ -1010,6 +1025,7 @@ class ClustResults:
         -------
         dict
                     {'skeleton_id': (r,g,b),...}
+
         """
 
         cl = self.get_clusters(k, criterion, return_type='indices')
@@ -1040,6 +1056,7 @@ class ClustResults:
         -------
         list
                     list of clusters [ [leaf1, leaf5], [leaf2, ...], ... ]
+
         """
 
         cl = scipy.cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
@@ -1064,6 +1081,7 @@ class ClustResults:
         Returns
         -------
         ete 3 tree
+
         """
         try:
             import ete3
@@ -1111,6 +1129,7 @@ def _calc_sparseness(x, mode='activity_ratio'):
                         describes distributions with heavy tails
                     (2) "lifetime_sparseness" after XY
                     (3) "kurtosis"
+
     """
 
     if mode not in ['activity_ratio','lifetime_sparseness','kurtosis']:

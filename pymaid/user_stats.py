@@ -49,6 +49,7 @@ Examples
 ...         "labels" : time_inv.user.tolist(),
 ...         "type" : "pie" } ] }
 >>> plotly.offline.plot(fig)
+
 """
 
 # TODOs
@@ -144,6 +145,7 @@ def get_user_contributions(x, remote_instance=None):
     :func:`~pymaid.get_contributor_statistics`
                            Gives you more basic info on neurons of interest
                            such as total reconstruction/review time.
+
     """
 
     remote_instance = fetch._eval_remote_instance(remote_instance)
@@ -402,6 +404,17 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
 def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, remote_instance=None):
     """ Get timestamps of users' actions (creations, editions, reviews).
 
+    Important
+    ---------
+    This function returns most but not all user actions::
+
+      1. The API endpoint used for finding neurons worked on by a given user
+         (:func:`pymaid.find_neurons`) does not return single-node neurons.
+         Hence, placing e.g. postsynaptic nodes is not taken into account.
+      2. Connecting a node to a connector is not taken into account as there 
+         is no API endpoint for getting timestamps of the creation of 
+         connector links.
+
     Parameters
     ----------
     users :           {list}, optional
@@ -412,18 +425,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     start_date :      {tuple, datetime.date}, optional
     end_date :        {tuple, datetime.date}, optional
                       Start and end date of time window to check.
-    remote_instance : {CatmaidInstance}, optional
-
-    Important
-    ---------
-    This function does return most but not all user actions::
-
-      1. The API endpoint used for finding neurons worked on by a given user
-         (:func:`pymaid.find_neurons`) does not return single-node neurons.
-         Hence, placing e.g. postsynaptic nodes is not taken into account.
-      2. Connecting a node to a connector is not taken into account as there 
-         is no API endpoint for getting timestamps of the creation of 
-         connector links.
+    remote_instance : {CatmaidInstance}, optional        
 
     Return
     ------

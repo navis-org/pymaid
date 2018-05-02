@@ -70,6 +70,7 @@ def _generate_segments(x, append=True):
     -------
     list
                 Segments as list of lists containing treenode ids.
+                
     """
 
     if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
@@ -283,7 +284,7 @@ def dist_between(x, a, b):
     Parameters
     ----------
     x :             {CatmaidNeuron, CatmaidNeuronList}
-                    Neuron containing the nodes
+                    Neuron containing the nodes.
     a,b :           treenode IDs
                     Treenodes to check.
 
@@ -403,6 +404,7 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
     >>> cut1 = pymaid.split_into_fragments(x, n=2)
     >>> # Cut into fragments of >10 um size
     >>> cut2 = pymaid.split_into_fragments(x, n=1000000000, min_size=10)
+
     """
 
     if isinstance(x, core.CatmaidNeuron):
@@ -494,6 +496,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     --------
     :func:`~pymaid.split_into_fragments`
             Split neuron into fragments based on longest neurites.
+
     """
 
     if isinstance(x, core.CatmaidNeuron):
@@ -567,7 +570,8 @@ def reroot_neuron(x, new_root, inplace=False):
     See Also
     --------
     :func:`~pymaid.CatmaidNeuron.reroot`
-                Quick access to reroot directly from CatmaidNeuron/List objects
+                Quick access to reroot directly from CatmaidNeuron/List 
+                objects.
 
     """
 
@@ -762,7 +766,7 @@ def subset_neuron( x, subset, clear_temp=True, keep_connectors=False, inplace=Fa
     ----------
     x :               CatmaidNeuron
     subset :          {np.ndarray, NetworkX.Graph}
-                      Treenodes to subset the neuron to
+                      Treenodes to subset the neuron to.
     clear_temp :      bool, optional
                       If True, will reset temporary attributes (graph, node
                       classification, etc. ). In general, you should leave
@@ -831,7 +835,7 @@ def subset_neuron( x, subset, clear_temp=True, keep_connectors=False, inplace=Fa
     return x
 
 def generate_list_of_childs(x):
-    """ Returns list of childs
+    """ Returns list of childs.
 
     Parameters
     ----------
@@ -841,7 +845,7 @@ def generate_list_of_childs(x):
     Returns
     -------
     dict
-     ``{ treenode_id : [ child_treenode, child_treenode, ... ] }``
+        ``{ treenode_id : [ child_treenode, child_treenode, ... ] }``
 
     """
 
@@ -858,7 +862,8 @@ def node_label_sorting(x):
     Returns
     -------
     list
-        [ root, treenode_id, treenode_id, ... ]
+        ``[ root, treenode_id, treenode_id, ... ]``
+
     """
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Need CatmaidNeuron, got "{0}"'.format(type(x)))
