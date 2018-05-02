@@ -339,7 +339,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     Notes
     -----
-    Use `float('inf')` as `resampling_factor` and `preserve_cn_treenodes=False`
+    Use ``resampling_factor=float('inf')`` and ``preserve_cn_treenodes=False``
     to get a neuron consisting only of root, branch and end points.
 
     See Also

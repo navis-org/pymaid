@@ -605,8 +605,8 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     x
                         Can be either:
 
-                        1. list of skeleton ID(s) (int or str)
-                        2. list of neuron name(s) (str, exact match)
+                        1. list of skeleton ID(s), int or str
+                        2. list of neuron name(s), str, exact match
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
     remote_instance :   CATMAID instance, optional
@@ -615,7 +615,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         Set if connector data should be retrieved.
                         Note: the CATMAID API endpoint does currently not
                         support retrieving abutting connectors this way.
-                        Please use <get_abutting = True> to set an additional
+                        Please use ``get_abutting=True`` to set an additional
                         flag.
     tag_flag :          {0/False,1/True}, optional
                         Set if tags should be retrieved.
@@ -623,8 +623,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         If True, the returned skeleton data will contain
                         creation date ([8]) and last modified ([9]) for each
                         node -> compact-details url the 'with_history' option
-                        is used in this case
-                        ATTENTION: if get_history = True, nodes/connectors
+                        is used in this case 
+
+                        ATTENTION: if ``get_history=True``, nodes/connectors
                         that have been moved since their creation will have
                         multiple entries reflecting their changes in position!
                         Each state has the date it was modified as creation
@@ -666,7 +667,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                                 { 'tag' : [ treenode_id, treenode_id, ... ] }
 
     Dataframe column titles for ``nodes`` and ``connectors`` should be
-    self-explanatory with the exception of ``connectors['relation']``::
+    self-explanatory with the exception of ``relation`` in connector table::
 
         connectors['relation']
 
@@ -821,7 +822,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     the whole chain::
 
         treenode1 -> (link_confidence) -> connector -> (link_confidence)
-        -> treenode2.
+        -> treenode2
 
     This means that connectors can shop up multiple times (i.e. if they have
     multiple postsynaptic targets). Does include connector x,y,z coordinates!
@@ -857,11 +858,11 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     - nodes and connectors are pandas.DataFrames themselves
     - tags is a dict: ``{ 'tag' : [ treenode_id, treenode_id, ... ] }``
 
-    Dataframe column titles should be self explanatory with these exception:
+    Dataframe (df) column titles should be self explanatory with these exception:
 
-    - conn_df['relation_1'] describes treenode_1 to/from connector
-    - conn_df['relation_2'] describes treenode_2 to/from connector
-    - 'relations' can be: 0 (presynaptic), 1 (postsynaptic), 2 (gap junction)
+    - ``df['relation_1']`` describes treenode_1 to/from connector
+    - ``df['relation_2']`` describes treenode_2 to/from connector
+    - ``relation`` can be: ``0`` (presynaptic), ``1`` (postsynaptic), ``2`` (gap junction)
 
     """
 
@@ -1086,10 +1087,10 @@ def get_partners(x, remote_instance=None, threshold=1,
     min_size :          int, optional
                         Minimum node count of partner
                         (default=2 to hide single-node partners).
-    filt :              {['incoming', 'outgoing', 'gapjunctions', 'attachments']}, optional
+    filt :              list of str, optional
                         Filters partners for neuron names (must be exact) or
                         skeleton_ids.
-    directions :        list of str, optional
+    directions :        {['incoming', 'outgoing', 'gapjunctions', 'attachments']}, optional    
                         Use to restrict to either up- or downstream partners.
 
     Returns
@@ -1131,10 +1132,10 @@ def get_partners(x, remote_instance=None, threshold=1,
 
     See Also
     --------
-    :func:`~pymaid.create_adjacency_matrix`
-                        Use if you need an adjacency matrix instead of a table
+    :func:`~pymaid.adjacency_matrix`
+                    Use if you need an adjacency matrix instead of a table.
     :func:`~pymaid.get_partners_in_volume`
-                        Use if you only want connectivity within a given volume
+                    Use if you only want connectivity within a given volume.
     """
 
     def _constructor_helper(entry, skid):
@@ -1415,6 +1416,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
     ----------
     x
                         Catmaid Neuron(s) as single or list of either:
+
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
@@ -1695,6 +1697,7 @@ def get_connector_details(x, remote_instance=None):
     --------
     :func:`~pymaid.get_connectors`
         If you just need the connector table (ID, x, y, z, creator, etc).
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1789,6 +1792,7 @@ def get_connectors_between(a, b, directional=True, remote_instance=None ):
     :func:`~pymaid.get_edges`
         If you just need the number of synapses between neurons, this is much
         faster.
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -1906,7 +1910,7 @@ def get_review(x, remote_instance=None):
     return df
 
 def remove_annotations(x, annotations, remote_instance=None):
-    """ Remove annotation(s) from a list of neuron(s)
+    """ Remove annotation(s) from a list of neuron(s).
 
     Parameters
     ----------
@@ -2001,6 +2005,7 @@ def add_annotations(x, annotations, remote_instance=None):
     Returns
     -------
     Nothing
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2232,6 +2237,7 @@ def get_annotations(x, remote_instance=None):
                         Gives you more detailed information about annotations
                         of a set of neuron (includes timestamp and user) but
                         is slower.
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2288,6 +2294,7 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
     -------
     dict
                         ``{ 'annotation_name' : 'annotation_id', ....}``
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2352,9 +2359,9 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     ----
     There is no shortcut to get this information - we have to load the 3D
     skeleton to get the soma. If you need the 3D skeletons anyway, it is more
-    efficient to use :func:`~pymaid.get_neuron` to get a neuronlist
-    and then use the :attr:`~pymaid.CatmaidNeuronList.soma`
-    attribute.
+    efficient to use :func:`~pymaid.get_neuron` to get a neuronlist and then 
+    use the :attr:`~pymaid.CatmaidNeuronList.soma` attribute.
+
     """
 
     remote_instance = _eval_remote_instance(remote_instance)
@@ -2630,7 +2637,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     Returns
     -------
     dict
-                dictionary (d) containing tags for each node
+                dictionary containing tags for each node
 
     Examples
     --------
@@ -3130,17 +3137,15 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
         Series (if ``separate=False``), otherwise DataFrame:
 
         >>> df
-            skeleton_id node_contributors multiuser_review_minutes  ..
+           skeleton_id  node_contributors  multiuser_review_minutes  ..
         1
         2
         3
-
-           post_contributors construction_minutes  min_review_minutes  ..
+           post_contributors  construction_minutes  min_review_minutes  ..
         1
         2
         3
-
-           n_postsynapses  n_presynapses pre_contributors  n_nodes review_contributors
+           n_postsynapses  n_presynapses  pre_contributors  n_nodes  review_contributors
         1
         2
         3
@@ -3400,13 +3405,13 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     start_date :        {datetime, str, tuple}, optional, default=last week
-                        dates can be either::
-                            - datetime.date
-                            - datetime.datetime
-                            - str 'YYYY-MM-DD' format, e.g. '2016-03-09'
-                            - tuple ( YYYY, MM, DD ), e.g. (2016,3,9)
+                        dates can be either:
+                            - ``datetime.date``
+                            - ``datetime.datetime``
+                            - str ``'YYYY-MM-DD'``, e.g. ``'2016-03-09'``
+                            - tuple ``(YYYY,MM,DD)``, e.g. ``(2016,3,9)``
     end_date :          {datetime, str, tuple}, optional, default=today
-                        See start_date
+                        See start_date.
     split :             bool, optional
                         If True, history will be requested in bouts of 6 months.
                         Useful if you want to look at a very big time window
@@ -3415,7 +3420,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     Returns
     -------
     pandas.Series
-            A pandas.Series with the following entries:
+            A pandas.Series with the following entries::
 
             {
             cable :             DataFrame containing cable created in nm.
@@ -4399,7 +4404,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
                     [ [ source1, , ... , target1 ], [source2, ... , target2 ], ...  ]
 
     ``NetworkX.DiGraph``
-                If ``return_graph is`` ``True``: Graph object containing the
+                If ``return_graph=True``: Graph object containing the
                 neurons that connect sources and targets. Does only contain
                 edges that connect sources and targets via max ``n_hops``!
 
@@ -5089,14 +5094,14 @@ def get_transactions(range_start=None, range_length=2500, remote_instance=None):
                         Start of table. Transactions are returned in
                         chronological order (most recent transactions first)
     range_length :      int, optional
-                        End of table. If None, will return all
+                        End of table. If None, will return all.
     remote_instance :   CatmaidInstance, optional
 
     Returns
     -------
     pandas.DataFrame
             >>> df
-               change_type      execution_time          label  \
+               change_type      execution_time          label  
             0  Backend       2017-12-26 03:37:00     labels.update
             1  Backend       2017-12-26 03:37:00  treenodes.create
             2  Backend       2017-12-26 03:37:00  treenodes.create

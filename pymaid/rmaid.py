@@ -274,7 +274,7 @@ def neuron2py(neuron, remote_instance=None):
     Notes
     -----
     Node creator and confidence are not included in R's neuron/neuronlist
-    and will be imported as <None>
+    and will be imported as ``None``.
 
     Parameters
     ----------
@@ -381,7 +381,8 @@ def neuron2r(neuron, convert_to_um=False):
     -----
     The way this works is essentially converting the PyMaid object back
     into what rcatmaid expects as a response from a CATMAID server, then
-    we are calling the same functions as in rcatmaid's read.neuron.catmaid().
+    we are calling the same functions as in rcatmaid's 
+    ``read.neuron.catmaid()``.
 
     Attention: Currently, the project ID saved as part of R neuronlist objects
     is ALWAYS 1.
@@ -390,7 +391,7 @@ def neuron2r(neuron, convert_to_um=False):
     ----------
     neuron :        {CatmaidNeuron, CatmaidNeuronList, pandas DataFrame}
     convert_to_um : bool, optional
-                    If True, coordinates are divided by 1000
+                    If True, coordinates are divided by 1000.
 
     Returns
     -------
@@ -548,21 +549,20 @@ def dotprops2py(dp, subset=None):
 
 
 def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_count(), UseAlpha=False):
-    """ Wrapper to use R's nat:nblast_allbyall (https://github.com/jefferislab/nat.nblast/).
+    """ Wrapper to use R's ``nat:nblast_allbyall`` 
+    (https://github.com/jefferislab/nat.nblast/).
 
     Parameters
     ----------
-    x
-                    Neurons to blast. This can be either:
-                    1. A list of skeleton IDs
-                    2. PyMaid neurons from e.g. pymaid.get_neuron()
-                    3. RCatmaid neuron objects
+    x :             {skeleton IDs, CatmaidNeuronList, RCatmaid neurons}
+                    Neurons to blast.
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
     normalize :     bool, optional
                     If true, matrix is normalized using z-score.
     n_cores :       int, optional
-                    Number of cores to use for nblasting. Default is os.cpu_count()
+                    Number of cores to use for nblasting. Default is 
+                    ``os.cpu_count()``.
     UseAlpha :      bool, optional
                     Emphasises neurons' straight parts (backbone) over parts
                     that have lots of branches.
@@ -570,9 +570,9 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     Returns
     -------
     nblast_results
-        Instance of :class:`pymaid.cluster_res` that holds distance
+        Instance of :class:`pymaid.rmaid.NBLASTresults` that holds distance
         matrix and contains wrappers to cluster and plot data. Please use
-        help(nblast_results) to learn more and see example below.
+        ``help(nblast_results)`` to learn more and see example below.
 
     Examples
     --------
@@ -871,21 +871,21 @@ class NBLASTresults:
     Attributes
     ----------
     results :   pandas.Dataframe
-                Contains top N results
+                Contains top N results.
     sc :        Robject
-                Contains original RNblast forward scores
+                Contains original RNblast forward scores.
     scr :       Robject
-                Original R Nblast reverse scores (Top N only)
+                Original R Nblast reverse scores (Top N only).
     neuron :    R ``catmaidneuron``
-                The neuron that was nblasted transformed into reference space
+                The neuron that was nblasted transformed into reference space.
     xdp :       robject
-                Dotproduct of the transformed neuron
+                Dotproduct of the transformed neuron.
     param :     dict
-                Contains parameters used for nblasting
+                Contains parameters used for nblasting.
     db :        file robject
-                Dotproduct database as R object "neuronlistfh"
+                Dotproduct database as R object "neuronlistfh".
     date :      datetime object
-                Time of nblasting
+                Time of nblasting.
 
     Examples
     --------
@@ -905,6 +905,7 @@ class NBLASTresults:
     """
 
     def __init__(self, results, sc, scr, neuron, xdp, dps_db, nblast_param):
+        """ Init function."""
         self.results = results  # this is pandas Dataframe holding top N results
         self.sc = sc  # original Nblast forward scores
         self.scr = scr  # original Nblast reverse scores (Top N only)
@@ -915,6 +916,7 @@ class NBLASTresults:
         self.date = datetime.now()  # time of nblasting
 
     def sort(self, columns):
+        """ Sort results by given column."""
         self.results.sort_values(columns, inplace=True, ascending=False)
         self.results.reset_index(inplace=True, drop=True)
 

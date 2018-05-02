@@ -81,7 +81,7 @@ pbar_hide = False
 pbar_leave = True
 
 def screenshot(file='screenshot.png', alpha=True):
-    """ Saves a screenshot of active Vispy 3D canvas.
+    """ Saves a screenshot of active vispy 3D canvas.
 
     Parameters
     ----------
@@ -130,7 +130,7 @@ def get_canvas():
 
 
 def clear3d():
-    """ Clear 3D canvas.
+    """ Clear vispy 3D canvas.
     """
     try:
         canvas = globals()['canvas']
@@ -143,7 +143,7 @@ def clear3d():
 
 
 def close3d():
-    """ Close existing 3D canvas (wipes memory).
+    """ Close existing vispy 3D canvas (wipes memory).
     """
     try:
         canvas = globals()['canvas']
@@ -160,7 +160,7 @@ def _orthogonal_proj(zfront, zback):
     view.
 
     Usage:
-    proj3d.persp_transformation = _orthogonal_proj
+    proj3d.persp_transformation = _orthogonal_proj    
     """
     a = (zfront+zback)/(zfront-zback)
     b = -2*(zfront*zback)/(zfront-zback)
@@ -174,12 +174,15 @@ def _orthogonal_proj(zfront, zback):
 
 def plot2d(x, method='2d', *args, **kwargs):
     """ Generate 2D plots of neurons and neuropils. The main advantage of this
-    is that you can save plot as vector graphics. *Important*: this function
-    uses matplotlib which "fakes" 3D as it has only very limited control over
-    layers. Therefore neurites aren't necessarily plotted in the right Z order
-    which becomes especially troublesome when plotting a complex scene with
-    lots of neurons criss-crossing. See the _method_ parameter for details.
-    All methods use orthogonal projection.
+    is that you can save plot as vector graphics. 
+
+    Important
+    ---------
+    This function uses matplotlib which "fakes" 3D as it has only very limited 
+    control over layers. Therefore neurites aren't necessarily plotted in the 
+    right Z order which becomes especially troublesome when plotting a complex 
+    scene with lots of neurons criss-crossing. See the ``method`` parameter 
+    for details. All methods use orthogonal projection.
 
     Parameters
     ----------
@@ -273,7 +276,7 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     ``group_neurons`` (bool, default=False)
       If True, neurons will be grouped. Works with SVG export (not PDF).
-      Does NOT work with method = '3d_complex'
+      Does NOT work with ``method='3d_complex'``.
 
     ``scatter_kws`` (dict, default = {})
       Parameters to be used when plotting points. Accepted keywords are:
@@ -811,8 +814,7 @@ def plot3d(x, *args, **kwargs):
     Parameters
     ----------
 
-    x :               {skeleton IDs, core.CatmaidNeuron, core.CatmaidNeuronList,
-                       core.Dotprops, core.Volumes}
+    x :               {skeleton IDs, CatmaidNeuron, CatmaidNeuronList, pymaid.Dotprops, pymaid.Volumes}
                       Objects to plot::
 
                         - int is intepreted as skeleton ID(s)
@@ -853,8 +855,7 @@ def plot3d(x, *args, **kwargs):
     use_neuron_color : bool, default=False
                       If True, will try using the ``.color`` attribute of
                       CatmaidNeurons.
-    width :           int, default=600
-    height :          int, default=600
+    width,height :    int, default=600
                       Use to define figure/window size.
     title :           str, default=None
                       Plot title (for plotly only!)

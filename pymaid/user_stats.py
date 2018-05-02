@@ -416,14 +416,14 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
 
     Important
     ---------
-    This function does return most but not all user actions:
+    This function does return most but not all user actions::
 
-    1. The API endpoint used for finding neurons worked on by a given user
-       (:func:`~pymaid.find_neurons`) does not return single-node neurons.
-       Hence, placing e.g. postsynaptic nodes is not taken into account.
-    2. Connecting a node to a connector is not taken into account as there is
-       no API endpoint for getting timestamps of the creation of connector
-       links.
+      1. The API endpoint used for finding neurons worked on by a given user
+         (:func:`pymaid.find_neurons`) does not return single-node neurons.
+         Hence, placing e.g. postsynaptic nodes is not taken into account.
+      2. Connecting a node to a connector is not taken into account as there 
+         is no API endpoint for getting timestamps of the creation of 
+         connector links.
 
     Return
     ------

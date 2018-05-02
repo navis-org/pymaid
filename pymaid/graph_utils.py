@@ -181,9 +181,9 @@ def distal_to(x, a=None, b=None):
     >>> # Get a treenode ID from tag
     >>> a = x.tags['TEST_TAG'][0]
     >>> # Check all nodes if they are distal or proximal to that tag
-    >>> df = pymaid.distal_to(x, a )
+    >>> df = pymaid.distal_to(x, a)
     >>> # Get the IDs of the nodes that are distal
-    >>> df[ df[a] ].index.tolist()
+    >>> df[ df[a] ].index.values
 
     """
 
@@ -284,7 +284,7 @@ def dist_between(x, a, b):
     ----------
     x :             {CatmaidNeuron, CatmaidNeuronList}
                     Neuron containing the nodes
-    a, b :          treenode IDs
+    a,b :           treenode IDs
                     Treenodes to check.
 
     Returns
@@ -487,8 +487,8 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
 
     Returns
     -------
-    pandas.DataFrame/CatmaidNeuron object
-                   Contains only node data of the longest neurite
+    CatmaidNeuron
+                        Contains only node data of the longest neurite.
 
     See Also
     --------

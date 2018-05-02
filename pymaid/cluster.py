@@ -88,21 +88,23 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                          Default = 1. Attention: this might impair proper
                          comparison: e.g. neuron A and neuron B connect to
                          neuron C with 1 and 3 synapses, respectively. If
-                         threshold = 2, then connection from A to C will be
+                         ``threshold=2``, connection from A to C will be
                          ignored!
     min_nodes :          int, optional
                          Minimum number of nodes for a partners to be
                          considered. Default = 2
-    include_skids :      {see x}, optional
+    include_skids :      {see ``x``}, optional
                          If filter_skids is not empty, only neurons whose skids
                          are in filter_skids will be considered when
                          calculating similarity score
-    exclude_skids :      {see x}, optional
+    exclude_skids :      {see ``x``}, optional
                          Neurons to exclude from calculation of connectivity
                          similarity
     connectivity_table : pd.DataFrame, optional
                          Connectivity table, e.g. from
-                         :func:`~pymaid.get_partners`. Filters still apply!
+                         :func:`~pymaid.get_partners`. If provided, will use 
+                         this instead of querying CATMAID server. Filters 
+                         still apply!
 
     Returns
     -------
@@ -493,9 +495,10 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
     -----
     Distances score is calculated by calculating for each synapse of
     neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
-    and (2) comparing the synapse density around synapse A and B. This is type
-    sensitive: presynapses will only be matched with presynapses, post with
-    post, etc. The formula is described in Schlegel et al., eLife (2017).
+    and (2) comparing the synapse density around synapse A and B. 
+    This is type-sensitive: presynapses will only be matched with presynapses, 
+    post with post, etc. The formula is described in 
+    Schlegel et al., eLife (2017).
 
     Parameters
     ----------
@@ -508,10 +511,10 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
                         4. CatmaidNeuron or CatmaidNeuronList object
     sigma :             int, optional
                         Distance in nanometer between synapses that is
-                        considered to be "close"
+                        considered to be "close".
     omega :             int, optional
                         Radius in nanometer over which to calculate synapse
-                        density
+                        density.
     mu_score :          bool, optional
                         If True, score is calculated as mean between A->B and
                         B->A comparison.
@@ -522,9 +525,10 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
                             - 2: gap junctions
                             - 3: abutting connectors
                         If None, will use all connectors. Use either single
-                        integer or list (e.g. [0,1] to restrict to synapses).
+                        integer or list. E.g. ``restrict_cn=[0,1]`` to use  
+                        only pre- and postsynapses.
     remote_instance :   CatmaidInstance, optional
-                        Need to provide if neurons (x) are only skids or
+                        Need to provide if neurons are only skids or
                         annotation(s).
 
     Returns

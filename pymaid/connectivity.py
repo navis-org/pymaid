@@ -65,10 +65,10 @@ def filter_connectivity( x, restrict_to, remote_instance=None):
     Parameter
     ---------
     x :                 Connectivity object
-                        Currently accepts either::
+                        Currently accepts either:
                          (1) Connectivity table from :func:`~pymaid.get_partners`
                          (2) Adjacency matrix from :func:`~pymaid.adjacency_matrix`
-    restrict_to :       {str, pymaid.Volume, pymaid.CatmaidNeuronList}
+    restrict_to :       {str, pymaid.Volume, CatmaidNeuronList}
                         Volume or neurons to restrict connectivity to. Strings
                         will be interpreted as volumes.
     remote_instance :   CATMAID instance, optional
@@ -341,7 +341,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
                 Neuron(s) for which to compute potential connectivity.
     method :    {'possible_contacts'}
                 Method to use for calculations. Currently only one implemented.
-    **kwargs :  Arbitrary keyword arguments.
+    **kwargs :  Keyword arguments.
                 1. For method = 'possible_contacts':
                     - `dist` to set distance between connectors and treenodes
                       manually.
@@ -352,10 +352,10 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     Notes
     -----
     Method ``possible_contacts`` works by:
-        1. Calculating mean distance `d` (connector->treenode) at which connections
-           between neurons A and neurons B occur
-        2. Check for all presynapses of neurons A if they are within `stdev`
-           (default=2) standard deviations of `d` of a neurons B treenode.
+        1. Calculating mean distance ``d`` (connector->treenode) at which connections
+           between neurons A and neurons B occur.
+        2. For all presynapses of neurons A, check if they are within `stdev`
+           (default=2) standard deviations of ``d`` of a neurons B treenode.
 
 
     Returns
@@ -496,14 +496,15 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    n_b                 optional
-                        Target neurons as single or list of either:
+    n_b                 
+                        Optional. Target neurons as single or list of either:
 
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-                        If not provided, source neurons = target neurons.
+
+                        If not provided, `source neurons = target neurons`.
     remote_instance :   CATMAID instance, optional
     syn_cutoff :        int, optional
                         If set, will cut off connections above given value.
@@ -511,8 +512,8 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                         If set, will ignore connections with less synapses.
     row_groups :        dict, optional
                         Use to collapse neuronsA/B into groups. Can be either:
-                          1. `{ group name : [ neuron1, neuron2, ... ], .. }`
-                          2. `{ neuron1 : group1, neuron2 : group2, .. }`
+                          1. ``{ group name : [ neuron1, neuron2, ... ], .. }``
+                          2. ``{ neuron1 : group1, neuron2 : group2, .. }``
 
                         `syn_cutoff` and `syn_threshold` are applied BEFORE
                         grouping!
@@ -520,9 +521,9 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     col_groups :        dict, optional
                         See row_groups
     use_connectors :    bool, optional
-                        If True AND n_a or n_b are CatmaidNeuron(s), use
-                        restrict adjacency matrix to their connectors. Use if
-                        e.g. you've pruned neurons.
+                        If True AND ``n_a`` or ``n_b`` are CatmaidNeuron(s), 
+                        use restrict adjacency matrix to their connectors. Use 
+                        if e.g. you've pruned neurons.
 
     Returns
     -------
@@ -627,8 +628,8 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False, method
                         Matrix to group.
     row_groups :        dict, optional
                         Row groups to be formed. Can be either:
-                          1. `{ group name : [ neuron1, neuron2, ... ], .. }`
-                          2. `{ neuron1 : group1, neuron2 : group2, .. }`
+                          1. ``{ group name : [ neuron1, neuron2, ... ], .. }``
+                          2. ``{ neuron1 : group1, neuron2 : group2, .. }``
                         If grouping numpy arrays, use indices!
     col_groups :        dict, optional
                         Col groups. See `row_groups` for details.

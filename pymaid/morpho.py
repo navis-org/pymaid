@@ -151,7 +151,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
                 Cable in micrometers [um]
 
     skdata
-                If `return_skdata==True`. Neuron object with
+                If ``return_skdata==True``. Neuron object with
                 ``nodes.parent_dist`` containing the distances to parent.
     """
 
@@ -1498,7 +1498,7 @@ def despike_neuron(x, sigma=5, inplace=False):
     -----
     For each treenode A, the (euclidean) distance to its immediate parent
     B and to that node's parent C is computed.
-    If `dist(A->B)/dist(A->C) > sigma`, node B is considered a spike and
+    If ``dist(A->B)/dist(A->C) > sigma``, node B is considered a spike and
     realigned between A and C.
 
     Parameters
@@ -1513,7 +1513,7 @@ def despike_neuron(x, sigma=5, inplace=False):
 
     Returns
     -------
-    CatmaidNeuron/CatmaidNeuronList (if `inplace=False`)
+    CatmaidNeuron/CatmaidNeuronList (if ``inplace=False``)
 
     """
 

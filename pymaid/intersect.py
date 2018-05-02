@@ -72,8 +72,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     ----------
     x :               {list of tuples, CatmaidNeuron, CatmaidNeuronList}
 
-                      1. List/np array -  ``[ ( x,y,z ), ( ... ) ]``
-                      2. DataFrame - needs to have 'x','y','z' columns
+                      1. List/numpy.array - ``[ [x1,y1,z1], [x2,y2,z2], .. ]``
+                      2. DataFrame - needs to have ``x,y,z`` columns
 
     volume :          {str, list of str, core.Volume}
                       Name of the CATMAID volume to test OR core.Volume dict
@@ -87,7 +87,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
                       If 'IN', parts of the neuron that are within the volume
                       are kept.
     remote_instance : CATMAID instance, optional
-                      Pass if volume is a volume name
+                      Pass if ``volume`` is a volume name.
 
     Returns
     -------
