@@ -2405,7 +2405,7 @@ class Volume(dict):
     @property
     def center(self):
         """ Returns center of mass."""
-        return np.mean( self.vertices(), axis=0 )
+        return np.mean( self.vertices, axis=0 )
 
     @property
     def vertices(self):
