@@ -347,19 +347,19 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         }
 
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=False):
             stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get reconstruction time spent
-        for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=pbar_hide, leave=False):
             stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get edition time spent
-        for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=pbar_hide, leave=False):
             stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get time spent reviewing
-        for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=pbar_hide, leave=False):
             stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
@@ -370,7 +370,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=False):
             this_ts = all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
             this_ts.columns=[ user_list.loc[u, 'login'] ]
 
@@ -388,7 +388,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=pbar_hide, leave=False):
             minutes_counting = ( all_timestamps[all_timestamps.user==u].set_index('timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions )
             minutes_counting = minutes_counting[ minutes_counting.timestamp == True ]
             this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
@@ -411,8 +411,8 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
       1. The API endpoint used for finding neurons worked on by a given user
          (:func:`pymaid.find_neurons`) does not return single-node neurons.
          Hence, placing e.g. postsynaptic nodes is not taken into account.
-      2. Connecting a node to a connector is not taken into account as there 
-         is no API endpoint for getting timestamps of the creation of 
+      2. Connecting a node to a connector is not taken into account as there
+         is no API endpoint for getting timestamps of the creation of
          connector links.
 
     Parameters
@@ -425,7 +425,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, r
     start_date :      {tuple, datetime.date}, optional
     end_date :        {tuple, datetime.date}, optional
                       Start and end date of time window to check.
-    remote_instance : {CatmaidInstance}, optional        
+    remote_instance : {CatmaidInstance}, optional
 
     Return
     ------
