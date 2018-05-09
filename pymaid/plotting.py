@@ -295,7 +295,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     _ACCEPTED_KWARGS = ['remote_instance','connectors','connectors_only',
                         'ax','color','view','scalebar','cn_mesh_colors',
                         'linewidth','cn_size','group_neurons', 'scatter_kws',
-                        'figsize', 'linestyle']
+                        'figsize', 'linestyle', 'alpha']
     wrong_kwargs = [ a for a in kwargs if a not in _ACCEPTED_KWARGS ]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS) ))
@@ -320,6 +320,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     color = kwargs.get('color', None)
     scalebar = kwargs.get('scalebar', None)
     group_neurons = kwargs.get('group_neurons', False)
+    alpha = kwargs.get('alpha', .9)
 
     scatter_kws = kwargs.get('scatter_kws', {})
 
@@ -431,14 +432,14 @@ def plot2d(x, method='2d', *args, **kwargs):
 
                 this_line = mlines.Line2D( coords[:,0], coords[:,1],
                                            lw=linewidth, ls=linestyle,
-                                           alpha=.9, color=this_color,
+                                           alpha=alpha, color=this_color,
                                            label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
 
                 ax.add_line(this_line)
 
                 for n in soma.itertuples():
                     s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius,
-                                         alpha=.9, fill=True, fc=this_color,
+                                         alpha=alpha, fill=True, fc=this_color,
                                          zorder=4, edgecolor='none')
                     ax.add_patch(s)
 
@@ -447,6 +448,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 if method == '3d':
                     lc = Line3DCollection( [ c[:,[0,2,1]] for c in coords ], color = this_color,
                                            label=neuron.neuron_name,
+                                           alpha=alpha,
                                            lw=linewidth,
                                            linestyle=linestyle)
                     if group_neurons:
@@ -457,7 +459,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 elif method =='3d_complex':
                     for c in coords:
                         lc = Line3DCollection( [ c[:,[0,2,1]] ], color = this_color,
-                                               lw=linewidth,
+                                               lw=linewidth, alpha=alpha,
                                                linestyle=linestyle )
                         if group_neurons:
                             lc.set_gid( neuron.neuron_name )
@@ -474,7 +476,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                     x = n.radius * np.outer(np.cos(u), np.sin(v)) + n.x
                     y = n.radius * np.outer(np.sin(u), np.sin(v)) - n.y
                     z = n.radius * np.outer(np.ones(np.size(u)), np.cos(v)) + n.z
-                    surf = ax.plot_surface(x, z, y, color=this_color, shade=False)
+                    surf = ax.plot_surface(x, z, y, color=this_color, shade=False, alpha=alpha)
                     if group_neurons:
                         surf.set_gid( neuron.neuron_name )
 
@@ -488,13 +490,14 @@ def plot2d(x, method='2d', *args, **kwargs):
                     this_cn = neuron.connectors[neuron.connectors.relation == c]
                     ax.scatter(this_cn.x.values,
                               (-this_cn.y).values,
-                              c=cn_types[c], alpha=1, zorder=4, edgecolor='none', s=cn_size)
+                              c=cn_types[c], alpha=alpha, zorder=4, edgecolor='none', s=cn_size)
                     ax.get_children()[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
             elif method in ['3d','3d_complex']:
                 all_cn = neuron.connectors
                 c = [ cn_types[i] for i in all_cn.relation.tolist() ]
                 ax.scatter(all_cn.x.values, all_cn.z.values, -all_cn.y.values,
-                           c=c, s=cn_size, depthshade=False, edgecolor='none')
+                           c=c, s=cn_size, depthshade=False, edgecolor='none',
+                           alpha=alpha)
                 ax.get_children()[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
 
             coords = neuron.connectors[['x','y','z']].as_matrix()
@@ -528,14 +531,14 @@ def plot2d(x, method='2d', *args, **kwargs):
 
             this_line = mlines.Line2D( x_coords, y_coords,
                                        lw=linewidth, ls=linestyle,
-                                       alpha=.9, color=this_color,
+                                       alpha=alpha, color=this_color,
                                        label='%s' % (neuron.gene_name) )
 
             ax.add_line(this_line)
 
             # Add soma
             s = mpatches.Circle( (neuron.X, -neuron.Y), radius=2,
-                                 alpha=.9, fill=True, fc=this_color,
+                                 alpha=alpha, fill=True, fc=this_color,
                                  zorder=4, edgecolor='none')
             ax.add_patch(s)
         elif method in ['3d','3d_complex']:
@@ -552,6 +555,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                     lc = Line3DCollection( np.split(coords[:,[0,2,1]], starts.shape[0]), color = this_color,
                                            label=neuron.gene_name,
                                            lw=linewidth,
+                                           alpha=alpha,
                                            linestyle=linestyle)
                     if group_neurons:
                         lc.set_gid( neuron.gene_name )
@@ -562,6 +566,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                     for c in np.split(coords[:,[0,2,1]], starts.shape[0]):
                         lc = Line3DCollection( [ c ], color = this_color,
                                                lw=linewidth,
+                                               alpha=alpha,
                                                linestyle=linestyle )
                         if group_neurons:
                             lc.set_gid( neuron.gene_name )
@@ -576,7 +581,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 x = 2 * np.outer(np.cos(u), np.sin(v)) + neuron.X
                 y = 2 * np.outer(np.sin(u), np.sin(v)) - neuron.Y
                 z = 2 * np.outer(np.ones(np.size(u)), np.cos(v)) + neuron.Z
-                surf = ax.plot_surface(x, z, y, color=this_color, shade=False)
+                surf = ax.plot_surface(x, z, y, color=this_color, shade=False, alpha=alpha)
                 if group_neurons:
                     surf.set_gid( neuron.gene_name )
 
@@ -585,7 +590,6 @@ def plot2d(x, method='2d', *args, **kwargs):
             if method == '2d':
                 default_settings = dict(
                             c = 'black',
-                            alpha = 1,
                             zorder = 4,
                             edge_color = 'none',
                             s = 1
