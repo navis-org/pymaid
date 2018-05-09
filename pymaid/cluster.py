@@ -140,7 +140,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                 'Please either pass a CATMAID instance or define globally as "remote_instance" ')
 
     # Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
-    neurons = fetch.eval_skids(x, remote_instance=remote_instance)
+    neurons = utils.eval_skids(x, remote_instance=remote_instance)
 
     # Make sure neurons are strings, not integers
     neurons = [str(n) for n in list(set(neurons))]
@@ -165,11 +165,11 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
         if not isinstance(include_skids, type(None)):
             connectivity = connectivity[
-                connectivity.skeleton_id.isin(fetch.eval_skids(include_skids, remote_instance=remote_instance))]
+                connectivity.skeleton_id.isin(utils.eval_skids(include_skids, remote_instance=remote_instance))]
 
         if not isinstance(exclude_skids, type(None)):
             connectivity = connectivity[
-                ~connectivity.skeleton_id.isin(fetch.eval_skids(exclude_skids, remote_instance=remote_instance))]
+                ~connectivity.skeleton_id.isin(utils.eval_skids(exclude_skids, remote_instance=remote_instance))]
 
         module_logger.info('%i entries after filtering' %
                            (connectivity.shape[0]))
