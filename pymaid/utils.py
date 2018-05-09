@@ -38,7 +38,7 @@ if len( module_logger.handlers ) == 0:
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['neuron2json', 'json2neuron', 'set_loggers', 'set_pbars']
+__all__ = ['neuron2json', 'json2neuron', 'set_loggers', 'set_pbars', 'eval_skids']
 
 def _type_of_script():
     """ Returns context in which pymaid is run. """
@@ -338,9 +338,9 @@ def eval_skids(x, remote_instance=None):
             else:
                 skids.append(temp)
         return sorted(set(skids), key=skids.index)
-    elif isinstance(x, core.CatmaidNeuron):
+    elif isinstance(x, pymaid.CatmaidNeuron):
         return [x.skeleton_id]
-    elif isinstance(x, core.CatmaidNeuronList):
+    elif isinstance(x, pymaid.CatmaidNeuronList):
         return list(x.skeleton_id)
     elif isinstance(x, pd.DataFrame):
         return x.skeleton_id.tolist()
@@ -461,14 +461,14 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         # Preserving the order after making a set is super costly
         # return sorted(set(ids), key=ids.index)
         return list(set(ids))
-    elif isinstance(x, core.CatmaidNeuron):
+    elif isinstance(x, pymaid.CatmaidNeuron):
         to_return = []
         if treenodes:
             to_return += x.nodes.treenode_id.tolist()
         if connectors:
             to_return += x.connectors.connector_id.tolist()
         return to_return
-    elif isinstance(x, core.CatmaidNeuronList):
+    elif isinstance(x, pymaid.CatmaidNeuronList):
         to_return = []
         for n in x:
             if treenodes:
