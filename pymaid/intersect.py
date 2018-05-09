@@ -189,7 +189,7 @@ def _in_volume_ray(points, volume):
                                  )
         volume['pyoctree'] = tree
 
-    # Generate rays for points
+    # Get min max of volume
     mx = np.array(volume['vertices']).max(axis=0)
     mn = np.array(volume['vertices']).min(axis=0)
 
@@ -197,22 +197,17 @@ def _in_volume_ray(points, volume):
                 [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
-    # by those that occur "above" the point
-    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[
-                         2] >= points[k][2]])for k, ray in enumerate( tqdm(rayPointList,
-                                                                           desc='Intersecting',
-                                                                           leave=False,
-                                                                           disable=pbar_hide
-                                                                        ))]
+    # to those that occur "above" the point we are querying
+    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[2] >= points[k][2]]) for k, ray in enumerate( rayPointList )]
 
-    # Count odd intersection
-    return [i % 2 != 0 for i in intersections]
+    # Count intersections and return True for odd counts
+    return np.remainder( list(intersections), 2 ) != 0 # [i % 2 != 0 for i in intersections]
 
 
 def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
     """ Uses scipy to test if points are within a given CATMAID volume.
-    The idea is to test if adding the point to the cloud would change the
-    convex hull.
+    The idea is to test if adding the point to the pointcloud changes the
+    convex hull -> if yes, that point is outside the convex hull.
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
