@@ -532,7 +532,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
             cur_time = time.time()
 
             #Update progress bar
-            if pbar_start:
+            if pbar_start != None:
                 p_delta = len(threads_closed) - (pbar.n - pbar_start)
                 pbar.update( p_delta  )
 
