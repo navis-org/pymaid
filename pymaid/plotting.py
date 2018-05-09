@@ -327,7 +327,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     cn_size = kwargs.get('cn_size', 1)
     linestyle = kwargs.get('linestyle','-')
 
-    remote_instance = fetch._eval_remote_instance(remote_instance, raise_error=False)
+    remote_instance = utils._eval_remote_instance(remote_instance, raise_error=False)
 
     if skids:
         skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
@@ -1535,7 +1535,7 @@ def plot3d(x, *args, **kwargs):
         except:
             pass
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if skids and remote_instance:
         skdata += fetch.get_neuron(skids, remote_instance,
@@ -1743,10 +1743,10 @@ def plot_network(x, *args, **kwargs):
     width = kwargs.get('width', 800)
     height = kwargs.get('height', 800)
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, (nx.DiGraph, nx.Graph) ):
-        x = fetch.eval_skids(x, remote_instance=remote_instance)
+        x = utils.eval_skids(x, remote_instance=remote_instance)
         g = graph.network2nx(x, threshold=syn_threshold)
     else:
         g = x

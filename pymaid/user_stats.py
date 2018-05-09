@@ -148,9 +148,9 @@ def get_user_contributions(x, remote_instance=None):
 
     """
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = fetch.eval_skids(x, remote_instance)
+    skids = utils.eval_skids(x, remote_instance)
 
     cont = fetch.get_contributor_statistics(
         skids, remote_instance, separate=False)
@@ -283,9 +283,9 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10, treenodes=Tru
     if mode not in ['SUM','OVER_TIME','ACTIONS']:
         raise ValueError('Unknown mode "%s"' % str(mode))
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = fetch.eval_skids(x, remote_instance)
+    skids = utils.eval_skids(x, remote_instance)
 
     # Maximal inactive time is simply translated into binning
     # We need this later for pandas.TimeGrouper() anyway

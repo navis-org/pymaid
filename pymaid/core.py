@@ -1508,7 +1508,7 @@ class CatmaidNeuronList:
     def __getitem__(self, key):
         if isinstance(key, six.string_types):
             if key.startswith('annotation:'):
-                skids = fetch.eval_skids(
+                skids = utils.eval_skids(
                     key, remote_instance=self._remote_instance)
                 subset = self[skids]
             else:

@@ -40,7 +40,7 @@ Examples
 
 import pandas as pd
 import numpy as np
-from pymaid import core, fetch
+from pymaid import core, utils
 import logging
 import colorsys
 import json
@@ -76,7 +76,7 @@ class handler:
     -----
 
         (1) The handler adds neurons and keeps track of them in the scene.
-        (2) If you request a list of objects via its attributes (e.g. ``handler.neurons``) 
+        (2) If you request a list of objects via its attributes (e.g. ``handler.neurons``)
             or via :func:`~pymaid.b3d.handler.select`, a :class:`~pymaid.b3d.object_list`
             is returned. This class lets you change basic parameters of your selected
             neurons.
@@ -112,7 +112,7 @@ class handler:
     >>> handler.clear()
     >>> # Add only soma
     >>> handler.add( nl, neurites=False, connectors=False )
-    """    
+    """
     cn_dict = {
         0: dict(name='presynapses',
                 color=(1, 0, 0)),
@@ -128,10 +128,10 @@ class handler:
         self.conversion = conversion
         self.cn_dict = handler.cn_dict
 
-    def _selection_helper(self, type):        
+    def _selection_helper(self, type):
         return [ ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == type ]
 
-    def _cn_selection_helper(self, cn_type):        
+    def _cn_selection_helper(self, cn_type):
         return [ ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == 'CONNECTORS' and ob['cn_type'] == cn_type ]
 
     def __getattr__(self, key):
@@ -177,7 +177,7 @@ class handler:
         if isinstance(x, core.CatmaidNeuron):
             self._create_neuron(x, neurites=neurites,
                                 soma=soma, connectors=connectors)
-        elif isinstance(x, core.CatmaidNeuronList):            
+        elif isinstance(x, core.CatmaidNeuronList):
             for i,n in enumerate(x):
                 self._create_neuron(n, neurites=neurites,
                                     soma=soma, connectors=connectors)
@@ -232,7 +232,7 @@ class handler:
 
         for s in x.segments:
             newSpline = cu.splines.new('POLY')
-            coords = np.vstack( [node_locs[tn] for tn in s ] )            
+            coords = np.vstack( [node_locs[tn] for tn in s ] )
             coords *= self.conversion
             coords = coords.tolist()
 
@@ -342,7 +342,7 @@ class handler:
         verts *= self.conversion
         verts[1] *= -1
 
-        # Switch y and z 
+        # Switch y and z
         blender_verts = verts[[0,2,1]].values.tolist()
 
         me = bpy.data.meshes.new(mesh_name + '_mesh')
@@ -351,7 +351,7 @@ class handler:
         scn = bpy.context.scene
         scn.objects.link(ob)
         scn.objects.active = ob
-        ob.select = True       
+        ob.select = True
 
         me.from_pydata(blender_verts, [], volume['faces'])
         me.update()
@@ -380,7 +380,7 @@ class handler:
         >>> selection.presynapses.color( 0, 1, 0 )
         """
 
-        skids = fetch.eval_skids(x)
+        skids = utils.eval_skids(x)
 
         if not skids:
             module_logger.error('No skids found.')
@@ -472,13 +472,13 @@ class object_list:
     Notes
     -----
 
-    1.  Object_lists should normally be constructed via the handler 
-        (see :class:`pymaid.b3d.handler`)! 
-    2.  List works with object NAMES to prevent Blender from crashing when 
-        trying to access neurons that do not exist anymore. This also means that 
-        changing names manually will compromise a object list. 
-    3.  Accessing a neuron list's attributes (see below) return another 
-        ``object_list`` class which you can use to manipulate the new subselection. 
+    1.  Object_lists should normally be constructed via the handler
+        (see :class:`pymaid.b3d.handler`)!
+    2.  List works with object NAMES to prevent Blender from crashing when
+        trying to access neurons that do not exist anymore. This also means that
+        changing names manually will compromise a object list.
+    3.  Accessing a neuron list's attributes (see below) return another
+        ``object_list`` class which you can use to manipulate the new subselection.
 
     Attributes
     ----------
@@ -488,15 +488,15 @@ class object_list:
     presynapses :   returns list containing all presynapses
     postsynapses :  returns list containing all postsynapses
     gapjunctions :  returns list containing all gap junctions
-    abutting :      returns list containing all abutting connectors  
-    skeleton_id :   returns list of skeleton IDs  
+    abutting :      returns list containing all abutting connectors
+    skeleton_id :   returns list of skeleton IDs
 
     Examples
     --------
     >>> import pymaid
     >>> # b3d module has to be import explicitly
     >>> from pymaid import b3d
-    >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )    
+    >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> handler = b3d.handler()
     >>> handler.add( nl )
@@ -624,7 +624,7 @@ class object_list:
         Parameters
         ----------
         r :         float
-                    New bevel radius 
+                    New bevel radius
         """
         for n in self.object_names:
             if n in bpy.data.objects:
@@ -664,7 +664,7 @@ class object_list:
         ----------
         fname :     str, optional
                     Filename to save selection to
-        """                
+        """
 
         neuron_objects = [ n for n in bpy.data.objects if n.name in self.object_names and n['type'] == 'NEURON']
 

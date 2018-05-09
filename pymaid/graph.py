@@ -23,7 +23,7 @@ import scipy.spatial
 
 import logging
 
-from pymaid import core, fetch
+from pymaid import core, fetch, utils
 
 import networkx as nx
 
@@ -99,8 +99,8 @@ def network2nx(x, remote_instance=None, threshold=1):
     """
 
     if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str )):
-        remote_instance = fetch._eval_remote_instance(remote_instance)
-        skids = fetch.eval_skids(x, remote_instance=remote_instance)
+        remote_instance = utils._eval_remote_instance(remote_instance)
+        skids = utils.eval_skids(x, remote_instance=remote_instance)
 
         # Fetch edges
         edges = fetch.get_edges(skids, remote_instance=remote_instance)
@@ -176,8 +176,8 @@ def network2igraph(x, remote_instance=None, threshold=1):
         raise ImportError('igraph must be installed to use this function.')
 
     if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str )):
-        remote_instance = fetch._eval_remote_instance(remote_instance)
-        skids = fetch.eval_skids(x, remote_instance=remote_instance)
+        remote_instance = utils._eval_remote_instance(remote_instance)
+        skids = utils.eval_skids(x, remote_instance=remote_instance)
 
         indices = { int(s): i for i,s in enumerate(skids) }
 

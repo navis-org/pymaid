@@ -126,7 +126,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     """
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
         #Turn into dict
@@ -215,7 +215,7 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
     convex hull.
     """
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if type(volume) == type(str()):
         volume = fetch.get_volume(volume, remote_instance)

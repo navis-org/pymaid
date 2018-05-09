@@ -89,7 +89,7 @@ def crop_neuron(x, output, dimensions=(1000,1000), interpolate_z_res=40, remote_
         raise ValueError('Need two dimensions, got {0}'.format(len(dimensions)))
 
     # Evalutate remote instance
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Prepare treenode table to be indexed by treenode_id
     this_tn = x.nodes.set_index('treenode_id')
@@ -224,7 +224,7 @@ class LoadTiles:
         else:
             raise TypeError('Bounding box must be list or array, not {0}'.format( type(bbox)) )
 
-        self.remote_instance = fetch._eval_remote_instance(remote_instance)
+        self.remote_instance = utils._eval_remote_instance(remote_instance)
         self.zoom_level = zoom_level
         self.coords = coords
         self.mem_lim = mem_lim

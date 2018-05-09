@@ -73,7 +73,7 @@ if utils.is_jupyter():
     tqdm = tqdm_notebook
     trange = tnrange
 
-__all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','eval_skids','get_3D_skeleton',
+__all__ = sorted([ 'CatmaidInstance','add_annotations','add_tags','get_3D_skeleton',
             'get_3D_skeletons','get_annotation_details','get_annotation_id',
             'get_annotation_list','get_annotations','get_arbor',
             'get_connector_details','get_connectors','get_contributor_statistics',
@@ -623,7 +623,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         If True, the returned skeleton data will contain
                         creation date ([8]) and last modified ([9]) for each
                         node -> compact-details url the 'with_history' option
-                        is used in this case 
+                        is used in this case
 
                         ATTENTION: if ``get_history=True``, nodes/connectors
                         that have been moved since their creation will have
@@ -678,9 +678,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -866,9 +866,9 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -961,9 +961,9 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -1091,7 +1091,7 @@ def get_partners(x, remote_instance=None, threshold=1,
     filt :              list of str, optional
                         Filters partners for neuron names (must be exact) or
                         skeleton_ids.
-    directions :        {['incoming', 'outgoing', 'gapjunctions', 'attachments']}, optional    
+    directions :        {['incoming', 'outgoing', 'gapjunctions', 'attachments']}, optional
                         Use to restrict to either up- or downstream partners.
 
     Returns
@@ -1148,9 +1148,9 @@ def get_partners(x, remote_instance=None, threshold=1,
         except:
             return 0
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     x = utils._make_iterable(x, force_type=str)
 
@@ -1267,9 +1267,9 @@ def get_names(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -1332,7 +1332,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     else:
         node_ids = x
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     module_logger.info(
         'Retrieving details for %i nodes...' % len(node_ids))
@@ -1393,9 +1393,9 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    treenode_ids = eval_node_ids(treenode_ids, connectors=False, treenodes=True)
+    treenode_ids = utils.eval_node_ids(treenode_ids, connectors=False, treenodes=True)
 
     if not isinstance(treenode_ids, (list, np.ndarray)):
         treenode_ids = [treenode_ids]
@@ -1448,9 +1448,9 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -1539,9 +1539,9 @@ def get_edges(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -1606,10 +1606,10 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, type(None)):
-        x = eval_skids(x, remote_instance=remote_instance)
+        x = utils.eval_skids(x, remote_instance=remote_instance)
 
         if not isinstance(x, (list, np.ndarray)):
             x = [x]
@@ -1702,9 +1702,9 @@ def get_connector_details(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    connector_ids = eval_node_ids( x, connectors=True, treenodes=False )
+    connector_ids = utils.eval_node_ids( x, connectors=True, treenodes=False )
 
     connector_ids = list(set(connector_ids))
 
@@ -1797,10 +1797,10 @@ def get_connectors_between(a, b, directional=True, remote_instance=None ):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    a = eval_skids(a, remote_instance=remote_instance)
-    b = eval_skids(b, remote_instance=remote_instance)
+    a = utils.eval_skids(a, remote_instance=remote_instance)
+    b = utils.eval_skids(b, remote_instance=remote_instance)
 
     if not isinstance(a, (list, np.ndarray)):
         a = [a]
@@ -1870,9 +1870,9 @@ def get_review(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -1935,9 +1935,9 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     x = utils._make_iterable(x)
     annotations = utils._make_iterable(annotations)
@@ -2010,9 +2010,9 @@ def add_annotations(x, annotations, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     x = utils._make_iterable(x)
     annotations = utils._make_iterable(annotations)
@@ -2061,7 +2061,7 @@ def get_user_annotations(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -2157,9 +2157,9 @@ def get_annotation_details(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = eval_skids(x, remote_instance=remote_instance)
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(skids, (list, np.ndarray)):
         skids = [skids]
@@ -2242,9 +2242,9 @@ def get_annotations(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -2299,7 +2299,7 @@ def get_annotation_id(annotations, remote_instance=None,  allow_partial=False):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     module_logger.debug('Retrieving list of annotations...')
 
@@ -2361,14 +2361,14 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     ----
     There is no shortcut to get this information - we have to load the 3D
     skeleton to get the soma. If you need the 3D skeletons anyway, it is more
-    efficient to use :func:`~pymaid.get_neuron` to get a neuronlist and then 
+    efficient to use :func:`~pymaid.get_neuron` to get a neuronlist and then
     use the :attr:`~pymaid.CatmaidNeuronList.soma` attribute.
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -2431,7 +2431,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
         )
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(names, str):
         names = [names]
@@ -2479,7 +2479,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
 
     Returns
     -------
-    list 
+    list
                             ``[skid1, skid2, skid3 ]``
 
     """
@@ -2490,7 +2490,7 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
         )
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     module_logger.info(
         'Looking for Annotation(s): ' + str(annotations))
@@ -2571,9 +2571,9 @@ def neuron_exists(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if isinstance(x, (list, np.ndarray)):
         return {n: neuron_exists(n) for n in x}
@@ -2610,9 +2610,9 @@ def get_treenode_info(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    treenode_ids = eval_node_ids( x, connectors=False, treenodes=True )
+    treenode_ids = utils.eval_node_ids( x, connectors=False, treenodes=True )
 
     urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]
 
@@ -2652,7 +2652,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(node_ids, (list, np.ndarray)):
         node_ids = [node_ids]
@@ -2705,9 +2705,9 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if isinstance(x, (list, np.ndarray)):
         return {n: delete_neuron(n, remote_instance=remote_instance) for n in x}
@@ -2785,7 +2785,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
                                                                                    ','.join(PERM_NODE_TYPES)
                                                                                     ))
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(node_list, (list, np.ndarray)):
         node_list = [node_list]
@@ -2857,7 +2857,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(node_list, (list, np.ndarray)):
         node_list = [node_list]
@@ -2909,9 +2909,9 @@ def get_segments(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -2962,9 +2962,9 @@ def get_review_details(x, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -3042,7 +3042,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not operations:
         operations = [-1]
@@ -3174,9 +3174,9 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
     >>> plt.show()
 
     """
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     x = utils._make_iterable(x)
 
@@ -3321,14 +3321,14 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         )
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     get_skeleton_list_GET_data = {'nodecount_gt': node_count}
 
     if user:
-        user = eval_user_ids( user, user_list=None, remote_instance=remote_instance )
+        user = utils.eval_user_ids( user, user_list=None, remote_instance=remote_instance )
     if reviewed_by:
-        reviewed_by = eval_user_ids( reviewed_by, user_list=None, remote_instance=remote_instance )
+        reviewed_by = utils.eval_user_ids( reviewed_by, user_list=None, remote_instance=remote_instance )
 
     if isinstance(user, str) or isinstance(reviewed_by, str):
         user_list = get_user_list(
@@ -3475,7 +3475,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
                 temp.append(0)
         return temp
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(start_date, datetime.date):
         start_date = start_date.isoformat()
@@ -3620,7 +3620,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, 
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Set resolution to 1:1 if coordinates are already in nm
     if coord_format == 'NM':
@@ -3746,13 +3746,13 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Fist, we have to prepare a whole lot of parameters
     if users:
-        users = eval_user_ids(users, remote_instance=remote_instance)
+        users = utils.eval_user_ids(users, remote_instance=remote_instance)
     if reviewed_by:
-        reviewed_by = eval_user_ids(reviewed_by, remote_instance=remote_instance)
+        reviewed_by = utils.eval_user_ids(reviewed_by, remote_instance=remote_instance)
     if annotations and not isinstance(annotations, (list, np.ndarray)):
         annotations = [annotations]
     if names and not isinstance(names, (list, np.ndarray)):
@@ -3781,7 +3781,7 @@ def find_neurons( names=None, annotations=None, volumes=None, users=None,
     sets_of_skids = []
 
     if not isinstance(skids, type(None)):
-        skids = eval_skids(skids)
+        skids = utils.eval_skids(skids)
         if not isinstance(skids, (list, set, np.ndarray)):
             skids = [ skids ]
         sets_of_skids.append( set(skids) )
@@ -4011,7 +4011,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
         )
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(volumes, (list, np.ndarray)):
         volumes = [ volumes ]
@@ -4083,7 +4083,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kw
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     MAX_THREADS = 50
 
@@ -4350,7 +4350,7 @@ def get_user_list(remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     user_list = remote_instance.fetch(remote_instance._get_user_list_url())
 
@@ -4434,10 +4434,10 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
     >>> plt.show()
 
     """
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    sources = eval_skids(sources, remote_instance=remote_instance)
-    targets = eval_skids(targets, remote_instance=remote_instance)
+    sources = utils.eval_skids(sources, remote_instance=remote_instance)
+    targets = utils.eval_skids(targets, remote_instance=remote_instance)
 
     if not isinstance(targets, (list, np.ndarray)):
         targets = [targets]
@@ -4541,7 +4541,7 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(volume_name, (list, np.ndarray)):
         vols =  { v : get_volume( v, remote_instance=remote_instance, color=color )
@@ -4663,7 +4663,7 @@ def get_annotation_list(remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     an = remote_instance.fetch(remote_instance._get_annotation_list())[
         'annotations']
@@ -4672,230 +4672,6 @@ def get_annotation_list(remote_instance=None):
     df.columns = ['annotation_id', 'annotation', 'users']
 
     return df
-
-
-def _eval_remote_instance(remote_instance, raise_error=True):
-    """ Evaluates remote instance and checks for globally defined remote
-    instances as fall back
-    """
-
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            return sys.modules['remote_instance']
-        elif 'remote_instance' in sys.modules:
-            return sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            return globals()['remote_instance']
-        else:
-            if raise_error:
-                raise Exception(
-                    'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            else:
-                module_logger.warning('No global remote instance found.')
-    return remote_instance
-
-
-def eval_skids(x, remote_instance=None):
-    """ Evaluate skeleton IDs. Will turn annotations and neuron names into
-    skeleton IDs.
-
-    Parameters
-    ----------
-    x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
-                    Your options are either::
-                    1. int or list of ints:
-                        - will be assumed to be skeleton IDs
-                    2. str or list of str:
-                        - if convertible to int, will be interpreted as x
-                        - elif start with 'annotation:' will be assumed to be
-                          annotations
-                        - else, will be assumed to be neuron names
-                    3. For CatmaidNeuron/List or pandas.DataFrames/Series:
-                        - will look for ``skeleton_id`` attribute
-    remote_instance : CatmaidInstance, optional
-                      If not passed directly, will try using global.
-
-    Returns
-    -------
-    list of str
-                    List containing skeleton IDs as strings.
-
-    """
-
-    remote_instance = _eval_remote_instance(remote_instance)
-
-    if isinstance(x, (int, np.int64, np.int32, np.int)):
-        return str(x)
-    elif isinstance(x, (str, np.str)):
-        try:
-            int(x)
-            return str(x)
-        except:
-            if x.startswith('annotation:'):
-                return get_skids_by_annotation(x[11:], remote_instance=remote_instance)
-            elif x.startswith('name:'):
-                return get_skids_by_name(x[5:], remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
-            else:
-                return get_skids_by_name(x, remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
-    elif isinstance(x, (list, np.ndarray, set)):
-        skids = []
-        for e in x:
-            temp = eval_skids(e, remote_instance=remote_instance)
-            if isinstance(temp, (list, np.ndarray)):
-                skids += temp
-            else:
-                skids.append(temp)
-        return sorted(set(skids), key=skids.index)
-    elif isinstance(x, core.CatmaidNeuron):
-        return [x.skeleton_id]
-    elif isinstance(x, core.CatmaidNeuronList):
-        return list(x.skeleton_id)
-    elif isinstance(x, pd.DataFrame):
-        return x.skeleton_id.tolist()
-    elif isinstance(x, pd.Series):
-        if x.name == 'skeleton_id':
-            return x.tolist()
-        elif 'skeleton_id' in x:
-            return [ x.skeleton_id ]
-        else:
-            raise ValueError('Unable to extract skeleton ID from Pandas series {0}'.format(x))
-    elif isinstance(x, type(None)):
-        return None
-    else:
-        module_logger.error(
-            'Unable to extract x from type %s' % str(type(x)))
-        raise TypeError('Unable to extract skids from type %s' % str(type(x)))
-
-def eval_user_ids( x, user_list=None, remote_instance=None ):
-    """ Checks a list of users and turns them into user IDs. Always
-    returns a list! Will attempt converting in the following order:
-
-        (1) user ID
-        (2) login name
-        (3) last name
-        (4) full name
-        (5) first name
-
-    Important
-    ---------
-    Last, first and full names are case-sensitive!
-
-    Parameters
-    ----------
-    x :         {int, str, list of either}
-                Users to check.
-    user_list : pd.DataFrame, optional
-                User list from :func:`~pymaid.get_user_list`. If you
-                already have it, pass it along to save time.
-
-    """
-
-    remote_instance = _eval_remote_instance(remote_instance)
-
-    if x and not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
-    try:
-        # Test if we have any non IDs (i.e. logins) in users
-        user_ids = [ int(u) for u in x ]
-    except:
-        # Get list of users if we don't already have it
-        if not user_list:
-            user_list = get_user_list(
-                remote_instance=remote_instance)
-
-        # Now convert individual entries to user IDs
-        user_ids = []
-        for u in x:
-            try:
-                user_ids.append( int( u ) )
-            except:
-                for col in ['login','last_name','full_name','first_name']:
-                    found = []
-                    if u in user_list[ col ].values:
-                        found = user_list[ user_list[ col ] == u ].id.tolist()
-                        break
-                if not found:
-                    module_logger.warning('User "{0}" not found. Skipping...'.format(u))
-                elif len(found) > 1:
-                    module_logger.warning('Multiple matching entries for "{0}" found. Skipping...'.format(u))
-                else:
-                    user_ids.append( int(found[0]) )
-
-    return user_ids
-
-def eval_node_ids(x, connectors=True, treenodes=True):
-    """ Extract treenode or connector IDs.
-
-    Parameters
-    ----------
-    x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
-                    Your options are either::
-                    1. int or list of ints will be assumed to be node IDs
-                    2. str or list of str will be checked if convertible to int
-                    3. For CatmaidNeuron/List or pandas.DataFrames will try
-                       to extract node IDs
-    connectors :    bool, optional
-                    If True will return connector IDs from neuron objects
-    treenodes :     bool, optional
-                    If True will return treenode IDs from neuron objects
-
-    Returns
-    -------
-    list
-                    List containing nodes as strings.
-
-    """
-
-    if isinstance(x, (int, np.int64, np.int32, np.int)):
-        return [ x ]
-    elif isinstance(x, (str, np.str)):
-        try:
-            return [ int(x) ]
-        except:
-            raise TypeError('Unable to extract node ID from string <%s>' % str(x))
-    elif isinstance(x, (list, np.ndarray)):
-        # Check non-integer entries
-        ids = [ ]
-        for e in x:
-            temp = eval_node_ids(e, connectors=connectors,
-                                 treenodes=treenodes)
-            if isinstance(temp, (list, np.ndarray)):
-                ids += temp
-            else:
-                ids.append(temp)
-        # Preserving the order after making a set is super costly
-        # return sorted(set(ids), key=ids.index)
-        return list(set(ids))
-    elif isinstance(x, core.CatmaidNeuron):
-        to_return = []
-        if treenodes:
-            to_return += x.nodes.treenode_id.tolist()
-        if connectors:
-            to_return += x.connectors.connector_id.tolist()
-        return to_return
-    elif isinstance(x, core.CatmaidNeuronList):
-        to_return = []
-        for n in x:
-            if treenodes:
-                to_return += n.nodes.treenode_id.tolist()
-            if connectors:
-                to_return += n.connectors.connector_id.tolist()
-        return to_return
-    elif isinstance(x, ( pd.DataFrame, pd.Series) ):
-        to_return = []
-        if treenodes and 'treenode_id' in x:
-            to_return += x.treenode_id.tolist()
-        if connectors and 'connector_id' in x:
-            to_return += x.connector_id.tolist()
-
-        if 'connector_id' not in x and 'treenode_id' not in x:
-            to_return = x.tolist()
-
-        return to_return
-    else:
-        raise TypeError('Unable to extract node IDs from type %s' % str(type(x)))
-
 
 def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_id=None, remote_instance=None, zoom=0, tool='tracingtool'):
     """ Generate URL to a location.
@@ -4955,7 +4731,7 @@ def url_to_coordinates( coords, stack_id, active_skeleton_id=None, active_node_i
         else:
             return x
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(coords, (pd.DataFrame, pd.Series)):
         try:
@@ -5004,9 +4780,9 @@ def rename_neurons( x, new_names, remote_instance=None, no_prompt=False ):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = eval_skids(x, remote_instance=remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
@@ -5086,7 +4862,7 @@ def get_label_list(remote_instance=None):
     >>> neurons = labels[ labels.tag == 'my_label' ].skeleton_id.unique()
 
     """
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     labels = remote_instance.fetch( remote_instance._get_label_list_url() )
 
@@ -5110,7 +4886,7 @@ def get_transactions(range_start=None, range_length=2500, remote_instance=None):
     -------
     pandas.DataFrame
             >>> df
-               change_type      execution_time          label  
+               change_type      execution_time          label
             0  Backend       2017-12-26 03:37:00     labels.update
             1  Backend       2017-12-26 03:37:00  treenodes.create
             2  Backend       2017-12-26 03:37:00  treenodes.create
@@ -5125,7 +4901,7 @@ def get_transactions(range_start=None, range_length=2500, remote_instance=None):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     remote_transactions_url = remote_instance._get_transactions_url()
 

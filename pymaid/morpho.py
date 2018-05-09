@@ -157,7 +157,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     """
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(skdata, int) or isinstance(skdata, str):
         skdata = fetch.get_neuron([skdata], remote_instance).loc[0]

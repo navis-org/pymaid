@@ -551,13 +551,13 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     """
 
-    remote_instance = fetch._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if n_b is None:
         n_b = n_a
 
-    neuronsA = fetch.eval_skids(n_a, remote_instance=remote_instance)
-    neuronsB = fetch.eval_skids(n_b, remote_instance=remote_instance)
+    neuronsA = utils.eval_skids(n_a, remote_instance=remote_instance)
+    neuronsB = utils.eval_skids(n_b, remote_instance=remote_instance)
 
     if not isinstance(neuronsA, list):
         neuronsA = [neuronsA]
