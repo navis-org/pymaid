@@ -1,22 +1,23 @@
 Install
 =======
 
-PyMaid requires Python 3.3 or higher. It heavily depends on other
-scientific packages (e.g. `scipy`). If you do not already
+PyMaid requires Python 3.4 or higher. It heavily depends on other
+scientific packages (e.g. `scipy` and `numpy`). If you do not already
 have a Python environment configured on your computer, please see the
 instructions for installing the full `scientific Python stack
 <https://scipy.org/install.html>`_. 
 
 .. note::
-   If you are on Windows and want to install optional packages (e.g., `scipy`),
-   then you will need to install a Python distribution such as
+   If you are on Windows (e.g., `scipy`) I strongly recommend installing 
+   a scientific Python distribution that comes with many of the key 
+   dependencies preinstalled:
    `Anaconda <https://www.continuum.io/downloads>`_,
    `Enthought Canopy <https://www.enthought.com/products/canopy/>`_,
    `Python(x,y) <http://python-xy.github.io/>`_,
    `WinPython <https://winpython.github.io/>`_, or
    `Pyzo <http://www.pyzo.org/>`_.
-   If you use one of these Python distribution, please refer to their online
-   documentation.
+   If you already use one of these Python distribution, please refer to their 
+   online documentation on how to install additional packages.
 
 Quick install
 -------------
@@ -41,12 +42,13 @@ PyMaid to be installed for Python 3:
    One of the dependencies ``pyoctree`` requires ``numpy`` to be installed. If 
    pip fails with ``ImportError: No module named 'numpy'`` you have to manually 
    install numpy first by running ``pip install numpy``. Then retry installing 
-   PyMaid via pip.
+   PyMaid via ``pip``.
 
 .. note::
    The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
    As ``rpy2`` installation fails if no R is installed, it is not a default 
-   dependency and has to be installed manually *after* R has been set up.
+   dependency. If you want to use the interface between R's nat, catnat and elmr
+   you have have to install ``rpy2`` manually *after* R has been set up.
 
 Installing from source
 ----------------------
@@ -64,10 +66,10 @@ Requirements
 
 PyMaid heavily relies on scientific Python packages to do its job. 
 On Linux and MacOS these packages will be installed automatically
-but on Windows you may have to tinker around to get them to work.
-Your best bet is to use a scientific Python distribution such
-as `Anaconda <https://www.continuum.io/downloads>`_ which has
-most of these preinstalled. 
+when you run ``pip`` but on Windows you may have to tinker around to 
+get them to work. Your best bet is to use a scientific Python 
+distribution such as `Anaconda <https://www.continuum.io/downloads>`_ 
+which should have of these preinstalled:
 
 
 NumPy
@@ -99,13 +101,13 @@ Used to visualise neurons in 2D. Alternative to Vispy based on WebGL.
 
 NetworkX
 ********
-Graph analysis tool written in pure Python. This is the standard library used by PyMaid. However - if available - will try using the faster iGraph (see below).
+Graph analysis tool written in pure Python. This is the standard library used by PyMaid. 
 
   - Download: https://networkx.github.io
 
 SciPy
 *****
-Provides sparse matrix representation of graphs and many numerical scientific tools.
+Provides sparse matrix representation of graphs and many scientific computing tools.
 
   - Download: http://scipy.org/Download
 
@@ -143,13 +145,7 @@ Provides interface with R. This allows you to use e.g. R packages from https://g
 
 Shapely (optional)
 ******************
-This is used to get 2D representations of CATMAID volumes (currently only required for :func:`~pymaid.plot2d`)
+This is used to get 2D outlines of CATMAID volumes.
 
   - Download: hhttps://shapely.readthedocs.io/en/latest/
-
-iGraph (optional)
-*****************
-Provides faster analysis of graphs (networks and neurons). PyMaid will preferentially use this over NetworkX for heavy computations (e.g. all-by-all geodesic distances).
-
-  - Download: http://igraph.org/python/#downloads
 
