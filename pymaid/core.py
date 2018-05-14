@@ -2420,6 +2420,21 @@ class Volume(dict):
     def vertices(self):
         return np.array( self['vertices'] )
 
+    @property
+    def faces(self):
+        return np.array( self['faces'] )
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return '{0} "{1}" at {2}: {3} vertices, {4} faces'.format(type(self),
+                                                                  self.get('name', ''),
+                                                                  hex(id(self)),
+                                                                  self.vertices.shape[0],
+                                                                  self.faces.shape[0] )
+
+
     def resize(self, x):
         """ Resize volume by given factor.
 
@@ -2443,6 +2458,7 @@ class Volume(dict):
 
         # Recalculate vertex positions
         self['vertices'] = vec + cn
+
 
     def plot3d(self, **kwargs):
         """Plot neuron using :func:`pymaid.plot3d`.
@@ -2469,6 +2485,7 @@ class Volume(dict):
 
         return plotting.plot3d(self, **kwargs)
 
+
     def to_trimesh(self):
         """ Returns trimesh representation of this volume.
 
@@ -2484,6 +2501,7 @@ class Volume(dict):
             raise ImportError('Unable to import trimesh. Please make sure it is installed properly')
 
         return trimesh.Trimesh( vertices = self['vertices'], faces=self['faces'] )
+
 
     def to_2d(self, alpha=0.00017, view='xy', invert_y=False):
         """ Computes the 2d alpha shape (concave hull) this volume. Uses Scipy
