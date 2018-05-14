@@ -56,8 +56,78 @@ __all__ = sorted([ 'classify_nodes', 'cut_neuron', 'longest_neurite',
                    'generate_list_of_childs', 'geodesic_matrix',
                    'subset_neuron', 'node_label_sorting' ])
 
-def _generate_segments(x, append=True):
-    """ Generate linear segments for a given neuron.
+def _generate_segments(x, weight=None):
+    """ Generate segments maximizing segment lengths. 
+
+    Parameters
+    ----------
+    x :         {CatmaidNeuron,CatmaidNeuronList}
+                May contain multiple neurons.
+    weight :    {'weight', None}, optional
+                If ``"weight"`` use physical length to determine segment length.
+                if ``None`` use number of nodes.
+
+    Returns
+    -------
+    list
+                Segments as list of lists containing treenode ids. List is
+                sorted by segment lengths.
+    """
+
+
+    if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
+        return [_generate_long_segments(x.loc[i], 
+                                        limit=limit, 
+                                        weight=weight, 
+                                        append=append) for i in range(x.shape[0])]
+    elif isinstance(x, core.CatmaidNeuron):
+        pass
+    else:
+        module_logger.error('Unexpected datatype: %s' % str(type(skdata)))
+        raise ValueError    
+
+    if weight == 'weight':
+        # Get distances from end nodes to root
+        m = geodesic_matrix(x, directed=True, weight=weight, tn_ids = x.nodes[x.nodes.type.isin(['end','root','branch'])].treenode_id.values)
+
+        # Sort by distance to root
+        endNodeIDs = set( m.sort_values(x.root[0], ascending=False).index )
+    elif not weight:
+        d = _edge_count_to_root(x)
+        endNodeIDs = x.nodes[x.nodes.type=='end'].treenode_id.values
+        endNodeIDs = sorted( endNodeIDs, key = d.get, reverse=True )
+    else:
+        raise ValueError('Unable to use weight "{}"'.format(weight))
+
+    seen = set()
+    sequences = []
+    for nodeID in endNodeIDs:
+        sequence = [nodeID]
+        parents = list( x.graph.successors(nodeID) )
+        while True:
+            if not parents:
+                break
+            parentID = parents[0]            
+            sequence.append(parentID)
+            if parentID in seen:
+                break
+            seen.add(parentID)
+            parents = list( x.graph.successors(parentID) )
+
+        if len(sequence) > 1:
+            sequences.append(sequence)
+
+    # Sort sequences by length
+    if weight == 'weight':
+        sequences = sorted(sequences, key = lambda x : m.loc[x[0],x[-1]], reverse=True )
+    else:
+        sequences = sorted(sequences, key = lambda x : d[x[0]] - d[x[-1]], reverse=True )
+
+    return sequences
+
+
+def _break_segments(x):
+    """ Break neuron into segments connecting ends, branches and root.
 
     Parameters
     ----------
@@ -95,10 +165,27 @@ def _generate_segments(x, append=True):
             seg.append(parent)
         seg_list.append(seg)
 
-    if append:
-        x.seg_list = seg_list
-
     return seg_list
+
+def _edge_count_to_root(x):
+    """ Return a map of nodeID vs number of edges from the first node that 
+    lacks successors (aka the root). 
+    """
+
+    distances = {}
+    count = 1
+    current_level = list(x.root)
+    next_level = []
+    while current_level:
+        # Consume all elements in current_level
+        while current_level:
+            node = current_level.pop()
+            distances[node] = count
+            next_level.extend(x.graph.predecessors(node))
+        # Rotate lists (current_level is now empty)
+        current_level, next_level = next_level, current_level
+        count += 1
+    return distances
 
 def classify_nodes(x, inplace=True):
     """ Classifies neuron's treenodes into end nodes, branches, slabs
@@ -226,7 +313,7 @@ def distal_to(x, a=None, b=None):
         # Return boolean
         return df
 
-def geodesic_matrix(x, tn_ids=None, directed=False):
+def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
     """ Generates all-by-all geodesic (along-the-arbor) distance matrix for a neuron.
 
     Parameters
@@ -238,6 +325,9 @@ def geodesic_matrix(x, tn_ids=None, directed=False):
     directed :  bool, optional
                 If True, pairs without a child->parent path will be returned with
                 distance = "inf".
+    weight :    {'weight', None}, optional
+                If ``weight`` distances are given as physical length.
+                if ``None`` distances is number of nodes.
 
     Returns
     -------
@@ -273,7 +363,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False):
         tn_indices = None
         ix = nodeList
 
-    dmat = csgraph.dijkstra(nx.to_scipy_sparse_matrix(x.graph, nodeList),
+    dmat = csgraph.dijkstra(nx.to_scipy_sparse_matrix(x.graph, nodeList, weight=weight),
             directed=directed, indices=tn_indices)
 
     return pd.DataFrame(dmat, columns=nodeList, index=ix )
@@ -479,8 +569,11 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     ----------
     x :                 {CatmaidNeuron,CatmaidNeuronList}
                         May contain only a single neuron.
-    n :                 int, optional
-                        Number of longest neurites to preserve.
+    n :                 {int, slice}, optional
+                        Number of longest neurites to preserve. For example:
+                         - ``n=1`` preserves the longest neurites
+                         - ``n=2`` preserves two longest neurites
+                         - ``n=slice(1,None)`` removes the longest neurite
     reroot_to_soma :    bool, optional
                         If True, neuron will be rerooted to soma.
     inplace :           bool, optional
@@ -520,32 +613,16 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     if reroot_to_soma and x.soma:
         x.reroot( x.soma )
 
-    tn_to_preserve = []
+    segments = _generate_segments(x, weight='weight')
 
-    for i in range(n):
-        if tn_to_preserve:
-            # Generate fresh graph
-            g = graph.neuron2nx( x )
+    if isinstance(n, (int, np.int)):
+        tn_to_preserve = [ tn for s in segments[:n] for tn in s ]
+    elif isinstance(n, slice):
+        tn_to_preserve = [ tn for s in segments[n] for tn in s ]
+    else:
+        raise TypeError('Unable to use N of type "{}"'.format(type(n)))
 
-            # Remove nodes that we have already preserved
-            g.remove_nodes_from( tn_to_preserve )
-        else:
-            g = x.graph
-
-        # Get path
-        tn_to_preserve += nx.dag_longest_path(g)
-
-    #Subset neuron
-    x.nodes = x.nodes[x.nodes.treenode_id.isin(
-        tn_to_preserve)].reset_index(drop=True)
-    x.connectors = x.connectors[ x.connectors.treenode_id.isin(
-                    tn_to_preserve)].reset_index(drop=True)
-
-    # Reset indices of node and connector tables (important for igraph!)
-    x.nodes.reset_index(inplace=True,drop=True)
-    x.connectors.reset_index(inplace=True,drop=True)
-
-    x._clear_temp_attr()
+    subset_neuron(x, tn_to_preserve, inplace=True )
 
     if not inplace:
         return x
@@ -898,8 +975,9 @@ def node_label_sorting(x):
 
     # Translate into segments
     node_list =[ x.root[0] ]
+    segments = _break_segments(x)
     for n in nodes_walked:
-        node_list += [ seg for seg in x.segments if seg[0] == n ][0][:-1]
+        node_list += [ seg for seg in segments if seg[0] == n ][0][:-1]
 
     return node_list
 

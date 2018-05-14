@@ -340,8 +340,11 @@ class CatmaidNeuron:
         elif key == 'gap_junctions':
             return self.connectors[ self.connectors.relation == 2 ].reset_index()
         elif key == 'segments':
-            self._get_segments()
+            self._get_segments(how='length')
             return self.segments
+        elif key == 'small_segments':
+            self._get_segments(how='break')
+            return self.small_segments
         elif key == 'soma':
             return self._get_soma()
         elif key == 'root':
@@ -520,10 +523,13 @@ class CatmaidNeuron:
         self.dps = morpho.to_dotproduct( self )
         return self.dps
 
-    def _get_segments(self):
+    def _get_segments(self, how='length'):
         """Generate segments for neuron."""
         module_logger.debug('Generating segments for neuron %s' % str(self.skeleton_id))
-        self.segments = graph_utils._generate_segments(self)
+        if how == 'length':
+            self.segments = graph_utils._generate_segments(self)
+        elif how == 'break':
+            self.small_segments = graph_utils._break_segments(self)
         return self.segments
 
     def _get_soma(self):

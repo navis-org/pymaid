@@ -342,7 +342,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, m
     if fix_not_a_branch and 'not a branch' in x.tags:
         nab_branch += x.tags['not a branch']
     if min_twig_size:
-        nab_branch += [ seg[0] for seg in x.segments if seg[0] in end_nodes and len(seg) < min_twig_size ]
+        nab_branch += [ seg[0] for seg in x.small_segments if seg[0] in end_nodes and len(seg) < min_twig_size ]
 
     # Generate dicts for childs and parents
     list_of_childs = graph_utils.generate_list_of_childs(x)
@@ -442,7 +442,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, m
         # Go over all terminal branches with the tag
         for tn in x.nodes[ (x.nodes.type == 'end') & (x.nodes.treenode_id.isin(x.tags['not a branch'])) ].treenode_id.values:
             # Get this terminal segment
-            this_seg = [ s for s in x.segments if s[0] == tn ][0]
+            this_seg = [ s for s in x.small_segments if s[0] == tn ][0]
             # Get strahler index of parent branch
             new_SI = this_tn.loc[ this_seg[-1] ].strahler_index
             # Set these nodes strahler index to that of the last branch point
@@ -1309,7 +1309,7 @@ def tortuosity( x, seg_length=10, skip_remainder=False):
     L = []
 
     # Go over all segments
-    for seg in x.segments:
+    for seg in x.small_segments:
         # Collect distances between treenodes (in microns)
         dist = np.array( [ x.graph.edges[ ( c, p  ) ]['weight'] for c,p in zip(seg[:-1],seg[1:]) ] ) / 1000
         # Walk the segment, collect stretches of length `seg_length`
@@ -1328,7 +1328,7 @@ def tortuosity( x, seg_length=10, skip_remainder=False):
             start_tn += [ seg[n] for n in cut_ix[:-1] ]
             end_tn += [ seg[n] for n in cut_ix[1:] ]
 
-    # Now geometric calculate distances
+    # Now calculate euclidean distances
     tn_table = x.nodes.set_index('treenode_id')
     start_co = tn_table.loc[ start_tn, ['x','y','z'] ].values
     end_co = tn_table.loc[ end_tn, ['x','y','z'] ].values
@@ -1354,7 +1354,8 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
                           Method of removal:
                             1. `segment` removes entire segment
                             2. `distal`/`proximal` removes everything
-                               distal/proximal to tagged node(s)
+                               distal/proximal to tagged node(s), including
+                               that node.
     preserve_connectors : bool, optional
                           If True, connectors that got disconnected during
                           branch removal will be reattached to the closest
@@ -1431,14 +1432,14 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
 
     if how == 'segment':
         # Find segments that have a tagged node
-        tagged_segs = [ s for s in x.segments if set(s) & tagged_nodes ]
+        tagged_segs = [ s for s in x.small_segments if set(s) & tagged_nodes ]
 
         # Sanity check: are any of these segments non-terminals?
         non_term = [ s for s in tagged_segs if x.graph.degree( s[0] ) > 1 ]
         if non_term:
             module_logger.warning('Pruning {0} non-terminal segment(s)'.format(len(non_term)))
 
-        # Get node to be removed
+        # Get nodes to be removed (excluding the last node -> branch )
         to_remove = [ t for s in tagged_segs for t in s[:-1] ]
 
         # Rewire connectors before we subset
