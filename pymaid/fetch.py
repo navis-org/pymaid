@@ -1712,7 +1712,7 @@ def get_connector_details(x, remote_instance=None):
 
     # Depending on DATA_UPLOAD_MAX_NUMBER_FIELDS of your CATMAID server
     # (default = 1000), we have to cut requests into batches smaller than that
-    DATA_UPLOAD_MAX_NUMBER_FIELDS = 50000
+    DATA_UPLOAD_MAX_NUMBER_FIELDS = min( 50000, len(connector_ids) )
 
     connectors = []
     with tqdm(total=len(connector_ids), desc='CN details', disable=pbar_hide, leave=pbar_leave) as pbar:
