@@ -4502,11 +4502,12 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
 
     Parameters
     ----------
-    volume_name :       str, list of str
+    volume_name :       {str, list of str}
                         Name(s) of the volume to import - must be EXACT!
                         If ``volume_name=None``, will return list of all
-                        available CATMAID volumes.
-    remote_instance :   CATMAID instance, optional
+                        available CATMAID volumes. If list of volume names,
+                        will return a dictionary ``{ name : Volume, ... }``
+    remote_instance :   CATMAIDInstance, optional
                         If not passed directly, will try using global.
     color :             tuple, optional
                         R,G,B,alpha values used by :func:`~pymaid.plot3d`.
@@ -4517,18 +4518,8 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
     Returns
     -------
     :class:`~pymaid.Volume`
-        Essentially a dictionary containing name, vertices and faces plus some
-        useful methods::
-
-            name :          str
-            volume_id :     int
-            vertices :      list of tuples
-                            [ (x,y,z), (x,y,z), .... ]
-            faces :         list of tuples
-                            [ ( vertex_ix, vertex_ix, vertex_ix ), ... ]
-            plot3d():       Plot volume
-            to_trimes():    Convert to trimesh
-            combine():      Merge multiple volumes (classmethod)
+            If ``volume_name`` is list of volumes, returns a dictionary of
+            Volumes: ``{ name : Volume, name : Volume, ...}``
 
     Examples
     --------
@@ -4543,104 +4534,109 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if isinstance(volume_name, (list, np.ndarray)):
-        vols =  { v : get_volume( v, remote_instance=remote_instance, color=color )
-                    for v in tqdm( volume_name, desc='Volumes',
-                                   disable=pbar_hide, leave=pbar_leave)  }
-        if combine_vols:
-            return core.Volume.combine( list( vols.values() ), color = color )
-        return vols
-    elif isinstance(volume_name, type(None)):
+    if isinstance(volume_name, type(None)):
         module_logger.info('Retrieving list of available volumes.')
-    elif not isinstance(volume_name, str):
-        raise TypeError('Volume name must be str')
+    elif not isinstance(volume_name, (str, list, np.ndarray)):
+        raise TypeError('Volume name must be str or list of str.')
 
-    # First, get volume ID
+    volume_names = utils._make_iterable(volume_name)
+
+    # First, get volume IDs
     get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
 
     if not volume_name:
         return pd.DataFrame.from_dict(response)
 
-    volume_id = [e['id'] for e in response if e['name'] == volume_name]
+    volume_ids = [ e['id'] for e in response if e['name'] in volume_names ]
 
-    if not volume_id:
-        module_logger.error(
-            'Did not find a matching volume for name %s' % volume_name)
+    if len(volume_ids) != len(volume_names):
+        not_found = [ v for v in volume_names if v not in response.name.values ]
         raise Exception(
-            'Did not find a matching volume for name %s' % volume_name)
-    else:
-        volume_id = volume_id[0]
+               'No volume(s) found for: {}'.format(not_found.split(',')) )
 
-    # Now download volume
-    url = remote_instance._get_volume_details(volume_id)
-    response = remote_instance.fetch(url)
+    url_list = [ remote_instance._get_volume_details(v) for v in volume_ids ]
 
-    mesh_str = response['mesh']
-    mesh_name = response['name']
+    # Get data
+    responses = _get_urls_threaded(url_list, remote_instance, desc='Volumes')
 
-    mesh_type = re.search('<(.*?) ', mesh_str).group(1)
+    # Generate volume(s) from responses
+    volumes = {}
+    for r in responses:
+        mesh_str = r['mesh']
+        mesh_name = r['name']
+        mesh_id = r['id']
 
-    # Now reverse engineer the mesh
-    if mesh_type == 'IndexedTriangleSet':
-        t = re.search("index='(.*?)'", mesh_str).group(1).split(' ')
-        faces = [(int(t[i]), int(t[i + 1]), int(t[i + 2]))
-                 for i in range(0, len(t) - 2, 3)]
+        mesh_type = re.search('<(.*?) ', mesh_str).group(1)
 
-        v = re.search("point='(.*?)'", mesh_str).group(1).split(' ')
-        vertices = [(float(v[i]), float(v[i + 1]), float(v[i + 2]))
-                    for i in range(0,  len(v) - 2, 3)]
+        # Now reverse engineer the mesh
+        if mesh_type == 'IndexedTriangleSet':
+            t = re.search("index='(.*?)'", mesh_str).group(1).split(' ')
+            faces = [(int(t[i]), int(t[i + 1]), int(t[i + 2]))
+                     for i in range(0, len(t) - 2, 3)]
 
-    elif mesh_type == 'IndexedFaceSet':
-        # For this type, each face is indexed and an index of -1 indicates the
-        # end of this face set
-        t = re.search("coordIndex='(.*?)'", mesh_str).group(1).split(' ')
-        faces = []
-        this_face = []
-        for f in t:
-            if int(f) != -1:
-                this_face.append(int(f))
-            else:
-                faces.append(this_face)
-                this_face = []
+            v = re.search("point='(.*?)'", mesh_str).group(1).split(' ')
+            vertices = [(float(v[i]), float(v[i + 1]), float(v[i + 2]))
+                        for i in range(0,  len(v) - 2, 3)]
 
-        # Make sure the last face is also appended
-        faces.append(this_face)
+        elif mesh_type == 'IndexedFaceSet':
+            # For this type, each face is indexed and an index of -1 indicates the
+            # end of this face set
+            t = re.search("coordIndex='(.*?)'", mesh_str).group(1).split(' ')
+            faces = []
+            this_face = []
+            for f in t:
+                if int(f) != -1:
+                    this_face.append(int(f))
+                else:
+                    faces.append(this_face)
+                    this_face = []
 
-        v = re.search("point='(.*?)'", mesh_str).group(1).split(' ')
-        vertices = [(float(v[i]), float(v[i + 1]), float(v[i + 2]))
-                    for i in range(0,  len(v) - 2, 3)]
+            # Make sure the last face is also appended
+            faces.append(this_face)
 
-    else:
-        module_logger.error("Unknown volume type: %s" % mesh_type)
-        raise Exception("Unknown volume type: %s" % mesh_type)
+            v = re.search("point='(.*?)'", mesh_str).group(1).split(' ')
+            vertices = [(float(v[i]), float(v[i + 1]), float(v[i + 2]))
+                        for i in range(0,  len(v) - 2, 3)]
 
-    # For some reason, in this format vertices occur multiple times - we have
-    # to collapse that to get a clean mesh
-    final_faces = []
-    final_vertices = []
+        else:
+            module_logger.error("Unknown volume type: %s" % mesh_type)
+            raise Exception("Unknown volume type: %s" % mesh_type)
 
-    for t in faces:
-        this_faces = []
-        for v in t:
-            if vertices[v] not in final_vertices:
-                final_vertices.append(vertices[v])
+        # For some reason, in this format vertices occur multiple times - we have
+        # to collapse that to get a clean mesh
+        final_faces = []
+        final_vertices = []
 
-            this_faces.append(final_vertices.index(vertices[v]))
+        for t in faces:
+            this_faces = []
+            for v in t:
+                if vertices[v] not in final_vertices:
+                    final_vertices.append(vertices[v])
 
-        final_faces.append(this_faces)
+                this_faces.append(final_vertices.index(vertices[v]))
 
-    module_logger.debug('Volume type: %s' % mesh_type)
-    module_logger.debug(
-        '# of vertices after clean-up: %i' % len(final_vertices))
-    module_logger.debug(
-        '# of faces after clean-up: %i' % len(final_faces))
+            final_faces.append(this_faces)
 
-    return core.Volume(name=volume_name,
-                       volume_id=volume_id,
-                       vertices=final_vertices,
-                       faces=final_faces,
-                       color=color)
+        module_logger.debug('Volume type: %s' % mesh_type)
+        module_logger.debug(
+            '# of vertices after clean-up: %i' % len(final_vertices))
+        module_logger.debug(
+            '# of faces after clean-up: %i' % len(final_faces))
+
+        v = core.Volume(   name=mesh_name,
+                           volume_id=mesh_id,
+                           vertices=final_vertices,
+                           faces=final_faces,
+                           color=color)
+
+        volumes[mesh_name] = v
+
+    # Return just the volume if a single one was requested
+    if len(volumes) == 1:
+        return volumes[ volumes.keys()[0] ]
+
+    return volumes
 
 
 def get_annotation_list(remote_instance=None):
@@ -4833,7 +4829,7 @@ def rename_neurons( x, new_names, remote_instance=None, no_prompt=False ):
     return
 
 def get_label_list(remote_instance=None):
-    """ Retrieves all labels (treenode tags) in a project.
+    """ Retrieves all labels (TREENODE tags only) in a project.
 
     Parameters
     ----------
