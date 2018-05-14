@@ -1685,12 +1685,12 @@ def get_connector_details(x, remote_instance=None):
         DataFrame in which each row represents a connector:
 
         >>> df
-        ...   connector_id  presynaptic_to  postsynaptic_to  presynaptic_to_node
+        ...   connector_id  presynaptic_to  postsynaptic_to  
         ... 0
         ... 1
         ... 2
         ...
-        ... postsynaptic_to_node
+        ...   presynaptic_to_node  postsynaptic_to_node
         ... 0
         ... 1
         ... 2

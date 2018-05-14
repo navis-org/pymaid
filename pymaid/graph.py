@@ -66,7 +66,7 @@ def network2nx(x, remote_instance=None, threshold=1):
                         Either pass directly to function or define globally
                         as 'remote_instance'.
     threshold :         int, optional
-                        Connections weaker than this will be excluded .
+                        Connections weaker than this will be excluded.
 
     Returns
     -------
@@ -237,7 +237,7 @@ def neuron2nx(x):
     edges = x.nodes[~x.nodes.parent_id.isnull()][['treenode_id','parent_id']].values
     # Collect weight
     weights = np.sqrt( np.sum( (nodes.loc[ edges[:,0], ['x','y','z'] ].values.astype(int)
-                                - nodes.loc[edges[:,1], ['x','y','z'] ].values.astype(int) )**2, axis=1) )
+                                - nodes.loc[ edges[:,1], ['x','y','z'] ].values.astype(int) )**2, axis=1) )
     # Generate weight dictionary
     edge_dict = np.array( [ { 'weight' : w } for w in weights ] )
     # Add weights to dictionary
@@ -250,7 +250,6 @@ def neuron2nx(x):
     g.add_edges_from( edges )
 
     return g
-
 
 def neuron2igraph(x):
     """ Turns CatmaidNeuron(s) into an iGraph graph. Requires iGraph to be

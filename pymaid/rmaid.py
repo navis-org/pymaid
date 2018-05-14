@@ -381,7 +381,7 @@ def neuron2r(neuron, convert_to_um=False):
     -----
     The way this works is essentially converting the PyMaid object back
     into what rcatmaid expects as a response from a CATMAID server, then
-    we are calling the same functions as in rcatmaid's 
+    we are calling the same functions as in rcatmaid's
     ``read.neuron.catmaid()``.
 
     Attention: Currently, the project ID saved as part of R neuronlist objects
@@ -549,7 +549,7 @@ def dotprops2py(dp, subset=None):
 
 
 def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_count(), UseAlpha=False):
-    """ Wrapper to use R's ``nat:nblast_allbyall`` 
+    """ Wrapper to use R's ``nat:nblast_allbyall``
     (https://github.com/jefferislab/nat.nblast/).
 
     Parameters
@@ -561,7 +561,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     normalize :     bool, optional
                     If true, matrix is normalized using z-score.
     n_cores :       int, optional
-                    Number of cores to use for nblasting. Default is 
+                    Number of cores to use for nblasting. Default is
                     ``os.cpu_count()``.
     UseAlpha :      bool, optional
                     Emphasises neurons' straight parts (backbone) over parts
@@ -648,7 +648,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
         matrix = (matrix - matrix.mean()) / matrix.std()
 
     module_logger.info(
-        'Done! Use results.plot_mpl() and matplotlib.pyplot.show() to plot dendrogram.')
+        'Done! Use results.plot_dendrgram() and matplotlib.pyplot.show() to plot dendrogram.')
 
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
         name_dict = x.summary().set_index('skeleton_id')[
@@ -1024,5 +1024,5 @@ class NBLASTresults:
                 return self.db.rx(robjects.StrVector(entries))
         else:
             module_logger.error(
-                'Unable to intepret entries provided. See help(NBLASTresults.plot) for details.')
+                'Unable to intepret entries provided. See help(NBLASTresults.plot3d) for details.')
             return None
