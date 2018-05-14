@@ -4634,7 +4634,7 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
 
     # Return just the volume if a single one was requested
     if len(volumes) == 1:
-        return volumes[ volumes.keys()[0] ]
+        return list(volumes.values())[0]
 
     return volumes
 
