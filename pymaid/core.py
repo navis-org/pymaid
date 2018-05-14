@@ -2126,20 +2126,23 @@ class CatmaidNeuronList:
         self.get_skeletons(skip_existing=True)
         return plotting.plot2d(self, **kwargs)
 
-    def has_annotation(self, x, intersect=False, partial=False):
+    def has_annotation(self, x, intersect=False, partial=False, raise_not_found=True):
         """Filter neurons by their annotations.
 
         Parameters
         ----------
-        x :             {str, list of str}
-                        Annotation(s) to filter for. Use tilde (~) as prefix
-                        to look for neurons WITHOUT given annotation(s).
-        intersect :     bool, optional
-                        If True, neuron must have/not have ALL provided
-                        annotations. Applies to include and exclude (~ prefix)
-                        annotations separately.
-        partial :       bool, optional
-                        If True, allow partial match of annotation.
+        x :               {str, list of str}
+                          Annotation(s) to filter for. Use tilde (~) as prefix
+                          to look for neurons WITHOUT given annotation(s).
+        intersect :       bool, optional
+                          If True, neuron must have/not have ALL provided
+                          annotations. Applies to include and exclude
+                          (~ prefix) annotations separately.
+        partial :         bool, optional
+                          If True, allow partial match of annotation.
+        raise_not_found : bool, optional
+                          If True, will raise exception if no match is found.
+                          If False, will simply return empty list.
 
         Returns
         -------
@@ -2187,7 +2190,7 @@ class CatmaidNeuronList:
 
         selection = [ n for n in inc_sel if n not in exc_sel ]
 
-        if not selection:
+        if not selection and raise_not_found:
             raise ValueError('No neurons with matching annotation(s) found')
         else:
             return CatmaidNeuronList(selection, make_copy=self.copy_on_subset)
