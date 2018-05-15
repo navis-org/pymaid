@@ -5,7 +5,7 @@ python:
 install:
   - pip install -U pip
   - pip install -U setuptools
-  - python setup.py develop
+  - pip install -e .
   - pip install coveralls
   - pip install pyoctree # additional requirement for fast intersections
   - pip install shapely # additional requirement for 2d shapes
