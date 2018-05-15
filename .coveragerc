@@ -1,0 +1,7 @@
+[run]
+omit =
+    pymaid/__init__py
+    pymaid/b3d.py
+    pymaid/cytoscape.py
+    pymaid/rmaid.py
+    setup.py

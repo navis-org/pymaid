@@ -1,10 +1,14 @@
 language: python
 python:
-  - "3.5"  
+  - "3.5"
 # command to install dependencies
 install:
   - pip install .
   - pip install pyoctree # additional requirement for fast intersections
-  - pip install shapely # additiona requirement for 2d shapes
+  - pip install shapely # additional requirement for 2d shapes
+  - pip install pytest-cov # to get .coverage report via pytest
 # command to run tests
-script: pytest --verbose
+script: pytest --cov=./ --verbose
+# push coverage results to coverall
+after_succes:
+  - coveralls
