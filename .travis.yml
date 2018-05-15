@@ -10,5 +10,5 @@ install:
 # command to run tests
 script: pytest --cov=./ --verbose
 # push coverage results to coverall
-after_succes:
+after_success:
   - coveralls
