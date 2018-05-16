@@ -60,4 +60,6 @@ setup(
     ],
 
     python_requires='>=3.4',
+
+    zip_safe = False
 )
