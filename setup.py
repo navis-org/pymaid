@@ -43,10 +43,8 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
 
-    #setup_requires=[ 'numpy>=1.12.1' ], #pyoctree's install requires numpy to install but didn't specify that, so we have to do that for it
-
     install_requires=[
-        "networkx>=2.1",
+        "decorator>=4.1.0",
         "scipy>=1.0.0",
         "numpy>=1.13.0",
         "matplotlib>=2.2.0",
@@ -55,7 +53,8 @@ setup(
         "vispy>=0.5.3",
         "tqdm>=4.14.0",
         "pyqt5",
-        "pypng"
+        "pypng",
+        "networkx>=2.1",
         #"rpy2>=2.8.5", #This throws an error when no R is installed on the system
     ],
 
