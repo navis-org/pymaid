@@ -45,7 +45,8 @@ __all__ = ['neuron2json', 'json2neuron',
 # Import mods from pymaid
 mods = {}
 for m in ['morpho', 'core', 'plotting', 'graph', 'graph_utils', 'core',
-          'connectivity', 'user_stats', 'cluster', 'resample', 'intersect', 'fetch']:
+          'scene3d', 'connectivity', 'user_stats', 'cluster', 'resample',
+          'intersect', 'fetch']:
     try:
         mods[m] = importlib.import_module('pymaid.{}'.format(m))
     except:
