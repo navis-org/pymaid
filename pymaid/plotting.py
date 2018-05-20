@@ -515,7 +515,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                 ax.get_children(
                 )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
 
-            coords = neuron.connectors[['x', 'y', 'z']].as_matrix()
+            coords = neuron.connectors[['x', 'y', 'z']].values
             coords[:, 1] *= -1
             lim.append(coords.max(axis=0))
             lim.append(coords.min(axis=0))
@@ -528,9 +528,9 @@ def plot2d(x, method='2d', *args, **kwargs):
             ['x_vec', 'y_vec', 'z_vec']] / 2
 
         starts = neuron.points[['x', 'y', 'z']
-                               ].as_matrix() - halfvect.as_matrix()
+                               ].values - halfvect.values
         ends = neuron.points[['x', 'y', 'z']
-                             ].as_matrix() + halfvect.as_matrix()
+                             ].values + halfvect.values
 
         try:
             this_color = colormap[neuron.gene_name]
@@ -1057,9 +1057,9 @@ def plot3d(x, *args, **kwargs):
 
                     if syn_lay['display'] == 'mpatches.Circles':
                         trace_data.append(go.Scatter3d(
-                            x=this_cn.x.as_matrix() * -1,
-                            y=this_cn.z.as_matrix() * -1,  # y and z are switched
-                            z=this_cn.y.as_matrix() * -1,
+                            x=this_cn.x.values * -1,
+                            y=this_cn.z.values * -1,  # y and z are switched
+                            z=this_cn.y.values * -1,
                             mode='markers',
                             marker=dict(
                                 color='rgb%s' % str(color),
@@ -1073,12 +1073,9 @@ def plot3d(x, *args, **kwargs):
                         # Find associated treenode
                         tn = neuron.nodes.set_index(
                             'treenode_id').ix[this_cn.treenode_id.tolist()]
-                        x_coords = [n for sublist in zip(this_cn.x.as_matrix(
-                        ) * -1, tn.x.as_matrix() * -1, [None] * this_cn.shape[0]) for n in sublist]
-                        y_coords = [n for sublist in zip(this_cn.y.as_matrix(
-                        ) * -1, tn.y.as_matrix() * -1, [None] * this_cn.shape[0]) for n in sublist]
-                        z_coords = [n for sublist in zip(this_cn.z.as_matrix(
-                        ) * -1, tn.z.as_matrix() * -1, [None] * this_cn.shape[0]) for n in sublist]
+                        x_coords = [n for sublist in zip(this_cn.x.values * -1, tn.x.values * -1, [None] * this_cn.shape[0]) for n in sublist]
+                        y_coords = [n for sublist in zip(this_cn.y.values * -1, tn.y.values * -1, [None] * this_cn.shape[0]) for n in sublist]
+                        z_coords = [n for sublist in zip(this_cn.z.values * -1, tn.z.values * -1, [None] * this_cn.shape[0]) for n in sublist]
 
                         trace_data.append(go.Scatter3d(
                             x=x_coords,
@@ -1100,9 +1097,9 @@ def plot3d(x, *args, **kwargs):
                 ['x_vec', 'y_vec', 'z_vec']] / 2 * scale_vect
 
             starts = neuron.points[['x', 'y', 'z']
-                                   ].as_matrix() - halfvect.as_matrix()
+                                   ].values - halfvect.values
             ends = neuron.points[['x', 'y', 'z']
-                                 ].as_matrix() + halfvect.as_matrix()
+                                 ].values + halfvect.values
 
             x_coords = [n for sublist in zip(
                 starts[:, 0] * -1, ends[:, 0] * -1, [None] * starts.shape[0]) for n in sublist]
@@ -1842,9 +1839,9 @@ def _neuron2vispy(x, **kwargs):
 
             # Extract treenode_coordinates and their parent's coordinates
             tn_coords = nodes[['x', 'y', 'z']].apply(
-                pd.to_numeric).as_matrix()
+                pd.to_numeric).values
             parent_coords = neuron.nodes.set_index('treenode_id').loc[nodes.parent_id.tolist(
-            )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
+            )][['x', 'y', 'z']].apply(pd.to_numeric).values
 
             # Turn coordinates into segments
             segments = [item for sublist in zip(
@@ -1858,14 +1855,14 @@ def _neuron2vispy(x, **kwargs):
                         morpho.strahler_index(neuron)
 
                     # Generate list of alpha values
-                    alpha = neuron.nodes['strahler_index'].as_matrix()
+                    alpha = neuron.nodes['strahler_index'].values
 
                 if kwargs.get('by_confidence', False):
                     if 'arbor_confidence' not in neuron.nodes:
                         morpho.arbor_confidence(neuron)
 
                     # Generate list of alpha values
-                    alpha = neuron.nodes['arbor_confidence'].as_matrix()
+                    alpha = neuron.nodes['arbor_confidence'].values
 
                 # Pop root from coordinate lists
                 alpha = np.delete(alpha, root_ix, axis=0)
@@ -1913,7 +1910,7 @@ def _neuron2vispy(x, **kwargs):
                 radius = soma.ix[soma.index[0]].radius
                 sp = create_sphere(5, 5, radius=radius)
                 s = scene.visuals.Mesh(vertices=sp.get_vertices() + soma.ix[soma.index[0]][
-                                       ['x', 'y', 'z']].as_matrix(),
+                                       ['x', 'y', 'z']].values,
                                        faces=sp.get_faces(),
                                        color=neuron_color)
 
@@ -1948,7 +1945,7 @@ def _neuron2vispy(x, **kwargs):
                     continue
 
                 pos = this_cn[['x', 'y', 'z']].apply(
-                    pd.to_numeric).as_matrix()
+                    pd.to_numeric).values
 
                 if syn_lay['display'] == 'mpatches.Circles':
                     con = scene.visuals.Markers()
@@ -1960,7 +1957,7 @@ def _neuron2vispy(x, **kwargs):
 
                 elif syn_lay['display'] == 'lines':
                     tn_coords = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.tolist(
-                    )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
+                    )][['x', 'y', 'z']].apply(pd.to_numeric).values
 
                     segments = [item for sublist in zip(
                         pos, tn_coords) for item in sublist]
@@ -2034,9 +2031,9 @@ def _dp2vispy(x, **kwargs):
             ['x_vec', 'y_vec', 'z_vec']] / 2 * scale_vect
 
         starts = n.points[['x', 'y', 'z']
-                          ].as_matrix() - halfvect.as_matrix()
+                          ].values - halfvect.values
         ends = n.points[['x', 'y', 'z']
-                        ].as_matrix() + halfvect.as_matrix()
+                        ].values + halfvect.values
 
         segments = [item for sublist in zip(
             starts, ends) for item in sublist]

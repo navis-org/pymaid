@@ -142,10 +142,10 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
         volume = fetch.get_volume(volume, remote_instance)
 
     if isinstance(x, pd.DataFrame):
-        points = x[['x', 'y', 'z']].as_matrix()
+        points = x[['x', 'y', 'z']].values
     elif isinstance(x, core.CatmaidNeuron):
         in_v = in_volume(
-            x.nodes[['x', 'y', 'z']].as_matrix(), volume, mode=mode)
+            x.nodes[['x', 'y', 'z']].values, volume, mode=mode)
 
         # If mode is OUT, invert selection
         if mode == 'OUT':

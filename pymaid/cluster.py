@@ -609,7 +609,7 @@ def cluster_xyz(x, labels=None):
 
     # Generate numpy array containing x, y, z coordinates
     try:
-        s = x[['x', 'y', 'z']].as_matrix()
+        s = x[['x', 'y', 'z']].values
     except:
         module_logger.error(
             'Please provide dataframe connector data of exactly a single neuron')
