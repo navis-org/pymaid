@@ -44,7 +44,7 @@ setup(
     ],
 
     install_requires=[
-        "decorator>=4.1.0",
+        "decorator>=4.1.0", # This is required for networkx -> if not present, readthedocs acts up
         "scipy>=1.0.0",
         "numpy>=1.13.0",
         "matplotlib>=2.2.0",

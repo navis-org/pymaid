@@ -14,16 +14,13 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-import pylab
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 import math
 import logging
 import scipy.cluster
 import scipy.spatial
 import colorsys
-import sys
 
 from concurrent.futures import ThreadPoolExecutor
 
@@ -38,33 +35,32 @@ if utils.is_jupyter():
     tqdm = tqdm_notebook
     trange = tnrange
 
-import matplotlib as mpl
-from scipy.cluster.hierarchy import set_link_color_palette
-
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
-if len( module_logger.handlers ) == 0:
+if len(module_logger.handlers) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
+        '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted([  'cluster_by_connectivity',
-                    'cluster_by_synapse_placement','cluster_xyz',
-                    'ClustResults'])
+__all__ = sorted(['cluster_by_connectivity', 'cluster_by_synapse_placement',
+                  'cluster_xyz', 'ClustResults'])
 
 # Default settings for progress bars
 pbar_hide = False
 pbar_leave = True
 
-def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=True,
-                            threshold=1, include_skids=None, exclude_skids=None, min_nodes=2,
-                            similarity='vertex_normalized', connectivity_table=None, cluster_kws={}):
+
+def cluster_by_connectivity(x, remote_instance=None, upstream=True,
+                            downstream=True, threshold=1, include_skids=None,
+                            exclude_skids=None, min_nodes=2,
+                            similarity='vertex_normalized',
+                            connectivity_table=None, cluster_kws={}):
     """ Calculate connectivity similarity.
 
     Parameters
@@ -102,8 +98,8 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
                          similarity
     connectivity_table : pd.DataFrame, optional
                          Connectivity table, e.g. from
-                         :func:`~pymaid.get_partners`. If provided, will use 
-                         this instead of querying CATMAID server. Filters 
+                         :func:`~pymaid.get_partners`. If provided, will use
+                         this instead of querying CATMAID server. Filters
                          still apply!
 
     Returns
@@ -125,19 +121,9 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     >>> # Plot a dendrogram
     >>> fig = res.plot_dendrogram()
     >>> plt.show()
-    
     """
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
-        else:
-            module_logger.error(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
-            raise Exception(
-                'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
     neurons = utils.eval_skids(x, remote_instance=remote_instance)
@@ -156,10 +142,10 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         connectivity = fetch.get_partners(
             neurons, remote_instance, min_size=min_nodes, threshold=threshold)
     else:
-        connectivity = connectivity_table[ ( connectivity_table.num_nodes >= min_nodes ) &
-                                           ( connectivity_table.total >= threshold ) ]
+        connectivity = connectivity_table[(connectivity_table.num_nodes >= min_nodes) &
+                                          (connectivity_table.total >= threshold)]
 
-    if not isinstance( include_skids, type(None) ) or not isinstance(exclude_skids, type(None)):
+    if not isinstance(include_skids, type(None)) or not isinstance(exclude_skids, type(None)):
         module_logger.info(
             'Filtering connectivity. %i entries before filtering' % (connectivity.shape[0]))
 
@@ -176,7 +162,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
     # Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)!
     # This is AFTER filtering! Total number of partners can be altered!
-    number_of_partners = { n: {'upstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'upstream')].shape[0],
+    number_of_partners = {n: {'upstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'upstream')].shape[0],
                               'downstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'downstream')].shape[0]
                               }
                           for n in neurons}
@@ -188,7 +174,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
 
     matching_scores = {}
 
-    if similarity in ['vertex_normalized','vertex']:
+    if similarity in ['vertex_normalized', 'vertex']:
         vertex_score = True
     else:
         vertex_score = False
@@ -206,18 +192,20 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
         if this_cn.shape[0] == 0:
             module_logger.warning('No %s partners found: filtered?' % d)
 
-        combinations = [ (nA,nB,this_cn,vertex_score,cn_subsets[nA],cn_subsets[nB],cluster_kws) for nA in neurons for nB in neurons ]
+        combinations = [(nA, nB, this_cn, vertex_score, cn_subsets[nA],
+                         cn_subsets[nB], cluster_kws) for nA in neurons for nB in neurons]
 
         with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
-            futures = e.map( _unpack_connectivity_helper, combinations  )
+            futures = e.map(_unpack_connectivity_helper, combinations)
 
-            matching_indices = [ n for n in tqdm(futures, total=len(combinations),
-                                                          desc=d,
-                                                          disable=pbar_hide,
-                                                          leave=pbar_leave ) ]
+            matching_indices = [n for n in tqdm(futures, total=len(combinations),
+                                                desc=d,
+                                                disable=pbar_hide,
+                                                leave=pbar_leave)]
 
-        for i,v in enumerate(combinations):
-            matching_scores[d].loc[ v[0],v[1] ] = matching_indices[i][similarity]
+        for i, v in enumerate(combinations):
+            matching_scores[d].loc[v[0], v[1]
+                                   ] = matching_indices[i][similarity]
 
     # Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
     # that have predominantly either only up- or downstream partners!
@@ -252,16 +240,19 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True, downstream=T
     #dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
     #dist_matrix.index = [ neuron_names[str(n)] for n in dist_matrix.index ]
 
-    results = ClustResults(dist_matrix, labels = [ neuron_names[str(n)] for n in dist_matrix.columns ], mat_type='similarity' )
+    results = ClustResults(dist_matrix, labels=[neuron_names[str(
+        n)] for n in dist_matrix.columns], mat_type='similarity')
 
     if isinstance(x, core.CatmaidNeuronList):
         results.neurons = x
 
     return results
 
+
 def _unpack_connectivity_helper(x):
     """Helper function to unpack values from pool"""
-    return _calc_connectivity_matching_index( x[0], x[1], x[2], vertex_score=x[3], nA_cn=x[4], nB_cn=x[5], **x[6]  )
+    return _calc_connectivity_matching_index(x[0], x[1], x[2], vertex_score=x[3], nA_cn=x[4], nB_cn=x[5], **x[6])
+
 
 def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_threshold=1, min_nodes=1, **kwargs):
     """ Calculates and returns various matching indices between two neurons.
@@ -363,13 +354,8 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     similarity_indices = {}
 
     if vertex_score:
-        # Get index of neuronA and neuronB -> itertuples unfortunately
-        # scrambles the column
-        nA_index = connectivity.columns.tolist().index(neuronA)
-        nB_index = connectivity.columns.tolist().index(neuronB)
-
         # We only need the columns for neuronA and neuronB
-        this_cn = total[ [neuronA, neuronB] ]
+        this_cn = total[[neuronA, neuronB]]
 
         # Get min and max between both neurons
         this_max = np.max(this_cn, axis=1)
@@ -377,14 +363,14 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
 
         # The max possible score is when both synapse counts are the same:
         # in which case score = max(x,y) - C1 * max(x,y) * e^(-C2 * max(x,y))
-        max_score = this_max - C1 * this_max * np.exp( - C2 * this_max )
+        max_score = this_max - C1 * this_max * np.exp(- C2 * this_max)
 
         # The smallest possible score is when either synapse count is 0:
         # in which case score = -C1 * max(a,b)
         min_score = -C1 * this_max
 
         # Implement: f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
-        v_sim = this_min - C1 * this_max * np.exp( - C2 * this_min )
+        v_sim = this_min - C1 * this_max * np.exp(- C2 * this_min)
 
         # Sum over all partners
         vertex_similarity = v_sim.sum()
@@ -393,7 +379,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
 
         try:
             similarity_indices['vertex_normalized'] = (
-                vertex_similarity - min_score.sum() ) / (max_score.sum() - min_score.sum())
+                vertex_similarity - min_score.sum()) / (max_score.sum() - min_score.sum())
         except:
             similarity_indices['vertex_normalized'] = 0
 
@@ -414,11 +400,14 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
 
     return similarity_indices
 
+
 def _unpack_synapse_helper(x):
     """Helper function to unpack values from pool."""
-    return _calc_synapse_similarity( x[0], x[1], x[2], x[3], x[4] )
+    return _calc_synapse_similarity(x[0], x[1], x[2], x[3], x[4])
 
-def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000, restrict_cn=None):
+
+def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000, 
+                             restrict_cn=None):
     """ Calculates synapses similarity score.
 
     Notes
@@ -448,59 +437,64 @@ def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000, restrict_cn=None)
     all_values = []
 
     # Get the connector types that we want to compare between neuron A and B
-    if isinstance( restrict_cn, type(None) ):
+    if isinstance(restrict_cn, type(None)):
         # If no restrictions, get all cn types in neuron A
         cn_to_check = cnA.relation.unique()
     else:
         # Intersect restricted connectors and actually available types
-        cn_to_check = set( cnA.relation.unique() ) & set( restrict_cn )
+        cn_to_check = set(cnA.relation.unique()) & set(restrict_cn)
 
     # Iterate over all types of connectors
     for r in cn_to_check:
         # Skip if either neuronA or neuronB don't have this synapse type
-        if cnB[ cnB.relation == r ].empty:
-            all_values += [0] * cnA[ cnA.relation == r ].shape[0]
+        if cnB[cnB.relation == r].empty:
+            all_values += [0] * cnA[cnA.relation == r].shape[0]
             continue
 
-        #Get inter-neuron matrix
-        dist_mat = scipy.spatial.distance.cdist(  cnA[ cnA.relation == r ][['x','y','z']],
-                                                  cnB[ cnB.relation == r ][['x','y','z']] )
+        # Get inter-neuron matrix
+        dist_mat = scipy.spatial.distance.cdist(cnA[cnA.relation == r][['x', 'y', 'z']],
+                                                cnB[cnB.relation == r][['x', 'y', 'z']])
 
-        #Get index of closest synapse in neuron B
-        closest_ix = np.argmin(dist_mat,axis=1)
+        # Get index of closest synapse in neuron B
+        closest_ix = np.argmin(dist_mat, axis=1)
 
-        #Get closest distances
+        # Get closest distances
         closest_dist = dist_mat.min(axis=1)
 
-        #Get intra-neuron matrices for synapse density checking
-        distA = scipy.spatial.distance.pdist( cnA[ cnA.relation == r ][['x','y','z']] )
+        # Get intra-neuron matrices for synapse density checking
+        distA = scipy.spatial.distance.pdist(
+            cnA[cnA.relation == r][['x', 'y', 'z']])
         distA = scipy.spatial.distance.squareform(distA)
-        distB = scipy.spatial.distance.pdist( cnB[ cnB.relation == r ][['x','y','z']] )
+        distB = scipy.spatial.distance.pdist(
+            cnB[cnB.relation == r][['x', 'y', 'z']])
         distB = scipy.spatial.distance.squareform(distB)
 
-        #Calculate number of synapses closer than OMEGA. This does count itself!
+        # Calculate number of synapses closer than OMEGA. This does count itself!
         closeA = (distA <= omega).sum(axis=1)
         closeB = (distB <= omega).sum(axis=1)
 
-        #Now calculate the scores over all synapses
+        # Now calculate the scores over all synapses
         for a in range(distA.shape[0]):
-            this_synapse_value = math.exp( -1 * math.fabs(closeA[a] - closeB[ closest_ix[a] ]) / (closeA[a] + closeB[ closest_ix[a] ]) ) * math.exp( -1 * (closest_dist[a]**2) / (2 * sigma**2))
+            this_synapse_value = math.exp(-1 * math.fabs(closeA[a] - closeB[closest_ix[a]]) / (
+                closeA[a] + closeB[closest_ix[a]])) * math.exp(-1 * (closest_dist[a]**2) / (2 * sigma**2))
             all_values.append(this_synapse_value)
 
-    score = sum(all_values)/len(all_values)
+    score = sum(all_values) / len(all_values)
 
     return score
 
-def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restrict_cn=None, remote_instance=None):
+
+def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
+                                 restrict_cn=None, remote_instance=None):
     """ Clusters neurons based on their synapse placement.
 
     Notes
     -----
     Distances score is calculated by calculating for each synapse of
     neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
-    and (2) comparing the synapse density around synapse A and B. 
-    This is type-sensitive: presynapses will only be matched with presynapses, 
-    post with post, etc. The formula is described in 
+    and (2) comparing the synapse density around synapse A and B.
+    This is type-sensitive: presynapses will only be matched with presynapses,
+    post with post, etc. The formula is described in
     Schlegel et al., eLife (2017).
 
     Parameters
@@ -528,7 +522,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
                             - 2: gap junctions
                             - 3: abutting connectors
                         If None, will use all connectors. Use either single
-                        integer or list. E.g. ``restrict_cn=[0,1]`` to use  
+                        integer or list. E.g. ``restrict_cn=[0,1]`` to use
                         only pre- and postsynapses.
     remote_instance :   CatmaidInstance, optional
                         Need to provide if neurons are only skids or
@@ -543,43 +537,40 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True, restr
     """
 
     if not isinstance(x, core.CatmaidNeuronList):
-        if remote_instance is None:
-            if 'remote_instance' in sys.modules:
-                remote_instance = sys.modules['remote_instance']
-            elif 'remote_instance' in globals():
-                remote_instance = globals()['remote_instance']
-            else:
-                raise Exception(
-                    'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+        remote_instance = utils._eval_remote_instance(remote_instance)
         neurons = fetch.get_neuron(x, remote_instance=remote_instance)
     else:
         neurons = x
 
     # If single value, turn into list
-    if not isinstance(restrict_cn, ( type(None), list, set, np.ndarray )):
-        restrict_cn = [ restrict_cn ]
+    if not isinstance(restrict_cn, (type(None), list, set, np.ndarray)):
+        restrict_cn = [restrict_cn]
 
     sim_matrix = pd.DataFrame(
-        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, columns=neurons.skeleton_id)
+        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, 
+                                                columns=neurons.skeleton_id)
 
-    combinations = [ (nA.connectors,nB.connectors,sigma,omega,restrict_cn) for nA in neurons for nB in neurons ]
-    comb_skids = [ (nA.skeleton_id,nB.skeleton_id) for nA in neurons for nB in neurons ]
+    combinations = [(nA.connectors, nB.connectors, sigma, omega, restrict_cn)
+                    for nA in neurons for nB in neurons]
+    comb_skids = [(nA.skeleton_id, nB.skeleton_id)
+                  for nA in neurons for nB in neurons]
 
     with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
-        futures = e.map( _unpack_synapse_helper, combinations  )
+        futures = e.map(_unpack_synapse_helper, combinations)
 
-        scores = [ n for n in tqdm(futures, total=len(combinations),
-                                   desc='Processing',
-                                   disable=pbar_hide,
-                                   leave=pbar_leave ) ]
+        scores = [n for n in tqdm(futures, total=len(combinations),
+                                  desc='Processing',
+                                  disable=pbar_hide,
+                                  leave=pbar_leave)]
 
-    for i,v in enumerate(combinations):
-        sim_matrix.loc[ comb_skids[i][0], comb_skids[i][1] ] = scores[i]
+    for i, v in enumerate(combinations):
+        sim_matrix.loc[comb_skids[i][0], comb_skids[i][1]] = scores[i]
 
     if mu_score:
         sim_matrix = (sim_matrix + sim_matrix.T) / 2
 
-    res = ClustResults(sim_matrix, mat_type='similarity', labels = [ neurons.skid[ str(s) ].neuron_name for s in sim_matrix.columns ])
+    res = ClustResults(sim_matrix, mat_type='similarity', labels=[
+                       neurons.skid[str(s)].neuron_name for s in sim_matrix.columns])
     res.neurons = neurons
 
     return res
@@ -681,14 +672,14 @@ class ClustResults:
 
         """
         if mat_type not in ClustResults._PERM_MAT_TYPES:
-            raise ValueError('Matrix type "{0}" unkown.'.format(mat_type) )
+            raise ValueError('Matrix type "{0}" unkown.'.format(mat_type))
 
         if mat_type == 'similarity':
-            self.dist_mat = self._invert_mat( mat )
+            self.dist_mat = self._invert_mat(mat)
             self.sim_mat = mat
         else:
             self.dist_mat = mat
-            self.sim_mat = self._invert_mat( mat )
+            self.sim_mat = self._invert_mat(mat)
 
         self.labels = labels
         self.mat_type = mat_type
@@ -701,11 +692,11 @@ class ClustResults:
             self.cluster()
             return self.linkage
         elif key == 'condensed_dist_mat':
-             return scipy.spatial.distance.squareform( self.dist_mat, checks=False )
+            return scipy.spatial.distance.squareform(self.dist_mat, checks=False)
         elif key in ['leafs', 'leaves']:
             return self.get_leafs()
         elif key == 'cophenet':
-             return self.calc_cophenet()
+            return self.calc_cophenet()
         elif key == 'agg_coeff':
             return self.calc_agg_coeff()
 
@@ -738,7 +729,7 @@ class ClustResults:
 
         """
 
-        return scipy.cluster.hierarchy.cophenet( self.linkage, self.condensed_dist_mat )
+        return scipy.cluster.hierarchy.cophenet(self.linkage, self.condensed_dist_mat)
 
     def calc_agg_coeff(self):
         """ Returns the agglomerative coefficient. This measures the clustering
@@ -754,25 +745,27 @@ class ClustResults:
         """
 
         # Turn into pandas DataFrame for fancy indexing
-        Z = pd.DataFrame(self.linkage, columns = ['obs1','obs2','dist','n_org'] )
+        Z = pd.DataFrame(self.linkage, columns=[
+                         'obs1', 'obs2', 'dist', 'n_org'])
 
         # Get all distances at which an original observation is merged
-        all_dist = Z[ ( Z.obs1.isin(self.leafs) ) | (Z.obs2.isin(self.leafs) ) ].dist.values
+        all_dist = Z[(Z.obs1.isin(self.leafs)) | (
+            Z.obs2.isin(self.leafs))].dist.values
 
         # Divide all distances by last merger
         all_dist /= self.linkage[-1][2]
 
         # Calc final coefficient
-        coeff = np.mean( 1 - all_dist )
+        coeff = np.mean(1 - all_dist)
 
         return coeff
 
     def _invert_mat(self, sim_mat):
         """ Inverts matrix."""
-        if isinstance( sim_mat, pd.DataFrame ):
-            return ( sim_mat - sim_mat.max().max() ) * -1
+        if isinstance(sim_mat, pd.DataFrame):
+            return (sim_mat - sim_mat.max().max()) * -1
         else:
-            return ( sim_mat - sim_mat.max() ) * -1
+            return (sim_mat - sim_mat.max()) * -1
 
     def cluster(self, method='ward'):
         """ Cluster distance matrix. This will automatically be called when
@@ -788,12 +781,13 @@ class ClustResults:
 
         # Use condensed distance matrix - otherwise clustering thinks we are
         # passing observations instead of final scores
-        self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat, method=method)
+        self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat,
+                                                       method=method)
 
         # Save method in case we want to look it up later
         self.cluster_method = method
 
-        module_logger.info('Clustering done using method "{0}"'.format(method) )
+        module_logger.info('Clustering done using method "{0}"'.format(method))
 
     def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None, **kwargs):
         """ Plot dendrogram using matplotlib.
@@ -818,23 +812,24 @@ class ClustResults:
                             If ``return_dendrogram=True``.
 
         """
+        import matplotlib.pyplot as plt
 
-        if isinstance( labels, type(None)):
+        if isinstance(labels, type(None)):
             labels = self.labels
         elif isinstance(labels, dict):
-            labels = [ labels[l] for l in self.labels ]
+            labels = [labels[l] for l in self.labels]
 
         if not fig:
             fig = plt.figure()
 
-        dn_kwargs = {'leaf_rotation':90,
-                     'above_threshold_color':'k'}
+        dn_kwargs = {'leaf_rotation': 90,
+                     'above_threshold_color': 'k'}
         dn_kwargs.update(kwargs)
 
         dn = scipy.cluster.hierarchy.dendrogram(self.linkage,
-                                          color_threshold=color_threshold,
-                                          labels=labels,
-                                          **dn_kwargs)
+                                                color_threshold=color_threshold,
+                                                labels=labels,
+                                                **dn_kwargs)
         module_logger.info(
             'Use matplotlib.pyplot.show() to render dendrogram.')
 
@@ -870,6 +865,8 @@ class ClustResults:
 
         """
 
+        import matplotlib.pyplot as plt
+
         try:
             import seaborn as sns
         except:
@@ -902,6 +899,7 @@ class ClustResults:
         matplotlib figure
 
         """
+        import pylab
 
         # Compute and plot first dendrogram for all nodes.
         fig = pylab.figure(figsize=(8, 8))
@@ -913,7 +911,8 @@ class ClustResults:
 
         # Compute and plot second dendrogram.
         ax2 = fig.add_axes([0.3, 0.71, 0.6, 0.2])
-        Z2 = scipy.cluster.hierarchy.dendrogram(self.linkage, labels=self.labels)
+        Z2 = scipy.cluster.hierarchy.dendrogram(
+            self.linkage, labels=self.labels)
         ax2.set_xticks([])
         ax2.set_yticks([])
 
@@ -997,17 +996,19 @@ class ClustResults:
         cmap = self.get_colormap(k=k, criterion=criterion)
 
         # Convert to 0-255
-        cmap = { n : [ int(v*255) for v in cmap[n] ] for n in cmap }
+        cmap = {n: [int(v * 255) for v in cmap[n]] for n in cmap}
 
-        data = [ dict(skeleton_id=int(n),
-                     color="#{:02x}{:02x}{:02x}".format( cmap[n][0],cmap[n][1],cmap[n][2] ),
+        data = [dict(skeleton_id=int(n),
+                     color="#{:02x}{:02x}{:02x}".format(
+                         cmap[n][0], cmap[n][1], cmap[n][2]),
                      opacity=1
-                     ) for n in cmap ]
+                     ) for n in cmap]
 
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        module_logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
+        module_logger.info('Selection saved as %s in %s' %
+                           (fname, os.getcwd()))
 
         return
 
@@ -1059,9 +1060,10 @@ class ClustResults:
 
         """
 
-        cl = scipy.cluster.hierarchy.fcluster(self.linkage, k, criterion=criterion)
+        cl = scipy.cluster.hierarchy.fcluster(
+            self.linkage, k, criterion=criterion)
 
-        if self.labels and return_type.lower()=='labels':
+        if self.labels and return_type.lower() == 'labels':
             return [[self.labels[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
         elif return_type.lower() == 'rows':
             return [[self.dist_mat.columns.tolist()[j] for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
@@ -1086,34 +1088,43 @@ class ClustResults:
         try:
             import ete3
         except:
-            raise ImportError('Please install ete3 package to use this function.')
+            raise ImportError(
+                'Please install ete3 package to use this function.')
 
         max_dist = self.linkage[-1][2]
         n_original_obs = self.dist_mat.shape[0]
 
-        list_of_childs = { n_original_obs+i : e[:2] for i,e in enumerate(self.linkage) }
-        list_of_parents = { int(e[0]) : int(n_original_obs+i) for i,e in enumerate(self.linkage) }
-        list_of_parents.update( { int(e[1]) : int(n_original_obs+i) for i,e in enumerate(self.linkage) } )
+        list_of_childs = {n_original_obs + i: e[:2]
+                          for i, e in enumerate(self.linkage)}
+        list_of_parents = {int(e[0]): int(n_original_obs + i)
+                           for i, e in enumerate(self.linkage)}
+        list_of_parents.update(
+            {int(e[1]): int(n_original_obs + i) for i, e in enumerate(self.linkage)})
 
-        total_dist = { n_original_obs+i : e[2] for i,e in enumerate(self.linkage) }
+        total_dist = {n_original_obs + i: e[2]
+                      for i, e in enumerate(self.linkage)}
         # Process total distance into distances between nodes (root = 0)
-        dist_to_parent = { n : max_dist - total_dist[ list_of_parents[n] ] for n in list_of_parents }
+        dist_to_parent = {
+            n: max_dist - total_dist[list_of_parents[n]] for n in list_of_parents}
 
-        names = { i : n for i,n in enumerate(self.dist_mat.columns.tolist())}
+        names = {i: n for i, n in enumerate(self.dist_mat.columns.tolist())}
 
         # Create empty tree
         tree = ete3.Tree()
 
         # Start with root node
-        root = sorted ( list( list_of_childs.keys() ), reverse=True)[0]
-        treenodes = { root : tree.add_child() }
+        root = sorted(list(list_of_childs.keys()), reverse=True)[0]
+        treenodes = {root: tree.add_child()}
 
-        for k in sorted(list( list_of_childs.keys()), reverse=True):
+        for k in sorted(list(list_of_childs.keys()), reverse=True):
             e = list_of_childs[k]
-            treenodes[ e[0] ] = treenodes[k].add_child(dist=dist_to_parent[e[0]], name=names.get(e[0],None) )
-            treenodes[ e[1] ] = treenodes[k].add_child(dist=dist_to_parent[e[1]], name=names.get(e[1],None) )
+            treenodes[e[0]] = treenodes[k].add_child(
+                dist=dist_to_parent[e[0]], name=names.get(e[0], None))
+            treenodes[e[1]] = treenodes[k].add_child(
+                dist=dist_to_parent[e[1]], name=names.get(e[1], None))
 
         return tree
+
 
 def _calc_sparseness(x, mode='activity_ratio'):
     """ Calculates sparseness for a set of neurons.
@@ -1132,10 +1143,10 @@ def _calc_sparseness(x, mode='activity_ratio'):
 
     """
 
-    if mode not in ['activity_ratio','lifetime_sparseness','kurtosis']:
+    if mode not in ['activity_ratio', 'lifetime_sparseness', 'kurtosis']:
         raise ValueError('Unknown mode: {0}'.format(mode))
 
-    if isinstance(x, pandas.DataFrame):
+    if isinstance(x, pd.DataFrame):
         mat = x.as_matrix()
         names = x.columns.tolist()
     elif isinstance(x, np.ndarray):
@@ -1144,13 +1155,11 @@ def _calc_sparseness(x, mode='activity_ratio'):
     else:
         raise TypeError('Unable to process data of type {0}'.format(type(x)))
 
-    for i in range( mat.shape[1] ):
-        this_col = mat[:,i].T
-        this_col = this_col[ this_col > 0 ]
+    for i in range(mat.shape[1]):
+        this_col = mat[:, i].T
+        this_col = this_col[this_col > 0]
 
         if mode == 'activity_ratio':
-            a = ( sum(this_col) / len(this_col) ) **2 / ( sum(this_col ** 2) / len(this_col) )
-            S = 1-a
-
-
-
+            a = (sum(this_col) / len(this_col)) ** 2 / \
+                (sum(this_col ** 2) / len(this_col))
+            S = 1 - a

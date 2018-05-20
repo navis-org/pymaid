@@ -232,9 +232,8 @@ class handler:
 
         for s in x.segments:
             newSpline = cu.splines.new('POLY')
-            coords = np.vstack( [node_locs[tn] for tn in s ] )
-            coords *= self.conversion
-            coords = coords.tolist()
+            coords = np.vstack( [node_locs[tn] for tn in s ] ).astype(float)
+            coords *= float(self.conversion)
 
             ids = x.nodes.treenode_id.tolist()
 
@@ -283,8 +282,8 @@ class handler:
             cn_coords *= self.conversion
 
             tn_coords = x.nodes.set_index('treenode_id').ix[
-                con.treenode_id.tolist()][['x', 'y', 'z']].as_matrix()
-            tn_coords *= self.conversion
+                con.treenode_id.tolist()][['x', 'y', 'z']].values.astype(float)
+            tn_coords *= float(self.conversion)
 
             ob_name = '%s of %s' % (self.cn_dict[i]['name'], x.skeleton_id)
 

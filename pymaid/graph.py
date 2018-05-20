@@ -35,18 +35,18 @@ except:
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.DEBUG)
-if len( module_logger.handlers ) == 0:
+if len(module_logger.handlers) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
+        '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = sorted(['network2nx','network2igraph','neuron2igraph',
-                  'neuron2nx','neuron2KDTree'])
+__all__ = sorted(['network2nx', 'network2igraph', 'neuron2igraph',
+                  'neuron2nx', 'neuron2KDTree'])
 
 
 def network2nx(x, remote_instance=None, threshold=1):
@@ -98,31 +98,33 @@ def network2nx(x, remote_instance=None, threshold=1):
 
     """
 
-    if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str )):
+    if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str)):
         remote_instance = utils._eval_remote_instance(remote_instance)
         skids = utils.eval_skids(x, remote_instance=remote_instance)
 
         # Fetch edges
         edges = fetch.get_edges(skids, remote_instance=remote_instance)
         # Reformat into networkx format
-        edges = [[ str(e.source_skid), str(e.target_skid), {'weight': e.weight} ]
-                          for e in edges[edges.weight >= threshold].itertuples()]
+        edges = [[str(e.source_skid), str(e.target_skid), {'weight': e.weight}]
+                 for e in edges[edges.weight >= threshold].itertuples()]
     elif isinstance(x, pd.DataFrame):
         # Get skids (we have to account for the fact that some might not be skids)
         skids = []
-        for s in list(set( x.columns.tolist() + x.index.tolist() )):
+        for s in list(set(x.columns.tolist() + x.index.tolist())):
             try:
                 skids.append(int(s))
             except:
                 pass
         # Generate edge list
-        edges = [ [ str(s), str(t), { 'weight': x.loc[s,t] } ] for s in x.index.values for t in x.columns.values if x.loc[s,t] >= threshold ]
+        edges = [[str(s), str(t), {'weight': x.loc[s, t]}]
+                 for s in x.index.values for t in x.columns.values if x.loc[s, t] >= threshold]
     else:
-        raise ValueError('Unable to process data of type "{0}"'.format(type(x)))
+        raise ValueError(
+            'Unable to process data of type "{0}"'.format(type(x)))
 
     # Generate node dictionary
     names = fetch.get_names(skids, remote_instance=remote_instance)
-    nodes = [ [ str(s), { 'neuron_name' : names.get(s,s) } ] for s in skids ]
+    nodes = [[str(s), {'neuron_name': names.get(s, s)}] for s in skids]
 
     # Generate graph and assign custom properties
     g = nx.DiGraph()
@@ -172,14 +174,14 @@ def network2igraph(x, remote_instance=None, threshold=1):
     >>> g.save('graph.graphml')
 
     """
-    if igraph == None:
+    if igraph is None:
         raise ImportError('igraph must be installed to use this function.')
 
-    if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str )):
+    if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str)):
         remote_instance = utils._eval_remote_instance(remote_instance)
         skids = utils.eval_skids(x, remote_instance=remote_instance)
 
-        indices = { int(s): i for i,s in enumerate(skids) }
+        indices = {int(s): i for i, s in enumerate(skids)}
 
         # Fetch edges
         edges = fetch.get_edges(skids, remote_instance=remote_instance)
@@ -187,15 +189,19 @@ def network2igraph(x, remote_instance=None, threshold=1):
         # Reformat into igraph format
         edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
                           for e in edges[edges.weight >= threshold].itertuples()]
-        weight = edges[ edges.weight >= threshold ].weight.tolist()
+        weight = edges[edges.weight >= threshold].weight.tolist()
     elif isinstance(x, pd.DataFrame):
-        skids = list(set( x.columns.tolist() + x.index.tolist() ))
+        skids = list(set(x.columns.tolist() + x.index.tolist()))
         # Generate edge list
-        edges = [ [i,j] for i in x.index.tolist() for j in x.columns.tolist() if x.loc[i,j] >= threshold ]
-        edges_by_index = [ [ skids.index(e[0]), skids.index(e[1]) ] for e in edges ]
-        weight = [ x.loc[i,j] for i in range( x.shape[0] ) for j in range( x.shape[1]) if x.loc[i,j] >= threshold ]
+        edges = [[i, j] for i in x.index.tolist()
+                 for j in x.columns.tolist() if x.loc[i, j] >= threshold]
+        edges_by_index = [
+            [skids.index(e[0]), skids.index(e[1])] for e in edges]
+        weight = [x.loc[i, j] for i in range(x.shape[0]) for j in range(
+            x.shape[1]) if x.loc[i, j] >= threshold]
     else:
-        raise ValueError('Unable to process data of type "{0}"'.format(type(x)))
+        raise ValueError(
+            'Unable to process data of type "{0}"'.format(type(x)))
 
     # Generate igraph and assign custom properties
     g = igraph.Graph(directed=True)
@@ -203,7 +209,7 @@ def network2igraph(x, remote_instance=None, threshold=1):
     g.add_edges(edges_by_index)
 
     g.vs['node_id'] = skids
-    g.vs['neuron_name'] = g.vs['label'] = neuron_names
+    # g.vs['neuron_name'] = g.vs['label'] = neuron_names
     g.es['weight'] = weight
 
     return g
@@ -224,7 +230,7 @@ def neuron2nx(x):
 
     """
 
-    if isinstance(x, ( pd.DataFrame, core.CatmaidNeuronList)):
+    if isinstance(x, (pd.DataFrame, core.CatmaidNeuronList)):
         return [neuron2nx(x.loc[i]) for i in range(x.shape[0])]
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
         pass
@@ -234,22 +240,24 @@ def neuron2nx(x):
     # Collect nodes
     nodes = x.nodes.set_index('treenode_id')
     # Collect edges
-    edges = x.nodes[~x.nodes.parent_id.isnull()][['treenode_id','parent_id']].values
+    edges = x.nodes[~x.nodes.parent_id.isnull(
+    )][['treenode_id', 'parent_id']].values
     # Collect weight
-    weights = np.sqrt( np.sum( (nodes.loc[ edges[:,0], ['x','y','z'] ].values.astype(int)
-                                - nodes.loc[ edges[:,1], ['x','y','z'] ].values.astype(int) )**2, axis=1) )
+    weights = np.sqrt(np.sum((nodes.loc[edges[:, 0], ['x', 'y', 'z']].values.astype(int)
+                              - nodes.loc[edges[:, 1], ['x', 'y', 'z']].values.astype(int))**2, axis=1))
     # Generate weight dictionary
-    edge_dict = np.array( [ { 'weight' : w } for w in weights ] )
+    edge_dict = np.array([{'weight': w} for w in weights])
     # Add weights to dictionary
-    edges = np.append( edges, edge_dict.reshape( len( edges ), 1 ), axis=1)
+    edges = np.append(edges, edge_dict.reshape(len(edges), 1), axis=1)
     # Create empty directed Graph
     g = nx.DiGraph()
     # Add nodes (in case we have disconnected nodes)
-    g.add_nodes_from( x.nodes.treenode_id.values )
+    g.add_nodes_from(x.nodes.treenode_id.values)
     # Add edges
-    g.add_edges_from( edges )
+    g.add_edges_from(edges)
 
     return g
+
 
 def neuron2igraph(x):
     """ Turns CatmaidNeuron(s) into an iGraph graph. Requires iGraph to be
@@ -270,7 +278,7 @@ def neuron2igraph(x):
     if igraph == None:
         return None
 
-    if isinstance(x, ( pd.DataFrame, core.CatmaidNeuronList)):
+    if isinstance(x, (pd.DataFrame, core.CatmaidNeuronList)):
         return [neuron2igraph(x.loc[i]) for i in range(x.shape[0])]
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
         pass
@@ -291,7 +299,7 @@ def neuron2igraph(x):
     parent_ids = nodes[~nodes.parent_id.isnull()].parent_id.values
     nodes['temp_index'] = nodes.index  # add temporary index column
     parent_index = nodes.set_index('treenode_id').loc[parent_ids,
-        'temp_index'].values
+                                                      'temp_index'].values
 
     # Generate list of edges based on index of vertices
     elist = list(zip(tn_index_with_parent, parent_index))
@@ -306,30 +314,32 @@ def neuron2igraph(x):
     tn_coords = nodes.loc[[e[0] for e in elist], ['x', 'y', 'z']].values
     parent_coords = nodes.loc[[e[1] for e in elist], ['x', 'y', 'z']].values
 
-    w = np.sqrt(np.sum((tn_coords - parent_coords) ** 2, axis=1).astype(float)).tolist()
+    w = np.sqrt(np.sum((tn_coords - parent_coords)
+                       ** 2, axis=1).astype(float)).tolist()
     g.es['weight'] = w
 
     return g
 
 
-def _find_all_paths(g, start, end, mode = 'OUT', maxlen = None):
+def _find_all_paths(g, start, end, mode='OUT', maxlen=None):
     """ Find all paths between two vertices in an iGraph object. For some reason
     this function exists in R iGraph but not Python iGraph. This is rather slow
     and should not be used for large graphs.
     """
 
-    def find_all_paths_aux(adjlist, start, end, path, maxlen = None):
+    def find_all_paths_aux(adjlist, start, end, path, maxlen=None):
         path = path + [start]
         if start == end:
             return [path]
         paths = []
         if maxlen is None or len(path) <= maxlen:
             for node in adjlist[start] - set(path):
-                paths.extend(find_all_paths_aux(adjlist, node, end, path, maxlen))
+                paths.extend(find_all_paths_aux(
+                    adjlist, node, end, path, maxlen))
         return paths
 
-    adjlist = [set(g.neighbors(node, mode = mode)) \
-        for node in range(g.vcount())]
+    adjlist = [set(g.neighbors(node, mode=mode))
+               for node in range(g.vcount())]
     all_paths = []
     start = start if type(start) is list else [start]
     end = end if type(end) is list else [end]
@@ -337,6 +347,7 @@ def _find_all_paths(g, start, end, mode = 'OUT', maxlen = None):
         for e in end:
             all_paths.extend(find_all_paths_aux(adjlist, s, e, [], maxlen))
     return all_paths
+
 
 def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
     """ Turns a neuron into scipy.spatial.cKDTree.
@@ -360,11 +371,12 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
 
     """
 
-    if tree_type not in ['c','normal']:
+    if tree_type not in ['c', 'normal']:
         raise ValueError('"tree_type" needs to be either "c" or "normal"')
 
-    if data not in ['treenodes','connectors']:
-        raise ValueError('"data" needs to be either "treenodes" or "connectors"')
+    if data not in ['treenodes', 'connectors']:
+        raise ValueError(
+            '"data" needs to be either "treenodes" or "connectors"')
 
     if isinstance(x, core.CatmaidNeuronList):
         if len(x) == 1:
@@ -375,14 +387,11 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
         raise TypeError('Need CatmaidNeuron, got "{0}"'.format(type(x)))
 
     if data == 'treenodes':
-        d = x.nodes[['x','y','z']].values
+        d = x.nodes[['x', 'y', 'z']].values
     else:
-        d = x.connectors[['x','y','z']].values
+        d = x.connectors[['x', 'y', 'z']].values
 
     if tree_type == 'c':
-        return scipy.spatial.cKDTree( data = d, **kwargs )
+        return scipy.spatial.cKDTree(data=d, **kwargs)
     else:
-        return scipy.spatial.KDTree( data = d, **kwargs )
-
-
-
+        return scipy.spatial.KDTree(data=d, **kwargs)

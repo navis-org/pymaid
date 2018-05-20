@@ -64,6 +64,10 @@ from colorsys import hsv_to_rgb
 import pymaid.cluster as pyclust
 from pymaid import core, fetch, plotting
 
+import rpy2.robjects as robjects
+from rpy2.robjects.packages import importr
+from rpy2.robjects import pandas2ri
+
 # Set up logging
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
@@ -76,10 +80,6 @@ if len(module_logger.handlers) == 0:
         '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
-
-import rpy2.robjects as robjects
-from rpy2.robjects.packages import importr
-from rpy2.robjects import pandas2ri
 
 cl = robjects.r('class')
 names = robjects.r('names')
@@ -97,7 +97,7 @@ except:
         'R library "nat" not found! Please install from within R.')
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid',
-           'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
+                  'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
 
 
 def init_rcatmaid(**kwargs):
@@ -322,20 +322,19 @@ def neuron2py(neuron, remote_instance=None):
         module_logger.warning(
             'Neuron has only nodes (no name, skid, connectors or tags).')
 
-
     data = []
     for i in range(neuron.shape[0]):
         # Note that radius is divided by 2 -> this is because in rcatmaid the
         # original radius is doubled for some reason
         nodes = pd.DataFrame([[no.PointNo, no.Parent, None, no.X, no.Y,
-                               no.Z, no.W / 2, None] for no in neuron.loc[i,'d'].itertuples()], dtype=object)
+                               no.Z, no.W / 2, None] for no in neuron.loc[i, 'd'].itertuples()], dtype=object)
         nodes.columns = ['treenode_id', 'parent_id',
                          'creator_id', 'x', 'y', 'z', 'radius', 'confidence']
         nodes.loc[nodes.parent_id == -1, 'parent_id'] = None
 
         if 'connectors' in neuron:
             connectors = pd.DataFrame([[cn.treenode_id, cn.connector_id, cn.prepost, cn.x, cn.y, cn.z]
-                                       for cn in neuron.loc[i,'connectors'].itertuples()], dtype=object)
+                                       for cn in neuron.loc[i, 'connectors'].itertuples()], dtype=object)
             connectors.columns = ['treenode_id',
                                   'connector_id', 'relation', 'x', 'y', 'z']
         else:
@@ -343,7 +342,7 @@ def neuron2py(neuron, remote_instance=None):
                 columns=['treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'])
 
         if 'skid' in neuron:
-            skid = neuron.loc[i,'skid'][0]
+            skid = neuron.loc[i, 'skid'][0]
         else:
             skid = 'NA'
 
@@ -361,14 +360,13 @@ def neuron2py(neuron, remote_instance=None):
     if 'tags' in neuron:
         df['tags'] = neuron.tags.tolist()
     else:
-        df['tags'] = [ {} for n in df.skeleton_id.tolist() ]
-
+        df['tags'] = [{} for n in df.skeleton_id.tolist()]
 
     if 'skid' in neuron and neuron_names is not None:
         df['neuron_name'] = [neuron_names[
             str(n)] for n in df.skeleton_id.tolist()]
     else:
-        df['neuron_name'] = [ 'NA' for n in df.skeleton_id.tolist() ]
+        df['neuron_name'] = ['NA' for n in df.skeleton_id.tolist()]
 
     return core.CatmaidNeuronList(df, remote_instance=remote_instance)
 
@@ -444,7 +442,7 @@ def neuron2r(neuron, convert_to_um=False):
 
         # Prepare list of parents -> root node's parent "None" has to be
         # replaced with -1
-        parents = np.array( n.nodes.parent_id.values )
+        parents = np.array(n.nodes.parent_id.values)
         # should technically be robjects.r('-1L')
         parents[parents == None] = -1
 
@@ -589,8 +587,6 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
     >>> res.plot_matrix()
     >>> plt.show()
     """
-
-    start_time = time.time()
 
     domc = importr('doMC')
     cores = robjects.r('registerDoMC(%i)' % n_cores)
@@ -960,7 +956,7 @@ class NBLASTresults:
         n_py.ix[0].nodes.radius /= 1000
 
         # Create colormap with the query neuron being black
-        cmap = { n_py.ix[0].skeleton_id : (0, 0, 0)}
+        cmap = {n_py.ix[0].skeleton_id: (0, 0, 0)}
 
         colors = np.linspace(0, 1, len(nl) + 1)
         colors = np.array([hsv_to_rgb(c, 1, 1) for c in colors])
@@ -984,7 +980,7 @@ class NBLASTresults:
         kwargs.update({'colors': cmap,
                        'downsampling': 1})
 
-        module_logger.info('Colormap:' + str(cmap) )
+        module_logger.info('Colormap:' + str(cmap))
 
         if nl:
             if plot_neuron is True:

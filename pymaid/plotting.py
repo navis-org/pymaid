@@ -21,8 +21,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
-import matplotlib.collections as mcollections
-from matplotlib.collections import PolyCollection
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.mplot3d import proj3d
 import matplotlib.colors as mcl
@@ -32,18 +30,16 @@ import colorsys
 import logging
 import png
 
+import uuid
+
 import networkx as nx
 
 from pymaid import morpho, graph, core, fetch, connectivity, graph_utils, utils
+import pandas as pd
+import numpy as np
+import math
 
-from tqdm import tqdm
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
 
-import plotly.plotly as py
-import plotly.offline as pyoff
 import plotly.graph_objs as go
 
 import vispy
@@ -51,34 +47,36 @@ from vispy import scene
 from vispy.geometry import create_sphere
 from vispy.gloo.util import _screenshot
 
+from tqdm import tqdm
+if utils.is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
+
 try:
     # Try setting vispy backend to PyQt5
     vispy.use(app='PyQt5')
 except:
     pass
 
-import pandas as pd
-import numpy as np
-import random
-import math
-from colorsys import hsv_to_rgb
-
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
-if len( module_logger.handlers ) == 0:
+if len(module_logger.handlers) == 0:
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     # Create formatter and add it to the handlers
     formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
+        '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
-__all__ = ['plot3d','plot2d','plot1d','plot_network','clear3d','close3d','screenshot','get_canvas']
+__all__ = ['plot3d', 'plot2d', 'plot1d', 'plot_network',
+           'clear3d', 'close3d', 'screenshot', 'get_canvas']
 
 # Default settings for progress bars
 pbar_hide = False
 pbar_leave = True
+
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active vispy 3D canvas.
@@ -100,6 +98,7 @@ def screenshot(file='screenshot.png', alpha=True):
     im.save(file)
 
     return
+
 
 def get_canvas():
     """ Returns active vispy canvas and scale factor. Use this to add custom
@@ -157,33 +156,34 @@ def close3d():
     except:
         pass
 
+
 def _orthogonal_proj(zfront, zback):
     """ Function to get matplotlib to use orthogonal instead of perspective
     view.
 
     Usage:
-    proj3d.persp_transformation = _orthogonal_proj    
+    proj3d.persp_transformation = _orthogonal_proj
     """
-    a = (zfront+zback)/(zfront-zback)
-    b = -2*(zfront*zback)/(zfront-zback)
+    a = (zfront + zback) / (zfront - zback)
+    b = -2 * (zfront * zback) / (zfront - zback)
     # -0.0001 added for numerical stability as suggested in:
     # http://stackoverflow.com/questions/23840756
-    return np.array([[1,0,0,0],
-                        [0,1,0,0],
-                        [0,0,a,b],
-                        [0,0,-0.0001,zback]])
+    return np.array([[1, 0, 0, 0],
+                     [0, 1, 0, 0],
+                     [0, 0, a, b],
+                     [0, 0, -0.0001, zback]])
 
 
 def plot2d(x, method='2d', *args, **kwargs):
     """ Generate 2D plots of neurons and neuropils. The main advantage of this
-    is that you can save plot as vector graphics. 
+    is that you can save plot as vector graphics.
 
     Important
     ---------
-    This function uses matplotlib which "fakes" 3D as it has only very limited 
-    control over layers. Therefore neurites aren't necessarily plotted in the 
-    right Z order which becomes especially troublesome when plotting a complex 
-    scene with lots of neurons criss-crossing. See the ``method`` parameter 
+    This function uses matplotlib which "fakes" 3D as it has only very limited
+    control over layers. Therefore neurites aren't necessarily plotted in the
+    right Z order which becomes especially troublesome when plotting a complex
+    scene with lots of neurons criss-crossing. See the ``method`` parameter
     for details. All methods use orthogonal projection.
 
     Parameters
@@ -292,17 +292,22 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     """
 
-    _ACCEPTED_KWARGS = ['remote_instance','connectors','connectors_only',
-                        'ax','color','view','scalebar','cn_mesh_colors',
-                        'linewidth','cn_size','group_neurons', 'scatter_kws',
-                        'figsize', 'linestyle', 'alpha']
-    wrong_kwargs = [ a for a in kwargs if a not in _ACCEPTED_KWARGS ]
-    if wrong_kwargs:
-        raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS) ))
+    # TODO:
+    # - depth-code option
 
-    _METHOD_OPTIONS = ['2d','3d', '3d_complex']
+    _ACCEPTED_KWARGS = ['remote_instance', 'connectors', 'connectors_only',
+                        'ax', 'color', 'view', 'scalebar', 'cn_mesh_colors',
+                        'linewidth', 'cn_size', 'group_neurons', 'scatter_kws',
+                        'figsize', 'linestyle', 'alpha']
+    wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
+    if wrong_kwargs:
+        raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
+            ','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS)))
+
+    _METHOD_OPTIONS = ['2d', '3d', '3d_complex']
     if method not in _METHOD_OPTIONS:
-        raise ValueError('Unknown method "{0}". Please use either: {1}'.format(method, _METHOD_OPTIONS))
+        raise ValueError('Unknown method "{0}". Please use either: {1}'.format(
+            method, _METHOD_OPTIONS))
 
     # Set axis to plot for method '2d'
     axis1, axis2 = 'x', 'y'
@@ -326,9 +331,10 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     linewidth = kwargs.get('linewidth', .5)
     cn_size = kwargs.get('cn_size', 1)
-    linestyle = kwargs.get('linestyle','-')
+    linestyle = kwargs.get('linestyle', '-')
 
-    remote_instance = utils._eval_remote_instance(remote_instance, raise_error=False)
+    remote_instance = utils._eval_remote_instance(
+        remote_instance, raise_error=False)
 
     if skids:
         skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
@@ -338,9 +344,9 @@ def plot2d(x, method='2d', *args, **kwargs):
     if not skdata.empty:
         all_identifiers += skdata.skeleton_id.tolist()
     if not dotprops.empty:
-        all_identifiers +=dotprops.gene_name.tolist()
+        all_identifiers += dotprops.gene_name.tolist()
 
-    if not color and (skdata.shape[0] + dotprops.shape[0])>0:
+    if not color and (skdata.shape[0] + dotprops.shape[0]) > 0:
         cm = _random_colors(
             skdata.shape[0] + dotprops.shape[0], color_space='RGB', color_range=1)
         colormap = {}
@@ -353,23 +359,25 @@ def plot2d(x, method='2d', *args, **kwargs):
                              for i, n in enumerate(dotprops.gene_name.tolist())})
     elif isinstance(color, dict):
         colormap = {n: tuple(color[n]) for n in color}
-    elif isinstance(color,(list,tuple)):
+    elif isinstance(color, (list, tuple)):
         colormap = {n: tuple(color) for n in all_identifiers}
-    elif isinstance(color,str):
-        color = tuple( [ c for c in mcl.to_rgb(color) ] )
+    elif isinstance(color, str):
+        color = tuple([c for c in mcl.to_rgb(color)])
         colormap = {n: color for n in all_identifiers}
-    elif (skdata.shape[0] + dotprops.shape[0])>0:
-        raise ValueError('Unable to interpret colors of type "{0}"'.format(type(color)))
+    elif (skdata.shape[0] + dotprops.shape[0]) > 0:
+        raise ValueError(
+            'Unable to interpret colors of type "{0}"'.format(type(color)))
 
     # Make sure axes are projected orthogonally
-    if method in ['3d','3d_complex']:
+    if method in ['3d', '3d_complex']:
         proj3d.persp_transformation = _orthogonal_proj
 
     if not ax:
-        if method =='2d':
-            fig, ax = plt.subplots(figsize= kwargs.get('figsize', (8, 8) ) )
-        elif method in ['3d','3d_complex']:
-            fig = plt.figure(figsize= kwargs.get('figsize', plt.figaspect(1)*1.5) )
+        if method == '2d':
+            fig, ax = plt.subplots(figsize=kwargs.get('figsize', (8, 8)))
+        elif method in ['3d', '3d_complex']:
+            fig = plt.figure(figsize=kwargs.get(
+                'figsize', plt.figaspect(1) * 1.5))
             ax = fig.gca(projection='3d')
             # Set projection to orthogonal
             # This sets front view
@@ -378,9 +386,10 @@ def plot2d(x, method='2d', *args, **kwargs):
         ax.set_aspect('equal')
     else:
         if not isinstance(ax, mpl.axes.Axes):
-            raise TypeError('Ax must be of type <mpl.axes.Axes>, not <{0}>'.format(type(ax)))
+            raise TypeError(
+                'Ax must be of type <mpl.axes.Axes>, not <{0}>'.format(type(ax)))
         fig = ax.get_figure()
-        if method in ['3d','3d_complex'] and ax.name != '3d':
+        if method in ['3d', '3d_complex'] and ax.name != '3d':
             raise TypeError('Axis must be 3d.')
         elif method == '2d' and ax.name == '3d':
             raise TypeError('Axis must be 2d.')
@@ -398,76 +407,79 @@ def plot2d(x, method='2d', *args, **kwargs):
 
             if method == '2d':
                 vpatch = mpatches.Polygon(
-                v.to_2d(view='{0}{1}'.format(axis1,axis2), invert_y=True), closed=True, lw=0, fill=True, fc=c, alpha=1)
+                    v.to_2d(view='{0}{1}'.format(axis1, axis2), invert_y=True),
+                    closed=True, lw=0, fill=True, fc=c, alpha=1)
                 ax.add_patch(vpatch)
-            elif method in ['3d','3d_complex']:
-                verts = np.vstack( v['vertices'] )
+            elif method in ['3d', '3d_complex']:
+                verts = np.vstack(v['vertices'])
                 # Invert y-axis
-                verts[:,1] *= -1
+                verts[:, 1] *= -1
                 # Add alpha
                 if len(c) == 3:
-                    c = ( c[0],c[1],c[2],.1 )
-                ts = ax.plot_trisurf( verts[:,0], verts[:,2], v['faces'],
-                                      verts[:,1], label=v['name'],
-                                      color=c)
-                ts.set_gid( v['name'] )
+                    c = (c[0], c[1], c[2], .1)
+                ts = ax.plot_trisurf(verts[:, 0], verts[:, 2], v['faces'],
+                                     verts[:, 1], label=v['name'],
+                                     color=c)
+                ts.set_gid(v['name'])
                 # Keep track of limits
-                lim.append( verts.max(axis=0) )
-                lim.append( verts.min(axis=0) )
+                lim.append(verts.max(axis=0))
+                lim.append(verts.min(axis=0))
 
     # Create lines from segments
     for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plot neurons', total=skdata.shape[0], leave=False, disable=pbar_hide)):
-        this_color = colormap[ neuron.skeleton_id ]
+        this_color = colormap[neuron.skeleton_id]
 
         if not connectors_only:
             soma = neuron.nodes[neuron.nodes.radius > 1]
 
             # Now make traces (invert y axis)
-            coords = _segments_to_coords(neuron, neuron.segments, modifier=(1,-1,1))
+            coords = _segments_to_coords(
+                neuron, neuron.segments, modifier=(1, -1, 1))
 
             if method == '2d':
                 # We have to add (None,None,None) to the end of each slab to
                 # make that line discontinuous there
-                coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
+                coords = np.vstack(
+                    [np.append(t, [[None] * 3], axis=0) for t in coords])
 
-                this_line = mlines.Line2D( coords[:,0], coords[:,1],
-                                           lw=linewidth, ls=linestyle,
-                                           alpha=alpha, color=this_color,
-                                           label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id) )
+                this_line = mlines.Line2D(coords[:, 0], coords[:, 1],
+                                          lw=linewidth, ls=linestyle,
+                                          alpha=alpha, color=this_color,
+                                          label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id))
 
                 ax.add_line(this_line)
 
                 for n in soma.itertuples():
                     s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius,
-                                         alpha=alpha, fill=True, fc=this_color,
-                                         zorder=4, edgecolor='none')
+                                        alpha=alpha, fill=True, fc=this_color,
+                                        zorder=4, edgecolor='none')
                     ax.add_patch(s)
 
-            elif method in ['3d','3d_complex']:
+            elif method in ['3d', '3d_complex']:
                 # For simple scenes, add whole neurons at a time -> will speed up rendering
                 if method == '3d':
-                    lc = Line3DCollection( [ c[:,[0,2,1]] for c in coords ], color = this_color,
-                                           label=neuron.neuron_name,
-                                           alpha=alpha,
-                                           lw=linewidth,
-                                           linestyle=linestyle)
+                    lc = Line3DCollection([c[:, [0, 2, 1]] for c in coords], color=this_color,
+                                          label=neuron.neuron_name,
+                                          alpha=alpha,
+                                          lw=linewidth,
+                                          linestyle=linestyle)
                     if group_neurons:
-                        lc.set_gid( neuron.neuron_name )
-                    ax.add_collection3d( lc )
+                        lc.set_gid(neuron.neuron_name)
+                    ax.add_collection3d(lc)
 
                 # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
-                elif method =='3d_complex':
+                elif method == '3d_complex':
                     for c in coords:
-                        lc = Line3DCollection( [ c[:,[0,2,1]] ], color = this_color,
-                                               lw=linewidth, alpha=alpha,
-                                               linestyle=linestyle )
+                        lc = Line3DCollection([c[:, [0, 2, 1]]], color=this_color,
+                                              lw=linewidth, alpha=alpha,
+                                              linestyle=linestyle)
                         if group_neurons:
-                            lc.set_gid( neuron.neuron_name )
-                        ax.add_collection3d( lc )
+                            lc.set_gid(neuron.neuron_name)
+                        ax.add_collection3d(lc)
 
                 coords = np.vstack(coords)
-                lim.append( coords.max(axis=0) )
-                lim.append( coords.min(axis=0) )
+                lim.append(coords.max(axis=0))
+                lim.append(coords.min(axis=0))
 
                 for n in soma.itertuples():
                     resolution = 20
@@ -475,35 +487,40 @@ def plot2d(x, method='2d', *args, **kwargs):
                     v = np.linspace(0, np.pi, resolution)
                     x = n.radius * np.outer(np.cos(u), np.sin(v)) + n.x
                     y = n.radius * np.outer(np.sin(u), np.sin(v)) - n.y
-                    z = n.radius * np.outer(np.ones(np.size(u)), np.cos(v)) + n.z
-                    surf = ax.plot_surface(x, z, y, color=this_color, shade=False, alpha=alpha)
+                    z = n.radius * \
+                        np.outer(np.ones(np.size(u)), np.cos(v)) + n.z
+                    surf = ax.plot_surface(
+                        x, z, y, color=this_color, shade=False, alpha=alpha)
                     if group_neurons:
-                        surf.set_gid( neuron.neuron_name )
+                        surf.set_gid(neuron.neuron_name)
 
         if connectors or connectors_only:
             if not cn_mesh_colors:
-                cn_types = {0: 'red', 1 : 'blue', 2 : 'green', 3 : 'magenta'}
+                cn_types = {0: 'red', 1: 'blue', 2: 'green', 3: 'magenta'}
             else:
-                cn_types = {0:  this_color, 1 :  this_color, 2 : this_color, 3 : this_color}
+                cn_types = {0: this_color, 1: this_color,
+                            2: this_color, 3: this_color}
             if method == '2d':
                 for c in cn_types:
                     this_cn = neuron.connectors[neuron.connectors.relation == c]
                     ax.scatter(this_cn.x.values,
-                              (-this_cn.y).values,
-                              c=cn_types[c], alpha=alpha, zorder=4, edgecolor='none', s=cn_size)
-                    ax.get_children()[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
-            elif method in ['3d','3d_complex']:
+                               (-this_cn.y).values,
+                               c=cn_types[c], alpha=alpha, zorder=4, edgecolor='none', s=cn_size)
+                    ax.get_children(
+                    )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
+            elif method in ['3d', '3d_complex']:
                 all_cn = neuron.connectors
-                c = [ cn_types[i] for i in all_cn.relation.tolist() ]
+                c = [cn_types[i] for i in all_cn.relation.tolist()]
                 ax.scatter(all_cn.x.values, all_cn.z.values, -all_cn.y.values,
                            c=c, s=cn_size, depthshade=False, edgecolor='none',
                            alpha=alpha)
-                ax.get_children()[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
+                ax.get_children(
+                )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
 
-            coords = neuron.connectors[['x','y','z']].as_matrix()
-            coords[:,1] *= -1
-            lim.append( coords.max(axis=0) )
-            lim.append( coords.min(axis=0) )
+            coords = neuron.connectors[['x', 'y', 'z']].as_matrix()
+            coords[:, 1] *= -1
+            lim.append(coords.max(axis=0))
+            lim.append(coords.min(axis=0))
 
     for neuron in tqdm(dotprops.itertuples(), desc='Plt dotprops', total=dotprops.shape[0], leave=False, disable=pbar_hide):
         # Prepare lines - this is based on nat:::plot3d.dotprops
@@ -518,127 +535,131 @@ def plot2d(x, method='2d', *args, **kwargs):
         try:
             this_color = colormap[neuron.gene_name]
         except:
-            this_color = (.1,.1,.1)
+            this_color = (.1, .1, .1)
 
         if method == '2d':
             # Add None between segments
             x_coords = [n for sublist in zip(
-                starts[:, 0] , ends[:, 0], [None] * starts.shape[0]) for n in sublist]
+                starts[:, 0], ends[:, 0], [None] * starts.shape[0]) for n in sublist]
             y_coords = [n for sublist in zip(
-                starts[:, 1] * -1, ends[:, 1] *-1, [None] * starts.shape[0]) for n in sublist]
-            z_coords = [n for sublist in zip(
-                starts[:, 2] , ends[:, 2], [None] * starts.shape[0]) for n in sublist]
+                starts[:, 1] * -1, ends[:, 1] * -1, [None] * starts.shape[0]) for n in sublist]
 
-            this_line = mlines.Line2D( x_coords, y_coords,
-                                       lw=linewidth, ls=linestyle,
-                                       alpha=alpha, color=this_color,
-                                       label='%s' % (neuron.gene_name) )
+            """
+            z_coords = [n for sublist in zip(
+                starts[:, 2], ends[:, 2], [None] * starts.shape[0]) for n in sublist]
+            """
+
+            this_line = mlines.Line2D(x_coords, y_coords,
+                                      lw=linewidth, ls=linestyle,
+                                      alpha=alpha, color=this_color,
+                                      label='%s' % (neuron.gene_name))
 
             ax.add_line(this_line)
 
             # Add soma
-            s = mpatches.Circle( (neuron.X, -neuron.Y), radius=2,
-                                 alpha=alpha, fill=True, fc=this_color,
-                                 zorder=4, edgecolor='none')
+            s = mpatches.Circle((neuron.X, -neuron.Y), radius=2,
+                                alpha=alpha, fill=True, fc=this_color,
+                                zorder=4, edgecolor='none')
             ax.add_patch(s)
-        elif method in ['3d','3d_complex']:
+        elif method in ['3d', '3d_complex']:
                 # Combine coords by weaving starts and ends together
-                coords = np.empty((starts.shape[0] * 2, 3), dtype=starts.dtype)
-                coords[0::2] = starts
-                coords[1::2] = ends
+            coords = np.empty((starts.shape[0] * 2, 3), dtype=starts.dtype)
+            coords[0::2] = starts
+            coords[1::2] = ends
 
-                # Invert y-axis
-                coords[:,1] *= -1
+            # Invert y-axis
+            coords[:, 1] *= -1
 
-                # For simple scenes, add whole neurons at a time -> will speed up rendering
-                if method == '3d':
-                    lc = Line3DCollection( np.split(coords[:,[0,2,1]], starts.shape[0]), color = this_color,
-                                           label=neuron.gene_name,
-                                           lw=linewidth,
-                                           alpha=alpha,
-                                           linestyle=linestyle)
-                    if group_neurons:
-                        lc.set_gid( neuron.gene_name )
-                    ax.add_collection3d( lc )
-
-                # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
-                elif method =='3d_complex':
-                    for c in np.split(coords[:,[0,2,1]], starts.shape[0]):
-                        lc = Line3DCollection( [ c ], color = this_color,
-                                               lw=linewidth,
-                                               alpha=alpha,
-                                               linestyle=linestyle )
-                        if group_neurons:
-                            lc.set_gid( neuron.gene_name )
-                        ax.add_collection3d( lc )
-
-                lim.append( coords.max(axis=0) )
-                lim.append( coords.min(axis=0) )
-
-                resolution = 20
-                u = np.linspace(0, 2 * np.pi, resolution)
-                v = np.linspace(0, np.pi, resolution)
-                x = 2 * np.outer(np.cos(u), np.sin(v)) + neuron.X
-                y = 2 * np.outer(np.sin(u), np.sin(v)) - neuron.Y
-                z = 2 * np.outer(np.ones(np.size(u)), np.cos(v)) + neuron.Z
-                surf = ax.plot_surface(x, z, y, color=this_color, shade=False, alpha=alpha)
+            # For simple scenes, add whole neurons at a time -> will speed up rendering
+            if method == '3d':
+                lc = Line3DCollection(np.split(coords[:, [0, 2, 1]], starts.shape[0]), color=this_color,
+                                      label=neuron.gene_name,
+                                      lw=linewidth,
+                                      alpha=alpha,
+                                      linestyle=linestyle)
                 if group_neurons:
-                    surf.set_gid( neuron.gene_name )
+                    lc.set_gid(neuron.gene_name)
+                ax.add_collection3d(lc)
+
+            # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
+            elif method == '3d_complex':
+                for c in np.split(coords[:, [0, 2, 1]], starts.shape[0]):
+                    lc = Line3DCollection([c], color=this_color,
+                                          lw=linewidth,
+                                          alpha=alpha,
+                                          linestyle=linestyle)
+                    if group_neurons:
+                        lc.set_gid(neuron.gene_name)
+                    ax.add_collection3d(lc)
+
+            lim.append(coords.max(axis=0))
+            lim.append(coords.min(axis=0))
+
+            resolution = 20
+            u = np.linspace(0, 2 * np.pi, resolution)
+            v = np.linspace(0, np.pi, resolution)
+            x = 2 * np.outer(np.cos(u), np.sin(v)) + neuron.X
+            y = 2 * np.outer(np.sin(u), np.sin(v)) - neuron.Y
+            z = 2 * np.outer(np.ones(np.size(u)), np.cos(v)) + neuron.Z
+            surf = ax.plot_surface(
+                x, z, y, color=this_color, shade=False, alpha=alpha)
+            if group_neurons:
+                surf.set_gid(neuron.gene_name)
 
     if points:
         for p in points:
             if method == '2d':
                 default_settings = dict(
-                            c = 'black',
-                            zorder = 4,
-                            edge_color = 'none',
-                            s = 1
-                                )
+                    c='black',
+                    zorder=4,
+                    edge_color='none',
+                    s=1
+                )
                 default_settings.update(scatter_kws)
                 default_settings = _fix_default_dict(default_settings)
 
-                ax.scatter(p[:,0],
-                           p[:,1] *-1,
+                ax.scatter(p[:, 0],
+                           p[:, 1] * -1,
                            **default_settings)
-            elif method in ['3d','3d_complex']:
+            elif method in ['3d', '3d_complex']:
                 default_settings = dict(
-                            c = 'black',
-                            s = 1,
-                            depthshade = False,
-                            edgecolor='none'
-                                )
+                    c='black',
+                    s=1,
+                    depthshade=False,
+                    edgecolor='none'
+                )
                 default_settings.update(scatter_kws)
                 default_settings = _fix_default_dict(default_settings)
 
-                ax.scatter(p[:,0], p[:,2], p[:,1] * -1,
+                ax.scatter(p[:, 0], p[:, 2], p[:, 1] * -1,
                            **default_settings
                            )
 
             coords = p
-            coords[:,1] *= -1
-            lim.append( coords.max(axis=0) )
-            lim.append( coords.min(axis=0) )
+            coords[:, 1] *= -1
+            lim.append(coords.max(axis=0))
+            lim.append(coords.min(axis=0))
 
     if method == '2d':
         ax.autoscale()
-    elif method in ['3d','3d_complex']:
+    elif method in ['3d', '3d_complex']:
         lim = np.vstack(lim)
         lim_min = lim.min(axis=0)
         lim_max = lim.max(axis=0)
 
-        center = lim_min + ( lim_max - lim_min ) / 2
-        max_dim = ( lim_max - lim_min ).max()
+        center = lim_min + (lim_max - lim_min) / 2
+        max_dim = (lim_max - lim_min).max()
 
         new_min = center - max_dim / 2
         new_max = center + max_dim / 2
 
-        ax.set_xlim( new_min[0], new_max[0] )
-        ax.set_ylim( new_min[2], new_max[2] )
-        ax.set_zlim( new_max[1], new_min[1] )
+        ax.set_xlim(new_min[0], new_max[0])
+        ax.set_ylim(new_min[2], new_max[2])
+        ax.set_zlim(new_max[1], new_min[1])
 
-        ax.set_xlim( lim_min[0], lim_min[0]+max_dim )
-        ax.set_ylim( lim_min[2], lim_min[2]+max_dim )
-        ax.set_zlim( lim_max[1]-max_dim, lim_max[1] )
+        ax.set_xlim(lim_min[0], lim_min[0] + max_dim)
+        ax.set_ylim(lim_min[2], lim_min[2] + max_dim)
+        ax.set_zlim(lim_max[1] - max_dim, lim_max[1])
 
     if scalebar != None:
         # Convert sc size to nm
@@ -651,32 +672,33 @@ def plot2d(x, method='2d', *args, **kwargs):
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
 
-            coords = np.array( [ [ xlim[0] + ax_offset, ylim[0] + ax_offset ],
-                                 [ xlim[0] + ax_offset + sc_size, ylim[0] + ax_offset ]
-                                ])
+            coords = np.array([[xlim[0] + ax_offset, ylim[0] + ax_offset],
+                               [xlim[0] + ax_offset + sc_size, ylim[0] + ax_offset]
+                               ])
 
-            sbar = mlines.Line2D( coords[:,0], coords[:,1], lw=3, alpha=.9, color='black')
+            sbar = mlines.Line2D(
+                coords[:, 0], coords[:, 1], lw=3, alpha=.9, color='black')
             sbar.set_gid('{0}_um'.format(scalebar))
 
-            ax.add_line( sbar )
-        elif method in ['3d','3d_complex']:
+            ax.add_line(sbar)
+        elif method in ['3d', '3d_complex']:
             left = lim_min[0] + ax_offset
             bottom = lim_min[1] + ax_offset
             front = lim_min[2] + ax_offset
 
-            sbar = [ np.array( [ [ left, front, bottom ],
-                                 [ left, front, bottom ] ] ),
-                     np.array( [ [ left, front, bottom ],
-                                 [ left, front, bottom ] ] ),
-                     np.array( [ [ left, front, bottom ],
-                                 [ left, front, bottom ] ] ) ]
+            sbar = [np.array([[left, front, bottom],
+                              [left, front, bottom]]),
+                    np.array([[left, front, bottom],
+                              [left, front, bottom]]),
+                    np.array([[left, front, bottom],
+                              [left, front, bottom]])]
             sbar[0][1][0] += sc_size
             sbar[1][1][1] += sc_size
             sbar[2][1][2] += sc_size
 
-            lc = Line3DCollection( sbar, color='black', lw=1)
-            lc.set_gid( '{0}_um'.format(scalebar) )
-            ax.add_collection3d( lc )
+            lc = Line3DCollection(sbar, color='black', lw=1)
+            lc.set_gid('{0}_um'.format(scalebar))
+            ax.add_collection3d(lc)
 
             """
             sbar_x = ax.plot( [left, left+sc_size], [front,front], [bottom,bottom], c='black' )
@@ -701,16 +723,17 @@ def _fix_default_dict(x):
     """
 
     # The first entry is the "survivor"
-    duplicates = [ ['color','c'], ['size','s'] ]
+    duplicates = [['color', 'c'], ['size', 's']]
 
     for dupl in duplicates:
-        if sum([ v in x for v in dupl ]) > 1:
-            to_delete = [ v for v in dupl if v in x ][1:]
-            _ = [ x.pop(v) for v in to_delete ]
+        if sum([v in x for v in dupl]) > 1:
+            to_delete = [v for v in dupl if v in x][1:]
+            _ = [x.pop(v) for v in to_delete]
 
     return x
 
-def _segments_to_coords(x, segments, modifier=(1,1,1)):
+
+def _segments_to_coords(x, segments, modifier=(1, 1, 1)):
     """Turns lists of treenode_ids into coordinates
 
     Parameters
@@ -728,12 +751,12 @@ def _segments_to_coords(x, segments, modifier=(1,1,1)):
 
     """
 
-    if not isinstance( modifier, np.ndarray ):
+    if not isinstance(modifier, np.ndarray):
         modifier = np.array(modifier)
 
-    locs = { r.treenode_id : (r.x,r.y,r.z) for r in x.nodes.itertuples() }
+    locs = {r.treenode_id: (r.x, r.y, r.z) for r in x.nodes.itertuples()}
 
-    coords = ( [ np.array([ locs[tn] for tn in s ]) * modifier for s in segments ] )
+    coords = ([np.array([locs[tn] for tn in s]) * modifier for s in segments])
 
     return coords
 
@@ -829,10 +852,8 @@ def plot3d(x, *args, **kwargs):
                         - multiple objects can be passed as list (see examples)
 
     remote_instance : CATMAID Instance, optional
-                      Need to pass this too if you are providing only skids
-                      also necessary if you want to include volumes! If
-                      possible, will try to get remote instance from neuron
-                      object.
+                      Will try using globally defined CatmaidInstance if not
+                      provided.
     backend :         {'vispy','plotly'}, default = 'vispy'
        | ``vispy`` uses OpenGL to generate high-performance 3D plots but is less pretty.
        | ``plotly`` generates 3D plots in .html which are shareable but take longer to generate.
@@ -941,8 +962,10 @@ def plot3d(x, *args, **kwargs):
 
             # Set camera range
             view.camera.set_range((min_x * vispy_scale_factor, max_x * vispy_scale_factor),
-                                  (min_y * vispy_scale_factor, max_y * vispy_scale_factor),
-                                  (min_z * vispy_scale_factor, max_z * vispy_scale_factor)
+                                  (min_y * vispy_scale_factor,
+                                   max_y * vispy_scale_factor),
+                                  (min_z * vispy_scale_factor,
+                                   max_z * vispy_scale_factor)
                                   )
         else:
             canvas = globals()['canvas']
@@ -954,15 +977,16 @@ def plot3d(x, *args, **kwargs):
             else:
                 view = canvas.central_widget.add_view()
 
-
                 # Add camera
                 #view.camera = scene.TurntableCamera()
                 view.camera = scene.ArcballCamera()
 
                 # Set camera range
                 view.camera.set_range((min_x * vispy_scale_factor, max_x * vispy_scale_factor),
-                                      (min_y * vispy_scale_factor, max_y * vispy_scale_factor),
-                                      (min_z * vispy_scale_factor, max_z * vispy_scale_factor)
+                                      (min_y * vispy_scale_factor,
+                                       max_y * vispy_scale_factor),
+                                      (min_z * vispy_scale_factor,
+                                       max_z * vispy_scale_factor)
                                       )
 
         for i, neuron in enumerate(skdata.itertuples()):
@@ -982,7 +1006,7 @@ def plot3d(x, *args, **kwargs):
                 neuron.nodes.parent_id.isnull()].index.tolist()
 
             if not connectors_only:
-                nodes = neuron.nodes[ ~neuron.nodes.parent_id.isnull() ]
+                nodes = neuron.nodes[~neuron.nodes.parent_id.isnull()]
 
                 # Extract treenode_coordinates and their parent's coordinates
                 tn_coords = nodes[['x', 'y', 'z']].apply(
@@ -1013,12 +1037,13 @@ def plot3d(x, *args, **kwargs):
                     # Pop root from coordinate lists
                     alpha = np.delete(alpha, root_ix, axis=0)
 
-                    alpha = alpha / (max(alpha)+1)
+                    alpha = alpha / (max(alpha) + 1)
                     # Duplicate values (start and end of each segment!)
-                    alpha = np.array([ v for l in zip(alpha,alpha) for v in l ])
+                    alpha = np.array([v for l in zip(alpha, alpha) for v in l])
 
                     # Turn color into array (need 2 colors per segment for beginnng and end)
-                    neuron_color = np.array( [ neuron_color ] * (tn_coords.shape[0] * 2), dtype=float )
+                    neuron_color = np.array(
+                        [neuron_color] * (tn_coords.shape[0] * 2), dtype=float)
 
                     neuron_color = np.insert(neuron_color, 3, alpha, axis=1)
 
@@ -1027,15 +1052,25 @@ def plot3d(x, *args, **kwargs):
                     # a scale factor
                     t = scene.visuals.Line(pos=np.array(segments) * vispy_scale_factor,
                                            color=list(neuron_color),
-                                           width=linewidth, # Can only be used with method 'agg'
+                                           width=linewidth,  # Can only be used with method 'agg'
                                            connect='segments',
                                            antialias=False,
-                                           method='gl') # method can also be 'agg' -> has to use connect='strip'
+                                           method='gl')  # method can also be 'agg' -> has to use connect='strip'
+                    # Make visual discoverable
+                    t.interactive = True
+
+                    # Add custom attributes
+                    t.unfreeze()
+                    t._object_type = 'catmaidneuron'
+                    t._skeleton_id = neuron.skeleton_id
+                    t._neuron_name = neuron.neuron_name
+                    t.freeze()
+
                     view.add(t)
 
                 if by_strahler or by_confidence:
-                    #Convert array back to a single color without alpha
-                    neuron_color=neuron_color[0][:3]
+                    # Convert array back to a single color without alpha
+                    neuron_color = neuron_color[0][:3]
 
                 # Extract and plot soma
                 soma = neuron.nodes[neuron.nodes.radius > 1]
@@ -1047,6 +1082,17 @@ def plot3d(x, *args, **kwargs):
                                            ['x', 'y', 'z']].as_matrix() * vispy_scale_factor,
                                            faces=sp.get_faces(),
                                            color=neuron_color)
+
+                    # Make visual discoverable
+                    s.interactive = True
+
+                    # Add custom attributes
+                    s.unfreeze()
+                    s._object_type = 'catmaidneuronsoma'
+                    s._skeleton_id = neuron.skeleton_id
+                    s._neuron_name = neuron.neuron_name
+                    s.freeze()
+
                     view.add(s)
 
             if connectors or connectors_only:
@@ -1085,10 +1131,10 @@ def plot3d(x, *args, **kwargs):
 
                         t = scene.visuals.Line(pos=np.array(segments) * vispy_scale_factor,
                                                color=color,
-                                               width=linewidth, # Can only be used with method 'agg'
+                                               width=linewidth,  # Can only be used with method 'agg'
                                                connect='segments',
                                                antialias=False,
-                                               method='gl') #method can also be 'agg' -> has to use connect='strip'
+                                               method='gl')  # method can also be 'agg' -> has to use connect='strip'
                         view.add(t)
 
         for neuron in dotprops.itertuples():
@@ -1117,7 +1163,7 @@ def plot3d(x, *args, **kwargs):
                                    width=2,
                                    connect='segments',
                                    antialias=False,
-                                   method='gl') #method can also be 'agg'
+                                   method='gl')  # method can also be 'agg'
             view.add(t)
 
             # Add soma
@@ -1148,9 +1194,9 @@ def plot3d(x, *args, **kwargs):
 
             con = scene.visuals.Markers()
             con.set_data(pos=p * vispy_scale_factor,
-                         face_color=scatter_kws.get('marker_color', (0,0,0)),
-                         edge_color=scatter_kws.get('marker_color', (0,0,0)),
-                         size= scatter_kws.get('marker_size', 2))
+                         face_color=scatter_kws.get('marker_color', (0, 0, 0)),
+                         edge_color=scatter_kws.get('marker_color', (0, 0, 0)),
+                         size=scatter_kws.get('marker_size', 2))
             view.add(con)
 
         # Add a 3D axis to keep us oriented
@@ -1228,11 +1274,13 @@ def plot3d(x, *args, **kwargs):
 
                 soma = neuron.nodes[neuron.nodes.radius > 1]
 
-                coords = _segments_to_coords(neuron, neuron.segments, modifier=(-1,-1,-1))
+                coords = _segments_to_coords(
+                    neuron, neuron.segments, modifier=(-1, -1, -1))
 
                 # We have to add (None,None,None) to the end of each slab to
                 # make that line discontinuous there
-                coords = np.vstack( [ np.append(t, [[None] * 3], axis=0) for t in coords] )
+                coords = np.vstack(
+                    [np.append(t, [[None] * 3], axis=0) for t in coords])
 
                 c = []
                 if by_strahler:
@@ -1251,20 +1299,21 @@ def plot3d(x, *args, **kwargs):
                     except:
                         c = 'rgb(10,10,10)'
 
-                trace_data.append(go.Scatter3d(x=coords[:,0],
-                                               y= coords[:,2],  # y and z are switched
-                                               z=coords[:,1],
+                trace_data.append(go.Scatter3d(x=coords[:, 0],
+                                               # y and z are switched
+                                               y=coords[:, 2],
+                                               z=coords[:, 1],
                                                mode='lines',
                                                line=dict(
                                                    color=c,
                                                    width=linewidth
-                                               ),
-                                               name=neuron_name,
-                                               legendgroup=neuron_name,
-                                               showlegend=True,
-                                               hoverinfo='none'
+                ),
+                    name=neuron_name,
+                    legendgroup=neuron_name,
+                    showlegend=True,
+                    hoverinfo='none'
 
-                                               ))
+                ))
 
                 # Add soma(s):
                 for n in soma.itertuples():
@@ -1293,7 +1342,7 @@ def plot3d(x, *args, **kwargs):
                         try:
                             color = colormap[str(skid)]
                         except:
-                            color = (10,10,10)
+                            color = (10, 10, 10)
                     else:
                         color = syn_lay[j]['color']
 
@@ -1316,7 +1365,8 @@ def plot3d(x, *args, **kwargs):
                         ))
                     elif syn_lay['display'] == 'lines':
                         # Find associated treenode
-                        tn = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.tolist()]
+                        tn = neuron.nodes.set_index(
+                            'treenode_id').ix[this_cn.treenode_id.tolist()]
                         x_coords = [n for sublist in zip(this_cn.x.as_matrix(
                         ) * -1, tn.x.as_matrix() * -1, [None] * this_cn.shape[0]) for n in sublist]
                         y_coords = [n for sublist in zip(this_cn.y.as_matrix(
@@ -1470,7 +1520,7 @@ def plot3d(x, *args, **kwargs):
         fig = dict(data=trace_data, layout=layout)
 
         module_logger.debug('Done. Plotted %i nodes and %i connectors' % (sum([n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only] + [
-                           n.points.shape[0] for n in dotprops.itertuples()]), sum([n.connectors.shape[0] for n in skdata.itertuples() if connectors or connectors_only])))
+            n.points.shape[0] for n in dotprops.itertuples()]), sum([n.connectors.shape[0] for n in skdata.itertuples() if connectors or connectors_only])))
         module_logger.info(
             'Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
 
@@ -1485,8 +1535,7 @@ def plot3d(x, *args, **kwargs):
     remote_instance = kwargs.get('remote_instance', None)
 
     # Parameters for neurons
-    color = kwargs.get('color', None)
-    names = kwargs.get('names', [])
+    color = kwargs.get('color', None)    
     downsampling = kwargs.get('downsampling', 1)
     connectors = kwargs.get('connectors', False)
     by_strahler = kwargs.get('by_strahler', False)
@@ -1497,27 +1546,26 @@ def plot3d(x, *args, **kwargs):
     use_neuron_color = kwargs.get('use_neuron_color', False)
 
     scatter_kws = kwargs.get('scatter_kws', {})
-    syn_lay_new = kwargs.get('synapse_layout',  {})
+    syn_lay_new = kwargs.get('synapse_layout', {})
     syn_lay = {
-                0: {
-                'name': 'Presynapses',
-                'color': (255, 0, 0)
-            },
-                1: {
-                'name': 'Postsynapses',
-                'color': (0, 0, 255)
-            },
-                2: {
-                'name': 'Gap junctions',
-                'color': (0, 255, 0)
-            },
-                'display': 'lines' #'mpatches.Circles'
+        0: {
+            'name': 'Presynapses',
+                    'color': (255, 0, 0)
+        },
+        1: {
+            'name': 'Postsynapses',
+                    'color': (0, 0, 255)
+        },
+        2: {
+            'name': 'Gap junctions',
+                    'color': (0, 255, 0)
+        },
+        'display': 'lines'  # 'mpatches.Circles'
     }
     syn_lay.update(syn_lay_new)
 
     # Parameters for dotprops
     scale_vect = kwargs.get('scale_vect', 1)
-    alpha_range = kwargs.get('alpha_range', False)
 
     # Parameters for figure
     pl_title = kwargs.get('title', None)
@@ -1528,7 +1576,7 @@ def plot3d(x, *args, **kwargs):
     auto_limits = kwargs.get('auto_limits', True)
     auto_limits = kwargs.get('autolimits', auto_limits)
 
-    if backend not in ['plotly','vispy']:
+    if backend not in ['plotly', 'vispy']:
         module_logger.error(
             'Unknown backend: %s. See help(plot.plot3d).' % str(backend))
         return
@@ -1551,7 +1599,7 @@ def plot3d(x, *args, **kwargs):
         module_logger.error(
             'You need to provide a CATMAID remote instance.')
 
-    if not color and (skdata.shape[0] + dotprops.shape[0])>0:
+    if not color and (skdata.shape[0] + dotprops.shape[0]) > 0:
         cm = _random_colors(
             skdata.shape[0] + dotprops.shape[0], color_space='RGB', color_range=255)
         colormap = {}
@@ -1563,22 +1611,24 @@ def plot3d(x, *args, **kwargs):
             colormap.update({str(n): cm[i + skdata.shape[0]]
                              for i, n in enumerate(dotprops.gene_name.tolist())})
         if use_neuron_color:
-            colormap.update( { n.skeleton_id : n.color for n in skdata } )
+            colormap.update({n.skeleton_id: n.color for n in skdata})
     elif isinstance(color, dict):
         colormap = {n: tuple(color[n]) for n in color}
-    elif isinstance(color,(list,tuple)):
+    elif isinstance(color, (list, tuple)):
         colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}
-    elif isinstance(color,str):
-        color = tuple( [ int(c *255) for c in mcl.to_rgb(color) ] )
+    elif isinstance(color, str):
+        color = tuple([int(c * 255) for c in mcl.to_rgb(color)])
         colormap = {n: color for n in skdata.skeleton_id.tolist()}
     else:
         colormap = {}
 
     # Make sure colors are 0-255
     if colormap:
-        if max([ v for n in colormap for v in colormap[n] ]) <= 1:
-            module_logger.warning('Looks like RGB values are 0-1. Converting to 0-255.')
-            colormap = { n : tuple( [ int(v * 255) for v in colormap[n] ] ) for n in colormap }
+        if max([v for n in colormap for v in colormap[n]]) <= 1:
+            module_logger.warning(
+                'Looks like RGB values are 0-1. Converting to 0-255.')
+            colormap = {n: tuple([int(v * 255) for v in colormap[n]])
+                        for n in colormap}
 
     # Get and prepare volumes
     volumes_data = {}
@@ -1591,11 +1641,11 @@ def plot3d(x, *args, **kwargs):
             else:
                 v = fetch.get_volume(v, remote_instance)
 
-        volumes_data[ v['name'] ] = {'verts': v['vertices'],
-                           'faces': v['faces'], 'color': v['color']}
+        volumes_data[v['name']] = {'verts': v['vertices'],
+                                   'faces': v['faces'], 'color': v['color']}
 
     # Get boundaries of what to plot
-    min_x, max_x, min_y, max_y, min_z, max_z, = [],[],[],[],[],[]
+    min_x, max_x, min_y, max_y, min_z, max_z, = [], [], [], [], [], []
 
     if not skdata.empty:
         if not connectors_only:
@@ -1623,25 +1673,27 @@ def plot3d(x, *args, **kwargs):
         max_z += [n.points.z.max() for n in dotprops.itertuples()]
 
     if volumes_data:
-        v_min  = [ np.array(volumes_data[v]['verts']).min(axis=0) for v in volumes_data ]
-        v_max  = [ np.array(volumes_data[v]['verts']).max(axis=0) for v in volumes_data ]
-        min_x += [ v[0] for v in v_min]
-        max_x += [ v[0] for v in v_max]
-        min_y += [ v[1] for v in v_min]
-        max_y += [ v[1] for v in v_max]
-        min_z += [ v[2] for v in v_min]
-        max_z += [ v[2] for v in v_max]
+        v_min = [np.array(volumes_data[v]['verts']).min(axis=0)
+                 for v in volumes_data]
+        v_max = [np.array(volumes_data[v]['verts']).max(axis=0)
+                 for v in volumes_data]
+        min_x += [v[0] for v in v_min]
+        max_x += [v[0] for v in v_max]
+        min_y += [v[1] for v in v_min]
+        max_y += [v[1] for v in v_max]
+        min_z += [v[2] for v in v_min]
+        max_z += [v[2] for v in v_max]
 
     if points:
-        p_min = [ p.min(axis=0) for p in points ]
-        p_max = [ p.max(axis=0) for p in points ]
+        p_min = [p.min(axis=0) for p in points]
+        p_max = [p.max(axis=0) for p in points]
 
-        min_x += [ p[0] for p in p_min]
-        max_x += [ p[0] for p in p_max]
-        min_y += [ p[1] for p in p_min]
-        max_y += [ p[1] for p in p_max]
-        min_z += [ p[2] for p in p_min]
-        max_z += [ p[2] for p in p_max]
+        min_x += [p[0] for p in p_min]
+        max_x += [p[0] for p in p_max]
+        min_y += [p[1] for p in p_min]
+        max_y += [p[1] for p in p_max]
+        min_z += [p[2] for p in p_min]
+        max_z += [p[2] for p in p_max]
 
     min_x = min(min_x)
     max_x = max(max_x)
@@ -1655,7 +1707,7 @@ def plot3d(x, *args, **kwargs):
     if downsampling > 1 and not connectors_only and not skdata.empty:
         module_logger.debug('Downsampling neurons...')
         morpho.module_logger.setLevel('ERROR')
-        skdata.downsample( downsampling )
+        skdata.downsample(downsampling)
         morpho.module_logger.setLevel('INFO')
         module_logger.debug('Downsampling finished.')
     elif skdata.shape[0] > 100:
@@ -1733,14 +1785,12 @@ def plot_network(x, *args, **kwargs):
 
     syn_cutoff = kwargs.get('syn_cutoff', None)
     syn_threshold = kwargs.get('syn_threshold', 1)
-    groups = kwargs.get('groups', [])
     colormap = kwargs.get('colormap', 'random')
 
     label_nodes = kwargs.get('label_nodes', True)
     label_edges = kwargs.get('label_edges', True)
     label_hover = kwargs.get('label_hover', True)
 
-    node_labels = kwargs.get('node_labels', [])
     node_hover_text = kwargs.get('node_hover_text', [])
     node_size = kwargs.get('node_size', 20)
 
@@ -1749,7 +1799,7 @@ def plot_network(x, *args, **kwargs):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if not isinstance(x, (nx.DiGraph, nx.Graph) ):
+    if not isinstance(x, (nx.DiGraph, nx.Graph)):
         x = utils.eval_skids(x, remote_instance=remote_instance)
         g = graph.network2nx(x, threshold=syn_threshold)
     else:
@@ -1764,9 +1814,9 @@ def plot_network(x, *args, **kwargs):
         colors.update({n: (.5, .5, .5) for n in g.nodes if n not in colormap})
     elif colormap == 'random':
         c = _random_colors(len(g.nodes), color_space='RGB', color_range=255)
-        colors = { n: c[i] for i, n in enumerate(g.nodes)}
-    elif isinstance(colormap, tuple, list) and len(colormap) == 3:
-        colors = {n : tuple(colormap) for v in g.nodes }
+        colors = {n: c[i] for i, n in enumerate(g.nodes)}
+    elif isinstance(colormap, (tuple, list, np.ndarray)) and len(colormap) == 3:
+        colors = {n: tuple(colormap) for n in g.nodes}
     else:
         module_logger.error(
             'I dont understand the colors you have provided. Please, see help(plot.plot_network).')
@@ -1774,8 +1824,8 @@ def plot_network(x, *args, **kwargs):
 
     edges = []
     annotations = []
-    max_weight = max( nx.get_edge_attributes(g,'weight').values() )
-    for e in  list( g.edges.data() ):
+    max_weight = max(nx.get_edge_attributes(g, 'weight').values())
+    for e in list(g.edges.data()):
         e_width = 2 + 5 * round(e[2]['weight']) / max_weight
 
         edges.append(
@@ -1846,19 +1896,19 @@ def plot_network(x, *args, **kwargs):
 
     # Prepare node sizes
     if isinstance(node_size, dict):
-        n_size = [ node_size[n] for n in g.nodes]
+        n_size = [node_size[n] for n in g.nodes]
     else:
         n_size = node_size
 
     nodes = go.Scatter(dict(
-        x=np.vstack( pos.values() )[:,0],
-        y=np.vstack( pos.values() )[:,1],
-        text=[node_hover_text[ n ] for n in g.nodes ] if label_hover else None,
+        x=np.vstack(pos.values())[:, 0],
+        y=np.vstack(pos.values())[:, 1],
+        text=[node_hover_text[n] for n in g.nodes] if label_hover else None,
         mode='markers',
         hoverinfo='text',
         marker=dict(
             size=n_size,
-            color=['rgb' + str(tuple(colors[ n ])) for n in g.nodes ]
+            color=['rgb' + str(tuple(colors[n])) for n in g.nodes]
         )
     ))
 
@@ -1905,7 +1955,8 @@ def plot_network(x, *args, **kwargs):
 
     return fig
 
-def _parse_objects(x,remote_instance=None):
+
+def _parse_objects(x, remote_instance=None):
     """ Helper class to extract objects for plotting.
     """
 
@@ -1923,12 +1974,12 @@ def _parse_objects(x,remote_instance=None):
     # Collect neuron objects and collate to single Neuronlist
     neuron_obj = [ob for ob in x if isinstance(
         ob, (pd.DataFrame, pd.Series, core.CatmaidNeuron, core.CatmaidNeuronList))
-        and not isinstance(ob, (core.Dotprops, core.Volume))] # dotprops and volumes are instances of pd.DataFrames
+        and not isinstance(ob, (core.Dotprops, core.Volume))]  # dotprops and volumes are instances of pd.DataFrames
 
-    skdata = core.CatmaidNeuronList( neuron_obj, make_copy=False)
+    skdata = core.CatmaidNeuronList(neuron_obj, make_copy=False)
 
     # Collect dotprops
-    dotprops = [ob for ob in x if isinstance(ob,core.Dotprops)]
+    dotprops = [ob for ob in x if isinstance(ob, core.Dotprops)]
 
     if len(dotprops) == 1:
         dotprops = dotprops[0]
@@ -1938,23 +1989,28 @@ def _parse_objects(x,remote_instance=None):
         dotprops = pd.concat(dotprops)
 
     # Collect and parse volumes
-    volumes = [ ob for ob in x if isinstance(ob, (core.Volume, str) ) ]
+    volumes = [ob for ob in x if isinstance(ob, (core.Volume, str))]
 
     # Collect dataframes with xyz coordinates
-    dataframes = [ ob for ob in x if isinstance(ob, (pd.DataFrame, pd.Series) ) ]
+    dataframes = [ob for ob in x if isinstance(ob, pd.DataFrame)]
+    if [d for d in dataframes if False in [c in d.columns for c in ['x', 'y', 'z']]]:
+        module_logger.warning('DataFrames must have x, y and z columns.')
+    dataframes = [d for d in dataframes if False not in [c in d.columns for c in ['x', 'y', 'z']]]
+    dataframes = [d[['x', 'y', 'z']].values for d in dataframes]
 
-    # Collect points
-    points = [ob.copy() for ob in x if isinstance(ob,np.ndarray)]
-
-    # Remove points with wrong dimensions
-    if [ ob for ob in points if ob.shape[1] != 3 ]:
+    # Collect arrays
+    arrays = [ob.copy() for ob in x if isinstance(ob, np.ndarray)]
+    # Remove arrays with wrong dimensions
+    if [ob for ob in arrays if ob.shape[1] != 3]:
         module_logger.warning('Point objects need to be of shape (n,3).')
-    points = [ ob for ob in points if ob.shape[1] == 3 ]
+    arrays = [ob for ob in arrays if ob.shape[1] == 3]
+
+    points = dataframes + arrays
 
     return skids, skdata, dotprops, volumes, points
 
 
-def plot1d( x, ax=None, color=None, **kwargs):
+def plot1d(x, ax=None, color=None, **kwargs):
     """ Plot neuron topology in 1D according to Cuntz et al. (2010).
 
     Parameters
@@ -1978,21 +2034,22 @@ def plot1d( x, ax=None, color=None, **kwargs):
     elif isinstance(x, core.CatmaidNeuron):
         x = core.CatmaidNeuronList(x)
     else:
-        raise TypeError('Unable to work with data of type "{0}"'.format(type(x)))
+        raise TypeError(
+            'Unable to work with data of type "{0}"'.format(type(x)))
 
     if isinstance(color, type(None)):
         color = (0.56, 0.86, 0.34)
 
     if not ax:
-        fig, ax = plt.subplots(figsize=(8, len(x)/3 ))
+        fig, ax = plt.subplots(figsize=(8, len(x) / 3))
 
     # Add some default parameters for the plotting to kwargs
-    kwargs.update( { 'lw' : kwargs.get('lw', .1),
-                     'ec' :  kwargs.get('ec', (1,1,1)),
-                     })
+    kwargs.update({'lw': kwargs.get('lw', .1),
+                   'ec': kwargs.get('ec', (1, 1, 1)),
+                   })
 
     max_x = []
-    for ix,n in enumerate( tqdm(x, desc='Processing', disable=pbar_hide, leave=pbar_leave) ):
+    for ix, n in enumerate(tqdm(x, desc='Processing', disable=pbar_hide, leave=pbar_leave)):
         if isinstance(color, dict):
             this_c = color[n.skeleton_id]
         else:
@@ -2002,12 +2059,14 @@ def plot1d( x, ax=None, color=None, **kwargs):
         topology = graph_utils.node_label_sorting(n)
 
         # Get terminals and branch points
-        bp = n.nodes[n.nodes.type=='branch'].treenode_id.values
-        term = n.nodes[n.nodes.type=='end'].treenode_id.values
+        bp = n.nodes[n.nodes.type == 'branch'].treenode_id.values
+        term = n.nodes[n.nodes.type == 'end'].treenode_id.values
 
         # Order this neuron's segments by topology
-        breaks = [ topology[0] ] + [ n for i,n in enumerate(topology) if n in bp or n in term ]
-        segs = [ ( [ s for s in n.segments if s[0] == end ][0][-1], end ) for end in breaks[1:] ]
+        breaks = [topology[0]] + \
+            [n for i, n in enumerate(topology) if n in bp or n in term]
+        segs = [([s for s in n.segments if s[0] == end][0][-1], end)
+                for end in breaks[1:]]
 
         # Now get distances for each segment
         if 'nodes_geodesic_distance_matrix' in n.__dict__:
@@ -2015,28 +2074,29 @@ def plot1d( x, ax=None, color=None, **kwargs):
             dist_mat = n.nodes_geodesic_distance_matrix
         else:
             # If not, compute matrix for subset of nodes
-            dist_mat = graph_utils.geodesic_matrix( n, tn_ids=breaks, directed=False )
+            dist_mat = graph_utils.geodesic_matrix(
+                n, tn_ids=breaks, directed=False)
 
-        dist = np.array([ dist_mat.loc[ s[0], s[1] ] for s in segs ] ) / 1000
+        dist = np.array([dist_mat.loc[s[0], s[1]] for s in segs]) / 1000
         max_x.append(sum(dist))
 
         # Plot
         curr_dist = 0
         for k, d in enumerate(dist):
             if segs[k][1] in term:
-                c = tuple( np.array(this_c) / 2 )
+                c = tuple(np.array(this_c) / 2)
             else:
                 c = color
 
-            p = mpatches.Rectangle( (curr_dist, ix), d, 1, fc=c, **kwargs )
+            p = mpatches.Rectangle((curr_dist, ix), d, 1, fc=c, **kwargs)
             ax.add_patch(p)
             curr_dist += d
 
-    ax.set_xlim(0,max(max_x))
-    ax.set_ylim(0,len(x))
+    ax.set_xlim(0, max(max_x))
+    ax.set_ylim(0, len(x))
 
-    ax.set_yticks( np.array( range(0, len(x)) ) + .5 )
-    ax.set_yticklabels( x.neuron_name )
+    ax.set_yticks(np.array(range(0, len(x))) + .5)
+    ax.set_yticklabels(x.neuron_name)
 
     ax.set_xlabel('distance [um]')
 
@@ -2049,3 +2109,242 @@ def plot1d( x, ax=None, color=None, **kwargs):
 
     return ax
 
+
+def _volume2vispy(x, **kwargs):
+    """ Converts CatmaidVolume(s) to vispy visuals."""
+
+    # Must not use _make_iterable here as this will turn into list of keys!
+    if not isinstance(x, (list, np.ndarray)):
+        x = [x]
+
+    # List to fill with vispy visuals
+    visuals = []
+
+    # Now add neuropils:
+    for v in x:
+        if not isinstance(v, core.Volume):
+            raise TypeError('Expected pymaid.Volume, got "{}"'.format(type(v)))
+
+        object_id = uuid.uuid4()
+
+        color = np.array(v['color'], dtype=float)
+
+        # Add alpha
+        if len(color) < 4:
+            color = np.append(color, [.6])
+
+        if max(color) > 1:
+            color[:3] = color[:3] / 255
+
+        s = scene.visuals.Mesh(vertices=v.vertices,
+                               faces=v.faces, color=color,
+                               shading=kwargs.get('shading', None))
+
+        # Make sure volumes are always drawn after neurons
+        s.order = 10
+
+        # Add custom attributes
+        s.unfreeze()
+        s._object_type = 'catmaid_volume'
+        s._volume_name = v['name']
+        s._object_id = object_id
+        s.freeze()
+
+        visuals.append(s)
+
+    return visuals
+
+
+def _neuron2vispy(x, colormap={}, connectors=False, connectors_only=False,
+                  by_strahler=False, by_confidence=False, linewidth=1,
+                  cn_mesh_colors=False, synapse_layout={}):
+    """ Converts a CatmaidNeuron/List to vispy visuals."""
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = core.CatmaidNeuronList(x)
+    elif isinstance(x, core.CatmaidNeuronList):
+        pass
+    else:
+        raise TypeError('Unable to process data of type "{}"'.format(type(x)))
+
+    syn_lay = {
+        0: {
+            'name': 'Presynapses',
+                    'color': (255, 0, 0)
+        },
+        1: {
+            'name': 'Postsynapses',
+                    'color': (0, 0, 255)
+        },
+        2: {
+            'name': 'Gap junctions',
+                    'color': (0, 255, 0)
+        },
+        'display': 'lines'  # 'mpatches.Circles'
+    }
+    syn_lay.update(synapse_layout)
+
+    # List to fill with vispy visuals
+    visuals = []
+
+    for neuron in x:
+        # Generate random ID -> we need this in case we have duplicate skeleton IDs
+        object_id = uuid.uuid4()
+
+        try:
+            neuron_color = colormap[str(neuron.skeleton_id)]
+        except:
+            neuron_color = (0, 0, 0)
+
+        # Convert color 0-1
+        if max(neuron_color) > 1:
+            neuron_color = np.array(neuron_color) / 255
+
+        # Get root node indices (may be more than one if neuron has been cut weirdly)
+        root_ix = neuron.nodes[
+            neuron.nodes.parent_id.isnull()].index.tolist()
+
+        if not connectors_only:
+            nodes = neuron.nodes[~neuron.nodes.parent_id.isnull()]
+
+            # Extract treenode_coordinates and their parent's coordinates
+            tn_coords = nodes[['x', 'y', 'z']].apply(
+                pd.to_numeric).as_matrix()
+            parent_coords = neuron.nodes.set_index('treenode_id').loc[nodes.parent_id.tolist(
+            )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
+
+            # Turn coordinates into segments
+            segments = [item for sublist in zip(
+                tn_coords, parent_coords) for item in sublist]
+
+            # Add alpha to color based on strahler
+            if by_strahler or by_confidence:
+                if by_strahler:
+                    if 'strahler_index' not in neuron.nodes:
+                        morpho.strahler_index(neuron)
+
+                    # Generate list of alpha values
+                    alpha = neuron.nodes['strahler_index'].as_matrix()
+
+                if by_confidence:
+                    if 'arbor_confidence' not in neuron.nodes:
+                        morpho.arbor_confidence(neuron)
+
+                    # Generate list of alpha values
+                    alpha = neuron.nodes['arbor_confidence'].as_matrix()
+
+                # Pop root from coordinate lists
+                alpha = np.delete(alpha, root_ix, axis=0)
+
+                alpha = alpha / (max(alpha) + 1)
+                # Duplicate values (start and end of each segment!)
+                alpha = np.array([v for l in zip(alpha, alpha) for v in l])
+
+                # Turn color into array (need 2 colors per segment for beginnng and end)
+                neuron_color = np.array(
+                    [neuron_color] * (tn_coords.shape[0] * 2), dtype=float)
+                neuron_color = np.insert(neuron_color, 3, alpha, axis=1)
+
+            if segments:
+                # Create line plot from segments.
+                t = scene.visuals.Line(pos=np.array(segments),
+                                       color=list(neuron_color),
+                                       width=linewidth,  # Can only be used with method 'agg'
+                                       connect='segments',
+                                       antialias=False,
+                                       method='gl')  # method can also be 'agg' -> has to use connect='strip'
+                # Make visual discoverable
+                t.interactive = True
+
+                # Add custom attributes
+                t.unfreeze()
+                t._object_type = 'neuron'
+                t._neuron_part = 'neurites'
+                t._skeleton_id = neuron.skeleton_id
+                t._neuron_name = neuron.neuron_name
+                t._object_id = object_id
+                t.freeze()
+
+                visuals.append(t)
+
+            if by_strahler or by_confidence:
+                # Convert array back to a single color without alpha
+                neuron_color = neuron_color[0][:3]
+
+            # Extract and plot soma
+            soma = neuron.nodes[neuron.nodes.radius > 1]
+            if soma.shape[0] >= 1:
+                radius = soma.ix[soma.index[0]].radius
+                sp = create_sphere(5, 5, radius=radius)
+                s = scene.visuals.Mesh(vertices=sp.get_vertices() + soma.ix[soma.index[0]][
+                                       ['x', 'y', 'z']].as_matrix(),
+                                       faces=sp.get_faces(),
+                                       color=neuron_color)
+
+                # Make visual discoverable
+                s.interactive = True
+
+                # Add custom attributes
+                s.unfreeze()
+                s._object_type = 'neuron'
+                s._neuron_part = 'soma'
+                s._skeleton_id = neuron.skeleton_id
+                s._neuron_name = neuron.neuron_name
+                s._object_id = object_id
+                s.freeze()
+
+                visuals.append(s)
+
+        if connectors or connectors_only:
+            for j in [0, 1, 2]:
+                if cn_mesh_colors:
+                    color = neuron_color
+                else:
+                    color = syn_lay[j]['color']
+
+                if max(color) > 1:
+                    color = np.array(color) / 255
+
+                this_cn = neuron.connectors[
+                    neuron.connectors.relation == j]
+
+                if this_cn.empty:
+                    continue
+
+                pos = this_cn[['x', 'y', 'z']].apply(
+                    pd.to_numeric).as_matrix()
+
+                if syn_lay['display'] == 'mpatches.Circles':
+                    con = scene.visuals.Markers()
+
+                    con.set_data(pos=np.array(pos),
+                                 face_color=color, edge_color=color, size=1)
+
+                    visuals.append(t)
+
+                elif syn_lay['display'] == 'lines':
+                    tn_coords = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.tolist(
+                    )][['x', 'y', 'z']].apply(pd.to_numeric).as_matrix()
+
+                    segments = [item for sublist in zip(
+                        pos, tn_coords) for item in sublist]
+
+                    t = scene.visuals.Line(pos=np.array(segments),
+                                           color=color,
+                                           width=linewidth,  # Can only be used with method 'agg'
+                                           connect='segments',
+                                           antialias=False,
+                                           method='gl')  # method can also be 'agg' -> has to use connect='strip'
+
+                    # Add custom attributes
+                    t.unfreeze()
+                    t._object_type = 'neuron'
+                    t._neuron_part = 'connectors'
+                    t._skeleton_id = neuron.skeleton_id
+                    t._neuron_name = neuron.neuron_name
+                    t._object_id = object_id
+                    t.freeze()
+
+                    visuals.append(t)
+
+    return visuals

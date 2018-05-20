@@ -18,11 +18,9 @@
 """ This module contains functions for intersections.
 """
 
-import time
 import logging
 import pandas as pd
 import numpy as np
-import scipy
 from scipy.spatial import ConvexHull
 
 from pymaid import fetch, core, utils, graph_utils
@@ -37,26 +35,27 @@ if utils.is_jupyter():
 module_logger = logging.getLogger(__name__)
 module_logger.setLevel(logging.INFO)
 
-if len( module_logger.handlers ) == 0:
+if len(module_logger.handlers) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
+    formatter = logging.Formatter('%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     module_logger.addHandler(sh)
 
 try:
     from pyoctree import pyoctree
 except:
-    module_logger.warning("Module pyoctree not found. Falling back to scipy's ConvexHull for intersection calculations.")
+    module_logger.warning("Module pyoctree not found. Falling back to scipy's \
+                            ConvexHull for intersection calculations.")
 
-__all__ = sorted([ 'in_volume'])
+__all__ = sorted(['in_volume'])
 
 # Default settings for progress bars
 pbar_hide = False
 pbar_leave = True
+
 
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     """ Test if points are within a given CATMAID volume.
@@ -77,12 +76,12 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     volume :          {str, list of str, core.Volume}
                       Name of the CATMAID volume to test OR core.Volume dict
-                      as returned by e.g. :func:`~pymaid.get_volume()`
+                      as returned by e.g. :func:`~pymaid.get_volume()`.
     inplace :         bool, optional
                       If False, a copy of the original DataFrames/Neuron is
                       returned. Does only apply to CatmaidNeuron or
                       CatmaidNeuronList objects. Does apply if multiple
-                      volumes are provided
+                      volumes are provided.
     mode :            {'IN','OUT'}, optional
                       If 'IN', parts of the neuron that are within the volume
                       are kept.
@@ -94,10 +93,10 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     CatmaidNeuron
                       If input is CatmaidNeuron or CatmaidNeuronList, will
                       return parts of the neuron (nodes and connectors) that
-                      are within the volume
+                      are within the volume.
     list of bools
                       If input is list or DataFrame, returns boolean: ``True``
-                      if in volume, ``False`` if not
+                      if in volume, ``False`` if not.
     dict
                       If multiple volumes are provided as list of strings,
                       results will be returned as dict of above returns.
@@ -129,9 +128,9 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
-        #Turn into dict
+        # Turn into dict
         if not isinstance(volume, dict):
-            volume = { v['name'] : v for v in volume }
+            volume = {v['name']: v for v in volume}
 
         data = dict()
         for v in tqdm(volume, desc='Volumes', disable=pbar_hide, leave=pbar_leave):
@@ -145,13 +144,15 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].as_matrix()
     elif isinstance(x, core.CatmaidNeuron):
-        in_v = in_volume(x.nodes[['x', 'y', 'z']].as_matrix(), volume, mode=mode)
+        in_v = in_volume(
+            x.nodes[['x', 'y', 'z']].as_matrix(), volume, mode=mode)
 
         # If mode is OUT, invert selection
         if mode == 'OUT':
             in_v = ~np.array(in_v)
 
-        x = graph_utils.subset_neuron( x, x.nodes[in_v].treenode_id.values, inplace=inplace )
+        x = graph_utils.subset_neuron(
+            x, x.nodes[in_v].treenode_id.values, inplace=inplace)
 
         if not inplace:
             return x
@@ -169,10 +170,12 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
         points = x
 
     try:
-        return _in_volume_ray( points, volume )
+        return _in_volume_ray(points, volume)
     except:
-        module_logger.warning('Package pyoctree not found. Falling back to ConvexHull.')
-        return _in_volume_convex( points, volume, approximate=False )
+        module_logger.warning(
+            'Package pyoctree not found. Falling back to ConvexHull.')
+        return _in_volume_convex(points, volume, approximate=False)
+
 
 def _in_volume_ray(points, volume):
     """ Uses pyoctree's raycsasting to test if points are within a given
@@ -194,14 +197,16 @@ def _in_volume_ray(points, volume):
     mn = np.array(volume['vertices']).min(axis=0)
 
     rayPointList = np.array(
-                [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # to those that occur "above" the point we are querying
-    intersections = [len([i for i in tree.rayIntersection(ray) if i.p[2] >= points[k][2]]) for k, ray in enumerate( rayPointList )]
+    intersections = [len([i for i in tree.rayIntersection(
+        ray) if i.p[2] >= points[k][2]]) for k, ray in enumerate(rayPointList)]
 
     # Count intersections and return True for odd counts
-    return np.remainder( list(intersections), 2 ) != 0 # [i % 2 != 0 for i in intersections]
+    # [i % 2 != 0 for i in intersections]
+    return np.remainder(list(intersections), 2) != 0
 
 
 def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
@@ -212,7 +217,7 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if type(volume) == type(str()):
+    if isinstance(volume, str):
         volume = fetch.get_volume(volume, remote_instance)
 
     verts = volume['vertices']
@@ -237,5 +242,3 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
             bbox[a] = (float('-inf'), float('inf'))
 
         return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
-
-
