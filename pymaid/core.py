@@ -79,11 +79,9 @@ import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 import scipy
 import networkx as nx
-
 import io
-
+import uuid
 import copy
-
 import six
 
 from pymaid import graph, morpho, fetch, graph_utils, resample, intersect, utils
@@ -1173,7 +1171,7 @@ class CatmaidNeuron:
 
         """
         if not neuron_id:
-            neuron_id = random.randint(100000, 999999)
+            neuron_id = uuid.uuid4().int
 
         if not neuron_name:
             neuron_name = filename
