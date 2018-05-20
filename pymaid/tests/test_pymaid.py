@@ -43,6 +43,7 @@ From shell:
 
 import unittest
 import os
+import datetime
 
 import pymaid
 import pandas as pd
@@ -262,6 +263,18 @@ class TestFetch(unittest.TestCase):
         self.assertIsInstance(pymaid.url_to_coordinates((0, 0, 0), 1),
                               str)
 
+    def test_get_segments(self):
+        self.assertIsInstance(pymaid.get_segments(config_test.test_skids[0]),
+                              list)
+
+    def test_neurons_in_volume(self):
+        self.assertIsInstance(pymaid.get_neurons_in_volume(config_test.test_volume),
+                              list)
+
+    def test_label_list(self):
+        self.assertIsInstance(pymaid.get_label_list(),
+                              pd.DataFrame)
+
 
 class TestCore(unittest.TestCase):
     """Test pymaid.core """
@@ -351,6 +364,39 @@ class TestCore(unittest.TestCase):
         self.assertIsInstance(n.reload(),
                               type(None))
 
+    def test_swc_io(self):
+        n = self.nl[0]
+
+        n.to_swc('neuron.swc')
+
+        self.assertIsInstance(pymaid.CatmaidNeuron.from_swc('neuron.swc'),
+                              pymaid.CatmaidNeuron)
+
+    def test_json_io(self):
+        n_string = pymaid.neuron2json(self.nl[:2])
+
+        self.assertIsInstance(n_string, str)
+
+        n = pymaid.json2neuron(n_string)
+
+        self.assertIsInstance(n, pymaid.CatmaidNeuronList)
+
+    def test_selection_io(self):
+        self.nl.to_selection('selection.json')
+
+        n = pymaid.CatmaidNeuronList.from_selection('selection.json')
+
+        self.assertIsInstance(n, pymaid.CatmaidNeuronList)
+
+    def test_has_annotation(self):
+        self.assertIsInstance(self.nl.has_annotation(self.nl.annotations[0][0]),
+                              pymaid.CatmaidNeuronList)
+
+    def test_remove_duplicates(self):
+        t = pymaid.CatmaidNeuronList([self.nl[0], self.nl[0], self.nl[0]])
+        t2 = t.remove_duplicates(inplace=False)
+        self.assertLess(len(t2), len(t))
+
 
 class TestMorpho(unittest.TestCase):
     """ Test morphological operations """
@@ -425,9 +471,10 @@ class TestGraphs(unittest.TestCase):
             config_test.token,
             logger_level='ERROR')
 
-        self.n = pymaid.get_neuron(config_test.test_skids[0],
-                                   remote_instance=self.rm)
+        self.nl = pymaid.get_neuron(config_test.test_skids[0:2],
+                                    remote_instance=self.rm)
 
+        self.n = self.nl[0]
         self.n.reroot(self.n.soma)
 
         # Get some random leaf node
@@ -438,6 +485,7 @@ class TestGraphs(unittest.TestCase):
 
     def test_reroot(self):
         self.assertIsNotNone(self.n.reroot(self.leaf_id, inplace=False))
+        self.assertIsNotNone(self.nl.reroot(self.nl.soma, inplace=False))
 
     def test_distal_to(self):
         self.assertTrue(pymaid.distal_to(self.n, self.leaf_id, self.n.root))
@@ -512,6 +560,16 @@ class TestConnectivity(unittest.TestCase):
 
     def test_adjacency_matrix(self):
         self.assertIsInstance(self.adj, pd.DataFrame)
+
+    def test_adjacency_matrix2(self):
+        nl = pymaid.get_neurons(self.cn_table[self.cn_table.relation == 'upstream'].iloc[:10].skeleton_id.values)
+        self.assertIsInstance(pymaid.adjacency_matrix(nl, use_connectors=True),
+                              pd.DataFrame)
+
+    def test_group_matrix(self):
+        gr_adj = pymaid.group_matrix(self.adj,
+                                     row_groups={n : 'group1' for n in self.adj.index.values})
+        self.assertIsInstance(gr_adj, pd.DataFrame)
 
     def test_connectivity_filter(self):
         dist, prox = pymaid.cut_neuron(
@@ -622,12 +680,36 @@ class TestUserStats(unittest.TestCase):
                                    remote_instance=self.rm)
 
     def test_time_invested(self):
-        self.assertIsInstance(pymaid.get_time_invested(
-            self.n.downsample(10, inplace=False), remote_instance=self.rm), pd.DataFrame)
+        ds = self.n.downsample(20, inplace=False)
+        self.assertIsInstance(pymaid.get_time_invested(ds,
+                                                       mode='SUM',
+                                                       remote_instance=self.rm),
+                              pd.DataFrame)
+        self.assertIsInstance(pymaid.get_time_invested(ds,
+                                                       mode='ACTIONS',
+                                                       remote_instance=self.rm),
+                              pd.DataFrame)
+        self.assertIsInstance(pymaid.get_time_invested(ds,
+                                                       mode='OVER_TIME',
+                                                       remote_instance=self.rm),
+                              pd.DataFrame)
 
     def test_user_contributions(self):
         self.assertIsInstance(pymaid.get_user_contributions(
             config_test.test_skids, remote_instance=self.rm), pd.DataFrame)
+
+    def test_user_actions(self):
+        # Get a day on which a random user has done some work
+        last_week = datetime.date.today() - datetime.timedelta(days=7)
+        h = pymaid.get_history(start_date=last_week,
+                               end_date=datetime.date.today())
+        u = h.treenodes.loc[h.treenodes.sum(axis=1) > 10].sample(1).index[0]
+
+        user_actions = pymaid.get_user_actions(users=u, start_date=last_week,
+                                               end_date=datetime.date.today())
+
+        self.assertIsInstance(user_actions, pd.DataFrame)
+
 
 
 if __name__ == '__main__':
