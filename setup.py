@@ -55,6 +55,7 @@ setup(
         "pyqt5",
         "pypng",
         "networkx>=2.1",
+        "seaborn",
         #"rpy2>=2.8.5", #This throws an error when no R is installed on the system
     ],
 

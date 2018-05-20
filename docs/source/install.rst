@@ -117,6 +117,12 @@ Provides flexible drawing of graphs.
 
   - Download: http://matplotlib.sourceforge.net/
 
+Seaborn
+*******
+Provides additional plotting.
+  
+  - Download: https://seaborn.pydata.org
+
 tqdm
 ****
 Neat progress bars.
