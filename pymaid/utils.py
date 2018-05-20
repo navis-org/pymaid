@@ -21,6 +21,7 @@ import numpy as np
 import json
 import pandas as pd
 import importlib
+import vispy as vp
 
 from pymaid import core, fetch
 
@@ -492,3 +493,69 @@ def eval_node_ids(x, connectors=True, treenodes=True):
     else:
         raise TypeError(
             'Unable to extract node IDs from type %s' % str(type(x)))
+
+def _parse_objects(x, remote_instance=None):
+    """ Helper class to extract objects for plotting.
+
+    Returns
+    -------
+    skids :     list
+    skdata :    pymaid.CatmaidNeuronList
+    dotprops :  pd.DataFrame
+    volumes :   list
+    points :    list of arrays
+    """
+
+    if not isinstance(x, list):
+        x = [x]
+
+    # Check for skeleton IDs
+    skids = []
+    for ob in x:
+        if isinstance(ob, (str, int)):
+            try:
+                skids.append(int(ob))
+            except:
+                pass
+
+    # Collect neuron objects and collate to single Neuronlist
+    neuron_obj = [ob for ob in x if isinstance(ob,
+                                               (core.CatmaidNeuron,
+                                                core.CatmaidNeuronList))]
+    skdata = core.CatmaidNeuronList(neuron_obj, make_copy=False)
+
+    # Collect visuals
+    visuals = [ob for ob in x if isinstance(ob, vp.scene.visuals.VisualNode)]
+
+    # Collect dotprops
+    dotprops = [ob for ob in x if isinstance(ob, core.Dotprops)]
+
+    if len(dotprops) == 1:
+        dotprops = dotprops[0]
+    elif len(dotprops) == 0:
+        dotprops = core.Dotprops()
+    elif len(dotprops) > 1:
+        dotprops = pd.concat(dotprops)
+
+    # Collect and parse volumes
+    volumes = [ob for ob in x if isinstance(ob, (core.Volume, str))]
+
+    # Collect dataframes with X/Y/Z coordinates
+    # Note: dotprops and volumes are instances of pd.DataFrames
+    dataframes = [ob for ob in x if isinstance(ob, pd.DataFrame) and not isinstance(ob, (core.Dotprops, core.Volume))]
+    if [d for d in dataframes if False in [c in d.columns for c in ['x', 'y', 'z']]]:
+        module_logger.warning('DataFrames must have x, y and z columns.')
+    # Filter to and extract x/y/z coordinates
+    dataframes = [d for d in dataframes if False not in [c in d.columns for c in ['x', 'y', 'z']]]
+    dataframes = [d[['x', 'y', 'z']].values for d in dataframes]
+
+    # Collect arrays
+    arrays = [ob.copy() for ob in x if isinstance(ob, np.ndarray)]
+    # Remove arrays with wrong dimensions
+    if [ob for ob in arrays if ob.shape[1] != 3]:
+        module_logger.warning('Point objects need to be of shape (n,3).')
+    arrays = [ob for ob in arrays if ob.shape[1] == 3]
+
+    points = dataframes + arrays
+
+    return skids, skdata, dotprops, volumes, points, visuals

@@ -42,6 +42,12 @@ except Exception as error:
     module_logger.warning('Error importing pymaid.plotting:\n' + str(error))
 
 try:
+    from pymaid.scene3d import *
+except Exception as error:
+    module_logger.warning(str(error))
+    module_logger.warning('Error importing pymaid.scene3d:\n' + str(error))
+
+try:
     from pymaid.user_stats import *
 except Exception as error:
     module_logger.warning(str(error))
