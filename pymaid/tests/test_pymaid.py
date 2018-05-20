@@ -85,7 +85,7 @@ class TestModules(unittest.TestCase):
     def test_imports(self):
         mods = ['morpho', 'core', 'plotting', 'graph', 'graph_utils', 'core',
                 'connectivity', 'user_stats', 'cluster', 'resample',
-                'intersect', 'fetch']
+                'intersect', 'fetch', 'scene3d']
 
         for m in mods:
             _ = importlib.import_module('pymaid.{}'.format(m))
