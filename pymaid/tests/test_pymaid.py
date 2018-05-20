@@ -46,9 +46,9 @@ import os
 
 import pymaid
 import pandas as pd
-import numpy as np
 import networkx as nx
-import matplotlib.pyplot as plt
+
+import importlib
 
 # Silence module loggers
 pymaid.set_loggers('ERROR')
@@ -61,7 +61,8 @@ required_variables = ['server_url', 'http_user', 'http_pw', 'token',
                       'test_skids', 'test_annotations', 'test_volume']
 
 if False not in [v in os.environ for v in required_variables]:
-    class conf: pass
+    class conf:
+        pass
     config_test = conf()
 
     for v in ['server_url', 'http_user', 'http_pw', 'token', 'test_volume']:
@@ -77,6 +78,18 @@ else:
         import config_test
     except:
         raise ImportError('Unable to import configuration file.')
+
+
+class TestModules(unittest.TestCase):
+    """Test individual module import. """
+    def test_imports(self):
+        mods = ['morpho', 'core', 'plotting', 'graph', 'graph_utils', 'core',
+                'connectivity', 'user_stats', 'cluster', 'resample',
+                'intersect', 'fetch']
+
+        for m in mods:
+            _ = importlib.import_module('pymaid.{}'.format(m))
+
 
 class TestFetch(unittest.TestCase):
     """Test pymaid.fetch """
@@ -135,7 +148,7 @@ class TestFetch(unittest.TestCase):
         self.assertIsInstance(pymaid.get_neuron(
             config_test.test_skids, remote_instance=self.rm), pymaid.CatmaidNeuronList)
 
-    def test_get_neuron(self):
+    def test_get_neuron2(self):
         self.assertIsInstance(pymaid.get_arbor(
             config_test.test_skids[0], remote_instance=self.rm), pd.DataFrame)
 
@@ -164,87 +177,91 @@ class TestFetch(unittest.TestCase):
             config_test.test_skids[0], remote_instance=self.rm), pd.DataFrame)
 
     def test_get_names(self):
-        names = pymaid.get_names(config_test.test_skids, remote_instance=self.rm)
+        names = pymaid.get_names(
+            config_test.test_skids, remote_instance=self.rm)
         self.assertIsInstance(names, dict)
         self.assertIsInstance(pymaid.get_skids_by_name(
             list(names.values()), remote_instance=self.rm), pd.DataFrame)
 
-    def test_get_edges(self):
+    def test_get_cn_table(self):
         self.assertIsInstance(pymaid.get_partners('annotation:%s' % config_test.test_annotations[
                               0], remote_instance=self.rm), pd.DataFrame)
 
     def test_get_connectors(self):
-        cn = pymaid.get_connectors(config_test.test_skids, remote_instance=self.rm)
+        cn = pymaid.get_connectors(
+            config_test.test_skids, remote_instance=self.rm)
         self.assertIsInstance(cn, pd.DataFrame)
         self.assertIsInstance(pymaid.get_connector_details(
             cn.connector_id.tolist(), remote_instance=self.rm), pd.DataFrame)
 
     def test_get_partners_in_volume(self):
-        self.assertIsInstance( pymaid.get_partners_in_volume( config_test.test_skids[0],
-                                                              config_test.test_volume ),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.get_partners_in_volume(config_test.test_skids[0],
+                                                            config_test.test_volume),
+                              pd.DataFrame)
 
     def test_node_details(self):
-        n = pymaid.get_neuron( config_test.test_skids[0] )
-        self.assertIsInstance( pymaid.get_node_details( n.nodes.sample(100).treenode_id.values ),
-                               pd.DataFrame )
+        n = pymaid.get_neuron(config_test.test_skids[0])
+        self.assertIsInstance(pymaid.get_node_details(n.nodes.sample(100).treenode_id.values),
+                              pd.DataFrame)
 
     def test_skid_from_treenode(self):
-        n = pymaid.get_neuron( config_test.test_skids[0] )
-        self.assertIsInstance( pymaid.get_skid_from_treenode( n.nodes.iloc[0].treenode_id ),
-                               dict )
+        n = pymaid.get_neuron(config_test.test_skids[0])
+        self.assertIsInstance(pymaid.get_skid_from_treenode(n.nodes.iloc[0].treenode_id),
+                              dict)
 
     def test_get_edges(self):
-        self.assertIsInstance( pymaid.get_edges( config_test.test_skids ),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.get_edges(config_test.test_skids),
+                              pd.DataFrame)
 
     def test_connectors_between(self):
-        self.assertIsInstance( pymaid.get_connectors_between( config_test.test_skids,
-                                                              config_test.test_skids),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.get_connectors_between(config_test.test_skids,
+                                                            config_test.test_skids),
+                              pd.DataFrame)
 
     def test_user_annotations(self):
         ul = pymaid.get_user_list()
-        self.assertIsInstance( pymaid.get_user_annotations( ul.sample(1).iloc[0].id ),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.get_user_annotations(ul.sample(1).iloc[0].id),
+                              pd.DataFrame)
 
     def test_has_soma(self):
-        self.assertIsInstance( pymaid.has_soma( config_test.test_skids[0] ),
-                               dict)
+        self.assertIsInstance(pymaid.has_soma(config_test.test_skids[0]),
+                              dict)
 
     def test_treenode_info(self):
-        n = pymaid.get_neuron( config_test.test_skids[0] )
-        self.assertIsInstance( pymaid.get_treenode_info( n.nodes.treenode_id.values[0:100] ),
-                               pd.DataFrame )
+        n = pymaid.get_neuron(config_test.test_skids[0])
+        self.assertIsInstance(pymaid.get_treenode_info(n.nodes.treenode_id.values[0:100]),
+                              pd.DataFrame)
 
-    def test_treenode_info(self):
-        n = pymaid.get_neuron( config_test.test_skids[0] )
-        self.assertIsInstance( pymaid.get_node_tags( n.nodes.treenode_id.values[0:100],
-                                                     node_type='TREENODE' ),
-                               dict )
+    def test_treenode_tags(self):
+        n = pymaid.get_neuron(config_test.test_skids[0])
+        self.assertIsInstance(pymaid.get_node_tags(n.nodes.treenode_id.values[0:100],
+                                                   node_type='TREENODE'),
+                              dict)
 
     def test_review_details(self):
-        self.assertIsInstance( pymaid.get_review_details( config_test.test_skids[0] ),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.get_review_details(config_test.test_skids[0]),
+                              pd.DataFrame)
 
     def test_find_neurons(self):
-        self.assertIsInstance( pymaid.find_neurons( annotations=config_test.test_annotations ),
-                               pymaid.CatmaidNeuronList )
+        self.assertIsInstance(pymaid.find_neurons(annotations=config_test.test_annotations),
+                              pymaid.CatmaidNeuronList)
 
     def test_get_paths(self):
-        paths, g = pymaid.get_paths( config_test.test_skids[0], config_test.test_skids[1], return_graph=True )
-        self.assertIsInstance( g,
-                               nx.Graph )
-        self.assertIsInstance( paths,
-                               list )
+        paths, g = pymaid.get_paths(
+            config_test.test_skids[0], config_test.test_skids[1], return_graph=True)
+        self.assertIsInstance(g,
+                              nx.Graph)
+        self.assertIsInstance(paths,
+                              list)
 
     def test_annotation_list(self):
-        self.assertIsInstance( pymaid.get_annotation_list( ),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.get_annotation_list(),
+                              pd.DataFrame)
 
     def test_url_to_coords(self):
-        self.assertIsInstance( pymaid.url_to_coordinates( (0,0,0), 1 ),
-                               str )
+        self.assertIsInstance(pymaid.url_to_coordinates((0, 0, 0), 1),
+                              str)
+
 
 class TestCore(unittest.TestCase):
     """Test pymaid.core """
@@ -258,7 +275,7 @@ class TestCore(unittest.TestCase):
             logger_level='ERROR')
 
         self.nl = pymaid.get_neuron('annotation:%s' % config_test.test_annotations[
-                               0], remote_instance=self.rm)
+            0], remote_instance=self.rm)
 
     def test_init(self):
         self.assertIsInstance(pymaid.CatmaidNeuron(
@@ -291,8 +308,6 @@ class TestCore(unittest.TestCase):
         self.assertIsInstance(self.nl, pymaid.CatmaidNeuronList)
 
     def test_graph_related(self):
-        nl = pymaid.get_neuron('annotation:%s' % config_test.test_annotations[
-                               0], remote_instance=self.rm)
         self.assertIsInstance(self.nl[0].graph, nx.Graph)
         self.assertIsInstance(self.nl[0].segments, list)
 
@@ -301,37 +316,41 @@ class TestCore(unittest.TestCase):
 
         self.assertIsInstance(self.nl[0], pymaid.CatmaidNeuron)
         self.assertIsInstance(self.nl[:3], pymaid.CatmaidNeuronList)
-        self.assertIsInstance(self.nl[self.nl.n_nodes > 1000], pymaid.CatmaidNeuronList)
-        self.assertIsInstance(self.nl[list(skids[:-1])], pymaid.CatmaidNeuronList)
+        self.assertIsInstance(
+            self.nl[self.nl.n_nodes > 1000], pymaid.CatmaidNeuronList)
+        self.assertIsInstance(
+            self.nl[list(skids[:-1])], pymaid.CatmaidNeuronList)
         self.assertIsInstance(self.nl - self.nl[0], pymaid.CatmaidNeuronList)
-        self.assertIsInstance(self.nl[0] + self.nl[1], pymaid.CatmaidNeuronList)
+        self.assertIsInstance(
+            self.nl[0] + self.nl[1], pymaid.CatmaidNeuronList)
         self.assertIsInstance(self.nl + self.nl[1], pymaid.CatmaidNeuronList)
 
         self.assertIsInstance(self.nl.sample(2), pymaid.CatmaidNeuronList)
 
     def test_neuron_attributes(self):
-        attr = ['graph','simple','dps','annotations','partners',
-                'review_status','nodes','connectors','presynapses',
-                'postsynapses','gap_junctions','segments','soma',
-                'root','tags','n_open_ends','n_end_nodes','n_connectors',
-                'n_presynapses','n_postsynapses','cable_length']
+        attr = ['graph', 'simple', 'dps', 'annotations', 'partners',
+                'review_status', 'nodes', 'connectors', 'presynapses',
+                'postsynapses', 'gap_junctions', 'segments', 'soma',
+                'root', 'tags', 'n_open_ends', 'n_end_nodes', 'n_connectors',
+                'n_presynapses', 'n_postsynapses', 'cable_length']
 
         for a in attr:
-            _ = getattr( self.nl[0], a )
+            _ = getattr(self.nl[0], a)
 
     def test_neuron_functions(self):
         n = self.nl[0]
-        slab = n.nodes[n.nodes.type=='slab'].sample(1).iloc[0].treenode_id
+        slab = n.nodes[n.nodes.type == 'slab'].sample(1).iloc[0].treenode_id
 
-        self.assertIsInstance( n.prune_distal_to(slab, inplace=False),
-                               pymaid.CatmaidNeuron )
-        self.assertIsInstance( n.prune_proximal_to(slab, inplace=False),
-                               pymaid.CatmaidNeuron )
-        self.assertIsInstance( n.prune_by_longest_neurite(inplace=False),
-                               pymaid.CatmaidNeuron )
+        self.assertIsInstance(n.prune_distal_to(slab, inplace=False),
+                              pymaid.CatmaidNeuron)
+        self.assertIsInstance(n.prune_proximal_to(slab, inplace=False),
+                              pymaid.CatmaidNeuron)
+        self.assertIsInstance(n.prune_by_longest_neurite(inplace=False),
+                              pymaid.CatmaidNeuron)
 
-        self.assertIsInstance( n.reload(),
-                               type(None) )
+        self.assertIsInstance(n.reload(),
+                              type(None))
+
 
 class TestMorpho(unittest.TestCase):
     """ Test morphological operations """
@@ -344,8 +363,8 @@ class TestMorpho(unittest.TestCase):
             config_test.token,
             logger_level='ERROR')
 
-        self.nl = pymaid.get_neuron( config_test.test_skids,
-                                     remote_instance=self.rm)
+        self.nl = pymaid.get_neuron(config_test.test_skids,
+                                    remote_instance=self.rm)
 
     def test_downsampling(self):
         nl2 = self.nl.copy()
@@ -361,38 +380,39 @@ class TestMorpho(unittest.TestCase):
         self.assertLess(nl2.n_nodes.sum(), self.nl.n_nodes.sum())
 
     def test_axon_dendrite_split(self):
-        self.assertIsInstance( pymaid.split_axon_dendrite(self.nl[0]),
-                               pymaid.CatmaidNeuronList )
+        self.assertIsInstance(pymaid.split_axon_dendrite(self.nl[0]),
+                              pymaid.CatmaidNeuronList)
 
     def test_segregation_index(self):
-        self.assertIsInstance( pymaid.segregation_index(self.nl[0]),
-                               float )
+        self.assertIsInstance(pymaid.segregation_index(self.nl[0]),
+                              float)
 
     def test_bending_flow(self):
-        self.assertIsInstance( pymaid.bending_flow(self.nl[0]),
-                               type(None) )
+        self.assertIsInstance(pymaid.bending_flow(self.nl[0]),
+                              type(None))
 
     def test_flow_centrality(self):
-        self.assertIsInstance( pymaid.flow_centrality(self.nl[0]),
-                               type(None) )
+        self.assertIsInstance(pymaid.flow_centrality(self.nl[0]),
+                              type(None))
 
     def test_stitching(self):
-        self.assertIsInstance( pymaid.stitch_neurons(self.nl[:2],
-                                                     method='NONE'),
-                               pymaid.CatmaidNeuron )
-        self.assertIsInstance( pymaid.stitch_neurons(self.nl[:2],
-                                                     method='LEAFS'),
-                               pymaid.CatmaidNeuron )
+        self.assertIsInstance(pymaid.stitch_neurons(self.nl[:2],
+                                                    method='NONE'),
+                              pymaid.CatmaidNeuron)
+        self.assertIsInstance(pymaid.stitch_neurons(self.nl[:2],
+                                                    method='LEAFS'),
+                              pymaid.CatmaidNeuron)
 
     def test_averaging(self):
-        self.assertIsInstance( pymaid.average_neurons(self.nl[:2]),
-                               pymaid.CatmaidNeuron )
+        self.assertIsInstance(pymaid.average_neurons(self.nl[:2]),
+                              pymaid.CatmaidNeuron)
 
     def test_tortuosity(self):
-        self.assertIsInstance( pymaid.tortuosity(self.nl[0]),
-                               float )
-        self.assertIsInstance( pymaid.tortuosity(self.nl),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.tortuosity(self.nl[0]),
+                              float)
+        self.assertIsInstance(pymaid.tortuosity(self.nl),
+                              pd.DataFrame)
+
 
 class TestGraphs(unittest.TestCase):
     """Test pymaid.graph and pymaid.graph_utils """
@@ -405,64 +425,67 @@ class TestGraphs(unittest.TestCase):
             config_test.token,
             logger_level='ERROR')
 
-        self.n = pymaid.get_neuron( config_test.test_skids[0],
-                                     remote_instance=self.rm)
+        self.n = pymaid.get_neuron(config_test.test_skids[0],
+                                   remote_instance=self.rm)
 
         self.n.reroot(self.n.soma)
 
         # Get some random leaf node
-        self.leaf_id = self.n.nodes[ self.n.nodes.type=='end' ].sample(1).iloc[0].treenode_id
-        self.slab_id = self.n.nodes[ self.n.nodes.type=='slab' ].sample(1).iloc[0].treenode_id
+        self.leaf_id = self.n.nodes[self.n.nodes.type == 'end'].sample(
+            1).iloc[0].treenode_id
+        self.slab_id = self.n.nodes[self.n.nodes.type == 'slab'].sample(
+            1).iloc[0].treenode_id
 
     def test_reroot(self):
-        self.assertIsNotNone( self.n.reroot(self.leaf_id, inplace=False) )
+        self.assertIsNotNone(self.n.reroot(self.leaf_id, inplace=False))
 
     def test_distal_to(self):
-        self.assertTrue( pymaid.distal_to(self.n, self.leaf_id, self.n.root) )
-        self.assertFalse( pymaid.distal_to(self.n, self.n.root, self.leaf_id) )
+        self.assertTrue(pymaid.distal_to(self.n, self.leaf_id, self.n.root))
+        self.assertFalse(pymaid.distal_to(self.n, self.n.root, self.leaf_id))
 
     def test_distance(self):
-        leaf_id = self.n.nodes[ self.n.nodes.type=='end' ].iloc[0].treenode_id
+        leaf_id = self.n.nodes[self.n.nodes.type == 'end'].iloc[0].treenode_id
 
-        self.assertIsNotNone( pymaid.dist_between(self.n,
-                                                  leaf_id,
-                                                  self.n.root) )
-        self.assertIsNotNone( pymaid.dist_between(self.n,
-                                                  self.n.root,
-                                                  leaf_id) )
-
-    def test_find_bp(self):
-        self.assertIsNotNone( pymaid.find_main_branchpoint(self.n,
-                                                            reroot_to_soma=False ) )
+        self.assertIsNotNone(pymaid.dist_between(self.n,
+                                                 leaf_id,
+                                                 self.n.root))
+        self.assertIsNotNone(pymaid.dist_between(self.n,
+                                                 self.n.root,
+                                                 leaf_id))
 
     def test_find_bp(self):
-        self.assertIsNotNone( pymaid.split_into_fragments(self.n,
-                                                          n =2,
-                                                          reroot_to_soma=False ) )
+        self.assertIsNotNone(pymaid.find_main_branchpoint(self.n,
+                                                          reroot_to_soma=False))
+
+    def test_split_fragments(self):
+        self.assertIsNotNone(pymaid.split_into_fragments(self.n,
+                                                         n=2,
+                                                         reroot_to_soma=False))
 
     def test_longest_neurite(self):
-        self.assertIsNotNone( pymaid.longest_neurite(self.n,
-                                                     n =2,
-                                                     reroot_to_soma=False ) )
+        self.assertIsNotNone(pymaid.longest_neurite(self.n,
+                                                    n=2,
+                                                    reroot_to_soma=False))
 
     def test_cut_neuron(self):
-        dist,prox = pymaid.cut_neuron(
-                                self.n,
-                                self.slab_id,
-                                )
-        self.assertNotEqual( dist.nodes.shape, prox.nodes.shape  )
+        dist, prox = pymaid.cut_neuron(
+            self.n,
+            self.slab_id,
+        )
+        self.assertNotEqual(dist.nodes.shape, prox.nodes.shape)
 
         # Make sure dist and prox check out
-        self.assertTrue( pymaid.distal_to( self.n, dist.root, prox.root ) )
+        self.assertTrue(pymaid.distal_to(self.n, dist.root, prox.root))
 
     def test_subset(self):
-        self.assertIsInstance( pymaid.subset_neuron( self.n,
-                                                     self.n.segments[0]),
-                               pymaid.CatmaidNeuron)
+        self.assertIsInstance(pymaid.subset_neuron(self.n,
+                                                   self.n.segments[0]),
+                              pymaid.CatmaidNeuron)
 
     def test_node_sorting(self):
-        self.assertIsInstance( pymaid.node_label_sorting( self.n ),
-                               list)
+        self.assertIsInstance(pymaid.node_label_sorting(self.n),
+                              list)
+
 
 class TestConnectivity(unittest.TestCase):
     """Test pymaid.plotting """
@@ -475,48 +498,51 @@ class TestConnectivity(unittest.TestCase):
             config_test.token,
             logger_level='ERROR')
 
-        self.n = pymaid.get_neuron( config_test.test_skids[0],
-                                     remote_instance=self.rm)
+        self.n = pymaid.get_neuron(config_test.test_skids[0],
+                                   remote_instance=self.rm)
 
         self.cn_table = pymaid.get_partners(config_test.test_skids[0],
                                             remote_instance=self.rm)
 
-        self.nB = pymaid.get_neuron( self.cn_table.iloc[0].skeleton_id,
-                                     remote_instance=self.rm )
+        self.nB = pymaid.get_neuron(self.cn_table.iloc[0].skeleton_id,
+                                    remote_instance=self.rm)
 
-        self.adj = pymaid.adjacency_matrix( self.cn_table[ self.cn_table.relation == 'upstream' ].iloc[:10].skeleton_id.values )
+        self.adj = pymaid.adjacency_matrix(
+            self.cn_table[self.cn_table.relation == 'upstream'].iloc[:10].skeleton_id.values)
 
     def test_adjacency_matrix(self):
         self.assertIsInstance(self.adj, pd.DataFrame)
 
     def test_connectivity_filter(self):
-        dist, prox = pymaid.cut_neuron( self.n, pymaid.find_main_branchpoint(self.n) )
+        dist, prox = pymaid.cut_neuron(
+            self.n, pymaid.find_main_branchpoint(self.n))
 
-        vol = pymaid.get_volume( config_test.test_volume )
+        vol = pymaid.get_volume(config_test.test_volume)
 
         # Connectivity table by neuron
-        self.assertIsInstance( pymaid.filter_connectivity( self.cn_table, prox),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.filter_connectivity(self.cn_table, prox),
+                              pd.DataFrame)
         # Adjacency matrix by neuron
-        self.assertIsInstance( pymaid.filter_connectivity( self.adj, prox),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.filter_connectivity(self.adj, prox),
+                              pd.DataFrame)
 
         # Connectivity table by volume
-        self.assertIsInstance( pymaid.filter_connectivity( self.cn_table, vol),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.filter_connectivity(self.cn_table, vol),
+                              pd.DataFrame)
         # Adjacency matrix by volume
-        self.assertIsInstance( pymaid.filter_connectivity( self.adj, vol),
-                               pd.DataFrame )
+        self.assertIsInstance(pymaid.filter_connectivity(self.adj, vol),
+                              pd.DataFrame)
 
     def test_calc_overlap(self):
-        self.assertIsInstance( pymaid.cable_overlap( self.n, self.nB ),
-                               pd.DataFrame)
+        self.assertIsInstance(pymaid.cable_overlap(self.n, self.nB),
+                              pd.DataFrame)
 
     def test_pred_connectivity(self):
-        self.assertIsInstance( pymaid.predict_connectivity( self.n,
-                                                            self.nB,
-                                                            remote_instance=self.rm),
-                               pd.DataFrame)
+        self.assertIsInstance(pymaid.predict_connectivity(self.n,
+                                                          self.nB,
+                                                          remote_instance=self.rm),
+                              pd.DataFrame)
+
 
 class TestCluster(unittest.TestCase):
     """Test pymaid.cluster """
@@ -530,12 +556,12 @@ class TestCluster(unittest.TestCase):
             logger_level='ERROR')
 
     def test_connectivity_cluster(self):
-        self.assertIsInstance( pymaid.cluster_by_connectivity(config_test.test_skids),
-                               pymaid.ClustResults )
+        self.assertIsInstance(pymaid.cluster_by_connectivity(config_test.test_skids),
+                              pymaid.ClustResults)
 
     def test_synapse_cluster(self):
-        self.assertIsInstance( pymaid.cluster_by_synapse_placement(config_test.test_skids),
-                               pymaid.ClustResults )
+        self.assertIsInstance(pymaid.cluster_by_synapse_placement(config_test.test_skids),
+                              pymaid.ClustResults)
 
 
 class TestPlot(unittest.TestCase):
@@ -549,10 +575,10 @@ class TestPlot(unittest.TestCase):
             config_test.token,
             logger_level='ERROR')
 
-        self.nl = pymaid.get_neuron( config_test.test_skids,
-                                     remote_instance=self.rm)
+        self.nl = pymaid.get_neuron(config_test.test_skids,
+                                    remote_instance=self.rm)
 
-        self.vol = pymaid.get_volume( config_test.test_volume )
+        self.vol = pymaid.get_volume(config_test.test_volume)
 
     """
     def test_plot3d_plotly(self):
@@ -592,13 +618,12 @@ class TestUserStats(unittest.TestCase):
             config_test.token,
             logger_level='ERROR')
 
-        self.n = pymaid.get_neuron( config_test.test_skids[0],
-                                     remote_instance=self.rm)
+        self.n = pymaid.get_neuron(config_test.test_skids[0],
+                                   remote_instance=self.rm)
 
     def test_time_invested(self):
         self.assertIsInstance(pymaid.get_time_invested(
             self.n.downsample(10, inplace=False), remote_instance=self.rm), pd.DataFrame)
-
 
     def test_user_contributions(self):
         self.assertIsInstance(pymaid.get_user_contributions(
