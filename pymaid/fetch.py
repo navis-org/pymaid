@@ -4923,7 +4923,7 @@ def get_label_list(remote_instance=None):
     return pd.DataFrame(labels, columns=['label_id', 'tag', 'skeleton_id', 'treenode_id'])
 
 
-def get_transactions(range_start=None, range_length=2500, remote_instance=None):
+def get_transactions(range_start=None, range_length=25, remote_instance=None):
     """ Retrieve individual transactions with server. This API endpoint is
     extremely slow!
 
