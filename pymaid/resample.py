@@ -215,8 +215,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     max_tn_id = x.nodes.treenode_id.max() + 1
 
     # Iterate over segments
-    for i, seg in enumerate(tqdm(x.segments, desc='Proc. segments',
                                  disable=pbar_hide, leave=False)):
+    for i, seg in enumerate(tqdm(x.small_segments, desc='Proc. segments',
         coords = locs.loc[seg].values.astype(float)
 
         # vecs between subsequently measured points
