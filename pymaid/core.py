@@ -298,7 +298,9 @@ class CatmaidNeuron:
 
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
-        if 'nodes' in self.__dict__ and self.nodes.empty and key in ['n_open_ends', 'n_branch_nodes', 'n_end_nodes', 'cable_length']:
+        if 'nodes' in self.__dict__ and \
+            self.nodes.empty and key in ['n_open_ends', 'n_branch_nodes',
+                                         'n_end_nodes', 'cable_length']:
             return 0
 
         if key == 'igraph':
@@ -388,8 +390,12 @@ class CatmaidNeuron:
                 return 'NA'
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
-                # Simply sum up edge weight of all igraph edges
-                return sum(nx.get_edge_attributes(self.graph, 'weight').values()) / 1000
+                # Simply sum up edge weight of all graph edges
+                if self.igraph and config.use_igraph:
+                    w = self.igraph.es.get_attribute_values('weight')
+                else:
+                    w = nx.get_edge_attributes(self.graph, 'weight').values()
+                return sum(w) / 1000
             else:
                 return 'NA'
         else:
@@ -409,12 +415,19 @@ class CatmaidNeuron:
         deepcopy :  bool, optional
                     If False, `.graph` (NetworkX DiGraph) will be returned as
                     view - changes to nodes/edges can progagate back!
+                    ``.igraph`` (iGraph) - if available - will always be
+                    deepcopied.
+
         """
         x = CatmaidNeuron(self.skeleton_id)
         x.__dict__ = {k: copy.copy(v) for k, v in self.__dict__.items()}
 
         if 'graph' in self.__dict__:
-            x.graph = self.graph.copy(as_view=deepcopy != True)
+            x.graph = self.graph.copy(as_view=deepcopy is not True)
+        if 'igraph' in self.__dict__:
+            if self.igraph is not None:
+                # This is pretty cheap, so we will always make a deep copy
+                x.igraph = self.igraph.copy()
 
         return x
 
@@ -460,7 +473,7 @@ class CatmaidNeuron:
 
     def _clear_temp_attr(self, exclude=[]):
         """Clear temporary attributes."""
-        temp_att = ['igraph', 'graph', 'segments',
+        temp_att = ['igraph', 'graph', 'segments', 'small_segments',
                     'nodes_geodesic_distance_matrix', 'dps', 'simple']
         for a in [at for at in temp_att if at not in exclude]:
             try:
@@ -468,12 +481,15 @@ class CatmaidNeuron:
             except:
                 pass
 
-        temp_node_cols = ['flow_centrality', 'type', 'strahler_index']
+        temp_node_cols = ['flow_centrality', 'strahler_index']
+
+        # Remove type only if we do not classify -> this speeds up things
+        # b/c we don't have to recreate the column, just change the values
+        #if 'classify_nodes' in exclude:
+        #    temp_node_cols.append('type')
 
         # Remove temporary node values
-        for c in [col for col in temp_node_cols if col not in exclude]:
-            if c in self.nodes:
-                self.nodes.drop(c, axis=1, inplace=True)
+        self.nodes = self.nodes[[c for c in self.nodes.columns if c not in temp_node_cols]]
 
         if 'classify_nodes' not in exclude:
             # Reclassify nodes
@@ -673,9 +689,9 @@ class CatmaidNeuron:
         Parameters
         ----------
         linkage_kwargs :    dict
-                            Will be passed to scipy.hierarchy.linkage
+                            Passed to ``scipy.cluster.hierarchy.linkage``.
         dend_kwargs :       dict
-                            Will be passed to scipy.hierarchy.dendrogram
+                            Passed to ``scipy.cluster.hierarchy.dendrogram``.
 
         Returns
         -------
@@ -2264,6 +2280,8 @@ class CatmaidNeuronList:
         deepcopy :  bool, optional
                     If False, ``.graph`` (NetworkX DiGraphs) will be returned
                     as views - changes to nodes/edges can progagate back!
+                    ``.igraph`` (iGraph) - if available - will always be
+                    deepcopied.
 
         """
         return CatmaidNeuronList([n.copy(deepcopy=deepcopy) for n in self.neurons],
