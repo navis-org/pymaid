@@ -2037,10 +2037,7 @@ class CatmaidNeuronList:
                 n.neuron_name = skdata.loc[str(n.skeleton_id), 'neuron_name']
                 n.date_retrieved = datetime.datetime.now().isoformat()
 
-                if 'type' not in n.nodes:
-                    graph_utils.classify_nodes(n)
-
-                # Delete outdated attributes
+                # Delete and update attributes
                 n._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
