@@ -25,35 +25,13 @@ import vispy as vp
 import uuid
 import csv
 
-from pymaid import core, fetch
+from pymaid import core, fetch, config
 
 # Set up logging
-import logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
-__all__ = ['neuron2json', 'json2neuron',
+__all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
            'set_loggers', 'set_pbars', 'eval_skids']
-
-# Import mods from pymaid
-mods = {}
-for m in ['morpho', 'core', 'plotting', 'graph', 'graph_utils', 'core',
-          'scene3d', 'connectivity', 'user_stats', 'cluster', 'resample',
-          'intersect', 'fetch']:
-    try:
-        mods[m] = importlib.import_module('pymaid.{}'.format(m))
-    except:
-        pass
-
 
 def _type_of_script():
     """ Returns context in which pymaid is run. """
@@ -74,8 +52,7 @@ def is_jupyter():
 
 def set_loggers(level='INFO'):
     """Helper function to set levels for all associated module loggers."""
-    for m in mods:
-        mods[m].module_logger.setLevel(level)
+    config.logger.setLevel(level)
 
 
 def set_pbars(hide=None, leave=None):
@@ -95,12 +72,10 @@ def set_pbars(hide=None, leave=None):
     """
 
     if isinstance(hide, bool):
-        for m in mods:
-            mods[m].pbar_hide = hide
+        config.pbar_hide = hide
 
     if isinstance(leave, bool):
-        for m in mods:
-            mods[m].pbar_leave = leave
+        config.pbar_leave = leave
 
 
 def _make_iterable(x, force_type=None):
@@ -207,7 +182,7 @@ def neuron2json(x, **kwargs):
             try:
                 this_data[k] = n.__dict__[k]
             except:
-                module_logger.error('Lost attribute "{0}"'.format(k))
+                logger.error('Lost attribute "{0}"'.format(k))
 
         data.append(this_data)
 
@@ -285,7 +260,7 @@ def _eval_remote_instance(remote_instance, raise_error=True):
                 raise Exception(
                     'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             else:
-                module_logger.warning('No global remote instance found.')
+                logger.warning('No global remote instance found.')
     return remote_instance
 
 
@@ -357,7 +332,7 @@ def eval_skids(x, remote_instance=None):
     elif isinstance(x, type(None)):
         return None
     else:
-        module_logger.error(
+        logger.error(
             'Unable to extract x from type %s' % str(type(x)))
         raise TypeError('Unable to extract skids from type %s' % str(type(x)))
 
@@ -412,10 +387,10 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
                         found = user_list[user_list[col] == u].id.tolist()
                         break
                 if not found:
-                    module_logger.warning(
+                    logger.warning(
                         'User "{0}" not found. Skipping...'.format(u))
                 elif len(found) > 1:
-                    module_logger.warning(
+                    logger.warning(
                         'Multiple matching entries for "{0}" found. Skipping...'.format(u))
                 else:
                     user_ids.append(int(found[0]))
@@ -547,7 +522,7 @@ def _parse_objects(x, remote_instance=None):
     # Note: dotprops and volumes are instances of pd.DataFrames
     dataframes = [ob for ob in x if isinstance(ob, pd.DataFrame) and not isinstance(ob, (core.Dotprops, core.Volume))]
     if [d for d in dataframes if False in [c in d.columns for c in ['x', 'y', 'z']]]:
-        module_logger.warning('DataFrames must have x, y and z columns.')
+        logger.warning('DataFrames must have x, y and z columns.')
     # Filter to and extract x/y/z coordinates
     dataframes = [d for d in dataframes if False not in [c in d.columns for c in ['x', 'y', 'z']]]
     dataframes = [d[['x', 'y', 'z']].values for d in dataframes]
@@ -556,7 +531,7 @@ def _parse_objects(x, remote_instance=None):
     arrays = [ob.copy() for ob in x if isinstance(ob, np.ndarray)]
     # Remove arrays with wrong dimensions
     if [ob for ob in arrays if ob.shape[1] != 3]:
-        module_logger.warning('Point objects need to be of shape (n,3).')
+        logger.warning('Point objects need to be of shape (n,3).')
     arrays = [ob for ob in arrays if ob.shape[1] == 3]
 
     points = dataframes + arrays

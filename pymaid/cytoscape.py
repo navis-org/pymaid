@@ -28,9 +28,9 @@ import pandas as pd
 from py2cytoscape.data.cyrest_client import CyRestClient
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len( module_logger.handlers ) == 0:
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if len( logger.handlers ) == 0:
     # Generate stream handler
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
@@ -38,7 +38,7 @@ if len( module_logger.handlers ) == 0:
     formatter = logging.Formatter(
                 '%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+    logger.addHandler(sh)
 
 def get_client():
     """Initialises connection with Cytoscape and returns client."""

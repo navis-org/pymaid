@@ -23,7 +23,7 @@ import pandas as pd
 import numpy as np
 import scipy
 import scipy.interpolate
-from pymaid import core, graph_utils, utils
+from pymaid import core, graph_utils, utils, config
 
 from tqdm import tqdm, trange
 if utils.is_jupyter():
@@ -32,25 +32,9 @@ if utils.is_jupyter():
     trange = tnrange
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 __all__ = sorted(['downsample_neuron', 'resample_neuron'])
-
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
-
 
 def _resample_neuron_spline(x, resample_to, inplace=False):
     """ Resamples neuron(s) by given resolution. Uses spline interpolation.
@@ -87,7 +71,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
         if not inplace:
             return core.CatmaidNeuronList(results)
     elif not isinstance(x, core.CatmaidNeuron):
-        module_logger.error('Unexpected datatype: %s' % str(type(x)))
+        logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
 
     if not inplace:
@@ -98,7 +82,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
 
     # Iterate over segments
     for i, seg in enumerate(tqdm(x.segments, desc='Working on segments',
-                                 disable=pbar_hide, leave=pbar_leave)):
+                                 disable=config.pbar_hide, leave=config.pbar_leave)):
         # Get length of this segment
         this_length = graph_utils.dist_between(x, seg[0], seg[-1])
 
@@ -118,7 +102,7 @@ def _resample_neuron_spline(x, resample_to, inplace=False):
             # Get all knots and info about the interpolated spline
             tck, u = scipy.interpolate.splprep(data)
         except:
-            module_logger.warning('Error downsampling segment {0} ({1} nodes, {2} nm) '.format(
+            logger.warning('Error downsampling segment {0} ({1} nodes, {2} nm) '.format(
                 i, len(seg), int(this_length), n_nodes))
             continue
 
@@ -198,11 +182,11 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     if isinstance(x, core.CatmaidNeuronList):
         results = [resample_neuron(x.loc[i], resample_to, inplace=inplace)
                    for i in trange(x.shape[0], desc='Resampl. neurons',
-                                   disable=pbar_hide, leave=pbar_leave)]
+                                   disable=config.pbar_hide, leave=config.pbar_leave)]
         if not inplace:
             return core.CatmaidNeuronList(results)
     elif not isinstance(x, core.CatmaidNeuron):
-        module_logger.error('Unexpected datatype: %s' % str(type(x)))
+        logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
 
     if not inplace:
@@ -215,8 +199,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     max_tn_id = x.nodes.treenode_id.max() + 1
 
     # Iterate over segments
-                                 disable=pbar_hide, leave=False)):
     for i, seg in enumerate(tqdm(x.small_segments, desc='Proc. segments',
+                                 disable=config.pbar_hide, leave=False)):
         coords = locs.loc[seg].values.astype(float)
 
         # vecs between subsequently measured points
@@ -249,7 +233,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
         # Generate new coordinates
         new_coords = np.array([xnew, ynew, znew]).T.round()
 
-        # Generate new ids
+        # Generate new ids (start and end node IDs of this segment)
         new_ids = seg[:1] + [max_tn_id +
                              i for i in range(len(new_coords) - 2)] + seg[-1:]
 
@@ -390,20 +374,20 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
         else:
             df = skdata
     else:
-        module_logger.error('Unexpected datatype: %s' % str(type(skdata)))
+        logger.error('Unexpected datatype: %s' % str(type(skdata)))
         raise ValueError
 
     # If no resampling, simply return neuron
     if resampling_factor <= 1:
-        module_logger.warning(
+        logger.warning(
             'Unable to downsample: resampling_factor must be > 1')
         return df
 
     if df.nodes.shape[0] == 0:
-        module_logger.warning('Unable to downsample: no nodes in neuron')
+        logger.warning('Unable to downsample: no nodes in neuron')
         return df
 
-    module_logger.debug('Preparing to downsample neuron...')
+    logger.debug('Preparing to downsample neuron...')
 
     list_of_parents = {
         n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
@@ -430,7 +414,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     # Walk from all fix points to the root - jump N nodes on the way
     new_parents = {}
 
-    module_logger.debug(
+    logger.debug(
         'Sampling neuron down by factor of {0}'.format(resampling_factor))
 
     for en in fix_points:
@@ -475,7 +459,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     # Reassign parent_id None to root node
     new_nodes.loc[root_ix, 'parent_id'] = None
 
-    module_logger.debug('Nodes before/after: %i/%i ' %
+    logger.debug('Nodes before/after: %i/%i ' %
                         (len(df.nodes), len(new_nodes)))
 
     df.nodes = new_nodes

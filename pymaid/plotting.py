@@ -38,7 +38,7 @@ import pandas as pd
 import numpy as np
 import math
 
-from pymaid import morpho, graph, core, fetch, graph_utils, utils, scene3d
+from pymaid import morpho, graph, core, fetch, graph_utils, utils, scene3d, config
 
 import plotly.graph_objs as go
 
@@ -59,24 +59,10 @@ try:
 except:
     pass
 
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
-
 __all__ = ['plot3d', 'plot2d', 'plot1d', 'plot_network',
            'clear3d', 'close3d', 'screenshot', 'get_viewer']
 
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
-
+logger = config.logger
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active vispy 3D canvas.
@@ -422,7 +408,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     # Create lines from segments
     for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plot neurons',
                                     total=skdata.shape[0], leave=False,
-                                    disable=pbar_hide)):
+                                    disable=config.pbar_hide)):
         this_color = colormap[neuron.skeleton_id]
 
         if not connectors_only:
@@ -522,7 +508,7 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     for neuron in tqdm(dotprops.itertuples(), desc='Plt dotprops',
                        total=dotprops.shape[0], leave=False,
-                       disable=pbar_hide):
+                       disable=config.pbar_hide):
         # Prepare lines - this is based on nat:::plot3d.dotprops
         halfvect = neuron.points[
             ['x_vec', 'y_vec', 'z_vec']] / 2
@@ -717,7 +703,7 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     plt.axis('off')
 
-    module_logger.debug('Done. Use matplotlib.pyplot.show() to show plot.')
+    logger.debug('Done. Use matplotlib.pyplot.show() to show plot.')
 
     return fig, ax
 
@@ -811,7 +797,7 @@ def _random_colors(color_count, color_space='RGB', color_range=1):
             hsv = colorsys.hsv_to_rgb(h, s, v)
             colormap.append(tuple(v * color_range for v in hsv))
 
-    module_logger.debug('%i random colors created: %s' %
+    logger.debug('%i random colors created: %s' %
                         (color_count, str(colormap)))
 
     return(colormap)
@@ -967,10 +953,10 @@ def plot3d(x, *args, **kwargs):
         # Generate sphere for somas
         fib_points = _fibonacci_sphere(samples=30)
 
-        module_logger.debug('Generating traces...')
+        logger.debug('Generating traces...')
 
         for i, neuron in enumerate(skdata.itertuples()):
-            module_logger.debug('Working on neuron %s' %
+            logger.debug('Working on neuron %s' %
                                 str(neuron.skeleton_id))
 
             neuron_name = neuron.neuron_name
@@ -1143,7 +1129,7 @@ def plot3d(x, *args, **kwargs):
             )
             )
 
-        module_logger.debug('Tracing done.')
+        logger.debug('Tracing done.')
 
         # Now add neuropils:
         for v in volumes_data:
@@ -1214,9 +1200,9 @@ def plot3d(x, *args, **kwargs):
 
         fig = dict(data=trace_data, layout=layout)
 
-        module_logger.debug('Done. Plotted %i nodes and %i connectors' % (sum([n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only] + [
+        logger.debug('Done. Plotted %i nodes and %i connectors' % (sum([n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only] + [
             n.points.shape[0] for n in dotprops.itertuples()]), sum([n.connectors.shape[0] for n in skdata.itertuples() if connectors or connectors_only])))
-        module_logger.info(
+        logger.info(
             'Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
 
         return fig
@@ -1255,7 +1241,7 @@ def plot3d(x, *args, **kwargs):
             'name': 'Gap junctions',
                     'color': (0, 255, 0)
         },
-        'display': 'lines'  # 'mpatches.Circles'
+        'display': 'lines'  # 'circles'
     }
     syn_lay.update(syn_lay_new)
 
@@ -1271,7 +1257,7 @@ def plot3d(x, *args, **kwargs):
     auto_limits = kwargs.get('autolimits', auto_limits)
 
     if backend not in ['plotly', 'vispy']:
-        module_logger.error(
+        logger.error(
             'Unknown backend: %s. See help(plot.plot3d).' % str(backend))
         return
 
@@ -1290,7 +1276,7 @@ def plot3d(x, *args, **kwargs):
                                    get_history=False,
                                    get_abutting=True)
     elif skids and not remote_instance:
-        module_logger.error(
+        logger.error(
             'You need to provide a CATMAID remote instance.')
 
     if not color and (skdata.shape[0] + dotprops.shape[0]) > 0:
@@ -1319,7 +1305,7 @@ def plot3d(x, *args, **kwargs):
     # Make sure colors are 0-255
     if colormap:
         if max([v for n in colormap for v in colormap[n]]) <= 1:
-            module_logger.warning(
+            logger.warning(
                 'Looks like RGB values are 0-1. Converting to 0-255.')
             colormap = {n: tuple([int(v * 255) for v in colormap[n]])
                         for n in colormap}
@@ -1332,7 +1318,7 @@ def plot3d(x, *args, **kwargs):
     for v in volumes:
         if isinstance(v, str):
             if not remote_instance:
-                module_logger.error(
+                logger.error(
                     'Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ... >')
                 return
             else:
@@ -1341,16 +1327,16 @@ def plot3d(x, *args, **kwargs):
         volumes_data[v['name']] = {'verts': v['vertices'],
                                    'faces': v['faces'], 'color': v['color']}
 
-    module_logger.debug('Preparing neurons for plotting...')
+    logger.debug('Preparing neurons for plotting...')
     # First downsample neurons
     if downsampling > 1 and not connectors_only and not skdata.empty:
-        module_logger.debug('Downsampling neurons...')
-        morpho.module_logger.setLevel('ERROR')
+        logger.debug('Downsampling neurons...')
+        morpho.logger.setLevel('ERROR')
         skdata.downsample(downsampling)
-        morpho.module_logger.setLevel('INFO')
-        module_logger.debug('Downsampling finished.')
+        morpho.logger.setLevel('INFO')
+        logger.debug('Downsampling finished.')
     elif skdata.shape[0] > 100:
-        module_logger.debug(
+        logger.debug(
             'Large dataset detected. Consider using the <downsampling> parameter if you encounter bad performance.')
 
     if backend == 'plotly':
@@ -1457,7 +1443,7 @@ def plot_network(x, *args, **kwargs):
     elif isinstance(colormap, (tuple, list, np.ndarray)) and len(colormap) == 3:
         colors = {n: tuple(colormap) for n in g.nodes}
     else:
-        module_logger.error(
+        logger.error(
             'I dont understand the colors you have provided. Please, see help(plot.plot_network).')
         return None
 
@@ -1589,7 +1575,7 @@ def plot_network(x, *args, **kwargs):
 
     fig = go.Figure(data=data, layout=layout)
 
-    module_logger.info(
+    logger.info(
         'Done! Use e.g. plotly.offline.plot(fig, filename="network_plot.html") to plot.')
 
     return fig

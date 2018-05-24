@@ -46,21 +46,11 @@ import seaborn as sns
 
 import matplotlib.colors as mcl
 
-from pymaid import utils, core, plotting, fetch
+from pymaid import utils, core, plotting, fetch, config
 
 __all__ = ['Viewer']
 
-import logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    sh = logging.StreamHandler()
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
-
+logger = config.logger
 
 class Viewer:
     """ 3D viewer for CatmaidNeurons.
@@ -215,7 +205,7 @@ class Viewer:
 
         neurons = self.neurons
 
-        module_logger.debug('{0} neurons selected ({1} previously)'.format(
+        logger.debug('{0} neurons selected ({1} previously)'.format(
             len(skids), len(self.selected)))
 
         # First un-highlight neurons no more selected
@@ -614,11 +604,11 @@ def on_mouse_press(event):
     canvas = event.source
     viewer = canvas._wrapper
 
-    module_logger.debug('Mouse press at {0}: {1}'.format(
+    logger.debug('Mouse press at {0}: {1}'.format(
         event.pos, canvas.visuals_at(event.pos)))
 
     if event.modifiers:
-        module_logger.debug('Modifiers found: {0}'.format(event.modifiers))
+        logger.debug('Modifiers found: {0}'.format(event.modifiers))
 
     # Iterate over visuals in this canvas at cursor position
     for v in canvas.visuals_at(event.pos, viewer._picking_radius):
@@ -642,8 +632,8 @@ def on_mouse_press(event):
             tr = canvas._view3d.node_transform(v)
             co = tr.map(event.pos)
             viewer._snap_cursor(co, v)
-            module_logger.debug('World coordinates: {}'.format(co))
-            module_logger.debug('URL: {}'.format(
+            logger.debug('World coordinates: {}'.format(co))
+            logger.debug('URL: {}'.format(
                 fetch.url_to_coordinates(co, 5)))
             break
 

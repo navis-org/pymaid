@@ -22,7 +22,7 @@ import sys
 import os
 import gc
 
-from pymaid import fetch, core, utils
+from pymaid import fetch, core, utils, config
 
 from tqdm import trange, tqdm
 if utils.is_jupyter():
@@ -47,21 +47,7 @@ import threading
 import logging
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len( module_logger.handlers ) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
-
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
+logger = config.logger
 
 def crop_neuron(x, output, dimensions=(1000,1000), interpolate_z_res=40, remote_instance=None):
     """ Crops EM tiles following a neuron's segments.
@@ -235,7 +221,7 @@ class LoadTiles:
 
         memory_est = self.estimate_memory()
 
-        module_logger.info('Estimated memory usage: {0:.2f} Mb'.format(memory_est))
+        logger.info('Estimated memory usage: {0:.2f} Mb'.format(memory_est))
 
     def estimate_memory(self):
         """ Estimates memory [Mb] consumption of loading all tiles."""
@@ -281,7 +267,7 @@ class LoadTiles:
         # Memory size per tile in byte
         self.bytes_per_tile = self.tile_width ** 2 * 8
 
-        module_logger.info('Fastest image mirror: {0}'.format( self.mirror_url) )
+        logger.info('Fastest image mirror: {0}'.format( self.mirror_url) )
 
     def bboxes2imgcoords(self):
         """ Converts bounding box(es) to coordinates for individual images.
@@ -408,8 +394,8 @@ class LoadTiles:
         # Initialise progress bar
         pbar = tqdm(total=len(threads),
                     desc='Loading tiles',
-                    disable=pbar_hide,
-                    leave=pbar_leave)
+                    disable=config.pbar_hide,
+                    leave=config.pbar_leave)
 
         # Save start value of pbar (in case we have an external pbar)
         pbar_start = pbar.n
@@ -434,7 +420,7 @@ class LoadTiles:
         # Check if we got all tiles
         for t in threads:
             if t not in threads_closed:
-                module_logger.warning(
+                logger.warning(
                     'Did not close thread for tile {0}'.format(t) )
 
         return data
@@ -446,7 +432,7 @@ class LoadTiles:
 
         # Assemble tiles into the requested images
         images = []
-        for l, im in enumerate( tqdm(self.image_coords, 'Stitching', leave=pbar_leave, disable=pbar_hide) ):
+        for l, im in enumerate( tqdm(self.image_coords, 'Stitching', leave=config.pbar_leave, disable=config.pbar_hide) ):
             # Get a list of all tiles that remain to be used and are not currently part of the tiles
             remaining_tiles = [ t for img in self.image_coords[l:] for t in img['tiles_to_load'] ]
 
@@ -502,7 +488,7 @@ class LoadTiles:
 
         # Get standard deviation to check if they are all the same
         if sum( np.std( dims, axis=0 ) ) != 0:
-            module_logger.warning('Varying image dimensions detected. Cropping everything to the smallest image size: {0}'.format(min_dims))
+            logger.warning('Varying image dimensions detected. Cropping everything to the smallest image size: {0}'.format(min_dims))
 
             # Crop images to the smallest common dimension
             for im in images:
@@ -617,7 +603,7 @@ class LoadTiles:
                                         (self.connectors.y <= slice_info['nm_bot'])
                                             ]
 
-        module_logger.debug('Retrieved {0} treenodes and {1} connectors'.format(
+        logger.debug('Retrieved {0} treenodes and {1} connectors'.format(
                                                                                 self.nodes.shape[0],
                                                                                 self.connectors.shape[0]
                                                                                 ))
@@ -629,7 +615,7 @@ class LoadTiles:
         if len(cn_include) > 0:
             self.connectors = self.connectors[ self.connectors.skeleton_id.isin( node_include ) ]
 
-        module_logger.debug('{0} treenodes and {1} connectors after filtering'.format(
+        logger.debug('{0} treenodes and {1} connectors after filtering'.format(
                                                                                 self.nodes.shape[0],
                                                                                 self.connectors.shape[0]
                                                                                 ))
@@ -814,7 +800,7 @@ class _retrieveTileThreaded(threading.Thread):
             self.url = url
             threading.Thread.__init__(self)
         except:
-            module_logger.error(
+            logger.error(
                 'Failed to initiate thread for ' + self.url)
 
     def run(self):
@@ -831,6 +817,6 @@ class _retrieveTileThreaded(threading.Thread):
             threading.Thread.join(self)
             return self.tile
         except:
-            module_logger.error(
+            logger.error(
                 'Failed to join thread for ' + self.url)
             return None

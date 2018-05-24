@@ -58,7 +58,7 @@ import numpy as np
 import sys
 import networkx as nx
 
-from pymaid import core, graph, utils
+from pymaid import core, graph, utils, config
 from pymaid.intersect import in_volume
 
 from tqdm import tqdm, trange
@@ -85,21 +85,11 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags', 'get_3D_skel
                   'get_transactions', 'remove_annotations'])
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 # Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
+config.pbar_hide = False
+config.pbar_leave = True
 
 
 class CatmaidInstance:
@@ -161,18 +151,16 @@ class CatmaidInstance:
         self.time_out = time_out
         self.project_id = project_id
 
-        module_logger.setLevel(logger_level)
-
         if set_global:
             self.set_global()
         else:
-            module_logger.info(
-                'CATMAID instance created. See help(CatmaidInstance) to learn how to define globally.')
+            logger.info(
+                'CATMAID instance created. See help(pymaid.CatmaidInstance) to learn how to define globally.')
 
     def set_global(self):
         """Sets this variable as global by attaching it as sys.module"""
         sys.modules['remote_instance'] = self
-        module_logger.info('Global CATMAID instance set.')
+        logger.info('Global CATMAID instance set.')
 
     def djangourl(self, path):
         """ Expects the path to lead with a slash '/'. """
@@ -197,7 +185,7 @@ class CatmaidInstance:
 
             data = urllib.parse.urlencode(post)
             data = data.encode('utf-8')
-            module_logger.debug('Encoded postdata: %s' % data)
+            logger.debug('Encoded postdata: %s' % data)
             # headers = {'Content-Type': 'application/json', 'Accept':'application/json'}
             request = urllib.request.Request(url, data=data)
         elif method:
@@ -490,7 +478,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
     else:
         time_out = remote_instance.time_out
 
-    module_logger.debug(
+    logger.debug(
         'Creating %i threads to retrieve data' % len(urls))
     for i, url in enumerate(urls):
         if post_data:
@@ -500,10 +488,10 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
             t = _retrieveUrlThreaded(url, remote_instance)
         t.start()
         threads[str(i)] = t
-        module_logger.debug('Threads: %i' % len(threads))
-    module_logger.debug('%i threads generated.' % len(threads))
+        logger.debug('Threads: %i' % len(threads))
+    logger.debug('%i threads generated.' % len(threads))
 
-    module_logger.debug('Joining threads...')
+    logger.debug('Joining threads...')
 
     start = cur_time = time.time()
     joined = 0
@@ -512,7 +500,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
         pbar = external_pbar
     else:
         pbar = tqdm(total=len(threads), desc=desc,
-                    disable=pbar_hide or disable_pbar, leave=pbar_leave)
+                    disable=config.pbar_hide or disable_pbar, leave=config.pbar_leave)
 
     # Save start value of pbar (in case we have an external pbar)
     pbar_start = getattr(pbar, 'n', None)
@@ -535,7 +523,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
                 p_delta = len(threads_closed) - (pbar.n - pbar_start)
                 pbar.update(p_delta)
 
-            module_logger.debug('Closing Threads: {0} ({1:.0f}s until time out)'.format(
+            logger.debug('Closing Threads: {0} ({1:.0f}s until time out)'.format(
                 len(threads_closed), time_out - (cur_time - start)))
     except:
         raise
@@ -545,16 +533,16 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
             pbar.close()
 
     if cur_time > (start + time_out):
-        module_logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % (
+        logger.warning('Timeout while joining threads. Retrieved only %i of %i urls' % (
             len([d for d in data if d != None]), len(threads)))
-        module_logger.warning(
+        logger.warning(
             'Consider increasing time to time-out via remote_instance.time_out')
         for t in threads:
             if t not in threads_closed:
-                module_logger.warning(
+                logger.warning(
                     'Did not close thread for url: ' + urls[int(t)])
     else:
-        module_logger.debug(
+        logger.debug(
             'Success! %i of %i urls retrieved.' % (len(threads_closed), len(urls)))
 
     return data
@@ -573,7 +561,7 @@ class _retrieveUrlThreaded(threading.Thread):
             self.tag_flag = 1
             self.remote_instance = remote_instance
         except:
-            module_logger.error(
+            logger.error(
                 'Failed to initiate thread for ' + self.url)
 
     def run(self):
@@ -591,7 +579,7 @@ class _retrieveUrlThreaded(threading.Thread):
             threading.Thread.join(self)
             return self.data
         except:
-            module_logger.error(
+            logger.error(
                 'Failed to join thread for ' + self.url)
             return None
 
@@ -704,7 +692,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         get_merge_history = get_merge_history == 1
 
     # Start a progress bar
-    with tqdm(total=len(x), desc='Get neurons', disable=pbar_hide, leave=pbar_leave) as pbar:
+    with tqdm(total=len(x), desc='Get neurons', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         collection = []
         # Go over requested neurons in batches of 100s
         for ix in range(0, len(x), 100):
@@ -731,7 +719,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
             # Retrieve abutting
             if get_abutting:
                 urls_abut = []
-                module_logger.debug(
+                logger.debug(
                     'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
 
                 for s in to_retrieve:
@@ -876,7 +864,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
     skdata = []
 
-    for s in tqdm(x, desc='Retrieving arbors', disable=pbar_hide, leave=pbar_leave):
+    for s in tqdm(x, desc='Retrieving arbors', disable=config.pbar_hide, leave=config.pbar_leave):
         # Create URL for retrieving example skeleton from server
         remote_compact_arbor_url = remote_instance._get_compact_arbor_url(
             s, node_flag, connector_flag, tag_flag)
@@ -886,7 +874,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
         skdata.append(arbor_data)
 
-        module_logger.debug('%s retrieved' % str(s))
+        logger.debug('%s retrieved' % str(s))
 
     names = get_names(x, remote_instance)
 
@@ -982,7 +970,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     # Get the subset of connectors within the volume
     cn_in_volume = cn_data[iv].copy()
 
-    module_logger.info(
+    logger.info(
         '%i unique connectors in volume. Reconstructing connectivity...' % len(cn_in_volume.connector_id.unique()))
 
     # Get details for connectors in volume
@@ -1004,7 +992,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
         len) >= cn_details.postsynaptic_to_node.apply(len)]
 
     if not mismatch.empty:
-        module_logger.info(
+        logger.info(
             'Retrieving additional details for {0} connectors'.format(mismatch.shape[0]))
         tn_to_skid = get_skid_from_treenode([tn for l in mismatch.postsynaptic_to_node.tolist() for tn in l],
                                             remote_instance=remote_instance)
@@ -1026,7 +1014,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     adj_mat = pd.DataFrame(np.zeros((len(unique_skids), len(unique_skids))),
                            columns=unique_skids, index=unique_skids)
 
-    for i, e in enumerate(tqdm(unique_edges, disable=pbar_hide, desc='Adj. matrix', leave=pbar_leave)):
+    for i, e in enumerate(tqdm(unique_edges, disable=config.pbar_hide, desc='Adj. matrix', leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.loc[str(e[0]), str(e[1])] = counts[i]
 
@@ -1054,7 +1042,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     df = pd.concat([all_upstream, all_downstream], axis=0, ignore_index=True)
 
     # We will use this to get name and size of neurons
-    module_logger.info('Collecting additional info for {0} neurons'.format(
+    logger.info('Collecting additional info for {0} neurons'.format(
         len(df.skeleton_id.unique())))
     review = get_review(df.skeleton_id.unique(),
                         remote_instance=remote_instance).set_index('skeleton_id')
@@ -1176,7 +1164,7 @@ def get_partners(x, remote_instance=None, threshold=1,
         tag = 'source_skeleton_ids[{0}]'.format(i)
         connectivity_post[tag] = skid
 
-    module_logger.info(
+    logger.info(
         'Fetching connectivity table for {0} neurons'.format(len(x)))
     connectivity_data = remote_instance.fetch(
         remote_connectivity_url, connectivity_post)
@@ -1251,7 +1239,7 @@ def get_partners(x, remote_instance=None, threshold=1,
     # Return reindexed concatenated dataframe
     df.reset_index(drop=True, inplace=True)
 
-    module_logger.info('Done. Found {0} pre-, {1} postsynaptic and {2} gap junction-connected neurons'.format(
+    logger.info('Done. Found {0} pre-, {1} postsynaptic and {2} gap junction-connected neurons'.format(
         *[df[df.relation == r].shape[0] for r in ['upstream', 'downstream', 'gapjunction']]))
 
     return df
@@ -1300,7 +1288,7 @@ def get_names(x, remote_instance=None):
 
     names = remote_instance.fetch(remote_get_names_url, get_names_postdata)
 
-    module_logger.debug(
+    logger.debug(
         'Names for %i of %i skeleton IDs retrieved' % (len(names), len(x)))
 
     return(names)
@@ -1347,14 +1335,14 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    module_logger.info(
+    logger.info(
         'Retrieving details for %i nodes...' % len(node_ids))
 
     remote_nodes_details_url = remote_instance._get_node_info_url()
 
     data = dict()
 
-    with tqdm(total=len(node_ids), disable=pbar_hide, desc='Nodes', leave=pbar_leave) as pbar:
+    with tqdm(total=len(node_ids), disable=config.pbar_hide, desc='Nodes', leave=config.pbar_leave) as pbar:
         for ix in range(0, len(node_ids), chunk_size):
             get_node_details_postdata = dict()
 
@@ -1417,7 +1405,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
 
     data = []
 
-    with tqdm(total=len(treenode_ids), disable=pbar_hide, desc='Nodes', leave=pbar_leave) as pbar:
+    with tqdm(total=len(treenode_ids), disable=config.pbar_hide, desc='Nodes', leave=config.pbar_leave) as pbar:
         for ix in range(0, len(treenode_ids), chunk_size):
             urls = [remote_instance._get_skid_from_tnid(
                 tn) for tn in treenode_ids[ix:ix + chunk_size]]
@@ -1472,7 +1460,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
 
-    module_logger.info(
+    logger.info(
         'Retrieving %i treenode table(s)...' % len(x))
 
     user_list = get_user_list(remote_instance)
@@ -1487,15 +1475,15 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     node_list = _get_urls_threaded(urls, remote_instance, desc='Get tbls')
 
-    module_logger.info(
+    logger.info(
         '%i treenodes retrieved. Creating table...' % sum([len(nl[0]) for nl in node_list]))
 
     all_tables = []
 
     for i, nl in enumerate(tqdm(node_list,
                                 desc='Creating table',
-                                leave=pbar_leave,
-                                disable=pbar_hide)):
+                                leave=config.pbar_leave,
+                                disable=config.pbar_hide)):
         if include_details:
             tag_dict = {n[0]: [] for n in nl[0]}
             reviewer_dict = {n[0]: [] for n in nl[0]}
@@ -1744,7 +1732,7 @@ def get_connector_details(x, remote_instance=None):
     DATA_UPLOAD_MAX_NUMBER_FIELDS = min(50000, len(connector_ids))
 
     connectors = []
-    with tqdm(total=len(connector_ids), desc='CN details', disable=pbar_hide, leave=pbar_leave) as pbar:
+    with tqdm(total=len(connector_ids), desc='CN details', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         for b in range(0, len(connector_ids), DATA_UPLOAD_MAX_NUMBER_FIELDS):
             get_connectors_postdata = {}
             for i, s in enumerate(connector_ids[b:b + DATA_UPLOAD_MAX_NUMBER_FIELDS]):
@@ -1756,7 +1744,7 @@ def get_connector_details(x, remote_instance=None):
 
             pbar.update(DATA_UPLOAD_MAX_NUMBER_FIELDS)
 
-    module_logger.info('Data for %i of %i unique connector IDs retrieved' % (
+    logger.info('Data for %i of %i unique connector IDs retrieved' % (
         len(connectors), len(set(connector_ids))))
 
     columns = ['connector_id', 'presynaptic_to', 'postsynaptic_to',
@@ -1914,7 +1902,7 @@ def get_review(x, remote_instance=None):
 
     CHUNK_SIZE = 1000
 
-    with tqdm(total=len(x), disable=pbar_hide, desc='Rev. status', leave=pbar_leave) as pbar:
+    with tqdm(total=len(x), disable=config.pbar_hide, desc='Rev. status', leave=config.pbar_leave) as pbar:
         for j in range(0, len(x), CHUNK_SIZE):
             get_review_postdata = {}
 
@@ -1979,7 +1967,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     an_ids = []
     for a in annotations:
         if a not in an_list.index:
-            module_logger.warning(
+            logger.warning(
                 'Annotation {0} not found. Skipping.'.format(a))
             continue
         an_ids.append(an_list.loc[a, 'annotation_id'])
@@ -2004,10 +1992,10 @@ def remove_annotations(x, annotations, remote_instance=None):
         an_list = an_list.reset_index().set_index('annotation_id')
 
         if len(resp['deleted_annotations']) == 0:
-            module_logger.info('No annotations removed.')
+            logger.info('No annotations removed.')
 
         for a in resp['deleted_annotations']:
-            module_logger.info('Removed "{0}" from {1} entities ({2} uses left)'
+            logger.info('Removed "{0}" from {1} entities ({2} uses left)'
                                .format(an_list.loc[int(a), 'annotation'],
                                        len(resp['deleted_annotations']
                                            [a]['targetIds']),
@@ -2015,7 +2003,7 @@ def remove_annotations(x, annotations, remote_instance=None):
                                        )
                                )
     else:
-        module_logger.info('No annotations removed.')
+        logger.info('No annotations removed.')
 
     return
 
@@ -2062,7 +2050,7 @@ def add_annotations(x, annotations, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(annotations[i])
 
-    module_logger.info(remote_instance.fetch(
+    logger.info(remote_instance.fetch(
         add_annotations_url, add_annotations_postdata))
 
     return
@@ -2307,7 +2295,7 @@ def get_annotations(x, remote_instance=None):
 
         return(annotation_list)
     except:
-        module_logger.error(
+        logger.error(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
         raise Exception(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
@@ -2334,7 +2322,7 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    module_logger.debug('Retrieving list of annotations...')
+    logger.debug('Retrieving list of annotations...')
 
     remote_annotation_list_url = remote_instance._get_annotation_list()
     annotation_list = remote_instance.fetch(remote_annotation_list_url)
@@ -2349,17 +2337,17 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
         if d['name'] in annotations and allow_partial is False:
             annotation_ids[d['name']] = d['id']
             annotations_matched.add(d['name'])
-            module_logger.debug(
+            logger.debug(
                 'Found matching annotation: %s' % d['name'])
         elif True in [a in d['name'] for a in annotations] and allow_partial is True:
             annotation_ids[d['name']] = d['id']
             annotations_matched |= set(
                 [a for a in annotations if a in d['name']])
-            module_logger.debug(
+            logger.debug(
                 'Found matching annotation: %s' % d['name'])
 
     if len(annotations) != len(annotations_matched):
-        module_logger.warning('Could not retrieve annotation id(s) for: ' + str(
+        logger.warning('Could not retrieve annotation id(s) for: ' + str(
             [a for a in annotations if a not in annotations_matched]))
 
     return annotation_ids
@@ -2459,7 +2447,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     """
 
     """
-    module_logger.warning(
+    logger.warning(
             "Deprecationwarning: get_skids_by_name() is deprecated, use find_neurons() instead."
         )
     """
@@ -2518,26 +2506,26 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
     """
 
     """
-    module_logger.warning(
+    logger.warning(
             "Deprecationwarning: get_skids_by_annotation() is deprecated, use find_neurons() instead."
         )
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    module_logger.info(
+    logger.info(
         'Looking for Annotation(s): ' + str(annotations))
 
     if intersect and isinstance(annotations, (list, np.ndarray)):
-        current_level = module_logger.level
-        module_logger.setLevel('WARNING')
+        current_level = logger.level
+        logger.setLevel('WARNING')
         skids = set.intersection(*[set(get_skids_by_annotation(a,
                                                                remote_instance=remote_instance,
                                                                allow_partial=allow_partial,
                                                                intersect=False))
                                    for a in annotations])
-        module_logger.setLevel(current_level)
-        module_logger.info(
+        logger.setLevel(current_level)
+        logger.info(
             'Found %i skeletons with matching annotation(s)' % len(skids))
         return list(skids)
 
@@ -2545,22 +2533,22 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
         annotations, remote_instance, allow_partial=allow_partial)
 
     if not annotation_ids:
-        module_logger.error(
+        logger.error(
             'No matching annotation found! Returning None')
         raise Exception('No matching annotation found!')
 
     if allow_partial is True:
-        module_logger.debug(
+        logger.debug(
             'Found id(s): %s (partial matches included)' % len(annotation_ids))
     elif isinstance(annotations, (list, np.ndarray)):
-        module_logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
+        logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
             str(annotation_ids), len(annotations) - len(annotation_ids)))
     elif isinstance(annotations, str):
-        module_logger.debug('Found id: %s | Unable to retrieve: %i' % (
+        logger.debug('Found id: %s | Unable to retrieve: %i' % (
             list(annotation_ids.keys())[0], 1 - len(annotation_ids)))
 
     annotated_skids = []
-    module_logger.debug(
+    logger.debug(
         'Retrieving skids for annotationed neurons...')
     for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
@@ -2568,12 +2556,12 @@ def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=Fal
                            'range_length': 500, 'with_annotations': False}
         remote_annotated_url = remote_instance._get_annotated_url()
         neuron_list = remote_instance.fetch(
-            remote_annotated_url, annotation_post)        
+            remote_annotated_url, annotation_post)
         for entry in neuron_list['entities']:
             if entry['type'] == 'neuron':
                 annotated_skids.append(str(entry['skeleton_ids'][0]))
 
-    module_logger.info(
+    logger.info(
         'Found %i skeletons with matching annotation(s)' % len(annotated_skids))
 
     return(annotated_skids)
@@ -2837,7 +2825,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
         # Check if our treenodes actually exist
         if [n for n in node_list if n not in existing_tags]:
-            module_logger.warning('Skipping %i nodes without tags' % len(
+            logger.warning('Skipping %i nodes without tags' % len(
                 [n for n in node_list if n not in existing_tags]))
             [node_list.remove(n) for n in [
                 n for n in node_list if n not in existing_tags]]
@@ -2950,7 +2938,7 @@ def get_segments(x, remote_instance=None):
 
     if not isinstance(x, (list, np.ndarray)):
         x = [x]
-    
+
     urls = []
     post_data = []
 
@@ -3220,7 +3208,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
     if not separate:
-        with tqdm(total=len(x), desc='Contr. stats', disable=pbar_hide, leave=pbar_leave) as pbar:
+        with tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
             stats = []
             for j in range(0, len(x), _split):
                 pbar.update(j)
@@ -3347,7 +3335,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         Filtered list of skeleton IDs
         """
         nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
-        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]    
+        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
@@ -3367,7 +3355,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if not isinstance(user, type(None)):
         if utils._is_iterable(user):
             skid_list = list()
-            for u in tqdm(user, desc='Get user', disable=pbar_hide, leave=pbar_leave):
+            for u in tqdm(user, desc='Get user', disable=config.pbar_hide, leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=u,
                                              node_count=node_count,
@@ -3389,7 +3377,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if not isinstance(reviewed_by, type(None)):
         if utils._is_iterable(reviewed_by):
             skid_list = list()
-            for u in tqdm(reviewed_by, desc='Get revs', disable=pbar_hide, leave=pbar_leave):
+            for u in tqdm(reviewed_by, desc='Get revs', disable=config.pbar_hide, leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=user,
                                              node_count=node_count,
@@ -3533,7 +3521,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         start = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
         end = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
 
-        module_logger.info(
+        logger.info(
             'Retrieving %i days of history in bouts!' % (end - start).days)
 
         # First make big bouts of roughly 6 months each
@@ -3549,7 +3537,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         rounds = [(start_date, end_date)]
 
     data = []
-    for r in tqdm(rounds, desc='Retrieving history', disable=pbar_hide, leave=pbar_leave):
+    for r in tqdm(rounds, desc='Retrieving history', disable=config.pbar_hide, leave=config.pbar_leave):
         get_history_GET_data = {'self.project_id': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
@@ -3560,7 +3548,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         remote_get_history_url += '?%s' % urllib.parse.urlencode(
             get_history_GET_data)
 
-        module_logger.debug(
+        logger.debug(
             'Retrieving user history from %s to %s ' % (r[0], r[1]))
 
         data.append(remote_instance.fetch(remote_get_history_url))
@@ -3813,7 +3801,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Warn if from/to_date are used without also querying by user or reviewer
     if from_date and not (users or reviewed_by):
-        module_logger.warning(
+        logger.warning(
             'Start/End dates can only be used for queries against <users> or <reviewed_by>')
 
     # Now go over all parameters and get sets of skids
@@ -3851,21 +3839,21 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
             annotations, remote_instance, allow_partial=partial_match)
 
         if not annotation_ids:
-            module_logger.error(
+            logger.error(
                 'No matching annotation(s) found! Returning None')
             raise Exception('No matching annotation(s) found!')
 
         if partial_match is True:
-            module_logger.debug(
+            logger.debug(
                 'Found {0} id(s) (partial matches included)'.format(len(annotation_ids)))
         else:
-            module_logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
+            logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
                 str(annotation_ids), len(annotations) - len(annotation_ids)))
 
-        module_logger.debug(
+        logger.debug(
             'Retrieving skids for annotationed neurons')
 
-        for an_id in tqdm(annotation_ids.values(), desc='Get annot', disable=pbar_hide, leave=pbar_leave):
+        for an_id in tqdm(annotation_ids.values(), desc='Get annot', disable=config.pbar_hide, leave=config.pbar_leave):
             annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                                'range_length': 500, 'with_annotations': False}
             remote_annotated_url = remote_instance._get_annotated_url()
@@ -3878,7 +3866,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by user
     if users:
         by_users = []
-        for u in tqdm(users, desc='Get by usr', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(users, desc='Get by usr', disable=config.pbar_hide, leave=config.pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['created_by'] = u
 
@@ -3898,7 +3886,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by reviewer
     if reviewed_by:
-        for u in tqdm(reviewed_by, desc='Get by revs', disable=pbar_hide, leave=pbar_leave):
+        for u in tqdm(reviewed_by, desc='Get by revs', disable=config.pbar_hide, leave=config.pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['reviewed_by'] = u
 
@@ -3917,7 +3905,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get by volume
     if volumes:
-        for v in tqdm(volumes, desc='Get by vols', disable=pbar_hide, leave=pbar_leave):
+        for v in tqdm(volumes, desc='Get by vols', disable=config.pbar_hide, leave=config.pbar_leave):
             if not isinstance(v, core.Volume):
                 vol = get_volume(v, remote_instance)
             else:
@@ -3938,10 +3926,10 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                     "Your search parameters will retrieve ALL neurons in the dataset. Proceed? [Y/N] ").lower()
 
             if answer != 'y':
-                module_logger.info('Query cancelled')
+                logger.info('Query cancelled')
                 return
 
-        module_logger.info(
+        logger.info(
             'Get all neurons with at least {0} nodes'.format(min_size))
         get_skeleton_list_GET_data = {'nodecount_gt': min_size}
         remote_get_list_url = remote_instance._get_list_skeletons_url()
@@ -3953,7 +3941,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Now merge the different neurons that we have
     if intersect:
-        module_logger.info('Intersecting by search parameters')
+        logger.info('Intersecting by search parameters')
         skids = list(set.intersection(*sets_of_skids))
     else:
         skids = list(set.union(*sets_of_skids))
@@ -3961,7 +3949,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Filtering by size was already done for users and reviewed_by and dates
     # If we queried by annotations, names or volumes we need to do this explicitly here
     if min_size > 1 and (volumes or annotations or names):
-        module_logger.info('Filtering neurons for size')
+        logger.info('Filtering neurons for size')
 
         get_skeleton_list_GET_data = {'nodecount_gt': min_size}
         remote_get_list_url = remote_instance._get_list_skeletons_url()
@@ -3975,7 +3963,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     nl.get_names()
 
     if only_soma:
-        module_logger.info('Filtering neurons for somas...')
+        logger.info('Filtering neurons for somas...')
         nl.get_skeletons(skip_existing=True)
         nl = nl[nl.soma != None]
 
@@ -3985,10 +3973,10 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                                     remote_instance=remote_instance)
 
     if nl.empty:
-        module_logger.warning(
+        logger.warning(
             'No neurons matching the search parameters were found')
     else:
-        module_logger.info(
+        logger.info(
             'Found {0} neurons matching the search parameters'.format(len(nl)))
 
     return nl
@@ -4052,7 +4040,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
     """
 
     """
-    module_logger.warning(
+    logger.warning(
             "Deprecationwarning: get_neurons_in_volume() is deprecated, use find_neurons() instead."
         )
     """
@@ -4069,7 +4057,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
     neurons = []
 
     for v in volumes:
-        module_logger.info('Retrieving nodes in volume {0}'.format(v['name']))
+        logger.info('Retrieving nodes in volume {0}'.format(v['name']))
         temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
                                    remote_instance=remote_instance)
 
@@ -4087,11 +4075,11 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
     neurons = list(set(neurons))
 
     if only_soma:
-        module_logger.info('Filtering neurons for somas...')
+        logger.info('Filtering neurons for somas...')
         soma = has_soma(neurons, remote_instance)
         neurons = [n for n in neurons if soma[n] is True]
 
-    module_logger.info('Done. {0} unique neurons found in volume(s) {1}'.format(
+    logger.info('Done. {0} unique neurons found in volume(s) {1}'.format(
         len(neurons), ','.join([v['name'] for v in volumes])))
 
     return neurons
@@ -4140,7 +4128,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kw
         time_out = remote_instance.time_out
 
     x_y_resolution = kwargs.get('xy_res', 3.8)
-    z_resolution = kwargs.get('z_res', 35)  
+    z_resolution = kwargs.get('z_res', 35)
 
     if isinstance(bbox, dict):
         bbox = np.array([[bbox['left'], bbox['right']],
@@ -4158,7 +4146,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kw
     boxes = _subset_volume(bbox, max_vol=50**3)
 
     node_list = []
-    with tqdm(desc='Retr. nodes in box volume', total=len(boxes), leave=pbar_leave, disable=pbar_hide) as pbar:
+    with tqdm(desc='Retr. nodes in box volume', total=len(boxes), leave=config.pbar_leave, disable=config.pbar_hide) as pbar:
         while boxes.any():
             pbar.total = len(boxes)
             new_boxes = np.empty((0, 3, 2))
@@ -4197,7 +4185,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kw
     unique, counts = np.unique([n[7] for n in node_list], return_counts=True)
     skeletons = unique[counts >= min_nodes]
 
-    module_logger.info("Done: %i nodes from %i unique neurons retrieved." % (
+    logger.info("Done: %i nodes from %i unique neurons retrieved." % (
         len(node_list), len(skeletons)))
 
     return skeletons
@@ -4358,7 +4346,7 @@ class _get_node_list_threaded(threading.Thread):
             threading.Thread.join(self)
             return self.response
         except:
-            module_logger.error(
+            logger.error(
                 'Failed to join thread.')
             return None
 
@@ -4587,7 +4575,7 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(volume_name, type(None)):
-        module_logger.info('Retrieving list of available volumes.')
+        logger.info('Retrieving list of available volumes.')
     elif not isinstance(volume_name, (str, list, np.ndarray)):
         raise TypeError('Volume name must be str or list of str.')
 
@@ -4652,7 +4640,7 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
                         for i in range(0, len(v) - 2, 3)]
 
         else:
-            module_logger.error("Unknown volume type: %s" % mesh_type)
+            logger.error("Unknown volume type: %s" % mesh_type)
             raise Exception("Unknown volume type: %s" % mesh_type)
 
         # For some reason, in this format vertices occur multiple times - we have
@@ -4670,10 +4658,10 @@ def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6)
 
             final_faces.append(this_faces)
 
-        module_logger.debug('Volume type: %s' % mesh_type)
-        module_logger.debug(
+        logger.debug('Volume type: %s' % mesh_type)
+        logger.debug(
             '# of vertices after clean-up: %i' % len(final_vertices))
-        module_logger.debug(
+        logger.debug(
             '# of faces after clean-up: %i' % len(final_faces))
 
         v = core.Volume(name=mesh_name,
@@ -4876,11 +4864,11 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
         url_list, remote_instance, post_data=postdata, desc='Renaming')]
 
     if False not in [r['success'] for r in responses]:
-        module_logger.info('All neurons successfully renamed.')
+        logger.info('All neurons successfully renamed.')
     else:
         failed = [n for i, n in enumerate(
             x) if responses[i]['success'] == False]
-        module_logger.error(
+        logger.error(
             'Error renaming neuron(s): {0}'.format(','.join(failed)))
 
     return

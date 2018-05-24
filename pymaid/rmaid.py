@@ -62,24 +62,11 @@ import numpy as np
 from colorsys import hsv_to_rgb
 
 import pymaid.cluster as pyclust
-from pymaid import core, fetch, plotting
+from pymaid import core, fetch, plotting, config
 
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
-
-# Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
 
 cl = robjects.r('class')
 names = robjects.r('names')
@@ -93,12 +80,14 @@ try:
     flycircuit = importr('flycircuit')
     elmr = importr('elmr')  # even if not used, these packages are important!
 except:
-    module_logger.error(
+    logger.error(
         'R library "nat" not found! Please install from within R.')
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid',
                   'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
 
+# Set up logging
+logger = config.logger
 
 def init_rcatmaid(**kwargs):
     """ This function initializes the R catmaid package from Jefferis
@@ -146,7 +135,7 @@ def init_rcatmaid(**kwargs):
         authpassword = remote_instance.authpassword
         authtoken = remote_instance.authtoken
     elif not remote_instance and None in (server, authname, authpassword, authtoken):
-        module_logger.error('Unable to initialize. Missing credentials: %s' % ''.join(
+        logger.error('Unable to initialize. Missing credentials: %s' % ''.join(
             [n for n in ['server', 'authname', 'authpassword', 'authtoken'] if n not in kwargs]))
         return None
 
@@ -154,7 +143,7 @@ def init_rcatmaid(**kwargs):
     try:
         catmaid = importr('catmaid')
     except:
-        module_logger.error(
+        logger.error(
             'RCatmaid not found. Please install before proceeding.')
         return None
 
@@ -171,7 +160,7 @@ def init_rcatmaid(**kwargs):
     # Login
     catmaid.catmaid_login(con)
 
-    module_logger.info('Rcatmaid successfully initiated.')
+    logger.info('Rcatmaid successfully initiated.')
 
     return catmaid
 
@@ -199,7 +188,7 @@ def data2py(data, **kwargs):
     """
 
     if 'neuronlistfh' in cl(data):
-        module_logger.error(
+        logger.error(
             'On-demand neuronlist found. Conversion cancelled to prevent loading large datasets in memory. Please use rmaid.dotprops2py() and its "subset" parameter.')
         return None
     elif 'neuronlist' in cl(data):
@@ -208,7 +197,7 @@ def data2py(data, **kwargs):
         elif 'dotprops' in cl(data[0]):
             return dotprops2py(data)
         else:
-            module_logger.error(
+            logger.error(
                 'Dont know how to convert unknown R datatype %s' % cl(data[0]))
             return data
     elif cl(data)[0] == 'integer':
@@ -258,11 +247,11 @@ def data2py(data, **kwargs):
                                    'reverse_score', 'mu_score']
                           )
 
-        module_logger.info(
+        logger.info(
             'Returning only nblast results. Neuron object is stored in your original_data[2].')
         return df
     else:
-        module_logger.error(
+        logger.error(
             'Dont know how to convert unknown R datatype %s' % cl(data))
         return data
 
@@ -316,10 +305,10 @@ def neuron2py(neuron, remote_instance=None):
             [n[0] for n in neuron.skid.tolist()], remote_instance)
     elif 'skid' in neuron and not remote_instance:
         neuron_names = None
-        module_logger.info(
+        logger.info(
             'Please provide a remote instance if you want to add neuron name.')
     else:
-        module_logger.warning(
+        logger.warning(
             'Neuron has only nodes (no name, skid, connectors or tags).')
 
     data = []
@@ -502,7 +491,7 @@ def neuron2r(neuron, convert_to_um=False):
 
         return n_r
     else:
-        module_logger.error('Unknown DataFrame format: %s' % str(type(neuron)))
+        logger.error('Unknown DataFrame format: %s' % str(type(neuron)))
 
 
 def dotprops2py(dp, subset=None):
@@ -604,24 +593,24 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
         rn = x
     elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] < 2:
-            module_logger.warning(
+            logger.warning(
                 'You have to provide more than a single neuron.')
             raise ValueError('You have to provide more than a single neuron.')
 
         rn = neuron2r(x, convert_to_um=True)
     elif isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
-        module_logger.warning(
+        logger.warning(
             'You have to provide more than a single neuron.')
         raise ValueError('You have to provide more than a single neuron.')
     elif isinstance(x, list):
         if not remote_instance:
-            module_logger.error(
+            logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
         x = fetch.get_neuron(x, remote_instance)
         rn = neuron2r(x, convert_to_um=True)
     else:
-        module_logger.error(
+        logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
         raise ValueError(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
@@ -643,7 +632,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
         # Perform z-score normalization
         matrix = (matrix - matrix.mean()) / matrix.std()
 
-    module_logger.info(
+    logger.info(
         'Done! Use results.plot_dendrgram() and matplotlib.pyplot.show() to plot dendrogram.')
 
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
@@ -745,14 +734,14 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
         flycircuit = importr('flycircuit')
         datadir = robjects.r('getOption("flycircuit.datadir")')[0]
     except:
-        module_logger.error('R Flycircuit not found.')
+        logger.error('R Flycircuit not found.')
 
     if db == None:
         if not os.path.isfile(datadir + '/dpscanon.rds'):
-            module_logger.error(
+            logger.error(
                 'Unable to find default DPS database dpscanon.rds in flycircuit.datadir. Please provide database using db parameter.')
             return
-        module_logger.info(
+        logger.info(
             'DPS database not explicitly provided. Loading local FlyCircuit DB from dpscanon.rds')
         dps = robjects.r('read.neuronlistfh("%s")' %
                          (datadir + '/dpscanon.rds'))
@@ -764,7 +753,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     elif 'rpy2' in str(type(db)):
         dps = db
     else:
-        module_logger.error(
+        logger.error(
             'Unable to process the DPS database you have provided. See help(rmaid.nblast) for details.')
         return
 
@@ -772,20 +761,20 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
         rn = neuron
     elif isinstance(neuron, pd.DataFrame) or isinstance(neuron, core.CatmaidNeuronList):
         if neuron.shape[0] > 1:
-            module_logger.warning(
+            logger.warning(
                 'You provided more than a single neuron. Blasting only against the first: %s' % neuron.ix[0].neuron_name)
         rn = neuron2r(neuron.ix[0], convert_to_um=False)
     elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
         rn = neuron2r(neuron, convert_to_um=False)
     elif isinstance(neuron, str) or isinstance(neuron, int):
         if not remote_instance:
-            module_logger.error(
+            logger.error(
                 'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
             return
         rn = neuron2r(fetch.get_neuron(
             neuron, remote_instance), convert_to_um=False)
     else:
-        module_logger.error(
+        logger.error(
             'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
         return
 
@@ -816,7 +805,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     # number of reverse scores to calculate (max 100)
     nrev = min(100, len(dps))
 
-    module_logger.info('Blasting neuron...')
+    logger.info('Blasting neuron...')
     if reverse:
         sc = r_nblast.nblast(dps, nat.neuronlist(
             xdp), **{'normalised': normalised, '.parallel': True})
@@ -854,7 +843,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
                                'reverse_score', 'mu_score']
                       )
 
-    module_logger.info('Blasting done in %s seconds' %
+    logger.info('Blasting done in %s seconds' %
                        round(time.time() - start_time))
 
     return NBLASTresults(df, sc, scr, rn, xdp, dps, {'mirror': mirror, 'reference': reference, 'UseAlpha': UseAlpha, 'normalised': normalised, 'reverse': reverse})
@@ -980,7 +969,7 @@ class NBLASTresults:
         kwargs.update({'colors': cmap,
                        'downsampling': 1})
 
-        module_logger.info('Colormap:' + str(cmap))
+        logger.info('Colormap:' + str(cmap))
 
         if nl:
             if plot_neuron is True:
@@ -1019,6 +1008,6 @@ class NBLASTresults:
             elif isinstance(entries[0], str):
                 return self.db.rx(robjects.StrVector(entries))
         else:
-            module_logger.error(
+            logger.error(
                 'Unable to intepret entries provided. See help(NBLASTresults.plot3d) for details.')
             return None

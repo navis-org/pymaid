@@ -23,7 +23,7 @@ import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from pymaid import fetch, core, utils, graph_utils
+from pymaid import fetch, core, utils, graph_utils, config
 
 from tqdm import tqdm
 if utils.is_jupyter():
@@ -31,31 +31,16 @@ if utils.is_jupyter():
     tqdm = tqdm_notebook
     trange = tnrange
 
-# Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter('%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
-
 try:
     from pyoctree import pyoctree
 except:
-    module_logger.warning("Module pyoctree not found. Falling back to scipy's \
+    logger.warning("Module pyoctree not found. Falling back to scipy's \
                             ConvexHull for intersection calculations.")
 
 __all__ = sorted(['in_volume'])
 
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
-
+# Set up logging
+logger = config.logger
 
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     """ Test if points are within a given CATMAID volume.
@@ -133,7 +118,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
             volume = {v['name']: v for v in volume}
 
         data = dict()
-        for v in tqdm(volume, desc='Volumes', disable=pbar_hide, leave=pbar_leave):
+        for v in tqdm(volume, desc='Volumes', disable=config.pbar_hide, leave=config.pbar_leave):
             data[v] = in_volume(
                 x, volume[v], remote_instance=remote_instance, inplace=False, mode=mode)
         return data
@@ -172,7 +157,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     try:
         return _in_volume_ray(points, volume)
     except:
-        module_logger.warning(
+        logger.warning(
             'Package pyoctree not found. Falling back to ConvexHull.')
         return _in_volume_convex(points, volume, approximate=False)
 

@@ -40,7 +40,7 @@ Examples
 
 import pandas as pd
 import numpy as np
-from pymaid import core, utils
+from pymaid import core, utils, config
 import logging
 import colorsys
 import json
@@ -52,16 +52,7 @@ except:
     raise ImportError(
         'Unable to load bpy - this module only works from within Blender!')
 
-module_logger = logging.getLogger('Blender')
-
-if len( module_logger.handlers ) == 0:
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-                '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 
 class handler:
@@ -186,7 +177,7 @@ class handler:
         elif isinstance(x, core.Volume):
             self._create_mesh( x )
         else:
-            module_logger.error(
+            logger.error(
                 'Unable to interpret data type ' + str(type(x)))
             raise AttributeError('Unable to add data of type' + str(type(x)))
 
@@ -382,7 +373,7 @@ class handler:
         skids = utils.eval_skids(x)
 
         if not skids:
-            module_logger.error('No skids found.')
+            logger.error('No skids found.')
 
         names = []
 
@@ -677,7 +668,7 @@ class object_list:
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        module_logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
+        logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
         print('Selection saved as {0} in {1}'.format( fname, os.getcwd() ) )
 
 

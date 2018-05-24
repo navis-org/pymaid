@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 
-from pymaid import fetch, core, plotting, utils
+from pymaid import fetch, core, plotting, utils, config
 
 from tqdm import tqdm
 if utils.is_jupyter():
@@ -36,25 +36,10 @@ if utils.is_jupyter():
     trange = tnrange
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 __all__ = sorted(['cluster_by_connectivity', 'cluster_by_synapse_placement',
                   'cluster_xyz', 'ClustResults'])
-
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
-
 
 def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                             downstream=True, threshold=1, include_skids=None,
@@ -146,7 +131,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                                           (connectivity_table.total >= threshold)]
 
     if not isinstance(include_skids, type(None)) or not isinstance(exclude_skids, type(None)):
-        module_logger.info(
+        logger.info(
             'Filtering connectivity. %i entries before filtering' % (connectivity.shape[0]))
 
         if not isinstance(include_skids, type(None)):
@@ -157,7 +142,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
             connectivity = connectivity[
                 ~connectivity.skeleton_id.isin(utils.eval_skids(exclude_skids, remote_instance=remote_instance))]
 
-        module_logger.info('%i entries after filtering' %
+        logger.info('%i entries after filtering' %
                            (connectivity.shape[0]))
 
     # Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)!
@@ -168,7 +153,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                           for n in neurons}
 
     # Retrieve names
-    module_logger.debug('Retrieving neuron names')
+    logger.debug('Retrieving neuron names')
     neuron_names = fetch.get_names(
         list(set(neurons + connectivity.skeleton_id.tolist())), remote_instance)
 
@@ -186,11 +171,11 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
         # Prepare connectivity subsets:
         cn_subsets = {n: this_cn[n] > 0 for n in neurons}
 
-        module_logger.info('Calculating %s similarity scores' % d)
+        logger.info('Calculating %s similarity scores' % d)
         matching_scores[d] = pd.DataFrame(
             np.zeros((len(neurons), len(neurons))), index=neurons, columns=neurons)
         if this_cn.shape[0] == 0:
-            module_logger.warning('No %s partners found: filtered?' % d)
+            logger.warning('No %s partners found: filtered?' % d)
 
         combinations = [(nA, nB, this_cn, vertex_score, cn_subsets[nA],
                          cn_subsets[nB], cluster_kws) for nA in neurons for nB in neurons]
@@ -200,8 +185,8 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
 
             matching_indices = [n for n in tqdm(futures, total=len(combinations),
                                                 desc=d,
-                                                disable=pbar_hide,
-                                                leave=pbar_leave)]
+                                                disable=config.pbar_hide,
+                                                leave=config.pbar_leave)]
 
         for i, v in enumerate(combinations):
             matching_scores[d].loc[v[0], v[1]
@@ -212,7 +197,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
     # To compensate, the ratio of upstream to downstream partners (after applying filters!) is considered!
     # Ratio is applied to neuronA of A-B comparison -> will be reversed at B-A
     # comparison
-    module_logger.info('Finalizing scores')
+    logger.info('Finalizing scores')
     dist_matrix = pd.DataFrame(
         np.zeros((len(neurons), len(neurons))), index=neurons, columns=neurons)
     for neuronA in neurons:
@@ -226,7 +211,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                         'upstream'] / (number_of_partners[neuronA]['upstream'] + number_of_partners[neuronA]['downstream'])
                     r_outputs = 1 - r_inputs
                 except:
-                    module_logger.warning(
+                    logger.warning(
                         'Failed to calculate input/output ratio for %s assuming 50/50 (probably division by 0 error)' % str(neuronA))
                     r_inputs = 0.5
                     r_outputs = 0.5
@@ -234,7 +219,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                 dist_matrix[neuronA][neuronB] = matching_scores['upstream'][neuronA][
                     neuronB] * r_inputs + matching_scores['downstream'][neuronA][neuronB] * r_outputs
 
-    module_logger.info('All done.')
+    logger.info('All done.')
 
     # Rename rows and columns
     #dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
@@ -406,7 +391,7 @@ def _unpack_synapse_helper(x):
     return _calc_synapse_similarity(x[0], x[1], x[2], x[3], x[4])
 
 
-def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000, 
+def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000,
                              restrict_cn=None):
     """ Calculates synapses similarity score.
 
@@ -547,7 +532,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
         restrict_cn = [restrict_cn]
 
     sim_matrix = pd.DataFrame(
-        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id, 
+        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id,
                                                 columns=neurons.skeleton_id)
 
     combinations = [(nA.connectors, nB.connectors, sigma, omega, restrict_cn)
@@ -560,8 +545,8 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
 
         scores = [n for n in tqdm(futures, total=len(combinations),
                                   desc='Processing',
-                                  disable=pbar_hide,
-                                  leave=pbar_leave)]
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave)]
 
     for i, v in enumerate(combinations):
         sim_matrix.loc[comb_skids[i][0], comb_skids[i][1]] = scores[i]
@@ -611,7 +596,7 @@ def cluster_xyz(x, labels=None):
     try:
         s = x[['x', 'y', 'z']].values
     except:
-        module_logger.error(
+        logger.error(
             'Please provide dataframe connector data of exactly a single neuron')
         return
 
@@ -787,7 +772,7 @@ class ClustResults:
         # Save method in case we want to look it up later
         self.cluster_method = method
 
-        module_logger.info('Clustering done using method "{0}"'.format(method))
+        logger.info('Clustering done using method "{0}"'.format(method))
 
     def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None, **kwargs):
         """ Plot dendrogram using matplotlib.
@@ -830,7 +815,7 @@ class ClustResults:
                                                 color_threshold=color_threshold,
                                                 labels=labels,
                                                 **dn_kwargs)
-        module_logger.info(
+        logger.info(
             'Use matplotlib.pyplot.show() to render dendrogram.')
 
         ax = plt.gca()
@@ -886,7 +871,7 @@ class ClustResults:
         # Increase padding
         cg.fig.subplots_adjust(right=.8, top=.95, bottom=.2)
 
-        module_logger.info(
+        logger.info(
             'Use matplotlib.pyplot.show() to render figure.')
 
         return cg
@@ -936,7 +921,7 @@ class ClustResults:
         axcolor = fig.add_axes([0.91, 0.1, 0.02, 0.6])
         pylab.colorbar(im, cax=axcolor)
 
-        module_logger.info(
+        logger.info(
             'Use matplotlib.pyplot.show() to render figure.')
 
         return fig
@@ -963,7 +948,7 @@ class ClustResults:
         """
 
         if 'neurons' not in self.__dict__:
-            module_logger.error(
+            logger.error(
                 'This works only with cluster results from neurons')
             return None
 
@@ -973,7 +958,7 @@ class ClustResults:
 
         return plotting.plot3d(self.neurons, **kwargs)
 
-    def to_json(self, fname='cluster.json', k=5, criterion='maxclust'):
+    def to_selection(self, fname='cluster.json', k=5, criterion='maxclust'):
         """ Convert clustered neurons into json file that can be loaded into
         CATMAID selection table.
 
@@ -988,9 +973,10 @@ class ClustResults:
 
         See Also
         --------
-        :func:`pymaid.plot.plot3d`
-                    Function called to generate 3d plot
-
+        :func:`pymaid.CatmaidNeuronList.to_selection`
+                    Turn CatmaidNeuronList into CATMAID-readable selection.
+        :func:`pymaid.CatmaidNeuronList.from_selection`
+                    CatmaidNeuronList from CATMAID selection.
         """
 
         cmap = self.get_colormap(k=k, criterion=criterion)
@@ -1007,7 +993,7 @@ class ClustResults:
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        module_logger.info('Selection saved as %s in %s' %
+        logger.info('Selection saved as %s in %s' %
                            (fname, os.getcwd()))
 
         return

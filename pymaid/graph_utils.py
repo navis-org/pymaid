@@ -24,7 +24,7 @@ import networkx as nx
 
 from scipy.sparse import csgraph, csr_matrix
 
-from pymaid import graph, core, utils
+from pymaid import graph, core, utils, config
 
 from tqdm import tqdm, trange
 if utils.is_jupyter():
@@ -33,18 +33,7 @@ if utils.is_jupyter():
     trange = tnrange
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 __all__ = sorted(['classify_nodes', 'cut_neuron', 'longest_neurite',
                   'split_into_fragments', 'reroot_neuron', 'distal_to',
@@ -61,8 +50,8 @@ def _generate_segments(x, weight=None):
     x :         {CatmaidNeuron,CatmaidNeuronList}
                 May contain multiple neurons.
     weight :    {'weight', None}, optional
-                If ``"weight"`` use physical length to determine segment length.
-                if ``None`` use number of nodes.
+                If ``"weight"`` use physical length to determine segment
+                length. If ``None`` use number of nodes.
 
     Returns
     -------
@@ -77,7 +66,7 @@ def _generate_segments(x, weight=None):
     elif isinstance(x, core.CatmaidNeuron):
         pass
     else:
-        module_logger.error('Unexpected datatype: %s' % str(type(x)))
+        logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
 
     if weight == 'weight':
@@ -137,8 +126,9 @@ def _generate_segments(x, weight=None):
 
     return sequences
 
+
 def _break_segments(x):
-    """ Break neuron into segments connecting ends, branches and root.
+    """ Break neuron into small segments connecting ends, branches and root.
 
     Parameters
     ----------
@@ -157,7 +147,7 @@ def _break_segments(x):
     elif isinstance(x, core.CatmaidNeuron):
         pass
     else:
-        module_logger.error('Unexpected datatype: %s' % str(type(x)))
+        logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
 
     if x.igraph and config.use_igraph:
@@ -417,7 +407,6 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
         Check if a node A is distal to node B.
     :func:`~pymaid.dist_between`
         Get point-to-point geodesic distances.
-
     """
 
     if isinstance(x, core.CatmaidNeuronList):
@@ -614,7 +603,7 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
         if x.shape[0] == 1:
             x = x[0]
         else:
-            module_logger.error(
+            logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception
     else:
@@ -712,7 +701,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
         if x.shape[0] == 1:
             x = x[0]
         else:
-            module_logger.error(
+            logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception
     else:
@@ -784,13 +773,13 @@ def reroot_neuron(x, new_root, inplace=False):
 
     # If new root is a tag, rather than a ID, try finding that node
     if isinstance(new_root, str):
-        if new_root not in df.tags:
-            module_logger.error(
-                '#%s: Found no treenodes with tag %s - please double check!' % (str(df.skeleton_id), str(new_root)))
+        if new_root not in x.tags:
+            logger.error(
+                '#%s: Found no treenodes with tag %s - please double check!' % (str(x.skeleton_id), str(new_root)))
             return
-        elif len(df.tags[new_root]) > 1:
-            module_logger.error(
-                '#%s: Found multiple treenodes with tag %s - please double check!' % (str(df.skeleton_id), str(new_root)))
+        elif len(x.tags[new_root]) > 1:
+            logger.error(
+                '#%s: Found multiple treenodes with tag %s - please double check!' % (str(x.skeleton_id), str(new_root)))
             return
         else:
             new_root = x.tags[new_root][0]
@@ -944,7 +933,7 @@ def cut_neuron(x, cut_node, ret='both'):
         if x.shape[0] == 1:
             x = x[0]
         else:
-            module_logger.error(
+            logger.error(
                 '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
             raise Exception(
                 '%i neurons provided. Please provide only a single neuron!' % x.shape[0])

@@ -27,7 +27,7 @@ import scipy
 import networkx as nx
 import itertools
 
-from pymaid import fetch, core, graph_utils, graph, utils
+from pymaid import fetch, core, graph_utils, graph, utils, config
 
 from tqdm import tqdm, trange
 if utils.is_jupyter():
@@ -36,28 +36,13 @@ if utils.is_jupyter():
     trange = tnrange
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter('%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'stitch_neurons', 'arbor_confidence', 'split_axon_dendrite',
                   'bending_flow', 'flow_centrality', 'segregation_index',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron'])
-
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
-
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
     """ Calculates confidence for each treenode by walking from root to leafs
@@ -116,7 +101,7 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
     nodes = x.nodes.set_index('treenode_id')
     nodes.loc[x.root, 'arbor_confidence'] = 1
 
-    with tqdm(total=len(x.segments), desc='Calc confidence', disable=pbar_hide, leave=pbar_leave) as pbar:
+    with tqdm(total=len(x.segments), desc='Calc confidence', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         for r in x.root:
             for c in loc[r]:
                 walk_to_leafs(c)
@@ -312,7 +297,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, m
 
     """
 
-    module_logger.debug('Calculating Strahler indices...')
+    logger.debug('Calculating Strahler indices...')
 
     start_time = time.time()
 
@@ -363,13 +348,13 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, m
     nodes_processed = []
 
     while starting_points:
-        module_logger.debug('New starting point. Remaining: %i' %
+        logger.debug('New starting point. Remaining: %i' %
                             len(starting_points))
         new_starting_points = []
         starting_points_done = []
 
         for i, this_node in enumerate(starting_points):
-            module_logger.debug('%i of %i ' % (i, len(starting_points)))
+            logger.debug('%i of %i ' % (i, len(starting_points)))
 
             # Calculate index for this branch
             previous_indices = []
@@ -455,7 +440,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, m
             x.nodes.loc[x.nodes.treenode_id.isin(
                 this_seg), 'strahler_index'] = new_SI
 
-    module_logger.debug('Done in %is' % round(time.time() - start_time))
+    logger.debug('Done in %is' % round(time.time() - start_time))
 
     if not inplace:
         return x
@@ -646,7 +631,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     # Make copy, so that we don't screw things up
     x = x.copy()
 
-    module_logger.debug(
+    logger.debug(
         'Splitting neuron #{0} by flow centrality'.format(x.skeleton_id))
 
     # Now get the node point with the highest flow centrality.
@@ -816,7 +801,7 @@ def bending_flow(x, polypre=False):
     Adds a new column 'flow_centrality' to ``x.nodes``. Branch points only!
 
     """
-    module_logger.info(
+    logger.info(
         'Calculating bending flow centrality for neuron #{0}'.format(x.skeleton_id))
 
     start_time = time.time()
@@ -829,15 +814,15 @@ def bending_flow(x, polypre=False):
         return [bending_flow(n, mode=mode, polypre=polypre, ) for n in x]
 
     if x.soma and x.soma not in x.root:
-        module_logger.warning(
+        logger.warning(
             'Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
 
     # We will be processing a super downsampled version of the neuron to speed up calculations
-    current_level = module_logger.level
-    module_logger.setLevel('ERROR')
+    current_level = logger.level
+    logger.setLevel('ERROR')
     y = x.copy()
     y.downsample(1000000)
-    module_logger.setLevel(current_level)
+    logger.setLevel(current_level)
 
     if polypre:
         # Get details for all presynapses
@@ -894,7 +879,7 @@ def bending_flow(x, polypre=False):
 
     x.nodes.reset_index(inplace=True)
 
-    module_logger.debug('Total time for bending flow calculation: {0}s'.format(
+    logger.debug('Total time for bending flow calculation: {0}s'.format(
         round(time.time() - start_time)))
 
     return
@@ -956,7 +941,7 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 
     """
 
-    module_logger.info(
+    logger.info(
         'Calculating flow centrality for neuron #{0}'.format(x.skeleton_id))
 
     start_time = time.time()
@@ -972,16 +957,16 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
         return [flow_centrality(n, mode=mode, polypre=polypre, ) for n in x]
 
     if x.soma and x.soma not in x.root:
-        module_logger.warning(
+        logger.warning(
             'Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
 
-    # We will be processing a super downsampled version of the neuron to 
+    # We will be processing a super downsampled version of the neuron to
     # speed up calculations
-    current_level = module_logger.level
-    module_logger.setLevel('ERROR')
+    current_level = logger.level
+    logger.setLevel('ERROR')
     y = x.copy()
     y.downsample(1000000)
-    module_logger.setLevel(current_level)
+    logger.setLevel(current_level)
 
     if polypre:
         # Get details for all presynapses
@@ -1051,7 +1036,7 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 
     x.nodes.reset_index(inplace=True)
 
-    module_logger.debug('Total time for SFC calculation: {0}s'.format(
+    logger.debug('Total time for SFC calculation: {0}s'.format(
         round(time.time() - start_time)))
 
     return
@@ -1107,11 +1092,11 @@ def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
     neurons = [n.copy() for n in neurons if isinstance(n, core.CatmaidNeuron)]
 
     if len(neurons) < 2:
-        module_logger.warning(
+        logger.warning(
             'Need at least 2 neurons to stitch, found %i' % len(neurons))
         return neurons[0]
 
-    module_logger.debug('Stitching %i neurons...' % len(neurons))
+    logger.debug('Stitching %i neurons...' % len(neurons))
 
     stitched_n = neurons[0]
 
@@ -1145,7 +1130,7 @@ def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
                 treenodesA = stitched_n.nodes.set_index(
                     'treenode_id').loc[tn_to_stitch].reset_index()
             else:
-                module_logger.warning(
+                logger.warning(
                     'None of the nodes in tn_to_stitch were found in the first {0} stitched neurons. Falling back to all nodes!'.format(i + 1))
                 treenodesA = stitched_n.nodes
 
@@ -1153,7 +1138,7 @@ def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
                 treenodesB = nB.nodes.set_index(
                     'treenode_id').loc[tn_to_stitch].reset_index()
             else:
-                module_logger.warning(
+                logger.warning(
                     'None of the nodes in tn_to_stitch were found in neuron #{0}. Falling back to all nodes!'.format(nB.skeleton_id))
                 treenodesB = nB.nodes
         elif method == 'LEAFS':
@@ -1175,7 +1160,7 @@ def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
         tnA = treenodesA.iloc[dist.argmin(axis=0)[0]].treenode_id
         tnB = treenodesB.iloc[dist.argmin(axis=1)[0]].treenode_id
 
-        module_logger.debug('Stitching treenodes %s and %s' %
+        logger.debug('Stitching treenodes %s and %s' %
                             (str(tnA), str(tnB)))
 
         # Reroot neuronB onto the node that will be stitched
@@ -1344,7 +1329,7 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
     if isinstance(x, core.CatmaidNeuronList):
         if not isinstance(seg_length, (list, np.ndarray, tuple)):
             seg_length = [seg_length]
-        df = pd.DataFrame([tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=pbar_hide, leave=pbar_leave)],
+        df = pd.DataFrame([tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=config.pbar_hide, leave=config.pbar_leave)],
                           index=x.skeleton_id, columns=seg_length).T
         df.index.name = 'seg_length'
         return df
@@ -1458,7 +1443,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
         if not inplace:
             x = x.copy()
 
-        for n in tqdm(x, desc='Removing', disable=pbar_hide, leave=pbar_leave):
+        for n in tqdm(x, desc='Removing', disable=config.pbar_hide, leave=config.pbar_leave):
             remove_tagged_branches(n, tag,
                                    how=how,
                                    preserve_connectors=preserve_connectors,
@@ -1478,7 +1463,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
 
     # Skip if tag not present
     if tag not in x.tags:
-        module_logger.info(
+        logger.info(
             'No "{0}" tag found on neuron #{1}... skipped'.format(tag, x.skeleton_id))
         if not inplace:
             return x
@@ -1496,7 +1481,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
         # Sanity check: are any of these segments non-terminals?
         non_term = [s for s in tagged_segs if x.graph.degree(s[0]) > 1]
         if non_term:
-            module_logger.warning(
+            logger.warning(
                 'Pruning {0} non-terminal segment(s)'.format(len(non_term)))
 
         # Get nodes to be removed (excluding the last node -> branch )
@@ -1600,7 +1585,7 @@ def despike_neuron(x, sigma=5, inplace=False):
         if not inplace:
             x = x.copy()
 
-        for n in tqdm(x, desc='Despiking', disable=pbar_hide, leave=pbar_leave):
+        for n in tqdm(x, desc='Despiking', disable=config.pbar_hide, leave=config.pbar_leave):
             despike_neuron(n, sigma=sigma, inplace=True)
 
         if not inplace:

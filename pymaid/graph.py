@@ -23,7 +23,7 @@ import scipy.spatial
 
 import logging
 
-from pymaid import core, fetch, utils
+from pymaid import core, fetch, utils, config
 
 import networkx as nx
 
@@ -33,17 +33,7 @@ except:
     igraph = None
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.DEBUG)
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 __all__ = sorted(['network2nx', 'network2igraph', 'neuron2igraph',
                   'neuron2nx', 'neuron2KDTree'])
@@ -287,7 +277,7 @@ def neuron2igraph(x):
     else:
         raise ValueError('Unable input type "{0}"'.format(type(x)))
 
-    module_logger.debug('Generating graph from skeleton data...')
+    logger.debug('Generating graph from skeleton data...')
 
     # Make sure we have correctly numbered indices
     nodes = x.nodes.reset_index(drop=True)

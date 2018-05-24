@@ -24,7 +24,7 @@ import numpy as np
 import scipy
 import scipy.spatial
 
-from pymaid import fetch, core, intersect, utils
+from pymaid import fetch, core, intersect, utils, config
 
 from tqdm import tqdm, trange
 if utils.is_jupyter():
@@ -33,25 +33,10 @@ if utils.is_jupyter():
     trange = tnrange
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
+logger = config.logger
 
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
                   'predict_connectivity', 'adjacency_matrix', 'group_matrix'])
-
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
@@ -171,7 +156,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                 cn_data.connector_loc.values, restrict_to)]
 
     if cn_data.empty:
-        module_logger.warning('No connectivity left after filtering')
+        logger.warning('No connectivity left after filtering')
         # return
 
     # Reconstruct connectivity data:
@@ -193,7 +178,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                            columns=unique_skids, index=unique_skids)
 
     # Fill in values
-    for i, e in enumerate(tqdm(unique_edges, disable=pbar_hide, desc='Adj. matrix', leave=pbar_leave)):
+    for i, e in enumerate(tqdm(unique_edges, disable=config.pbar_hide, desc='Adj. matrix', leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.at[str(e[0]), str(e[1])] = counts[i]
 
@@ -301,7 +286,7 @@ def cable_overlap(a, b, dist=2, method='min'):
     matrix = pd.DataFrame(
         np.zeros((a.shape[0], b.shape[0])), index=a.skeleton_id, columns=b.skeleton_id)
 
-    with tqdm(total=len(a), desc='Calc. overlap', disable=pbar_hide, leave=pbar_leave) as pbar:
+    with tqdm(total=len(a), desc='Calc. overlap', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         # Keep track of KDtrees
         trees = {}
         for nA in a:
@@ -429,16 +414,16 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     if kwargs.get('dist', None):
         distances = kwargs.get('dist')
     elif cn_between.shape[0] > 0:
-        module_logger.warning('No ')
+        logger.warning('No ')
         cn_locs = np.vstack(cn_between.connector_loc.values)
         tn_locs = np.vstack(cn_between.treenode2_loc.values)
 
         distances = np.sqrt(np.sum((cn_locs - tn_locs) ** 2, axis=1))
 
-        module_logger.info(
+        logger.info(
             'Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(), distances.std()))
     else:
-        module_logger.warning('No existing connectors to calculate average \
+        logger.warning('No existing connectors to calculate average \
                                connector->treenode distance found. Falling \
                                back to default of 1um. Use <stdev> argument\
                                to set manually.')
@@ -448,8 +433,8 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     n_std = kwargs.get('n_std', 2)
     dist_threshold = np.mean(distances) + n_std * np.std(distances)
 
-    with tqdm(total=len(b), desc='Predicting', disable=pbar_hide,
-              leave=pbar_leave) as pbar:
+    with tqdm(total=len(b), desc='Predicting', disable=config.pbar_hide,
+              leave=config.pbar_leave) as pbar:
         for nB in b:
             # Create cKDTree for nB
             tree = scipy.spatial.cKDTree(
@@ -601,7 +586,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     neuronsA = sorted(set(neuronsA), key=neuronsA.index)
     neuronsB = sorted(set(neuronsB), key=neuronsB.index)
 
-    module_logger.info('Retrieving and filtering connectivity...')
+    logger.info('Retrieving and filtering connectivity...')
 
     if use_connectors and (isinstance(n_a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or isinstance(n_b, (core.CatmaidNeuron, core.CatmaidNeuronList))):
         edges = _edges_from_connectors(
@@ -641,7 +626,7 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
                               col_groups,
                               drop_ungrouped=False)
 
-    module_logger.info('Finished!')
+    logger.info('Finished!')
 
     return matrix
 
@@ -677,7 +662,7 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False, method
             method, ','.join(PERMISSIBLE_METHODS)))
 
     if not row_groups and not col_groups:
-        module_logger.warning('No column/row groups provided - skipping.')
+        logger.warning('No column/row groups provided - skipping.')
         return mat
 
     # Convert numpy array to DataFrame

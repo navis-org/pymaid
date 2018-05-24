@@ -84,7 +84,7 @@ import uuid
 import copy
 import six
 
-from pymaid import graph, morpho, fetch, graph_utils, resample, intersect, utils
+from pymaid import graph, morpho, fetch, graph_utils, resample, intersect, utils, config
 
 from tqdm import tqdm, trange
 if utils.is_jupyter():
@@ -95,22 +95,7 @@ if utils.is_jupyter():
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
 # Set up logging
-module_logger = logging.getLogger(__name__)
-module_logger.setLevel(logging.INFO)
-if len(module_logger.handlers) == 0:
-    # Generate stream handler
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    module_logger.addHandler(sh)
-
-# Default settings for progress bars
-pbar_hide = False
-pbar_leave = True
-
+logger = config.logger
 
 class CatmaidNeuron:
     """ Catmaid neuron object holding neuron data (nodes, connectors, name,
@@ -453,7 +438,7 @@ class CatmaidNeuron:
                 'Get_skeleton - Unable to connect to server without remote_instance. See help(core.CatmaidNeuron) to learn how to assign.')
         elif not remote_instance:
             remote_instance = self._remote_instance
-        module_logger.info('Retrieving skeleton data...')
+        logger.info('Retrieving skeleton data...')
         skeleton = fetch.get_neuron(
             self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).iloc[0]
 
@@ -519,10 +504,7 @@ class CatmaidNeuron:
         --------
         :func:`pymaid.neuron2igraph`
         """
-        level = graph.module_logger.level
-        graph.module_logger.setLevel('WARNING')
         self.igraph = graph.neuron2igraph(self)
-        graph.module_logger.setLevel(level)
         return self.igraph
 
     def get_dps(self):
@@ -539,7 +521,7 @@ class CatmaidNeuron:
 
     def _get_segments(self, how='length'):
         """Generate segments for neuron."""
-        module_logger.debug('Generating segments for neuron %s' %
+        logger.debug('Generating segments for neuron %s' %
                             str(self.skeleton_id))
         if how == 'length':
             self.segments = graph_utils._generate_segments(self)
@@ -582,7 +564,7 @@ class CatmaidNeuron:
         elif len(tn) == 0:
             return None
 
-        module_logger.warning(
+        logger.warning(
             '%s: Multiple possible somas found' % self.skeleton_id)
         return tn
 
@@ -594,7 +576,7 @@ class CatmaidNeuron:
     def get_partners(self, remote_instance=None):
         """ Get connectivity table for this neuron."""
         if not remote_instance and not self._remote_instance:
-            module_logger.error(
+            logger.error(
                 'Get_partners: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
@@ -608,7 +590,7 @@ class CatmaidNeuron:
     def get_review(self, remote_instance=None):
         """Get review status for neuron."""
         if not remote_instance and not self._remote_instance:
-            module_logger.error(
+            logger.error(
                 'Get_review: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
@@ -620,7 +602,7 @@ class CatmaidNeuron:
     def get_annotations(self, remote_instance=None):
         """Retrieve annotations for neuron."""
         if not remote_instance and not self._remote_instance:
-            module_logger.error(
+            logger.error(
                 'Get_annotations: Need CatmaidInstance to retrieve annotations. Use neuron.get_annotations( remote_instance = CatmaidInstance )')
             return None
         elif not remote_instance:
@@ -699,26 +681,27 @@ class CatmaidNeuron:
         """
 
         # First get the all by all distances
-        # need to change THIS to get_all_shortest_paths
-        dist_mat = self.nodes_geodesic_distance_matrix
+        ends = self.nodes[self.nodes.type=='end'].treenode_id.values
+        dist_mat = graph_utils.geodesic_matrix(self,
+                                               tn_ids=ends,
+                                               directed=False)
 
-        # Remove non end nodes
-        non_leaf_ix = [v.index for v in self.igraph.vs if v['node_id']
-                       not in self.nodes[self.nodes.type == 'end'].treenode_id.values]
+        # Prune matrix to ends
+        dist_mat = dist_mat.loc[ends,ends]
 
-        ends_mat = np.delete(dist_mat, non_leaf_ix, 0)
-        ends_mat = np.delete(ends_mat, non_leaf_ix, 1)
+        # Turn into observation vector
+        obs_vec = scipy.spatial.distance.squareform(dist_mat.values, checks=False)
 
         # Cluster
-        linkage = scipy.hierarchy.linkage(ends_mat, **linkage_kwargs)
+        linkage = scipy.cluster.hierarchy.linkage(obs_vec, **linkage_kwargs)
 
         # Plot
-        return scipy.hierarchy.dendrogram(linkage, **dend_kwargs)
+        return scipy.cluster.hierarchy.dendrogram(linkage, **dend_kwargs)
 
     def get_name(self, remote_instance=None):
         """Retrieve/update name of neuron."""
         if not remote_instance and not self._remote_instance:
-            module_logger.error(
+            logger.error(
                 'Get_name: Need CatmaidInstance to retrieve annotations. Use neuron.get_annotations( remote_instance = CatmaidInstance )')
             return None
         elif not remote_instance:
@@ -1009,7 +992,7 @@ class CatmaidNeuron:
         connectors and tags, not e.g. annotations."""
 
         if not remote_instance and not self._remote_instance:
-            module_logger.error(
+            logger.error(
                 'Get_update: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
         elif not remote_instance:
             remote_instance = self._remote_instance
@@ -1065,13 +1048,13 @@ class CatmaidNeuron:
         from pymaid import plotting
         import matplotlib.pyplot as plt
         # Store some previous states
-        prev_level = plotting.module_logger.getEffectiveLevel()
-        prev_pbar = plotting.pbar_hide
+        prev_level = logger.getEffectiveLevel()
+        prev_pbar = config.pbar_hide
         prev_int = plt.isinteractive()
 
         plt.ioff()  # turn off interactive mode
-        plotting.module_logger.setLevel('WARNING')
-        plotting.pbar_hide = True
+        logger.setLevel('WARNING')
+        config.pbar_hide = True
         fig = plt.figure(figsize=(2, 2))
         ax = fig.add_subplot(111)
         fig, ax = self.plot2d(connectors=False, ax=ax)
@@ -1080,8 +1063,8 @@ class CatmaidNeuron:
 
         if prev_int:
             plt.ion()  # turn on interactive mode
-        plotting.module_logger.setLevel(prev_level)
-        plotting.pbar_hide = prev_pbar
+        logger.setLevel(prev_level)
+        config.pbar_hide = prev_pbar
         _ = plt.clf()
         return output.getvalue()
 
@@ -1330,14 +1313,14 @@ class CatmaidNeuronList:
 
                     converted = [n for n in tqdm(futures, total=len(to_convert),
                                                  desc='Make nrn',
-                                                 disable=pbar_hide,
-                                                 leave=pbar_leave)]
+                                                 disable=config.pbar_hide,
+                                                 leave=config.pbar_leave)]
 
                     for i, c in enumerate(to_convert):
                         self.neurons[c[2]] = converted[i]
 
             else:
-                for n in tqdm(to_convert, desc='Make nrn', disable=pbar_hide, leave=pbar_leave):
+                for n in tqdm(to_convert, desc='Make nrn', disable=config.pbar_hide, leave=config.pbar_leave):
                     self.neurons[n[2]] = CatmaidNeuron(
                         n[0], remote_instance=remote_instance)
 
@@ -1437,7 +1420,7 @@ class CatmaidNeuronList:
             if len(set(all_instances)) > 1:
                 # Note that multiprocessing causes remote_instances to be pickled
                 # and thus not be the same anymore
-                module_logger.debug(
+                logger.debug(
                     'Neurons are using multiple remote_instances! Returning first entry.')
             elif len(set(all_instances)) == 0:
                 raise Exception(
@@ -1495,7 +1478,7 @@ class CatmaidNeuronList:
         return CatmaidNeuronList(subset, make_copy=self.copy_on_subset)
 
     def __missing__(self, key):
-        module_logger.error('No neuron matching the search critera.')
+        logger.error('No neuron matching the search critera.')
         raise AttributeError('No neuron matching the search critera.')
 
     def __add__(self, to_add):
@@ -1564,12 +1547,12 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, resample_to) for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._resample_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Downsampling', disable=pbar_hide, leave=pbar_leave))
+                combinations), desc='Downsampling', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Resampling', disable=pbar_hide, leave=pbar_leave):
+            for n in tqdm(x.neurons, desc='Resampling', disable=config.pbar_hide, leave=config.pbar_leave):
                 n.resample(resample_to=resample_to, inplace=True)
 
         if not inplace:
@@ -1611,12 +1594,12 @@ class CatmaidNeuronList:
             combinations = [(n, factor, kwargs)
                             for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._downsample_helper, combinations,
-                                            chunksize=10), desc='Downsampling', disable=pbar_hide, leave=pbar_leave))
+                                            chunksize=10), desc='Downsampling', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Downsampling', disable=pbar_hide, leave=pbar_leave):
+            for n in tqdm(x.neurons, desc='Downsampling', disable=config.pbar_hide, leave=config.pbar_leave):
                 n.downsample(factor=factor, inplace=True, **kwargs)
 
         if not inplace:
@@ -1662,30 +1645,24 @@ class CatmaidNeuronList:
             x = x.copy(deepcopy=False)
 
         # Silence loggers (except Errors)
-        morpholevel = morpho.module_logger.getEffectiveLevel()
-        utillevel = graph_utils.module_logger.getEffectiveLevel()
-        graphlevel = graph.module_logger.getEffectiveLevel()
+        level = logger.getEffectiveLevel()
 
-        graph.module_logger.setLevel('ERROR')
-        morpho.module_logger.setLevel('ERROR')
-        graph_utils.module_logger.setLevel('ERROR')
+        logger.setLevel('ERROR')
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, new_root[i]) for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._reroot_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Rerooting', disable=pbar_hide, leave=pbar_leave))
+                combinations), desc='Rerooting', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for i, n in enumerate(tqdm(x.neurons, desc='Rerooting', disable=pbar_hide, leave=pbar_leave)):
+            for i, n in enumerate(tqdm(x.neurons, desc='Rerooting', disable=config.pbar_hide, leave=config.pbar_leave)):
                 n.reroot(new_root[i], inplace=True)
 
         # Reset logger level to previous state
-        graph.module_logger.setLevel(graphlevel)
-        morpho.module_logger.setLevel(morpholevel)
-        graph_utils.module_logger.setLevel(morpholevel)
+        logger.setLevel(level)
 
         if not inplace:
             return x
@@ -1715,12 +1692,12 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, tag) for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._prune_distal_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave))
+                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
                 n.prune_distal_to(tag, inplace=True)
 
         if not inplace:
@@ -1751,12 +1728,12 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, tag) for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._prune_proximal_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave))
+                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
                 n.prune_proximal_to(tag, inplace=True)
 
         if not inplace:
@@ -1797,12 +1774,12 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, to_prune) for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._prune_strahler_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave))
+                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
                 n.prune_by_strahler(to_prune=to_prune, inplace=True)
 
         if not inplace:
@@ -1842,12 +1819,12 @@ class CatmaidNeuronList:
             combinations = [(neuron, n, reroot_to_soma)
                             for i, neuron in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(self._prune_neurite_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=pbar_hide, leave=pbar_leave))
+                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for neuron in tqdm(x.neurons, desc='Pruning', disable=pbar_hide, leave=pbar_leave):
+            for neuron in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
                 neuron.prune_by_longest_neurite(
                     n, reroot_to_soma=reroot_to_soma, inplace=True)
 
@@ -1892,13 +1869,13 @@ class CatmaidNeuronList:
             x.neurons = list(tqdm(pool.imap(x._prune_by_volume_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations), desc='Pruning',
-                                  disable=pbar_hide, leave=pbar_leave))
+                                  disable=config.pbar_hide, leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=pbar_hide,
-                          leave=pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+                          leave=config.pbar_leave):
                 n.prune_by_volume(v, mode=mode, inplace=True)
 
         if not inplace:
@@ -1912,7 +1889,7 @@ class CatmaidNeuronList:
     def get_partners(self, remote_instance=None):
         """ Get connectivity table for neurons."""
         if not remote_instance and not self._remote_instance:
-            module_logger.error(
+            logger.error(
                 'Get_partners: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
@@ -1991,7 +1968,7 @@ class CatmaidNeuronList:
             update = list(tqdm(pool.imap(self._generate_segments_helper,
                                          to_retrieve, chunksize=10),
                                total=len(to_retrieve), desc='Gen. segments',
-                               disable=pbar_hide, leave=pbar_leave))
+                               disable=config.pbar_hide, leave=config.pbar_leave))
             pool.close()
             pool.join()
 
@@ -1999,7 +1976,7 @@ class CatmaidNeuronList:
                 self.neurons[ix] = n
         else:
             for n in tqdm(self.neurons, desc='Gen. segments',
-                          disable=pbar_hide, leave=pbar_leave):
+                          disable=config.pbar_hide, leave=config.pbar_leave):
                 if 'segments' not in n.__dict__:
                     _ = n.segments
 
@@ -2029,7 +2006,7 @@ class CatmaidNeuronList:
             skdata = fetch.get_neuron(
                 [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
             for n in tqdm(to_update, desc='Processing neurons',
-                          disable=pbar_hide, leave=pbar_leave):
+                          disable=config.pbar_hide, leave=config.pbar_leave):
 
                 n.nodes = skdata.loc[str(n.skeleton_id), 'nodes']
                 n.connectors = skdata.loc[str(n.skeleton_id), 'connectors']
@@ -2225,7 +2202,7 @@ class CatmaidNeuronList:
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        module_logger.info('Selection saved as %s in %s' %
+        logger.info('Selection saved as %s in %s' %
                            (fname, os.getcwd()))
 
     def to_swc(self, filenames=None):
