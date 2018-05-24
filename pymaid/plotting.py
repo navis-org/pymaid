@@ -1055,7 +1055,7 @@ def plot3d(x, *args, **kwargs):
                     this_cn = neuron.connectors[
                         neuron.connectors.relation == j]
 
-                    if syn_lay['display'] == 'mpatches.Circles':
+                    if syn_lay['display'] == 'circles':
                         trace_data.append(go.Scatter3d(
                             x=this_cn.x.values * -1,
                             y=this_cn.z.values * -1,  # y and z are switched
@@ -1634,7 +1634,7 @@ def plot1d(x, ax=None, color=None, **kwargs):
                    })
 
     max_x = []
-    for ix, n in enumerate(tqdm(x, desc='Processing', disable=pbar_hide, leave=pbar_leave)):
+    for ix, n in enumerate(tqdm(x, desc='Processing', disable=config.pbar_hide, leave=config.pbar_leave)):
         if isinstance(color, dict):
             this_c = color[n.skeleton_id]
         else:
@@ -1779,7 +1779,7 @@ def _neuron2vispy(x, **kwargs):
                                 'name': 'Gap junctions',
                                 'color': (0, 255, 0)
                                 },
-                            'display': 'lines'  # 'mpatches.Circles'
+                            'display': 'lines'  # 'circles'
                         }
 
     Returns
@@ -1810,7 +1810,7 @@ def _neuron2vispy(x, **kwargs):
             'name': 'Gap junctions',
             'color': (0, 255, 0)
         },
-        'display': 'lines'  # 'mpatches.Circles'
+        'display': 'lines'  # 'circle'
     }
     syn_lay.update(kwargs.get('synapse_layout', {}))
 
@@ -1947,13 +1947,13 @@ def _neuron2vispy(x, **kwargs):
                 pos = this_cn[['x', 'y', 'z']].apply(
                     pd.to_numeric).values
 
-                if syn_lay['display'] == 'mpatches.Circles':
+                if syn_lay['display'] == 'circles':
                     con = scene.visuals.Markers()
 
                     con.set_data(pos=np.array(pos),
                                  face_color=color, edge_color=color, size=1)
 
-                    visuals.append(t)
+                    visuals.append(con)
 
                 elif syn_lay['display'] == 'lines':
                     tn_coords = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.tolist(
@@ -1979,7 +1979,7 @@ def _neuron2vispy(x, **kwargs):
                     t._object_id = object_id
                     t.freeze()
 
-                    visuals.append(t)
+                    visuals.append(t)                
 
     return visuals
 

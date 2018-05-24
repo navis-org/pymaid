@@ -366,14 +366,14 @@ class Viewer:
         Parameters
         ----------
         x :         {skeleton IDs, CatmaidNeuron/List, Dotprops, Volumes, Points, vispy Visuals}
-                    Object(s) to add to the canvas. 
+                    Object(s) to add to the canvas.
         center :    bool, optional
                     If True re-center camera to all objects on canvas.
         clear :     bool, optional
-                    If True clear canvas before adding new objects. 
+                    If True clear canvas before adding new objects.
         **kwargs
                     Keyword arguments passed when generating visuals. See
-                    :func:`~pymaid.plot3d` for options. 
+                    :func:`~pymaid.plot3d` for options.
 
         Returns
         -------
