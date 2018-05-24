@@ -22,6 +22,8 @@ import json
 import pandas as pd
 import importlib
 import vispy as vp
+import uuid
+import csv
 
 from pymaid import core, fetch
 
@@ -560,3 +562,208 @@ def _parse_objects(x, remote_instance=None):
     points = dataframes + arrays
 
     return skids, skdata, dotprops, volumes, points, visuals
+
+
+def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None, post_label=None):
+    """ Generate neuron object from SWC file. This import is following
+    format specified here: http://research.mssm.edu/cnic/swc.html
+
+    Important
+    ---------
+    This import assumes coordinates in SWC are in microns and will convert to
+    nanometers! Soma is inferred from radius (>0), not the label.
+
+    Parameters
+    ----------
+    filename :          str
+                        SWC filename.
+    neuronname :        str, optional
+                        Name to use for the neuron. If not provided, will use
+                        filename.
+    neuron_id :         int, optional
+                        Unique identifier (essentially skeleton ID). If not
+                        provided, will generate one from scratch.
+    pre/post_label :    {bool, int}, optional
+                        If not ``None``, will try to extract pre-/postsynapses
+                        from label column.
+
+    Returns
+    -------
+    CatmaidNeuron
+
+    """
+    if not neuron_id:
+        neuron_id = uuid.uuid4().int
+
+    if not neuron_name:
+        neuron_name = filename
+
+    data = []
+    with open(filename) as file:
+        reader = csv.reader(file, delimiter=' ')
+        for row in reader:
+            # skip empty rows
+            if not row:
+                continue
+            # skip comments
+            if not row[0].startswith('#'):
+                data.append(row)
+
+    # Remove empty entries and generate nodes DataFrame
+    nodes = pd.DataFrame([[float(e) for e in row if e != ''] for row in data],
+                         columns=['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id'], dtype=object)
+
+    # Root node will have parent=-1 -> set this to None
+    nodes.loc[nodes.parent_id<0, 'parent_id'] = None
+
+    # Bring radius from um into nm space
+    nodes[['x', 'y', 'z', 'radius']] *= 1000
+
+    connectors = pd.DataFrame([], columns=[
+                              'treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'], dtype=object)
+
+    if pre_label:
+        pre = nodes[nodes.label==pre_label][['treenode_id','x','y','z']]
+        pre['connector_id'] = None
+        pre['relation'] = 0
+        connectors = pd.concat([connectors, pre], axis=0)
+
+    if post_label:
+        post = nodes[nodes.label==post_label][['treenode_id','x','y','z']]
+        post['connector_id'] = None
+        post['relation'] = 1
+        connectors = pd.concat([connectors, post], axis=0)
+
+    df = pd.DataFrame([[
+        neuron_name,
+        str(neuron_id),
+        nodes,
+        connectors,
+        {},
+    ]],
+        columns=['neuron_name', 'skeleton_id',
+                 'nodes', 'connectors', 'tags'],
+        dtype=object
+    )
+
+    # Placeholder for graph representations of neurons
+    df['igraph'] = None
+    df['graph'] = None
+
+    # Convert data to respective dtypes
+    dtypes = {'treenode_id': int, 'parent_id': object,
+              'creator_id': int, 'relation': int,
+              'connector_id': object, 'x': int, 'y': int, 'z': int,
+              'radius': int, 'confidence': int}
+
+    for k, v in dtypes.items():
+        for t in ['nodes', 'connectors']:
+            for i in range(df.shape[0]):
+                if k in df.loc[i, t]:
+                    df.loc[i, t][k] = df.loc[i, t][k].astype(v)
+
+    return core.CatmaidNeuron(df)
+
+
+def to_swc(x, filename=None, export_synapses=False):
+    """ Generate SWC file from neuron(s). Follows the format specified here:
+    http://research.mssm.edu/cnic/swc.html
+
+    Important
+    ---------
+    Converts CATMAID nanometer coordinates into microns!
+
+    Parameters
+    ----------
+    x :                 {CatmaidNeuron, CatmaidNeuronList}
+                        If multiple neurons, will generate a single SWC file
+                        for each neurons (see also ``filename``).
+    filename :          (None, str, list), optional
+                        If ``None``, will use "neuron_{skeletonID}.swc". Pass
+                        filenames as list when processing multiple neurons.
+    export_synapses :   bool, optional
+                        If True, will label nodes with pre- ("7") and
+                        postsynapse ("8"). Because only one label can be given
+                        this might drop synapses (i.e. in case of multiple
+                        pre- or postsynapses on a single treenode)!
+
+    Returns
+    -------
+    Nothing
+
+    """
+    if isinstance(x, core.CatmaidNeuronList):
+        if isinstance(filename, type(None)):
+            filename = [None] * len(x)
+        else:
+            filename = _make_iterable(filename)
+        for n,f in zip(x, filename):
+            to_swc(n, f)
+        return
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise ValueError('Can only process CatmaidNeurons, got "{}"'.format(type(x)))
+
+    # If not specified, generate generic filename
+    if isinstance(filename, type(None)):
+        filename = 'neuron_{}.swc'.format(x.skeleton_id)
+
+    # Check if filename is of correct type
+    if not isinstance(filename, str):
+        raise ValueError('Filename must be str or None, got "{}"'.format(type(filename)))
+
+    # Make sure file ending is correct
+    if not filename.endswith('.swc'):
+        filename += '.swc'
+
+    # Make copy of nodes
+    this_tn = x.nodes.copy()
+
+    # Add an index column
+    this_tn.loc[:, 'index'] = list(range(this_tn.shape[0]))
+
+    # Make a dictionary
+    this_tn = this_tn.set_index('treenode_id')
+    parent_index = {r.parent_id: this_tn.loc[r.parent_id, 'index']
+                    for r in x.nodes[~x.nodes.parent_id.isnull()].itertuples()}
+    parent_index[None] = -1
+
+    # Generate table consisting of PointNo Label X Y Z Radius Parent
+    # .copy() is to prevent pandas' chaining warnings
+    swc = this_tn[['index', 'x', 'y', 'z', 'radius']].copy()
+    # Set Label column to 0 (undefined)
+    swc['Label'] = 0
+    # Add soma label
+    if x.soma:
+        swc.loc[x.soma, 'Label'] = 1
+    if export_synapses:
+        # Add synapse label
+        swc.loc[x.presynapses.treenode_id.values, 'Label'] = 7
+        swc.loc[x.postsynapses.treenode_id.values, 'Label'] = 8
+    # Add parents
+    swc['Parent'] = [parent_index[tn] for tn in this_tn.parent_id.values]
+    # Adjust column titles
+    swc.columns = ['PointNo', 'X', 'Y', 'Z', 'Radius', 'Label', 'Parent']
+    # Reorder columns
+    swc = swc[['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']]
+    # Coordinates and radius to microns
+    swc.loc[:,['X','Y','Z','Radius']] /= 1000
+
+    with open(filename, 'w') as file:
+        # Write header
+        file.write('# SWC format file\n')
+        file.write(
+            '# based on specifications at http://research.mssm.edu/cnic/swc.html\n')
+        file.write(
+            '# Created by pymaid (https://github.com/schlegelp/PyMaid)\n')
+        file.write('# PointNo Label X Y Z Radius Parent\n')
+        file.write('# Labels:\n')
+        for l in ['0 = undefined', '1 = soma']:
+            file.write('# {}\n'.format(l))
+        if export_synapses:
+            for l in ['7 = presynapse', '8 = postsynapse']:
+                file.write('# {}\n'.format(l))
+        file.write('\n')
+
+        writer = csv.writer(file, delimiter=' ')
+        writer.writerows(swc.astype(str).values)

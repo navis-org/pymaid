@@ -1100,54 +1100,27 @@ class CatmaidNeuron:
                                 'n_open_ends', 'cable_length', 'review_status', 'soma']
                          )
 
-    def to_swc(self, filename):
-        """ Generate SWC file from this neuron.
+    def to_swc(self, filename=None):
+        """ Generate SWC file from this neuron. This converts CATMAID
+        nanometer coordinates into microns.
 
         Parameters
         ----------
-        filename :      str
+        filename :      (str, None), optional
+                        If ``None``, will use "neuron_{skeletonID}.swc".
 
         Returns
         -------
         Nothing
 
+        See Also
+        --------
+        :func:`~pymaid.to_swc`
+                See this function for further details.
+
         """
 
-        # Make copy of nodes
-        this_tn = self.nodes.copy()
-
-        # Add an index column
-        this_tn.loc[:, 'index'] = list(range(this_tn.shape[0]))
-
-        # Make a dictionary
-        this_tn = this_tn.set_index('treenode_id')
-        parent_index = {r.parent_id: this_tn.loc[r.parent_id, 'index']
-                        for r in self.nodes[~self.nodes.parent_id.isnull()].itertuples()}
-        parent_index[None] = -1
-
-        # Generate table consisting of PointNo Label X Y Z Radius Parent
-        swc = this_tn[['index', 'x', 'y', 'z', 'radius']]
-        # Set Label column to 0
-        swc['Label'] = 0
-        # Add parents
-        swc['Parent'] = [parent_index[tn] for tn in this_tn.parent_id.values]
-        # Adjust column titles
-        swc.columns = ['PointNo', 'X', 'Y', 'Z', 'Radius', 'Label', 'Parent']
-        # Reorder columns
-        swc = swc[['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']]
-        # Radius to microns
-        swc['Radius'] /= 1000
-
-        with open(filename, 'w') as file:
-            # Write header
-            file.write('# SWC format file\n')
-            file.write(
-                '# based on specifications at http://research.mssm.edu/cnic/swc.html\n')
-            file.write(
-                '# Created by pymaid (https://github.com/schlegelp/PyMaid)\n')
-            file.write('# PointNo Label X Y Z Radius Parent\n')
-            writer = csv.writer(file, delimiter=' ')
-            writer.writerows(swc.values)
+        return utils.to_swc(self, filename)
 
     @classmethod
     def from_swc(self, filename, neuron_name=None, neuron_id=None):
@@ -1169,63 +1142,13 @@ class CatmaidNeuron:
         -------
         CatmaidNeuron
 
+        See Also
+        --------
+        :func:`~pymaid.from_swc`
+                See this function for further details.
+
         """
-        if not neuron_id:
-            neuron_id = uuid.uuid4().int
-
-        if not neuron_name:
-            neuron_name = filename
-
-        data = []
-        with open(filename) as file:
-            reader = csv.reader(file, delimiter=' ')
-            for row in reader:
-                # skip empty rows
-                if not row:
-                    continue
-                # skip comments
-                if not row[0].startswith('#'):
-                    data.append(row)
-
-        # Remove empty entries and generate nodes DataFrame
-        nodes = pd.DataFrame([[float(e) for e in row if e != ''] for row in data],
-                             columns=['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id'], dtype=object)
-
-        # Bring radius from um into nm space
-        nodes[['x', 'y', 'z', 'radius']] *= 1000
-
-        connectors = pd.DataFrame([], columns=[
-                                  'treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'], dtype=object)
-
-        df = pd.DataFrame([[
-            neuron_name,
-            str(neuron_id),
-            nodes,
-            connectors,
-            {},
-        ]],
-            columns=['neuron_name', 'skeleton_id',
-                     'nodes', 'connectors', 'tags'],
-            dtype=object
-        )
-
-        # Placeholder for graph representations of neurons
-        df['igraph'] = None
-        df['graph'] = None
-
-        # Convert data to respective dtypes
-        dtypes = {'treenode_id': int, 'parent_id': object,
-                  'creator_id': int, 'relation': int,
-                  'connector_id': int, 'x': int, 'y': int, 'z': int,
-                  'radius': int, 'confidence': int}
-
-        for k, v in dtypes.items():
-            for t in ['nodes', 'connectors']:
-                for i in range(df.shape[0]):
-                    if k in df.loc[i, t]:
-                        df.loc[i, t][k] = df.loc[i, t][k].astype(v)
-
-        return CatmaidNeuron(df)
+        return utils.from_swc(filename, neuron_name, neuron_id)
 
 
 class CatmaidNeuronList:
@@ -2291,6 +2214,29 @@ class CatmaidNeuronList:
 
         module_logger.info('Selection saved as %s in %s' %
                            (fname, os.getcwd()))
+
+    def to_swc(self, filenames=None):
+        """ Generate SWC file from this neuron. This converts CATMAID
+        nanometer coordinates into microns.
+
+        Parameters
+        ----------
+        filenames :  (None, str, list), optional
+                     If ``None``, will use "neuron_{skeletonID}.swc". Pass
+                     filenames as list when processing multiple neurons.
+
+        Returns
+        -------
+        Nothing
+
+        See Also
+        --------
+        :func:`~pymaid.to_swc`
+                See this function for further details.
+
+        """
+
+        return utils.to_swc(self, filenames)
 
     def itertuples(self):
         """Helper class to mimic ``pandas.DataFrame`` ``itertuples()``."""
