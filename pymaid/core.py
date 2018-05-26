@@ -97,6 +97,7 @@ __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 # Set up logging
 logger = config.logger
 
+
 class CatmaidNeuron:
     """ Catmaid neuron object holding neuron data (nodes, connectors, name,
     etc) and providing quick access to various PyMaid functions.
@@ -120,59 +121,66 @@ class CatmaidNeuron:
     Attributes
     ----------
     skeleton_id :       str
-                        This neurons skeleton ID
+                        This neuron's skeleton ID.
     neuron_name :       str
-                        This neurons name
+                        This neuron's name.
     nodes :             ``pandas.DataFrame``
-                        Contains complete treenode table
+                        Contains complete treenode table.
     connectors :        ``pandas.DataFrame``
-                        Contains complete connector table
+                        Contains complete connector table.
     presynapses :       ``pandas.DataFrame``
-                        All presynaptic connectors
+                        All presynaptic connectors.
     postsynapses :      ``pandas.DataFrame``
-                        All postsynaptic connectors
+                        All postsynaptic connectors.
     gap_junctions :     ``pandas.DataFrame``
-                        All gap junction connectors
+                        All gap junction connectors.
     date_retrieved :    ``datetime`` object
-                        Timestamp of data retrieval
+                        Timestamp of data retrieval.
     tags :              dict
-                        Treenode tags
+                        Treenode tags.
     annotations :       list
-                        This neuron's annotations
-    graph :             ``NetworkX`` graph
-                        Graph representation of this neuron
-    igraph :            ``igraph`` graph
-                        iGraph representation of this neuron. Will be None, if
-                        igraph is not installed.
+                        This neuron's annotations.
+    graph :             ``network.DiGraph``
+                        Graph representation of this neuron.
+    igraph :            ``igraph.Graph``
+                        iGraph representation of this neuron. Returns ``None``
+                        if igraph library not installed.
     dps :               ``pandas.DataFrame``
-                        Dotproduct representation of this neuron
+                        Dotproduct representation of this neuron.
     review_status :     int
-                        This neuron's review status
+                        This neuron's review status.
     n_connectors :      int
-                        Total number of synapses
+                        Total number of synapses.
     n_presynapses :     int
-                        Total number of presynaptic sites
+                        Total number of presynaptic sites.
     n_postsynapses :    int
-                        Total number of presynaptic sites
+                        Total number of presynaptic sites.
     n_branch_nodes :    int
-                        Number of branch nodes
+                        Number of branch nodes.
     n_end_nodes :       int
-                        Number of end nodes
+                        Number of end nodes.
     n_open_ends :       int
-                        Number of open end nodes. Leaf nodes that are not
-                        tagged with either: 'ends', 'not a branch',
-                        'uncertain end', 'soma' or 'uncertain continuation'
+                        Number of open end nodes = leaf nodes that are not
+                        tagged with either: ``ends``, ``not a branch``,
+                        ``uncertain end``, ``soma`` or
+                        ``uncertain continuation``.
     cable_length :      float
-                        Cable length in micrometers [um]
-    segments :          list of treenode IDs
-                        Linear segments of the neuron
+                        Cable length in micrometers [um].
+    segments :          list of lists
+                        Treenode IDs making up linear segments. Maximizes
+                        segment lengths (similar to CATMAID's review widget).
+    small_segments :    list of lists
+                        Treenode IDs making up linear segments between
+                        end/branch points.
     soma :              treenode_id of soma
-                        Returns None if no soma or 'NA' if data not available
-    root :              treenode_id(s) of root
+                        Returns ``None`` if no soma or 'NA' if data not
+                        available.
+    root :              numpy.array
+                        Treenode_id(s) of root.
     color :             tuple
-                        Color of neuron. Used for e.g. export to json
+                        Color of neuron. Used for e.g. export to json.
     partners :          pd.DataFrame
-                        Connectivity table of this neuron
+                        Connectivity table of this neuron.
 
     Examples
     --------
