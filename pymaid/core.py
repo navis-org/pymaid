@@ -1334,13 +1334,16 @@ class CatmaidNeuronList:
         """ Helper function to convert x to CatmaidNeuron."""
         return CatmaidNeuron(x[0], remote_instance=x[1])
 
-    def summary(self, n=None):
+    def summary(self, n=None, add_cols=[]):
         """ Get summary over all neurons in this NeuronList.
 
         Parameters
         ----------
-        n :     int, optional
-                Get only first N entries
+        n :         int, optional
+                    Get only first N entries
+        add_cols :  list, optional
+                    Additional columns for the summary. If attribute not
+                    available will return 'NA'.
 
         Returns
         -------
@@ -1357,12 +1360,19 @@ class CatmaidNeuronList:
             else:
                 soma_temp = 'NA'
 
-            d.append([neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors, n.n_branch_nodes, n.n_end_nodes, n.n_open_ends,
-                      n.cable_length, review_status, soma_temp])
+            this_n = [neuron_name, n.skeleton_id, n.n_nodes, n.n_connectors,
+                      n.n_branch_nodes, n.n_end_nodes, n.n_open_ends,
+                      n.cable_length, review_status, soma_temp]
+            this_n += [getattr(n, a, 'NA') for a in add_cols]
+
+            d.append(this_n)
 
         return pd.DataFrame(data=d,
-                            columns=['neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes', 'open_ends',
-                                     'cable_length', 'review_status', 'soma']
+                            columns=['neuron_name', 'skeleton_id', 'n_nodes',
+                                     'n_connectors', 'n_branch_nodes',
+                                     'n_end_nodes', 'open_ends',
+                                     'cable_length', 'review_status',
+                                     'soma'] + add_cols
                             )
 
     def __str__(self):
