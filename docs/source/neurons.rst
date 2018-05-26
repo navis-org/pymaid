@@ -32,7 +32,7 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.Catm
 - ``soma``: treenode ID of soma (if applicable)
 - ``segments``: list of linear segments
 - ``graph``: NetworkX graph representation of the neuron
-- ``igraph``: iGraph representation of the neuron (if available)
+- ``igraph``: iGraph representation of the neuron (if library available)
 - ``dps``: Dotproduct representation of the neuron
 
 
@@ -60,6 +60,7 @@ CatmaidNeuron/List methods
 	pymaid.CatmaidNeuron.resample
 	pymaid.CatmaidNeuron.downsample
 	pymaid.CatmaidNeuron.copy
+	pymaid.CatmaidNeuron.to_swc
 
 CatmaidNeuron-specific
 ++++++++++++++++++++++
@@ -67,7 +68,6 @@ CatmaidNeuron-specific
 	:toctree: generated/
 
 	pymaid.CatmaidNeuron.from_swc
-	pymaid.CatmaidNeuron.to_swc
 
 CatmaidNeuronList-specific
 +++++++++++++++++++++++++++
