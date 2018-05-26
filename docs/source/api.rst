@@ -33,14 +33,6 @@ CatmaidNeuron/List methods
     pymaid.CatmaidNeuron.downsample
     pymaid.CatmaidNeuron.copy
 
-CatmaidNeuron-specific
-----------------------
-.. autosummary::
-    :toctree: generated/
-
-    pymaid.CatmaidNeuron.from_swc
-    pymaid.CatmaidNeuron.to_swc
-
 CatmaidNeuronList-specific
 --------------------------
 .. autosummary::
@@ -179,6 +171,7 @@ Plotting
     ~pymaid.get_canvas
     ~pymaid.screenshot
     ~pymaid.Volume
+    ~pymaid.Viewer
 
 
 Fetching data
@@ -273,6 +266,17 @@ Misc
     ~pymaid.url_to_coordinates
     ~pymaid.get_review
     ~pymaid.get_review_details
+
+
+Import/Export
++++++++++++++
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.from_swc
+    pymaid.to_swc
+    pymaid.neuron2json
+    pymaid.json2neuron
 
 
 Blender API
