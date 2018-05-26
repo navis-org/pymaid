@@ -27,6 +27,7 @@ install from `Github <https://github.com/schlegelp/PyMaid>`_. To get the
 most recent version please use:
 
 ::
+
    pip install git+git://github.com/schlegelp/pymaid@master
 
 See `here <https://pip.pypa.io/en/stable/installing/>`_ how to get PIP.
@@ -35,6 +36,7 @@ Depending on your default Python version you may have to specify that you want
 PyMaid to be installed for Python 3:
 
 ::
+
    pip3 install git+git://github.com/schlegelp/pymaid@master
 
 .. important::
@@ -94,11 +96,11 @@ which should come with "batteries included".
   Provides sparse matrix representation of graphs and many scientific
   computing tools.
 
-`Matplotlib < http://matplotlib.sourceforge.net/>`_
+`Matplotlib <http://matplotlib.sourceforge.net/>`_
   Essential for all 2D plotting.
 
 `Seaborn <https://seaborn.pydata.org>`_
-  Provides additional plotting.
+  Used e.g. for its color palettes.
 
 `tqdm <https://pypi.python.org/pypi/tqdm>`_
   Neat progress bars.
@@ -108,7 +110,7 @@ which should come with "batteries included".
   from PIP: ``pip install pypng``.
 
 `PyOctree <https://pypi.python.org/pypi/pyoctree/>`_ (optional)
-  Generates octrees from meshes to compute ray casting. Used to check if
+  Provides octrees from meshes to perform ray casting. Used to check if
   objects are within volume.
 
 `Rpy2 <https://rpy2.readthedocs.io/en/version_2.8.x/overview.html#installation>`_ (optional)
