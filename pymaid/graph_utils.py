@@ -194,7 +194,7 @@ def _edge_count_to_root(x):
     """
     if x.igraph and config.use_igraph:
         g = x.igraph
-        current_level = [g.vs.find(_outdegree=0).index]
+        current_level = g.vs(_outdegree=0).indices
     else:
         g = x.graph
         current_level = list(x.root)
