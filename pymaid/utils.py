@@ -482,6 +482,7 @@ def _parse_objects(x, remote_instance=None):
     dotprops :  pd.DataFrame
     volumes :   list
     points :    list of arrays
+    visuals :   list of vispy visuals
     """
 
     if not isinstance(x, list):
@@ -503,7 +504,7 @@ def _parse_objects(x, remote_instance=None):
     skdata = core.CatmaidNeuronList(neuron_obj, make_copy=False)
 
     # Collect visuals
-    visuals = [ob for ob in x if isinstance(ob, vp.scene.visuals.VisualNode)]
+    visuals = [ob for ob in x if 'vispy' in str(type(ob))]
 
     # Collect dotprops
     dotprops = [ob for ob in x if isinstance(ob, core.Dotprops)]
