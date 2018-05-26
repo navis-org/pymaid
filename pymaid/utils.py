@@ -141,7 +141,6 @@ def neuron2json(x, **kwargs):
     this would expose your credentials. Parameters attached to a neuronlist
     are currently not preserved.
 
-
     Parameters
     ----------
     x :         {CatmaidNeuron, CatmaidNeuronList}
@@ -206,7 +205,7 @@ def json2neuron(s, **kwargs):
 
     See Also
     --------
-    :func:`~pymaid.to_json`
+    :func:`~pymaid.neuron2json`
                 Turn neuron into json.
 
     """
