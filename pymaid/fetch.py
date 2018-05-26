@@ -500,7 +500,8 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
         pbar = external_pbar
     else:
         pbar = tqdm(total=len(threads), desc=desc,
-                    disable=config.pbar_hide or disable_pbar, leave=config.pbar_leave)
+                    disable=config.pbar_hide or disable_pbar or len(threads) == 1,
+                    leave=config.pbar_leave)
 
     # Save start value of pbar (in case we have an external pbar)
     pbar_start = getattr(pbar, 'n', None)
@@ -692,7 +693,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         get_merge_history = get_merge_history == 1
 
     # Start a progress bar
-    with tqdm(total=len(x), desc='Get neurons', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
+    with tqdm(total=len(x), desc='Get neurons',
+              disable=config.pbar_hide or len(x)==1,
+              leave=config.pbar_leave) as pbar:
         collection = []
         # Go over requested neurons in batches of 100s
         for ix in range(0, len(x), 100):
