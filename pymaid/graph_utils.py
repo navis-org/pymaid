@@ -981,6 +981,8 @@ def _cut_igraph(x, cut_node, ret):
     # Get subgraph
     a, b = g.decompose(mode='WEAK')
 
+    # Important: a,b are now UNDIRECTED graphs -> we must not keep using them.
+
     if x.root[0] in a.vs['node_id']:
         dist_graph, prox_graph = b, a
     else:
@@ -993,9 +995,6 @@ def _cut_igraph(x, cut_node, ret):
         # dist.nodes.loc[dist.nodes.treenode_id == cut_node, 'parent_id'] = None
         dist.nodes.loc[dist.nodes.treenode_id == cut_node, 'type'] = 'root'
 
-        # Reassign graphs
-        dist.igraph = dist_graph
-
         # Clear other temporary attributes
         dist._clear_temp_attr(exclude=['igraph', 'type', 'classify_nodes'])
 
@@ -1004,9 +1003,6 @@ def _cut_igraph(x, cut_node, ret):
 
         # Change new root for dist
         prox.nodes.loc[prox.nodes.treenode_id == cut_node, 'type'] = 'end'
-
-        # Reassign graphs
-        prox.igraph = prox_graph
 
         # Clear other temporary attributes
         prox._clear_temp_attr(exclude=['igraph', 'type', 'classify_nodes'])
@@ -1108,8 +1104,8 @@ def subset_neuron(x, subset, clear_temp=True, keep_connectors=False, inplace=Fal
     elif isinstance(subset, (nx.DiGraph, nx.Graph)):
         subset = subset.nodes
     else:
-        raise TypeError('Can only process data of type "numpy.ndarray" or\
-                         "networkx.Graph", not "{0}"'.format(type(subset)))
+        raise TypeError('Can only subset to list, set, numpy.ndarray or \
+                         networkx.Graph, not "{0}"'.format(type(subset)))
 
     # Make a copy of the neuron
     if not inplace:
