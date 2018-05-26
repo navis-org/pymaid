@@ -391,6 +391,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     list_of_parents = {
         n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
+    list_of_parents[None] = None
 
     if 'type' not in df.nodes:
         graph_utils.classify_nodes(df)
@@ -423,15 +424,14 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
         while True:
             stop = False
             new_p = list_of_parents[this_node]
-            if new_p is not None:
+            if new_p:
                 i = 0
                 while i < resampling_factor:
-                    if new_p in fix_points:
+                    if new_p in fix_points or not new_p:
                         new_parents[this_node] = new_p
                         stop = True
                         break
-                    else:
-                        new_p = list_of_parents[new_p]
+                    new_p = list_of_parents[new_p]
                     i += 1
 
                 if stop is True:
