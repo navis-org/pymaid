@@ -46,23 +46,42 @@ import seaborn as sns
 
 import matplotlib.colors as mcl
 
-from pymaid import utils, core, plotting, fetch, config
+from pymaid import utils, plotting, fetch, config
 
 __all__ = ['Viewer']
 
 logger = config.logger
 
+
 class Viewer:
-    """ 3D viewer for CatmaidNeurons.
+    """
+    Experimental 3D viewer for CatmaidNeurons.
 
     Parameters
     ----------
+    picking :   bool, default = False
+                If ``True``, allow selecting neurons by shift-clicking on
+                neurons and placing a 3D cursor via control-click (for OSX:
+                command-click).
     **kwargs
-              Keyword arguments passed to vispy.scene.SceneCanvas
+              Keyword arguments passed to ``vispy.scene.SceneCanvas``.
+
+    Attributes
+    ----------
+    picking :       bool,
+                    Set to ``True`` to allow picking via shift-clicking.
+    selected :      np.array
+                    List of currently selected neurons. Can also be used to
+                    set the selection.
+    show_legend :   bool
+                    Set to ``True`` or press ``L`` to show legend. This may
+                    impact performance.
+    legend_font_size : int
+                    Font size for legend.
+
 
     """
-
-    def __init__(self, **kwargs):
+    def __init__(self, picking=False, **kwargs):
         # Update some defaults as necessary
         defaults = dict(keys=None,
                         show=True,
@@ -87,7 +106,10 @@ class Viewer:
         self.canvas.freeze()
 
         # Add picking functionality
-        self.canvas.connect(on_mouse_press)
+        if picking:
+            self.picking = True
+        else:
+            self.picking = False
 
         # Add keyboard shortcuts
         self.canvas.connect(on_key_press)
@@ -143,10 +165,10 @@ class Viewer:
         shorts_text = 'SHORTCUTS | ' + \
             ' '.join(['<{0}> {1} |'.format(k, v)
                       for k, v in self._available_shortcuts.items()])
-        #shorts_text = 'SHORTCUTS | <L> toggle overlay | (shift) click to select | <D> deselect all |'
         self._shortcuts = vp.scene.visuals.Text(shorts_text,
                                                 pos=(10, overlay.size[1]),
-                                                anchor_x='left', anchor_y='bottom',
+                                                anchor_x='left',
+                                                anchor_y='bottom',
                                                 name='permanent',
                                                 parent=overlay,
                                                 color=(0, 0, 0), font_size=6)
@@ -165,6 +187,7 @@ class Viewer:
 
     @property
     def show_legend(self):
+        """Set to ``True`` to hide neuron legend."""
         return self.__show_legend
 
     @show_legend.setter
@@ -179,6 +202,7 @@ class Viewer:
 
     @property
     def legend_font_size(self):
+        """Change legend's font size."""
         return self.__legend_font_size
 
     @legend_font_size.setter
@@ -187,13 +211,30 @@ class Viewer:
         self.update_legend()
 
     @property
+    def picking(self):
+        """ Allow picking."""
+        return self.__picking
+
+    @picking.setter
+    def picking(self, v):
+        if not isinstance(v, bool):
+            raise TypeError('Need bool, got {}'.format(type(v)))
+
+        self.__picking = v
+
+        if self.picking:
+            self.canvas.connect(on_mouse_press)
+        else:
+            self.canvas.events.mouse_press.disconnect(on_mouse_press)
+
+    @property
     def visible(self):
         """ Returns skeleton IDs of currently selected visible. """
         return [s for s in self.neurons if self.neurons[s][0].visible]
 
     @property
     def selected(self):
-        """ Returns skeleton IDs of currently selected neurons. """
+        """ Skeleton IDs of currently selected neurons. """
         return self.__selected
 
     @selected.setter
@@ -314,7 +355,7 @@ class Viewer:
                                       anchor_x='left',
                                       anchor_y='top',
                                       parent=self.overlay,
-                                      font_size=7)
+                                      font_size=self.legend_font_size)
             l.interactive = True
             l.unfreeze()
             l._object_id = s
@@ -330,8 +371,11 @@ class Viewer:
             else:
                 color = (.3, .3, .3)
 
-            labels[s].pos = (10, 10 * (i + 1))
+            offset = 10 * (self.legend_font_size / 7)
+
+            labels[s].pos = (10, offset * (i + 1))
             labels[s].color = color
+            labels[s].font_size = self.legend_font_size
 
     def toggle_overlay(self):
         """ Toggle legend on and off. """
