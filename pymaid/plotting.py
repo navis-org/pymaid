@@ -74,6 +74,10 @@ def screenshot(file='screenshot.png', alpha=True):
     alpha :     bool, optional
                 If True, alpha channel will be saved
 
+    See Also
+    --------
+    :func:`pymaid.Viewer.screenshot`
+                Take screenshot of specific canvas.
     """
     if alpha:
         mode = 'RGBA'
