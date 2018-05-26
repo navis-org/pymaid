@@ -846,8 +846,8 @@ def plot3d(x, *args, **kwargs):
                       Will try using globally defined CatmaidInstance if not
                       provided.
     backend :         {'vispy','plotly'}, default = 'vispy'
-       | ``vispy`` uses OpenGL to generate high-performance 3D plots but is less pretty.
-       | ``plotly`` generates 3D plots in .html which are shareable but take longer to generate.
+       | ``vispy`` uses OpenGL to generate high-performance 3D plots.
+       | ``plotly`` generates 3D plots in html format.
 
     connectors :      bool, default=False
                       Plot synapses and gap junctions.
@@ -885,16 +885,13 @@ def plot3d(x, *args, **kwargs):
     --------
     If ``backend='vispy'``
 
-       Opens a 3D window and returns:
-
-            - ``canvas`` - Vispy canvas object
-            - ``view`` - Vispy view object -> use to manipulate camera, add object, etc.
+       Opens a 3D window and returns :class:`pymaid.Viewer`.
 
     If ``backend='plotly'``
 
        ``fig`` - dictionary to generate plotly 3D figure:
 
-            Use for example: ``plotly.offline.plot(fig, filename='3d_plot.html')``
+            Use ``plotly.offline.plot(fig, filename='3d_plot.html')``
             to generate html file and open it webbrowser
 
     Examples
