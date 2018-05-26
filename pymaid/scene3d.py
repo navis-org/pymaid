@@ -43,6 +43,7 @@ import vispy as vp
 import numpy as np
 import scipy
 import seaborn as sns
+import png
 
 import matplotlib.colors as mcl
 
@@ -642,6 +643,42 @@ class Viewer:
         self._cursor.set_data(pos=np.array([start, snap_pos]),
                               arrows=arrows)
 
+    def screenshot(self, filename='screenshot.png', pixel_scale=2,
+                   alpha=True, hide_overlay=True):
+        """ Save a screenshot of this viewer.
+
+        Parameters
+        ----------
+        filename :      str, optional
+                        Filename to save to.
+        pixel_scale :   int, optional
+                        Factor by which to scale canvas. Determines image
+                        dimensions.
+        alpha :         bool, optional
+                        If True, will export transparent background.
+        hide_overlay :  bool, optional
+                        If True, will hide overlay for screenshot.
+        """
+
+        if alpha:
+            bgcolor = list(self.canvas.bgcolor.rgb) + [0]
+        else:
+            bgcolor = list(self.canvas.bgcolor.rgb)
+
+        region = (0, 0, self.canvas.size[0], self.canvas.size[1])
+        size = tuple(np.array(self.canvas.size) * pixel_scale)
+
+        if hide_overlay:
+            prev_state = self.overlay.visible
+            self.overlay.visible = False
+
+        m = self.canvas.render(region=region, size=size, bgcolor=bgcolor)
+
+        if hide_overlay:
+            self.overlay.visible = prev_state
+
+        im = png.from_array(m, mode='RGBA')
+        im.save(filename)
 
 def on_mouse_press(event):
     """ Manage picking on canvas. """
