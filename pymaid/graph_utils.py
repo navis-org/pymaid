@@ -14,10 +14,10 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" Collection of tools to maniuplate CATMAID neurons using Graph representations.
+""" Collection of tools to maniuplate CATMAID neurons using Graph
+representations.
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -71,12 +71,13 @@ def _generate_segments(x, weight=None):
 
     if weight == 'weight':
         # Get distances from end nodes to root
-        m = geodesic_matrix(x, directed=True,
+        m = geodesic_matrix(x,
+                            directed=True,
                             weight=weight,
-                            tn_ids=x.nodes[x.nodes.type.isin(['end', 'root', 'branch'])].treenode_id.values)
+                            tn_ids=x.nodes[x.nodes.type == 'end'].treenode_id.values)
 
         # Sort by distance to root
-        endNodeIDs = set(m.sort_values(x.root[0], ascending=False).index)
+        endNodeIDs = m.sort_values(x.root[0], ascending=False).index.values
     elif not weight:
         d = _edge_count_to_root(x)
         endNodeIDs = x.nodes[x.nodes.type == 'end'].treenode_id.values
@@ -265,7 +266,7 @@ def classify_nodes(x, inplace=True):
                 # [ n for n in g.nodes if g.degree(n) > 2 ]
                 branches = deg[deg.iloc[:, 0] > 2].index.values
 
-            x.nodes['type'] = 'slab'
+            x.nodes.loc[:, 'type'] = 'slab'
             x.nodes.loc[x.nodes.treenode_id.isin(ends), 'type'] = 'end'
             x.nodes.loc[x.nodes.treenode_id.isin(branches), 'type'] = 'branch'
             x.nodes.loc[x.nodes.parent_id.isnull(), 'type'] = 'root'
@@ -339,20 +340,20 @@ def distal_to(x, a=None, b=None):
 
     if x.igraph and config.use_igraph:
         # Map treenodeID to index
-        id2ix = { n:v for v,n in zip(x.igraph.vs.indices,
-                                     x.igraph.vs['node_id'])}
+        id2ix = {n: v for v, n in zip(x.igraph.vs.indices,
+                                      x.igraph.vs['node_id'])}
         if isinstance(a, type(None)):
             a = x.igraph.vs.indices
         else:
-            a = [ id2ix[n] for n in a ]
+            a = [id2ix[n] for n in a]
         if isinstance(b, type(None)):
             b = x.igraph.vs
         else:
-            b = [ id2ix[n] for n in b ]
+            b = [id2ix[n] for n in b]
 
-        df = pd.DataFrame( x.igraph.shortest_paths(a,b,mode='OUT'),
-                           index=x.igraph.vs[a]['node_id'],
-                           columns=x.igraph.vs[b]['node_id'])
+        df = pd.DataFrame(x.igraph.shortest_paths(a, b, mode='OUT'),
+                          index=x.igraph.vs[a]['node_id'],
+                          columns=x.igraph.vs[b]['node_id'])
 
         df = df != float('inf')
     else:
@@ -509,10 +510,10 @@ def dist_between(x, a, b):
                                                       weight='weight'))
     else:
         # If not, we're assuming g is an iGraph object
-        return g.shortest_paths( g.vs.find(node_id=a),
-                                 g.vs.find(node_id=b),
-                                 weights='weight',
-                                 mode='ALL' )[0][0]
+        return g.shortest_paths(g.vs.find(node_id=a),
+                                g.vs.find(node_id=b),
+                                weights='weight',
+                                mode='ALL')[0][0]
 
 
 
@@ -701,9 +702,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
         if x.shape[0] == 1:
             x = x[0]
         else:
-            logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
-            raise Exception
+            raise ValueError('Please provide only a single neuron.')
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
@@ -775,11 +774,11 @@ def reroot_neuron(x, new_root, inplace=False):
     if isinstance(new_root, str):
         if new_root not in x.tags:
             logger.error(
-                '#%s: Found no treenodes with tag %s - please double check!' % (str(x.skeleton_id), str(new_root)))
+                '#{}: Found no treenodes with tag {} - please double check!'.format(x.skeleton_id, new_root))
             return
         elif len(x.tags[new_root]) > 1:
             logger.error(
-                '#%s: Found multiple treenodes with tag %s - please double check!' % (str(x.skeleton_id), str(new_root)))
+                '#{}: Found multiple treenodes with tag {} - please double check!'.format(x.skeleton_id, new_root))
             return
         else:
             new_root = x.tags[new_root][0]
@@ -793,9 +792,6 @@ def reroot_neuron(x, new_root, inplace=False):
             return x
         else:
             return
-
-    # Keep track of old root
-    old_root = x.root[0]
 
     if x.igraph and config.use_igraph:
         path = x.igraph.get_shortest_paths(x.igraph.vs.find(node_id=new_root),
@@ -824,11 +820,9 @@ def reroot_neuron(x, new_root, inplace=False):
         old_root_deg = len(x.igraph.es.select(_target=path[-1]))
 
         # Translate path indices to treenode IDs
-        ix2id = { ix: n for ix, n in zip(x.igraph.vs.indices,
-                                         x.igraph.vs.get_attribute_values('node_id'))}
-        path = [ix2id[i] for i in path ]
-
-
+        ix2id = {ix: n for ix, n in zip(x.igraph.vs.indices,
+                                        x.igraph.vs.get_attribute_values('node_id'))}
+        path = [ix2id[i] for i in path]
     else:
         # If this NetworkX graph is just an (immutable) view, turn it into a
         # full, independent graph
@@ -851,7 +845,8 @@ def reroot_neuron(x, new_root, inplace=False):
 
         # Invert path and add weights
         new_edges = [
-            (path[i + 1], path[i], {'weight': weights[i]}) for i in range(len(path) - 1)]
+                     (path[i + 1], path[i],
+                      {'weight': weights[i]}) for i in range(len(path) - 1)]
 
         # Add inverted path between old and new root
         g.add_edges_from(new_edges)
@@ -875,9 +870,9 @@ def reroot_neuron(x, new_root, inplace=False):
     x.nodes.loc[x.nodes.treenode_id == new_root, 'parent_id'] = None
 
     if x.igraph and config.use_igraph:
-        x._clear_temp_attr(exclude=['igraph','classify_nodes'])
+        x._clear_temp_attr(exclude=['igraph', 'classify_nodes'])
     else:
-        x._clear_temp_attr(exclude=['graph','classify_nodes'])
+        x._clear_temp_attr(exclude=['graph', 'classify_nodes'])
 
     if not inplace:
         return x
@@ -909,7 +904,7 @@ def cut_neuron(x, cut_node, ret='both'):
     --------
     >>> # Example for multiple cuts
     >>> import pymaid
-    >>> remote_instance = pymaid.CatmaidInstance( url, http_user, http_pw, token )
+    >>> rm = pymaid.CatmaidInstance(url, http_user, http_pw, token)
     >>> n = pymaid.get_neuron(skeleton_id)
     >>> # First cut
     >>> nA, nB = cut_neuron2( n, cut_node1 )
@@ -958,6 +953,7 @@ def cut_neuron(x, cut_node, ret='both'):
         return _cut_igraph(x, cut_node, ret)
     else:
         return _cut_networkx(x, cut_node, ret)
+
 
 def _cut_igraph(x, cut_node, ret):
     """Uses iGraph to cut a neuron."""
@@ -1014,6 +1010,7 @@ def _cut_igraph(x, cut_node, ret):
     elif ret == 'proximal':
         return prox
 
+
 def _cut_networkx(x, cut_node, ret):
     """Uses networkX graph to cut a neuron."""
 
@@ -1021,10 +1018,12 @@ def _cut_networkx(x, cut_node, ret):
     dist_graph = nx.bfs_tree(x.graph, cut_node, reverse=True)
 
     if ret == 'distal' or ret == 'both':
-        # bfs_tree does not preserve 'weight' -> need to subset original graph by those nodes
+        # bfs_tree does not preserve 'weight'
+        # -> need to subset original graph by those nodes
         dist_graph = x.graph.subgraph(dist_graph.nodes)
 
-        # Generate new neurons (this is the actual bottleneck of the function: ~70% of time)
+        # Generate new neurons
+        # This is the actual bottleneck of the function: ~70% of time
         dist = subset_neuron(x, dist_graph, clear_temp=False)
 
         # Change new root for dist
@@ -1038,11 +1037,13 @@ def _cut_networkx(x, cut_node, ret):
         dist._clear_temp_attr(exclude=['graph', 'type', 'classify_nodes'])
 
     if ret == 'proximal' or ret == 'both':
-        # bfs_tree does not preserve 'weight' -> need to subset original graph by those nodes
+        # bfs_tree does not preserve 'weight'
+        # need to subset original graph by those nodes
         prox_graph = x.graph.subgraph(
             [n for n in x.graph.nodes if n not in dist_graph.nodes] + [cut_node])
 
-        # Generate new neurons (this is the actual bottleneck of the function: ~70% of time)
+        # Generate new neurons
+        # This is the actual bottleneck of the function: ~70% of time
         prox = subset_neuron(x, prox_graph, clear_temp=False)
 
         # Change cut node to end node for prox
@@ -1055,7 +1056,7 @@ def _cut_networkx(x, cut_node, ret):
         prox._clear_temp_attr(exclude=['graph', 'type', 'classify_nodes'])
 
     # ATTENTION: prox/dist_graph contain pointers to the original graph
-    # -> changes to structure don't but changes to attributes will propagate back
+    # -> changes to attributes will propagate back
 
     if ret == 'both':
         return dist, prox
@@ -1065,7 +1066,8 @@ def _cut_networkx(x, cut_node, ret):
         return prox
 
 
-def subset_neuron(x, subset, clear_temp=True, keep_connectors=False, inplace=False):
+def subset_neuron(x, subset, clear_temp=True, keep_connectors=False,
+                  inplace=False):
     """ Subsets a neuron to a set of treenodes.
 
     Parameters
@@ -1139,7 +1141,7 @@ def subset_neuron(x, subset, clear_temp=True, keep_connectors=False, inplace=Fal
         if x.igraph and config.use_igraph:
             id2ix = {n: ix for ix, n in zip(x.igraph.vs.indices,
                                             x.igraph.vs.get_attribute_values('node_id'))}
-            indices = [ id2ix[n] for n in x.nodes.treenode_id.values ]
+            indices = [id2ix[n] for n in x.nodes.treenode_id.values]
             vs = x.igraph.vs[indices]
             x.igraph = x.igraph.subgraph(vs)
 
