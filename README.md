@@ -1,4 +1,4 @@
-[![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Build Status](https://travis-ci.org/schlegelp/pyMaid.svg?branch=master)](https://travis-ci.org/schlegelp/pyMaid) [![Coverage Status](https://coveralls.io/repos/github/schlegelp/pyMaid/badge.svg?branch=master)](https://coveralls.io/github/schlegelp/pyMaid?branch=master) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=lab)
+[![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Build Status](https://travis-ci.org/schlegelp/pyMaid.svg?branch=master)](https://travis-ci.org/schlegelp/pyMaid) [![Coverage Status](https://coveralls.io/repos/github/schlegelp/pyMaid/badge.svg?branch=master)](https://coveralls.io/github/schlegelp/pyMaid?branch=master) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=tree)
 
 pymaid
 ======
@@ -25,7 +25,7 @@ See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for 
 
 `pip install git+git://github.com/schlegelp/pymaid@master`
 
-Alternatively click on the *Binder* badge above to try out pymaid hosted by [mybinder](https://mybinder.org)!
+Alternatively click on the *launch binder* badge above to try out pymaid hosted by [mybinder](https://mybinder.org)!
 
 ## License:
 This code is under GNU GPL V3
