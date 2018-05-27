@@ -48,7 +48,6 @@ CatmaidNeuron/List methods
 
 	pymaid.CatmaidNeuron.plot3d
 	pymaid.CatmaidNeuron.plot2d
-	pymaid.CatmaidNeuron.plot_dendrogram
 	pymaid.CatmaidNeuron.prune_by_strahler
 	pymaid.CatmaidNeuron.prune_by_volume
 	pymaid.CatmaidNeuron.prune_distal_to
@@ -60,7 +59,8 @@ CatmaidNeuron/List methods
 	pymaid.CatmaidNeuron.resample
 	pymaid.CatmaidNeuron.downsample
 	pymaid.CatmaidNeuron.copy
-	pymaid.CatmaidNeuron.to_swc
+	pymaid.CatmaidNeuron.to_swc	
+
 
 CatmaidNeuron-specific
 ++++++++++++++++++++++
@@ -68,6 +68,8 @@ CatmaidNeuron-specific
 	:toctree: generated/
 
 	pymaid.CatmaidNeuron.from_swc
+	pymaid.CatmaidNeuron.plot_dendrogram	
+
 
 CatmaidNeuronList-specific
 +++++++++++++++++++++++++++
@@ -77,3 +79,13 @@ CatmaidNeuronList-specific
 	pymaid.CatmaidNeuronList.to_selection
 	pymaid.CatmaidNeuronList.from_selection
 	pymaid.CatmaidNeuronList.has_annotation
+	pymaid.CatmaidNeuronList.summary
+	pymaid.CatmaidNeuronList.head
+	pymaid.CatmaidNeuronList.sort_values
+	pymaid.CatmaidNeuronList.sample
+	pymaid.CatmaidNeuronList.remove_duplicates
+	pymaid.CatmaidNeuronList.sum
+	pymaid.CatmaidNeuronList.mean
+	pymaid.CatmaidNeuronList.itertuples
+
+
