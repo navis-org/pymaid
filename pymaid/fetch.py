@@ -70,19 +70,26 @@ if utils.is_jupyter():
     tqdm = tqdm_notebook
     trange = tnrange
 
-__all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags', 'get_3D_skeleton',
-                  'get_3D_skeletons', 'get_annotation_details', 'get_annotation_id',
+__all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
+                  'get_3D_skeleton', 'get_3D_skeletons',
+                  'get_annotation_details', 'get_annotation_id',
                   'get_annotation_list', 'get_annotations', 'get_arbor',
-                  'get_connector_details', 'get_connectors', 'get_contributor_statistics',
-                  'get_edges', 'get_history', 'get_logs', 'get_names', 'get_neuron', 'get_neuron_list',
-                  'get_neurons', 'get_neurons_in_bbox', 'get_neurons_in_volume', 'get_node_tags',
-                  'get_node_details', 'get_nodes_in_volume', 'get_partners', 'get_partners_in_volume',
-                  'get_paths', 'get_review', 'get_review_details', 'get_skids_by_annotation',
-                  'get_skids_by_name', 'get_treenode_info', 'get_treenode_table', 'get_user_annotations',
-                  'get_user_list', 'get_volume', 'has_soma', 'neuron_exists', 'delete_tags',
-                  'get_segments', 'delete_neuron', 'get_connectors_between', 'url_to_coordinates',
-                  'rename_neurons', 'get_label_list', 'find_neurons', 'get_skid_from_treenode',
-                  'get_transactions', 'remove_annotations'])
+                  'get_connector_details', 'get_connectors',
+                  'get_contributor_statistics', 'get_edges', 'get_history',
+                  'get_logs', 'get_names', 'get_neuron', 'get_neuron_list',
+                  'get_neurons', 'get_neurons_in_bbox',
+                  'get_neurons_in_volume', 'get_node_tags', 'get_node_details',
+                  'get_nodes_in_volume', 'get_partners',
+                  'get_partners_in_volume', 'get_paths', 'get_review',
+                  'get_review_details', 'get_skids_by_annotation',
+                  'get_skids_by_name', 'get_treenode_info',
+                  'get_treenode_table', 'get_user_annotations',
+                  'get_user_list', 'get_volume', 'has_soma', 'neuron_exists',
+                  'delete_tags', 'get_segments', 'delete_neuron',
+                  'get_connectors_between', 'url_to_coordinates',
+                  'rename_neurons', 'get_label_list', 'find_neurons',
+                  'get_skid_from_treenode', 'get_transactions',
+                  'remove_annotations'])
 
 # Set up logging
 logger = config.logger
@@ -141,7 +148,9 @@ class CatmaidInstance:
 
     """
 
-    def __init__(self, server, authname, authpassword, authtoken, project_id=1, logger_level='INFO', time_out=None, set_global=True):
+    def __init__(self, server, authname, authpassword, authtoken,
+                 project_id=1, logger_level='INFO', time_out=None,
+                 set_global=True):
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
@@ -176,7 +185,9 @@ class CatmaidInstance:
                                "Token {}".format(self.authtoken))
 
     def fetch(self, url, post=None, method=None):
-        """ Requires the url to connect to and the variables for POST, if any, in a dictionary. """
+        """ Requires the url to connect to and the variables for POST, 
+        if any, in a dictionary. 
+        """
         if post:
             # Convert bools into lower case str
             for v in post:
@@ -444,7 +455,8 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/labels/stats")
 
 
-def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external_pbar=None, disable_pbar=False):
+def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
+                       external_pbar=None, disable_pbar=False):
     """ Retrieve a list of urls in parallel using threads.
 
     Parameters
@@ -493,8 +505,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get', external
 
     logger.debug('Joining threads...')
 
-    start = cur_time = time.time()
-    joined = 0
+    start = cur_time = time.time()    
 
     if isinstance(external_pbar, tqdm_class):
         pbar = external_pbar
@@ -623,8 +634,8 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         The creator_id is always the original creator though.
     get_abutting:       bool, optional
                         If True, will retrieve abutting connectors.
-                        For some reason they are not part of compact-json,
-                        so they have to be retrieved via a separate API endpoint
+                        For some reason they are not part of compact-json, so
+                        they have to be retrieved via a separate API endpoint
                         -> will show up as connector type 3!
     return_df :         bool, optional
                         If True, a ``pandas.DataFrame`` instead of
@@ -694,7 +705,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 
     # Start a progress bar
     with tqdm(total=len(x), desc='Get neurons',
-              disable=config.pbar_hide or len(x)==1,
+              disable=config.pbar_hide or len(x) == 1,
               leave=config.pbar_leave) as pbar:
         collection = []
         # Go over requested neurons in batches of 100s
@@ -740,7 +751,8 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
                                          for c in cn['links']]
                     else:
-                        skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4], c[8], None]
+                        skdata[i][1] += [[c[7], c[1], 3, c[2], 
+                                          c[3], c[4], c[8], None]
                                          for c in cn['links']]
 
             # Get neuron names
@@ -750,10 +762,13 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                 df = pd.DataFrame([[
                     names[str(to_retrieve[i])],
                     str(to_retrieve[i]),
-                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id',
-                                                'x', 'y', 'z', 'radius', 'confidence'], dtype=object),
+                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
+                                                'creator_id', 'x', 'y', 'z',
+                                                'radius', 'confidence'],
+                                 dtype=object),
                     pd.DataFrame(n[1], columns=['treenode_id', 'connector_id',
-                                                'relation', 'x', 'y', 'z'], dtype=object),
+                                                'relation', 'x', 'y', 'z'],
+                                 dtype=object),
                     n[2]]
                     for i, n in enumerate(skdata)
                 ],
@@ -765,10 +780,17 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                 df = pd.DataFrame([[
                     names[str(to_retrieve[i])],
                     str(to_retrieve[i]),
-                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y',
-                                                'z', 'radius', 'confidence', 'last_modified', 'creation_date'], dtype=object),
-                    pd.DataFrame(n[1], columns=['treenode_id', 'connector_id', 'relation',
-                                                'x', 'y', 'z', 'last_modified', 'creation_date'], dtype=object),
+                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
+                                                'creator_id', 'x', 'y', 'z',
+                                                'radius', 'confidence',
+                                                'last_modified',
+                                                'creation_date'],
+                                 dtype=object),
+                    pd.DataFrame(n[1], columns=['treenode_id', 'connector_id',
+                                                'relation', 'x', 'y', 'z',
+                                                'last_modified',
+                                                'creation_date'],
+                                 dtype=object),
                     n[2]]
                     for i, n in enumerate(skdata)
                 ],
@@ -808,7 +830,8 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
 get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
 
 
-def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1):
+def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
+              tag_flag=1):
     """ Retrieve skeleton data for a list of skeleton ids.
     Similar to :func:`pymaid.get_neuron` but the connector data includes
     the whole chain::
@@ -867,7 +890,8 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
 
     skdata = []
 
-    for s in tqdm(x, desc='Retrieving arbors', disable=config.pbar_hide, leave=config.pbar_leave):
+    for s in tqdm(x, desc='Retrieving arbors', disable=config.pbar_hide,
+                  leave=config.pbar_leave):
         # Create URL for retrieving example skeleton from server
         remote_compact_arbor_url = remote_instance._get_compact_arbor_url(
             s, node_flag, connector_flag, tag_flag)
@@ -884,10 +908,12 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     df = pd.DataFrame([[
         names[str(x[i])],
         str(x[i]),
-        pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
-                                    'creator_id', 'x', 'y', 'z', 'radius', 'confidence']),
-        pd.DataFrame(n[1], columns=['treenode_1', 'link_confidence', 'connector_id',
-                                    'link_confidence', 'treenode_2', 'other_skeleton_id', 'relation_1', 'relation_2']),
+        pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id',
+                                    'x', 'y', 'z', 'radius', 'confidence']),
+        pd.DataFrame(n[1], columns=['treenode_1', 'link_confidence',
+                                    'connector_id', 'link_confidence',
+                                    'treenode_2', 'other_skeleton_id',
+                                    'relation_1', 'relation_2']),
         n[2]]
         for i, n in enumerate(skdata)
     ],
@@ -897,7 +923,8 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1, tag_flag=1
     return df
 
 
-def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_size=2):
+def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
+                           min_size=2):
     """ Retrieve the synaptic/gap junction partners of neurons
     of interest **within** a given CATMAID Volume.
 
@@ -978,7 +1005,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
     # Get details for connectors in volume
     cn_details = get_connector_details(
-        cn_in_volume.connector_id.unique().tolist(), remote_instance=remote_instance)
+        cn_in_volume.connector_id.unique().tolist(),
+        remote_instance=remote_instance)
 
     # Filter those connectors that don't have a presynaptic node
     cn_details = cn_details[~cn_details.presynaptic_to.isnull()]
@@ -1017,7 +1045,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
     adj_mat = pd.DataFrame(np.zeros((len(unique_skids), len(unique_skids))),
                            columns=unique_skids, index=unique_skids)
 
-    for i, e in enumerate(tqdm(unique_edges, disable=config.pbar_hide, desc='Adj. matrix', leave=config.pbar_leave)):
+    for i, e in enumerate(tqdm(unique_edges, disable=config.pbar_hide,
+                               desc='Adj. matrix', leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.loc[str(e[0]), str(e[1])] = counts[i]
 
@@ -1069,7 +1098,8 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1, min_siz
 
 def get_partners(x, remote_instance=None, threshold=1,
                  min_size=2, filt=[],
-                 directions=['incoming', 'outgoing', 'gapjunctions', 'attachments']):
+                 directions=['incoming', 'outgoing',
+                             'gapjunctions', 'attachments']):
     """ Retrieve partners connected by synapses, gap junctions or attachments
     to a set of neurons.
 
@@ -1104,10 +1134,10 @@ def get_partners(x, remote_instance=None, threshold=1,
         synapses with the query neurons:
 
         >>> df
-        ...   neuron_name  skeleton_id    num_nodes    relation   total skid1  skid2 ..
-        ... 0   name1         skid1      node_count1  upstream    n_syn  n_syn ...
-        ... 1   name2         skid2      node_count2  downstream  n_syn  n_syn ..
-        ... 2   name3         skid3      node_count3  gapjunction n_syn  n_syn .
+          neuron_name  skeleton_id    num_nodes    relation   total  skid1  skid2 ...
+        0   name1         skid1      node_count1  upstream    n_syn  n_syn  ...
+        1   name2         skid2      node_count2  downstream  n_syn  n_syn  ..
+        2   name3         skid3      node_count3  gapjunction n_syn  n_syn  .
         ... ...
 
         ``relation`` can be ``'upstream'`` (incoming), ``'downstream'`` (outgoing),
@@ -1148,7 +1178,7 @@ def get_partners(x, remote_instance=None, threshold=1,
         """
         try:
             return entry['skids'][str(skid)]
-        except:
+        except BaseException:
             return 0
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -1345,7 +1375,8 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     data = dict()
 
-    with tqdm(total=len(node_ids), disable=config.pbar_hide, desc='Nodes', leave=config.pbar_leave) as pbar:
+    with tqdm(total=len(node_ids), disable=config.pbar_hide,
+              desc='Nodes', leave=config.pbar_leave) as pbar:
         for ix in range(0, len(node_ids), chunk_size):
             get_node_details_postdata = dict()
 
@@ -1408,13 +1439,15 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
 
     data = []
 
-    with tqdm(total=len(treenode_ids), disable=config.pbar_hide, desc='Nodes', leave=config.pbar_leave) as pbar:
+    with tqdm(total=len(treenode_ids), disable=config.pbar_hide,
+              desc='Nodes', leave=config.pbar_leave) as pbar:
         for ix in range(0, len(treenode_ids), chunk_size):
             urls = [remote_instance._get_skid_from_tnid(
                 tn) for tn in treenode_ids[ix:ix + chunk_size]]
 
             data += _get_urls_threaded(urls,
-                                       remote_instance=remote_instance, external_pbar=pbar)
+                                       remote_instance=remote_instance,
+                                       external_pbar=pbar)
 
     return {treenode_ids[i]: d['skeleton_id'] for i, d in enumerate(data)}
 
@@ -1735,7 +1768,8 @@ def get_connector_details(x, remote_instance=None):
     DATA_UPLOAD_MAX_NUMBER_FIELDS = min(50000, len(connector_ids))
 
     connectors = []
-    with tqdm(total=len(connector_ids), desc='CN details', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
+    with tqdm(total=len(connector_ids), desc='CN details',
+              disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         for b in range(0, len(connector_ids), DATA_UPLOAD_MAX_NUMBER_FIELDS):
             get_connectors_postdata = {}
             for i, s in enumerate(connector_ids[b:b + DATA_UPLOAD_MAX_NUMBER_FIELDS]):
@@ -1846,9 +1880,11 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
         data += remote_instance.fetch(url, post=post)
 
     df = pd.DataFrame(data,
-                      columns=['connector_id', 'connector_loc', 'treenode1_id', 'source_neuron',
-                               'confidence1', 'creator1', 'treenode1_loc', 'treenode2_id', 'target_neuron',
-                               'confidence2', 'creator2', 'treenode2_loc'])
+                      columns=['connector_id', 'connector_loc', 'treenode1_id',
+                               'source_neuron', 'confidence1', 'creator1',
+                               'treenode1_loc', 'treenode2_id',
+                               'target_neuron', 'confidence2', 'creator2',
+                               'treenode2_loc'])
 
     # Get user list and replace IDs with logins
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
@@ -1905,7 +1941,8 @@ def get_review(x, remote_instance=None):
 
     CHUNK_SIZE = 1000
 
-    with tqdm(total=len(x), disable=config.pbar_hide, desc='Rev. status', leave=config.pbar_leave) as pbar:
+    with tqdm(total=len(x), disable=config.pbar_hide, desc='Rev. status',
+              leave=config.pbar_leave) as pbar:
         for j in range(0, len(x), CHUNK_SIZE):
             get_review_postdata = {}
 
@@ -1926,8 +1963,9 @@ def get_review(x, remote_instance=None):
                         review_status[s][1],
                         int(review_status[s][1] / review_status[s][0] * 100)
                         ] for s in review_status],
-                      columns=['skeleton_id', 'neuron_name', 'total_node_count',
-                               'nodes_reviewed', 'percent_reviewed']
+                      columns=['skeleton_id', 'neuron_name',
+                               'total_node_count', 'nodes_reviewed',
+                               'percent_reviewed']
                       )
 
     return df
@@ -2095,7 +2133,7 @@ def get_user_annotations(x, remote_instance=None):
 
     try:
         ids = [int(e) for e in x]
-    except:
+    except BaseException:
         ids = [user_list.set_index('login').loc[e, 'user_id'] for e in x]
 
     # This works with neuron_id NOT skeleton_id
@@ -2219,7 +2257,8 @@ def get_annotation_details(x, remote_instance=None):
     # Create dataframe
     df = pd.DataFrame(annotations,
                       columns=['annotation', 'skeleton_id', 'time_annotated',
-                               'times_used', 'user_id', 'annotation_id', 'user'],
+                               'times_used', 'user_id', 'annotation_id',
+                               'user'],
                       dtype=object
                       )
 
@@ -2297,7 +2336,7 @@ def get_annotations(x, remote_instance=None):
                     annotation_list_temp['annotations'][str(annotation_id)])
 
         return(annotation_list)
-    except:
+    except BaseException:
         logger.error(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
         raise Exception(
@@ -2487,7 +2526,8 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     return df.sort_values(['name']).reset_index(drop=True)
 
 
-def get_skids_by_annotation(annotations, remote_instance=None, allow_partial=False, intersect=False):
+def get_skids_by_annotation(annotations, remote_instance=None,
+                            allow_partial=False, intersect=False):
     """ Retrieve the all neurons annotated with given annotation(s).
 
     Parameters
@@ -2656,8 +2696,8 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     node_ids
                         Single or list of treenode or connector IDs.
     node_type :         {'TREENODE','CONNECTOR'}
-                        Set which node type of IDs you have provided as they use
-                        different API endpoints!
+                        Set which node type of IDs you have provided as they
+                        use different API endpoints!
     remote_instance :   CATMAID instance
                         If not passed directly, will try using global.
 
@@ -2734,7 +2774,8 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if isinstance(x, (list, np.ndarray)):
-        return {n: delete_neuron(n, remote_instance=remote_instance) for n in x}
+        return {n: delete_neuron(n,
+                                 remote_instance=remote_instance) for n in x}
 
     # Need to get the neuron ID
     remote_get_neuron_name = remote_instance._get_single_neuronname_url(x)
@@ -2767,8 +2808,8 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
                         Use ``tags=None`` and to remove all tags from a set of
                         nodes.
     node_type :         {'TREENODE','CONNECTOR'}
-                        Set which node type of IDs you have provided as they use
-                        different API endpoints!
+                        Set which node type of IDs you have provided as they
+                        use different API endpoints!
     remote_instance :   CATMAID instance
                         If not passed directly, will try using global.
 
@@ -2840,10 +2881,12 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
         existing_tags = ''
 
     # Use the add_tags function to override existing tags
-    return add_tags(node_list, existing_tags, node_type, remote_instance=remote_instance, override_existing=True)
+    return add_tags(node_list, existing_tags, node_type,
+                    remote_instance=remote_instance, override_existing=True)
 
 
-def add_tags(node_list, tags, node_type, remote_instance=None, override_existing=False):
+def add_tags(node_list, tags, node_type, remote_instance=None,
+             override_existing=False):
     """ Add or edit tag(s) for a list of treenode(s) or connector(s).
 
     Parameters
@@ -2856,12 +2899,12 @@ def add_tags(node_list, tags, node_type, remote_instance=None, override_existing
                         each node gets individual tags. If string or list
                         are provided, all nodes will get the same tags.
     node_type :         {'TREENODE','CONNECTOR'}
-                        Set which node type of IDs you have provided as they use
-                        different API endpoints!
+                        Set which node type of IDs you have provided as they
+                        use different API endpoints!
     override_existing : bool, default=False
-                        This needs to be set to True if you want to delete a tag.
-                        Otherwise, your tags (even if empty) will not override
-                        existing tags.
+                        This needs to be set to True if you want to delete a
+                        tag. Otherwise, your tags (even if empty) will not
+                        override existing tags.
     remote_instance :   CATMAID instance
                         If not passed directly, will try using global.
 
@@ -3010,7 +3053,7 @@ def get_review_details(x, remote_instance=None):
     for i, neuron in enumerate(rdata):
         # There is a small chance that nodes are counted twice but not
         # tracking node_id speeds up this extraction a LOT
-        #node_ids = []
+        # node_ids = []
         for arbor in neuron:
             node_list += [(n['id'], x[i], n['rids'])
                           for n in arbor['sequence'] if n['rids']]
@@ -3033,7 +3076,8 @@ def get_review_details(x, remote_instance=None):
     return df
 
 
-def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, search=''):
+def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
+             search=''):
     """ Retrieve logs (same data as in log widget).
 
     Parameters
@@ -3139,7 +3183,8 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0, s
     return df
 
 
-def get_contributor_statistics(x, remote_instance=None, separate=False, _split=500):
+def get_contributor_statistics(x, remote_instance=None, separate=False,
+                               _split=500):
     """ Retrieve contributor statistics for given skeleton ids.
     By default, stats are given over all neurons.
 
@@ -3205,13 +3250,16 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
 
     x = utils._make_iterable(x)
 
-    columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses', 'pre_contributors',
-               'n_postsynapses', 'post_contributors', 'review_contributors', 'multiuser_review_minutes', 'construction_minutes', 'min_review_minutes']
+    columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',
+               'pre_contributors', 'n_postsynapses', 'post_contributors',
+               'review_contributors', 'multiuser_review_minutes',
+               'construction_minutes', 'min_review_minutes']
 
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
     if not separate:
-        with tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
+        with tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide,
+                  leave=config.pbar_leave) as pbar:
             stats = []
             for j in range(0, len(x), _split):
                 pbar.update(j)
@@ -3256,8 +3304,9 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
         remote_get_statistics_url = [
             remote_instance._get_contributions_url() for s in x]
 
-        stats = _get_urls_threaded(
-            remote_get_statistics_url, remote_instance, post_data=get_statistics_postdata, desc='Get contrib.')
+        stats = _get_urls_threaded(remote_get_statistics_url, remote_instance,
+                                   post_data=get_statistics_postdata,
+                                   desc='Get contrib.')
 
         df = pd.DataFrame([[
             s,
@@ -3282,9 +3331,11 @@ def get_contributor_statistics(x, remote_instance=None, separate=False, _split=5
     return df
 
 
-def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[], end_date=[], reviewed_by=None, minimum_cont=None):
-    """ Retrieves a list of all skeletons that fit given parameters
-    (see variables). If no parameters are provided, all existing skeletons are
+def get_neuron_list(remote_instance=None, user=None, node_count=1,
+                    start_date=[], end_date=[], reviewed_by=None,
+                    minimum_cont=None):
+    """ Retrieves a list of all skeletons that fit given parameters (see
+    variables). If no parameters are provided, all existing skeletons are
     returned!
 
     Parameters
@@ -3351,14 +3402,16 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
         reviewed_by = utils.eval_user_ids(
             reviewed_by, user_list=None, remote_instance=remote_instance)
 
-    if not isinstance(user, type(None)) or not isinstance(reviewed_by, type(None)):
+    if not isinstance(user, type(None)) or not isinstance(reviewed_by,
+                                                          type(None)):
         user_list = get_user_list(
             remote_instance=remote_instance).set_index('login')
 
     if not isinstance(user, type(None)):
         if utils._is_iterable(user):
             skid_list = list()
-            for u in tqdm(user, desc='Get user', disable=config.pbar_hide, leave=config.pbar_leave):
+            for u in tqdm(user, desc='Get user', disable=config.pbar_hide,
+                          leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=u,
                                              node_count=node_count,
@@ -3380,7 +3433,9 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     if not isinstance(reviewed_by, type(None)):
         if utils._is_iterable(reviewed_by):
             skid_list = list()
-            for u in tqdm(reviewed_by, desc='Get revs', disable=config.pbar_hide, leave=config.pbar_leave):
+            for u in tqdm(reviewed_by, desc='Get revs',
+                          disable=config.pbar_hide,
+                          leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=user,
                                              node_count=node_count,
@@ -3422,7 +3477,9 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1, start_date=[]
     return list(set(skid_list))
 
 
-def get_history(remote_instance=None, start_date=(datetime.date.today() - datetime.timedelta(days=7)).isoformat(), end_date=datetime.date.today().isoformat(), split=True):
+def get_history(remote_instance=None,
+                start_date=(datetime.date.today() - datetime.timedelta(days=7)).isoformat(),
+                end_date=datetime.date.today().isoformat(), split=True):
     """ Retrieves CATMAID project history.
 
     Notes
@@ -3497,7 +3554,7 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         for d in days:
             try:
                 temp.append(data[d][key])
-            except:
+            except BaseException:
                 temp.append(0)
         return temp
 
@@ -3540,7 +3597,8 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
         rounds = [(start_date, end_date)]
 
     data = []
-    for r in tqdm(rounds, desc='Retrieving history', disable=config.pbar_hide, leave=config.pbar_leave):
+    for r in tqdm(rounds, desc='Retrieving history', disable=config.pbar_hide,
+                  leave=config.pbar_leave):
         get_history_GET_data = {'self.project_id': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
@@ -3595,7 +3653,8 @@ def get_history(remote_instance=None, start_date=(datetime.date.today() - dateti
     return df
 
 
-def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None, coord_format='NM', resolution=(4, 4, 50)):
+def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
+                        coord_format='NM', resolution=(4, 4, 50)):
     """ Retrieve treenodes in given bounding box.
 
     Parameters
@@ -3856,7 +3915,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         logger.debug(
             'Retrieving skids for annotationed neurons')
 
-        for an_id in tqdm(annotation_ids.values(), desc='Get annot', disable=config.pbar_hide, leave=config.pbar_leave):
+        for an_id in tqdm(annotation_ids.values(), desc='Get annot',
+                          disable=config.pbar_hide, leave=config.pbar_leave):
             annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                                'range_length': 500, 'with_annotations': False}
             remote_annotated_url = remote_instance._get_annotated_url()
@@ -3869,7 +3929,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by user
     if users:
         by_users = []
-        for u in tqdm(users, desc='Get by usr', disable=config.pbar_hide, leave=config.pbar_leave):
+        for u in tqdm(users, desc='Get by usr', disable=config.pbar_hide,
+                      leave=config.pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['created_by'] = u
 
@@ -3889,7 +3950,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by reviewer
     if reviewed_by:
-        for u in tqdm(reviewed_by, desc='Get by revs', disable=config.pbar_hide, leave=config.pbar_leave):
+        for u in tqdm(reviewed_by, desc='Get by revs',
+                      disable=config.pbar_hide, leave=config.pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['reviewed_by'] = u
 
@@ -3908,7 +3970,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get by volume
     if volumes:
-        for v in tqdm(volumes, desc='Get by vols', disable=config.pbar_hide, leave=config.pbar_leave):
+        for v in tqdm(volumes, desc='Get by vols', disable=config.pbar_hide,
+                      leave=config.pbar_leave):
             if not isinstance(v, core.Volume):
                 vol = get_volume(v, remote_instance)
             else:
@@ -3985,7 +4048,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     return nl
 
 
-def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False, remote_instance=None):
+def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
+                          only_soma=False, remote_instance=None):
     """ Retrieves neurons with processes within CATMAID volumes. This function
     uses the *BOUNDING BOX* around the volume as proxy and queries for neurons
     that are within that volume. See examples on how to work around this.
@@ -4088,7 +4152,8 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2, only_soma=False
     return neurons
 
 
-def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kwargs):
+def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
+                        **kwargs):
     """ Retrieves neurons with processes within a defined box volume. Because the
     API returns only a limited number of neurons at a time, the defined volume
     has to be chopped into smaller pieces for crowded areas - may thus take
@@ -4149,7 +4214,8 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None, **kw
     boxes = _subset_volume(bbox, max_vol=50**3)
 
     node_list = []
-    with tqdm(desc='Retr. nodes in box volume', total=len(boxes), leave=config.pbar_leave, disable=config.pbar_hide) as pbar:
+    with tqdm(desc='Retr. nodes in box volume', total=len(boxes),
+              leave=config.pbar_leave, disable=config.pbar_hide) as pbar:
         while boxes.any():
             pbar.total = len(boxes)
             new_boxes = np.empty((0, 3, 2))
@@ -4348,7 +4414,7 @@ class _get_node_list_threaded(threading.Thread):
         try:
             threading.Thread.join(self)
             return self.response
-        except:
+        except BaseException:
             logger.error(
                 'Failed to join thread.')
             return None
@@ -4408,7 +4474,8 @@ def get_user_list(remote_instance=None):
     return df
 
 
-def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, return_graph=False, remove_isolated=False):
+def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
+              return_graph=False, remove_isolated=False):
     """ Retrieves paths between two sets of neurons.
 
     Parameters
@@ -4539,7 +4606,8 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1, 
     return all_paths, g
 
 
-def get_volume(volume_name=None, remote_instance=None, color=(120, 120, 120, .6), combine_vols=False):
+def get_volume(volume_name=None, remote_instance=None,
+               color=(120, 120, 120, .6), combine_vols=False):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of
     vertices and faces.
 
@@ -4713,7 +4781,9 @@ def get_annotation_list(remote_instance=None):
     return df
 
 
-def url_to_coordinates(coords, stack_id, active_skeleton_id=None, active_node_id=None, remote_instance=None, zoom=0, tool='tracingtool'):
+def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
+                       active_node_id=None, remote_instance=None, zoom=0,
+                       tool='tracingtool'):
     """ Generate URL to a location.
 
     Parameters
@@ -4775,7 +4845,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None, active_node_id
 
     if isinstance(coords, (pd.DataFrame, pd.Series)):
         try:
-            coords = coords[['x', 'y', 'z']].as_matrix()
+            coords = coords[['x', 'y', 'z']].values
         except:
             raise ValueError(
                 'Pandas DataFrames/Series must have "x","y","z" columns.')
@@ -4870,7 +4940,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
         logger.info('All neurons successfully renamed.')
     else:
         failed = [n for i, n in enumerate(
-            x) if responses[i]['success'] == False]
+            x) if responses[i]['success'] is False]
         logger.error(
             'Error renaming neuron(s): {0}'.format(','.join(failed)))
 
@@ -4911,7 +4981,8 @@ def get_label_list(remote_instance=None):
 
     labels = remote_instance.fetch(remote_instance._get_label_list_url())
 
-    return pd.DataFrame(labels, columns=['label_id', 'tag', 'skeleton_id', 'treenode_id'])
+    return pd.DataFrame(labels, columns=['label_id', 'tag', 'skeleton_id',
+                                         'treenode_id'])
 
 
 def get_transactions(range_start=None, range_length=25, remote_instance=None):
@@ -4951,7 +5022,7 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
     remote_transactions_url = remote_instance._get_transactions_url()
 
     desc = {'range_start': range_start, 'range_length': range_length}
-    desc = {k: v for k, v in desc.items() if v != None}
+    desc = {k: v for k, v in desc.items() if v is not None}
 
     remote_transactions_url += '?%s' % urllib.parse.urlencode(desc)
 

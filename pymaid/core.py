@@ -65,7 +65,6 @@ also allow quick access to other PyMaid functions:
 """
 
 import datetime
-import logging
 import pandas as pd
 
 import numpy as np
@@ -73,14 +72,12 @@ import math
 import random
 import json
 import os
-import csv
 import sys
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
 import scipy
 import networkx as nx
 import io
-import uuid
 import copy
 import six
 
@@ -254,7 +251,7 @@ class CatmaidNeuron:
             try:
                 int(x)  # Check if this is a skeleton ID
                 self.skeleton_id = str(x)  # Make sure skid is a string
-            except:
+            except BaseException:
                 raise Exception(
                     'Unable to construct CatmaidNeuron from data provided: %s' % str(type(x)))
         else:
@@ -286,7 +283,7 @@ class CatmaidNeuron:
                 try:
                     # Simple attributes don't have a .copy()
                     setattr(self, at, getattr(self, at).copy())
-                except:
+                except BaseException:
                     pass
 
     def __getattr__(self, key):
@@ -346,8 +343,11 @@ class CatmaidNeuron:
             return self.tags
         elif key == 'n_open_ends':
             if 'nodes' in self.__dict__:
-                closed = self.tags.get('ends', []) + self.tags.get('uncertain end', []) + self.tags.get(
-                    'uncertain continuation', []) + self.tags.get('not a branch', []) + self.tags.get('soma', [])
+                closed = self.tags.get('ends', []) \
+                    + self.tags.get('uncertain end', []) \
+                    + self.tags.get('uncertain continuation', []) \
+                    + self.tags.get('not a branch', []) \
+                    + self.tags.get('soma', [])
                 return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed])
             else:
                 return 'NA'
@@ -447,8 +447,10 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
         logger.info('Retrieving skeleton data...')
-        skeleton = fetch.get_neuron(
-            self.skeleton_id, remote_instance, return_df=True, kwargs=kwargs).iloc[0]
+        skeleton = fetch.get_neuron(self.skeleton_id,
+                                    remote_instance,
+                                    return_df=True,
+                                    kwargs=kwargs).iloc[0]
 
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
@@ -471,18 +473,19 @@ class CatmaidNeuron:
         for a in [at for at in temp_att if at not in exclude]:
             try:
                 delattr(self, a)
-            except:
+            except BaseException:
                 pass
 
         temp_node_cols = ['flow_centrality', 'strahler_index']
 
         # Remove type only if we do not classify -> this speeds up things
         # b/c we don't have to recreate the column, just change the values
-        #if 'classify_nodes' in exclude:
+        # if 'classify_nodes' in exclude:
         #    temp_node_cols.append('type')
 
         # Remove temporary node values
-        self.nodes = self.nodes[[c for c in self.nodes.columns if c not in temp_node_cols]]
+        self.nodes = self.nodes[[
+            c for c in self.nodes.columns if c not in temp_node_cols]]
 
         if 'classify_nodes' not in exclude:
             # Reclassify nodes
@@ -491,7 +494,6 @@ class CatmaidNeuron:
     def get_graph_nx(self):
         """Calculates networkX representation of neuron. Once calculated stored
         as `.graph`. Call function again to update graph.
-
 
         See Also
         --------
@@ -529,8 +531,8 @@ class CatmaidNeuron:
 
     def _get_segments(self, how='length'):
         """Generate segments for neuron."""
-        logger.debug('Generating segments for neuron %s' %
-                            str(self.skeleton_id))
+        logger.debug(
+            'Generating segments for neuron {}'.format(self.skeleton_id))
         if how == 'length':
             self.segments = graph_utils._generate_segments(self)
         elif how == 'break':
@@ -603,8 +605,8 @@ class CatmaidNeuron:
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
-        self.review_status = fetch.get_review(self.skeleton_id, remote_instance).loc[
-            0, 'percent_reviewed']
+        self.review_status = fetch.get_review(self.skeleton_id,
+                                              remote_instance).loc[0, 'percent_reviewed']
         return self.review_status
 
     def get_annotations(self, remote_instance=None):
@@ -671,7 +673,8 @@ class CatmaidNeuron:
 
         if 'nodes' not in self.__dict__:
             self.get_skeleton()
-        return plotting.plot3d(CatmaidNeuronList(self, make_copy=False), **kwargs)
+        return plotting.plot3d(CatmaidNeuronList(self, make_copy=False),
+                               **kwargs)
 
     def plot_dendrogram(self, linkage_kwargs={}, dend_kwargs={}):
         """ Plot neuron as dendrogram.
@@ -689,16 +692,17 @@ class CatmaidNeuron:
         """
 
         # First get the all by all distances
-        ends = self.nodes[self.nodes.type=='end'].treenode_id.values
+        ends = self.nodes[self.nodes.type == 'end'].treenode_id.values
         dist_mat = graph_utils.geodesic_matrix(self,
                                                tn_ids=ends,
                                                directed=False)
 
         # Prune matrix to ends
-        dist_mat = dist_mat.loc[ends,ends]
+        dist_mat = dist_mat.loc[ends, ends]
 
         # Turn into observation vector
-        obs_vec = scipy.spatial.distance.squareform(dist_mat.values, checks=False)
+        obs_vec = scipy.spatial.distance.squareform(dist_mat.values,
+                                                    checks=False)
 
         # Cluster
         linkage = scipy.cluster.hierarchy.linkage(obs_vec, **linkage_kwargs)
@@ -897,7 +901,7 @@ class CatmaidNeuron:
                     1. ``to_prune = 1`` removes all leaf branches
                     2. ``to_prune = [1,2]`` removes indices 1 and 2
                     3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3
-                    4. ``to_prune = -1`` removes everything but the highest index
+                    4. ``to_prune = -1`` keep only the highest index
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
@@ -923,7 +927,8 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def prune_by_longest_neurite(self, n=1, reroot_to_soma=False, inplace=True):
+    def prune_by_longest_neurite(self, n=1, reroot_to_soma=False,
+                                 inplace=True):
         """ Prune neuron down to the longest neurite.
 
         Parameters
@@ -1012,7 +1017,8 @@ class CatmaidNeuron:
         # Clear temporary attributes
         self._clear_temp_attr()
 
-    def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
+    def set_remote_instance(self, remote_instance=None, server_url=None,
+                            http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to neuron. Provide either existing
         CatmaidInstance OR your credentials.
 
@@ -1053,7 +1059,6 @@ class CatmaidNeuron:
         return frame._repr_html_()
 
     def _gen_svg_thumbnail(self):
-        from pymaid import plotting
         import matplotlib.pyplot as plt
         # Store some previous states
         prev_level = logger.getEffectiveLevel()
@@ -1081,7 +1086,8 @@ class CatmaidNeuron:
             if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
                 return CatmaidNeuronList([self] + [to_add], make_copy=False)
             else:
-                return CatmaidNeuronList([self] + [CatmaidNeuron[n] for n in to_add], make_copy=False)
+                return CatmaidNeuronList([self] + [CatmaidNeuron[n] for n in to_add],
+                                         make_copy=False)
         elif isinstance(to_add, CatmaidNeuron):
             return CatmaidNeuronList([self, to_add], make_copy=False)
         elif isinstance(to_add, CatmaidNeuronList):
@@ -1102,9 +1108,15 @@ class CatmaidNeuron:
         else:
             soma_temp = 'NA'
 
-        return pd.Series([type(self), neuron_name, self.skeleton_id, self.n_nodes, self.n_connectors, self.n_branch_nodes, self.n_end_nodes, self.n_open_ends, self.cable_length, review_status, soma_temp],
-                         index=['type', 'neuron_name', 'skeleton_id', 'n_nodes', 'n_connectors', 'n_branch_nodes', 'n_end_nodes',
-                                'n_open_ends', 'cable_length', 'review_status', 'soma']
+        return pd.Series([type(self), neuron_name, self.skeleton_id,
+                          self.n_nodes, self.n_connectors,
+                          self.n_branch_nodes, self.n_end_nodes,
+                          self.n_open_ends, self.cable_length,
+                          review_status, soma_temp],
+                         index=['type', 'neuron_name', 'skeleton_id',
+                                'n_nodes', 'n_connectors', 'n_branch_nodes',
+                                'n_end_nodes', 'n_open_ends', 'cable_length',
+                                'review_status', 'soma']
                          )
 
     def to_swc(self, filename=None):
@@ -1205,7 +1217,7 @@ class CatmaidNeuronList:
     root :              np.array of treenode_ids
     n_cores :           int
                         Number of cores to use. Default is os.cpu_count()-1
-    _use_parallel :     bool (default=True)
+    _use_threading :    bool (default=True)
                         If True, will use parallel threads. Should be slightly
                         up to a lot faster depending of the numbers of cores.
                         Switch off if you experience performance issues.
@@ -1240,7 +1252,8 @@ class CatmaidNeuronList:
 
     """
 
-    def __init__(self, x, remote_instance=None, make_copy=True, _use_parallel=False):
+    def __init__(self, x, remote_instance=None, make_copy=True,
+                 _use_parallel=False):
         """ Initialize CatmaidNeuronList.
 
         Parameters
@@ -1278,13 +1291,14 @@ class CatmaidNeuronList:
         if remote_instance is None:
             try:
                 remote_instance = x.remote_instance
-            except:
+            except BaseException:
                 if 'remote_instance' in sys.modules:
                     remote_instance = sys.modules['remote_instance']
                 elif 'remote_instance' in globals():
                     remote_instance = globals()['remote_instance']
 
-        if not isinstance(x, (list, pd.DataFrame, CatmaidNeuronList, np.ndarray)):
+        if not isinstance(x, (list, pd.DataFrame, CatmaidNeuronList,
+                              np.ndarray)):
             self.neurons = list([x])
         elif isinstance(x, pd.DataFrame):
             self.neurons = [x.loc[i] for i in range(x.shape[0])]
@@ -1319,7 +1333,8 @@ class CatmaidNeuronList:
 
                     futures = e.map(CatmaidNeuron, [n[0] for n in to_convert])
 
-                    converted = [n for n in tqdm(futures, total=len(to_convert),
+                    converted = [n for n in tqdm(futures,
+                                                 total=len(to_convert),
                                                  desc='Make nrn',
                                                  disable=config.pbar_hide,
                                                  leave=config.pbar_leave)]
@@ -1328,7 +1343,9 @@ class CatmaidNeuronList:
                         self.neurons[c[2]] = converted[i]
 
             else:
-                for n in tqdm(to_convert, desc='Make nrn', disable=config.pbar_hide, leave=config.pbar_leave):
+                for n in tqdm(to_convert, desc='Make nrn',
+                              disable=config.pbar_hide,
+                              leave=config.pbar_leave):
                     self.neurons[n[2]] = CatmaidNeuron(
                         n[0], remote_instance=remote_instance)
 
@@ -1364,7 +1381,7 @@ class CatmaidNeuronList:
             review_status = n.__dict__.get('review_status', 'NA')
 
             if 'nodes' in n.__dict__:
-                soma_temp = n.soma != None
+                soma_temp = n.soma is not None
             else:
                 soma_temp = 'NA'
 
@@ -1387,7 +1404,9 @@ class CatmaidNeuronList:
         return self.__repr__()
 
     def __repr__(self):
-        return '{0} of {1} neurons \n {2}'.format(type(self), len(self.neurons), str(self.summary()))
+        return '{0} of {1} neurons \n {2}'.format(type(self),
+                                                  len(self.neurons),
+                                                  str(self.summary()))
 
     def _repr_html_(self):
         return self.summary()._repr_html_()
@@ -1416,9 +1435,10 @@ class CatmaidNeuronList:
     def __getattr__(self, key):
         if key == 'shape':
             return (self.__len__(),)
-        elif key in ['n_nodes', 'n_connectors', 'n_presynapses', 'n_postsynapses',
-                     'n_open_ends', 'n_end_nodes', 'cable_length', 'tags', 'igraph',
-                     'soma', 'root', 'segments', 'graph', 'n_branch_nodes', 'dps']:
+        elif key in ['n_nodes', 'n_connectors', 'n_presynapses',
+                     'n_postsynapses', 'n_open_ends', 'n_end_nodes',
+                     'cable_length', 'tags', 'igraph', 'soma', 'root',
+                     'segments', 'graph', 'n_branch_nodes', 'dps']:
             self.get_skeletons(skip_existing=True)
             return np.array([getattr(n, key) for n in self.neurons])
         elif key == 'neuron_name':
@@ -1430,7 +1450,9 @@ class CatmaidNeuronList:
             return np.array([n.skeleton_id for n in self.neurons])
         elif key in ['nodes', 'connectors', 'presynapses', 'postsynapses', 'gap_junctions']:
             self.get_skeletons(skip_existing=True)
-            return pd.concat([getattr(n, key) for n in self.neurons], axis=0, ignore_index=True)
+            return pd.concat([getattr(n, key) for n in self.neurons],
+                             axis=0,
+                             ignore_index=True)
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]
@@ -1501,27 +1523,36 @@ class CatmaidNeuronList:
 
     def __add__(self, to_add):
         if isinstance(to_add, CatmaidNeuron):
-            return CatmaidNeuronList(self.neurons + [to_add], make_copy=self.copy_on_subset)
+            return CatmaidNeuronList(self.neurons + [to_add],
+                                     make_copy=self.copy_on_subset)
         elif isinstance(to_add, CatmaidNeuronList):
-            return CatmaidNeuronList(self.neurons + to_add.neurons, make_copy=self.copy_on_subset)
+            return CatmaidNeuronList(self.neurons + to_add.neurons,
+                                     make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_add):
             if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
-                return CatmaidNeuronList(self.neurons + to_add, make_copy=self.copy_on_subset)
+                return CatmaidNeuronList(self.neurons + to_add,
+                                         make_copy=self.copy_on_subset)
             else:
-                return CatmaidNeuronList(self.neurons + [CatmaidNeuron[n] for n in to_add], make_copy=self.copy_on_subset)
+                return CatmaidNeuronList(self.neurons
+                                         + [CatmaidNeuron[n] for n in to_add],
+                                         make_copy=self.copy_on_subset)
         else:
             raise TypeError(
                 'Unable to add data of type {0}'.format(type(to_add)))
 
     def __sub__(self, to_sub):
         if isinstance(to_sub, (str, int)):
-            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub], make_copy=self.copy_on_subset)
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub],
+                                     make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
-            return CatmaidNeuronList([n for n in self.neurons if n != to_sub], make_copy=self.copy_on_subset)
+            return CatmaidNeuronList([n for n in self.neurons if n != to_sub],
+                                     make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
-            return CatmaidNeuronList([n for n in self.neurons if n not in to_sub], make_copy=self.copy_on_subset)
+            return CatmaidNeuronList([n for n in self.neurons if n not in to_sub],
+                                     make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_sub):
-            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub], make_copy=self.copy_on_subset)
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub],
+                                     make_copy=self.copy_on_subset)
         else:
             raise TypeError(
                 'Unable to substract data of type {0}'.format(type(to_sub)))
@@ -1538,7 +1569,8 @@ class CatmaidNeuronList:
         """Returns random subset of neurons."""
         indices = list(range(len(self.neurons)))
         random.shuffle(indices)
-        return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]], make_copy=self.copy_on_subset)
+        return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]],
+                                 make_copy=self.copy_on_subset)
 
     def resample(self, resample_to, preserve_cn_treenodes=False, inplace=True):
         """Resamples all neurons to given resolution [nm].
@@ -1564,13 +1596,18 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, resample_to) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._resample_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Downsampling', disable=config.pbar_hide, leave=config.pbar_leave))
+            x.neurons = list(tqdm(pool.imap(x._resample_helper, combinations,
+                                            chunksize=10),
+                                  total=len(combinations),
+                                  desc='Downsampling',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Resampling', disable=config.pbar_hide, leave=config.pbar_leave):
+            for n in tqdm(x.neurons, desc='Resampling',
+                          disable=config.pbar_hide, leave=config.pbar_leave):
                 n.resample(resample_to=resample_to, inplace=True)
 
         if not inplace:
@@ -1612,12 +1649,16 @@ class CatmaidNeuronList:
             combinations = [(n, factor, kwargs)
                             for i, n in enumerate(x.neurons)]
             x.neurons = list(tqdm(pool.imap(x._downsample_helper, combinations,
-                                            chunksize=10), desc='Downsampling', disable=config.pbar_hide, leave=config.pbar_leave))
+                                            chunksize=10),
+                                  desc='Downsampling',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Downsampling', disable=config.pbar_hide, leave=config.pbar_leave):
+            for n in tqdm(x.neurons, desc='Downsampling',
+                          disable=config.pbar_hide, leave=config.pbar_leave):
                 n.downsample(factor=factor, inplace=True, **kwargs)
 
         if not inplace:
@@ -1670,13 +1711,19 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, new_root[i]) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._reroot_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Rerooting', disable=config.pbar_hide, leave=config.pbar_leave))
+            x.neurons = list(tqdm(pool.imap(x._reroot_helper, combinations,
+                                            chunksize=10),
+                                  total=len(combinations),
+                                  desc='Rerooting',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for i, n in enumerate(tqdm(x.neurons, desc='Rerooting', disable=config.pbar_hide, leave=config.pbar_leave)):
+            for i, n in enumerate(tqdm(x.neurons, desc='Rerooting',
+                                       disable=config.pbar_hide,
+                                       leave=config.pbar_leave)):
                 n.reroot(new_root[i], inplace=True)
 
         # Reset logger level to previous state
@@ -1709,13 +1756,18 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, tag) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_distal_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
+            x.neurons = list(tqdm(pool.imap(x._prune_distal_helper,
+                                            combinations, chunksize=10),
+                                  total=len(combinations),
+                                  desc='Pruning',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+                          leave=config.pbar_leave):
                 n.prune_distal_to(tag, inplace=True)
 
         if not inplace:
@@ -1745,13 +1797,19 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, tag) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_proximal_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
+            x.neurons = list(tqdm(pool.imap(x._prune_proximal_helper,
+                                            combinations,
+                                            chunksize=10),
+                                  total=len(combinations),
+                                  desc='Pruning',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+                          leave=config.pbar_leave):
                 n.prune_proximal_to(tag, inplace=True)
 
         if not inplace:
@@ -1770,13 +1828,13 @@ class CatmaidNeuronList:
         ----------
         to_prune :  {int, list, range}, optional
                     Strahler indices to prune.
-                    1. ``to_prune = 1`` removes all leaf branches
-                    2. ``to_prune = [1,2]`` removes indices 1 and 2
-                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3
-                    4. ``to_prune = -1`` removes everything but the highest index
+                    1. ``to_prune = 1`` remove all leaf branches
+                    2. ``to_prune = [1,2]`` remove indices 1 and 2
+                    3. ``to_prune = range(1,4)`` remove indices 1, 2 and 3
+                    4. ``to_prune = -1`` keep only the highest index
         inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is
-                    returned.
+                    If False, pruning is done on a copy of this
+                    CatmaidNeuronList which is then returned.
 
         See Also
         --------
@@ -1791,13 +1849,18 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, to_prune) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_strahler_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
+            x.neurons = list(tqdm(pool.imap(x._prune_strahler_helper,
+                                            combinations, chunksize=10),
+                                  total=len(combinations),
+                                  desc='Pruning',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
+            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+                          leave=config.pbar_leave):
                 n.prune_by_strahler(to_prune=to_prune, inplace=True)
 
         if not inplace:
@@ -1808,7 +1871,8 @@ class CatmaidNeuronList:
         x[0].prune_by_strahler(to_prune=x[1], inplace=True)
         return x[0]
 
-    def prune_by_longest_neurite(self, n=1, reroot_to_soma=False, inplace=True):
+    def prune_by_longest_neurite(self, n=1, reroot_to_soma=False,
+                                 inplace=True):
         """ Prune neurons down to their longest neurites.
 
         Parameters
@@ -1836,13 +1900,19 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(neuron, n, reroot_to_soma)
                             for i, neuron in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(self._prune_neurite_helper, combinations, chunksize=10), total=len(
-                combinations), desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave))
+            x.neurons = list(tqdm(pool.imap(self._prune_neurite_helper,
+                                            combinations, chunksize=10),
+                                  total=len(combinations),
+                                  desc='Pruning',
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
         else:
-            for neuron in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide, leave=config.pbar_leave):
+            for neuron in tqdm(x.neurons, desc='Pruning',
+                               disable=config.pbar_hide,
+                               leave=config.pbar_leave):
                 neuron.prune_by_longest_neurite(
                     n, reroot_to_soma=reroot_to_soma, inplace=True)
 
@@ -1887,7 +1957,8 @@ class CatmaidNeuronList:
             x.neurons = list(tqdm(pool.imap(x._prune_by_volume_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations), desc='Pruning',
-                                  disable=config.pbar_hide, leave=config.pbar_leave))
+                                  disable=config.pbar_hide,
+                                  leave=config.pbar_leave))
 
             pool.close()
             pool.join()
@@ -1933,8 +2004,8 @@ class CatmaidNeuronList:
             to_update = self.skeleton_id.tolist()
 
         if to_update:
-            re = fetch.get_review(
-                to_update, remote_instance=self._remote_instance).set_index('skeleton_id')
+            re = fetch.get_review(to_update,
+                                  remote_instance=self._remote_instance).set_index('skeleton_id')
             for n in self.neurons:
                 if str(n.skeleton_id) in re:
                     n.review_status = re.loc[str(
@@ -1986,7 +2057,8 @@ class CatmaidNeuronList:
             update = list(tqdm(pool.imap(self._generate_segments_helper,
                                          to_retrieve, chunksize=10),
                                total=len(to_retrieve), desc='Gen. segments',
-                               disable=config.pbar_hide, leave=config.pbar_leave))
+                               disable=config.pbar_hide,
+                               leave=config.pbar_leave))
             pool.close()
             pool.join()
 
@@ -2021,8 +2093,9 @@ class CatmaidNeuronList:
             to_update = self.neurons
 
         if to_update:
-            skdata = fetch.get_neuron(
-                [n.skeleton_id for n in to_update], remote_instance=self._remote_instance, return_df=True).set_index('skeleton_id')
+            skdata = fetch.get_neuron([n.skeleton_id for n in to_update],
+                                      remote_instance=self._remote_instance,
+                                      return_df=True).set_index('skeleton_id')
             for n in tqdm(to_update, desc='Processing neurons',
                           disable=config.pbar_hide, leave=config.pbar_leave):
 
@@ -2035,7 +2108,8 @@ class CatmaidNeuronList:
                 # Delete and update attributes
                 n._clear_temp_attr()
 
-    def set_remote_instance(self, remote_instance=None, server_url=None, http_user=None, http_pw=None, auth_token=None):
+    def set_remote_instance(self, remote_instance=None, server_url=None,
+                            http_user=None, http_pw=None, auth_token=None):
         """Assign remote_instance to all neurons. Provide either existing
         CatmaidInstance OR your credentials.
 
@@ -2104,7 +2178,8 @@ class CatmaidNeuronList:
         self.get_skeletons(skip_existing=True)
         return plotting.plot2d(self, **kwargs)
 
-    def has_annotation(self, x, intersect=False, partial=False, raise_not_found=True):
+    def has_annotation(self, x, intersect=False, partial=False,
+                       raise_not_found=True):
         """Filter neurons by their annotations.
 
         Parameters
@@ -2220,8 +2295,7 @@ class CatmaidNeuronList:
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        logger.info('Selection saved as %s in %s' %
-                           (fname, os.getcwd()))
+        logger.info('Selection saved as {}.'.format(fname))
 
     def to_swc(self, filenames=None):
         """ Generate SWC file from this neuron. This converts CATMAID
@@ -2240,7 +2314,7 @@ class CatmaidNeuronList:
         See Also
         --------
         :func:`~pymaid.to_swc`
-                See this function for further details.
+                See this for further details.
 
         """
 
@@ -2427,19 +2501,23 @@ class Volume(dict):
 
     @property
     def bbox(self):
-        return np.array([self.vertices.min(axis=0), self.vertices.max(axis=0)]).T
+        """ Bounding box of this volume. """
+        return np.array([self.vertices.min(axis=0),
+                         self.vertices.max(axis=0)]).T
 
     @property
     def center(self):
-        """ Returns center of mass."""
+        """ Center of mass."""
         return np.mean(self.vertices, axis=0)
 
     @property
     def vertices(self):
+        """ Vertices. """
         return np.array(self['vertices'])
 
     @property
     def faces(self):
+        """ Faces. """
         return np.array(self['faces'])
 
     def __str__(self):
@@ -2447,8 +2525,7 @@ class Volume(dict):
 
     def __repr__(self):
         return '{0} "{1}" at {2}: {3} vertices, {4} faces'.format(type(self),
-                                                                  self.get(
-                                                                      'name', ''),
+                                                                  self.get('name', ''),
                                                                   hex(id(self)),
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
@@ -2515,7 +2592,7 @@ class Volume(dict):
 
         try:
             import trimesh
-        except:
+        except ImportError:
             raise ImportError(
                 'Unable to import trimesh. Please make sure it is installed properly')
 
@@ -2584,7 +2661,7 @@ class Volume(dict):
         try:
             from shapely.ops import cascaded_union, polygonize
             import shapely.geometry as geometry
-        except:
+        except ImportError:
             raise ImportError('This function needs the <shapely> package.')
 
         if view in['xy', 'yx']:
@@ -2600,7 +2677,8 @@ class Volume(dict):
                 coords[:, 0] = coords[:, 0] * -1
         else:
             raise ValueError(
-                'View {0} unknown. Please use either: {1}'.format(view, accepted_views))
+                'View {0} unknown. Please use either: {1}'.format(view,
+                                                                  accepted_views))
 
         tri = scipy.spatial.Delaunay(coords)
         edges = set()

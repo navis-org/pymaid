@@ -27,7 +27,6 @@ import matplotlib.colors as mcl
 
 import random
 import colorsys
-import logging
 import png
 
 import uuid
@@ -63,6 +62,7 @@ __all__ = ['plot3d', 'plot2d', 'plot1d', 'plot_network',
            'clear3d', 'close3d', 'screenshot', 'get_viewer']
 
 logger = config.logger
+
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active vispy 3D canvas.
@@ -102,30 +102,26 @@ def get_viewer():
     >>> from vispy import scene
     >>> # Get and plot neuron in 3d
     >>> n = pymaid.get_neuron(12345)
-    >>> n.plot3d(color='red')
+    >>> n.plot3d(color = 'red')
     >>> # Plot connector IDs
     >>> cn_ids = n.connectors.connector_id.values.astype(str)
-    >>> cn_co = n.connectors[['x','y','z']].values
+    >>> cn_co = n.connectors[['x', 'y', 'z']].values
     >>> viewer = pymaid.get_viewer()
-    >>> text = scene.visuals.Text( text=cn_ids,
-    ...                             pos=cn_co*scale_factor)
+    >>> text = scene.visuals.Text(text=cn_ids,
+    ...                           pos=cn_co * scale_factor)
     >>> viewer.add(text)
 
     """
-    try:
-        return globals()['viewer']
-    except:
-        raise Exception('No viewer found.')
+    return globals().get('viewer', None)
 
 
 def clear3d():
     """ Clear viewer 3D canvas.
     """
-    try:
-        viewer = globals()['viewer']
+    viewer = get_viewer
+
+    if viewer:
         viewer.clear()
-    except:
-        pass
 
 
 def close3d():
@@ -136,7 +132,7 @@ def close3d():
         viewer.close()
         globals().pop('viewer')
         del viewer
-    except:
+    except BaseException:
         pass
 
 
@@ -203,7 +199,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     Examples
     --------
     >>> import matplotlib.pyplot as plt
-    >>> # 1. Plot two neurons and have plot2d download the skeleton data for you:
+    >>> # 1. Plot two neurons from skeleton IDs:
     >>> fig, ax = pymaid.plot2d( [12345, 45567] )
     >>> # 2. Manually download a neuron, prune it and plot it:
     >>> neuron = pymaid.get_neuron( [12345], rm )
@@ -331,8 +327,8 @@ def plot2d(x, method='2d', *args, **kwargs):
         all_identifiers += dotprops.gene_name.tolist()
 
     if not color and (skdata.shape[0] + dotprops.shape[0]) > 0:
-        cm = _random_colors(
-            skdata.shape[0] + dotprops.shape[0], color_space='RGB', color_range=1)
+        cm = _random_colors(skdata.shape[0] + dotprops.shape[0],
+                            color_space='RGB', color_range=1)
         colormap = {}
 
         if not skdata.empty:
@@ -371,7 +367,7 @@ def plot2d(x, method='2d', *args, **kwargs):
     else:
         if not isinstance(ax, mpl.axes.Axes):
             raise TypeError(
-                'Ax must be of type <mpl.axes.Axes>, not <{0}>'.format(type(ax)))
+                'Ax must be of type <mpl.axes.Axes>, not <{}>'.format(type(ax)))
         fig = ax.get_figure()
         if method in ['3d', '3d_complex'] and ax.name != '3d':
             raise TypeError('Axis must be 3d.')
@@ -431,7 +427,8 @@ def plot2d(x, method='2d', *args, **kwargs):
                 this_line = mlines.Line2D(coords[:, 0], coords[:, 1],
                                           lw=linewidth, ls=linestyle,
                                           alpha=alpha, color=this_color,
-                                          label='%s - #%s' % (neuron.neuron_name, neuron.skeleton_id))
+                                          label='{} - #{}'.format(neuron.neuron_name,
+                                                                  neuron.skeleton_id))
 
                 ax.add_line(this_line)
 
@@ -493,7 +490,8 @@ def plot2d(x, method='2d', *args, **kwargs):
                     this_cn = neuron.connectors[neuron.connectors.relation == c]
                     ax.scatter(this_cn.x.values,
                                (-this_cn.y).values,
-                               c=cn_types[c], alpha=alpha, zorder=4, edgecolor='none', s=cn_size)
+                               c=cn_types[c], alpha=alpha, zorder=4,
+                               edgecolor='none', s=cn_size)
                     ax.get_children(
                     )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
             elif method in ['3d', '3d_complex']:
@@ -524,7 +522,7 @@ def plot2d(x, method='2d', *args, **kwargs):
 
         try:
             this_color = colormap[neuron.gene_name]
-        except:
+        except BaseException:
             this_color = (.1, .1, .1)
 
         if method == '2d':
@@ -656,7 +654,7 @@ def plot2d(x, method='2d', *args, **kwargs):
         ax.set_ylim(lim_min[2], lim_min[2] + max_dim)
         ax.set_zlim(lim_max[1] - max_dim, lim_max[1])
 
-    if scalebar != None:
+    if scalebar is not None:
         # Convert sc size to nm
         sc_size = scalebar * 1000
 
@@ -932,6 +930,8 @@ def plot3d(x, *args, **kwargs):
             viewer = scene3d.Viewer()
         else:
             viewer = globals()['viewer']
+            # Make sure viewer is visible
+            viewer.show()
 
         if skdata:
             viewer.add(skdata, **kwargs)
@@ -957,8 +957,7 @@ def plot3d(x, *args, **kwargs):
         logger.debug('Generating traces...')
 
         for i, neuron in enumerate(skdata.itertuples()):
-            logger.debug('Working on neuron %s' %
-                                str(neuron.skeleton_id))
+            logger.debug('Working on neuron {}'.format(neuron.skeleton_id))
 
             neuron_name = neuron.neuron_name
             skid = neuron.skeleton_id
@@ -990,8 +989,8 @@ def plot3d(x, *args, **kwargs):
                         c += [this_c] * (len(s) + 1)
                 else:
                     try:
-                        c = 'rgb%s' % str(colormap[str(skid)])
-                    except:
+                        c = 'rgb{}'.format(colormap[str(skid)])
+                    except BaseException:
                         c = 'rgb(10,10,10)'
 
                 trace_data.append(go.Scatter3d(x=coords[:, 0],
@@ -1013,8 +1012,8 @@ def plot3d(x, *args, **kwargs):
                 # Add soma(s):
                 for n in soma.itertuples():
                     try:
-                        color = 'rgb%s' % str(colormap[str(skid)])
-                    except:
+                        color = 'rgb{}'.format(colormap[str(skid)])
+                    except BaseException:
                         color = 'rgb(10,10,10)'
                     trace_data.append(go.Mesh3d(
                         x=[(v[0] * n.radius / 2) - n.x for v in fib_points],
@@ -1265,7 +1264,7 @@ def plot3d(x, *args, **kwargs):
     if not remote_instance and isinstance(skdata, core.CatmaidNeuronList):
         try:
             remote_instance = skdata._remote_instance
-        except:
+        except BaseException:
             pass
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -1441,7 +1440,9 @@ def plot_network(x, *args, **kwargs):
     elif colormap == 'random':
         c = _random_colors(len(g.nodes), color_space='RGB', color_range=255)
         colors = {n: c[i] for i, n in enumerate(g.nodes)}
-    elif isinstance(colormap, (tuple, list, np.ndarray)) and len(colormap) == 3:
+    elif isinstance(colormap, (tuple,
+                               list,
+                               np.ndarray)) and len(colormap) == 3:
         colors = {n: tuple(colormap) for n in g.nodes}
     else:
         logger.error(
@@ -1621,7 +1622,9 @@ def plot1d(x, ax=None, color=None, **kwargs):
                    })
 
     max_x = []
-    for ix, n in enumerate(tqdm(x, desc='Processing', disable=config.pbar_hide, leave=config.pbar_leave)):
+    for ix, n in enumerate(tqdm(x, desc='Processing',
+                                disable=config.pbar_hide,
+                                leave=config.pbar_leave)):
         if isinstance(color, dict):
             this_c = color[n.skeleton_id]
         else:
@@ -1676,7 +1679,7 @@ def plot1d(x, ax=None, color=None, **kwargs):
 
     try:
         plt.tight_layout()
-    except:
+    except BaseException:
         pass
 
     return ax
@@ -1827,8 +1830,7 @@ def _neuron2vispy(x, **kwargs):
             # Extract treenode_coordinates and their parent's coordinates
             tn_coords = nodes[['x', 'y', 'z']].apply(
                 pd.to_numeric).values
-            parent_coords = neuron.nodes.set_index('treenode_id').loc[nodes.parent_id.tolist(
-            )][['x', 'y', 'z']].apply(pd.to_numeric).values
+            parent_coords = neuron.nodes.set_index('treenode_id').loc[nodes.parent_id.values][['x', 'y', 'z']].apply(pd.to_numeric).values
 
             # Turn coordinates into segments
             segments = [item for sublist in zip(
@@ -1858,7 +1860,8 @@ def _neuron2vispy(x, **kwargs):
                 # Duplicate values (start and end of each segment!)
                 alpha = np.array([v for l in zip(alpha, alpha) for v in l])
 
-                # Turn color into array (need 2 colors per segment for beginnng and end)
+                # Turn color into array
+                # (need 2 colors per segment for beginning and end)
                 neuron_color = np.array(
                     [neuron_color] * (tn_coords.shape[0] * 2), dtype=float)
                 neuron_color = np.insert(neuron_color, 3, alpha, axis=1)
@@ -1915,7 +1918,8 @@ def _neuron2vispy(x, **kwargs):
 
                 visuals.append(s)
 
-        if kwargs.get('connectors', False) or kwargs.get('connectors_only', False):
+        if kwargs.get('connectors', False) or kwargs.get('connectors_only',
+                                                         False):
             for j in [0, 1, 2]:
                 if kwargs.get('cn_mesh_colors', False):
                     color = neuron_color
@@ -1955,7 +1959,8 @@ def _neuron2vispy(x, **kwargs):
                                            width=kwargs.get('linewidth', 1),
                                            connect='segments',
                                            antialias=False,
-                                           method='gl')  # method can also be 'agg' -> has to use connect='strip'
+                                           method='gl')
+                    # method can also be 'agg' -> has to use connect='strip'
 
                     # Add custom attributes
                     t.unfreeze()
@@ -1966,7 +1971,7 @@ def _neuron2vispy(x, **kwargs):
                     t._object_id = object_id
                     t.freeze()
 
-                    visuals.append(t)                
+                    visuals.append(t)
 
     return visuals
 
@@ -2005,7 +2010,7 @@ def _dp2vispy(x, **kwargs):
         if isinstance(colormap, dict):
             try:
                 color = colormap[str(n.gene_name)]
-            except:
+            except BaseException:
                 color = (10 / 255, 10 / 255, 10 / 255)
         else:
             color = colormap
@@ -2046,7 +2051,8 @@ def _dp2vispy(x, **kwargs):
         sp = create_sphere(5, 5, radius=4)
         s = scene.visuals.Mesh(vertices=sp.get_vertices() +
                                         np.array([n.X, n.Y, n.Z]),
-                               faces=sp.get_faces(), color=color)
+                               faces=sp.get_faces(),
+                               color=color)
 
         # Add custom attributes
         s.unfreeze()

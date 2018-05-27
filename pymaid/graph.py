@@ -21,15 +21,13 @@ import numpy as np
 import pandas as pd
 import scipy.spatial
 
-import logging
-
 from pymaid import core, fetch, utils, config
 
 import networkx as nx
 
 try:
     import igraph
-except:
+except ImportError:
     igraph = None
 
 # Set up logging
@@ -82,7 +80,7 @@ def network2nx(x, remote_instance=None, threshold=1):
     >>> plt.show()
     >>> # Plot with edge weights
     >>> nx.draw_networkx_nodes(g, pos=layout)
-    >>> weight = np.array( list( nx.get_edge_attributes(g, 'weight').values() ) )
+    >>> weight = np.array(list(nx.get_edge_attributes(g, 'weight').values()))
     >>> nx.draw_networkx_edges(g, pos=layout, width=weight/50)
     >>> plt.show()
 
@@ -98,12 +96,12 @@ def network2nx(x, remote_instance=None, threshold=1):
         edges = [[str(e.source_skid), str(e.target_skid), {'weight': e.weight}]
                  for e in edges[edges.weight >= threshold].itertuples()]
     elif isinstance(x, pd.DataFrame):
-        # Get skids (we have to account for the fact that some might not be skids)
+        # We have to account for the fact that some might not be skids
         skids = []
         for s in list(set(x.columns.tolist() + x.index.tolist())):
             try:
                 skids.append(int(s))
-            except:
+            except BaseException:
                 pass
         # Generate edge list
         edges = [[str(s), str(t), {'weight': x.loc[s, t]}]
@@ -310,6 +308,7 @@ def neuron2igraph(x):
     g.es['weight'] = w
 
     return g
+
 
 def _find_all_paths(g, start, end, mode='OUT', maxlen=None):
     """ Find all paths between two vertices in an iGraph object. For some reason

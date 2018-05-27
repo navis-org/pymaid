@@ -20,8 +20,6 @@ import sys
 import numpy as np
 import json
 import pandas as pd
-import importlib
-import vispy as vp
 import uuid
 import csv
 
@@ -33,6 +31,7 @@ logger = config.logger
 __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
            'set_loggers', 'set_pbars', 'eval_skids']
 
+
 def _type_of_script():
     """ Returns context in which pymaid is run. """
     try:
@@ -41,7 +40,7 @@ def _type_of_script():
             return 'jupyter'
         if 'terminal' in ipy_str:
             return 'ipython'
-    except:
+    except BaseException:
         return 'terminal'
 
 
@@ -298,13 +297,20 @@ def eval_skids(x, remote_instance=None):
         try:
             int(x)
             return str(x)
-        except:
+        except BaseException:
             if x.startswith('annotation:'):
-                return fetch.get_skids_by_annotation(x[11:], remote_instance=remote_instance)
+                return fetch.get_skids_by_annotation(x[11:],
+                                                     remote_instance=remote_instance)
             elif x.startswith('name:'):
-                return fetch.get_skids_by_name(x[5:], remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
+                return fetch.get_skids_by_name(x[5:],
+                                               remote_instance=remote_instance,
+                                               allow_partial=False
+                                               ).skeleton_id.tolist()
             else:
-                return fetch.get_skids_by_name(x, remote_instance=remote_instance, allow_partial=False).skeleton_id.tolist()
+                return fetch.get_skids_by_name(x,
+                                               remote_instance=remote_instance,
+                                               allow_partial=False
+                                               ).skeleton_id.tolist()
     elif isinstance(x, (list, np.ndarray, set)):
         skids = []
         for e in x:
@@ -368,7 +374,7 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
     try:
         # Test if we have any non IDs (i.e. logins) in users
         user_ids = [int(u) for u in x]
-    except:
+    except BaseException:
         # Get list of users if we don't already have it
         if not user_list:
             user_list = fetch.get_user_list(
@@ -379,7 +385,7 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
         for u in x:
             try:
                 user_ids.append(int(u))
-            except:
+            except BaseException:
                 for col in ['login', 'last_name', 'full_name', 'first_name']:
                     found = []
                     if u in user_list[col].values:
@@ -425,7 +431,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
     elif isinstance(x, (str, np.str)):
         try:
             return [int(x)]
-        except:
+        except BaseException:
             raise TypeError(
                 'Unable to extract node ID from string <%s>' % str(x))
     elif isinstance(x, (list, np.ndarray)):
@@ -471,6 +477,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         raise TypeError(
             'Unable to extract node IDs from type %s' % str(type(x)))
 
+
 def _parse_objects(x, remote_instance=None):
     """ Helper class to extract objects for plotting.
 
@@ -493,7 +500,7 @@ def _parse_objects(x, remote_instance=None):
         if isinstance(ob, (str, int)):
             try:
                 skids.append(int(ob))
-            except:
+            except BaseException:
                 pass
 
     # Collect neuron objects and collate to single Neuronlist
@@ -539,7 +546,8 @@ def _parse_objects(x, remote_instance=None):
     return skids, skdata, dotprops, volumes, points, visuals
 
 
-def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None, post_label=None):
+def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
+             post_label=None):
     """ Generate neuron object from SWC file. This import is following
     format specified here: http://research.mssm.edu/cnic/swc.html
 
@@ -586,25 +594,28 @@ def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None, post_la
 
     # Remove empty entries and generate nodes DataFrame
     nodes = pd.DataFrame([[float(e) for e in row if e != ''] for row in data],
-                         columns=['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id'], dtype=object)
+                         columns=['treenode_id', 'label', 'x', 'y', 'z',
+                                  'radius', 'parent_id'],
+                         dtype=object)
 
     # Root node will have parent=-1 -> set this to None
-    nodes.loc[nodes.parent_id<0, 'parent_id'] = None
+    nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
 
     # Bring radius from um into nm space
     nodes[['x', 'y', 'z', 'radius']] *= 1000
 
-    connectors = pd.DataFrame([], columns=[
-                              'treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'], dtype=object)
+    connectors = pd.DataFrame([], columns=['treenode_id', 'connector_id',
+                                           'relation', 'x', 'y', 'z'],
+                              dtype=object)
 
     if pre_label:
-        pre = nodes[nodes.label==pre_label][['treenode_id','x','y','z']]
+        pre = nodes[nodes.label == pre_label][['treenode_id', 'x', 'y', 'z']]
         pre['connector_id'] = None
         pre['relation'] = 0
         connectors = pd.concat([connectors, pre], axis=0)
 
     if post_label:
-        post = nodes[nodes.label==post_label][['treenode_id','x','y','z']]
+        post = nodes[nodes.label == post_label][['treenode_id', 'x', 'y', 'z']]
         post['connector_id'] = None
         post['relation'] = 1
         connectors = pd.concat([connectors, post], axis=0)
@@ -672,12 +683,13 @@ def to_swc(x, filename=None, export_synapses=False):
             filename = [None] * len(x)
         else:
             filename = _make_iterable(filename)
-        for n,f in zip(x, filename):
+        for n, f in zip(x, filename):
             to_swc(n, f)
         return
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise ValueError('Can only process CatmaidNeurons, got "{}"'.format(type(x)))
+        raise ValueError(
+               'Can only process CatmaidNeurons, got "{}"'.format(type(x)))
 
     # If not specified, generate generic filename
     if isinstance(filename, type(None)):
@@ -685,7 +697,8 @@ def to_swc(x, filename=None, export_synapses=False):
 
     # Check if filename is of correct type
     if not isinstance(filename, str):
-        raise ValueError('Filename must be str or None, got "{}"'.format(type(filename)))
+        raise ValueError(
+               'Filename must be str or None, got "{}"'.format(type(filename)))
 
     # Make sure file ending is correct
     if not filename.endswith('.swc'):
@@ -722,7 +735,7 @@ def to_swc(x, filename=None, export_synapses=False):
     # Reorder columns
     swc = swc[['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']]
     # Coordinates and radius to microns
-    swc.loc[:,['X','Y','Z','Radius']] /= 1000
+    swc.loc[:, ['X', 'Y', 'Z', 'Radius']] /= 1000
 
     with open(filename, 'w') as file:
         # Write header

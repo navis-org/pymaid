@@ -56,7 +56,6 @@ Examples
 # - Github punch card-like figure
 
 from pymaid import core, fetch, utils, config
-import logging
 import pandas as pd
 import numpy as np
 import datetime
@@ -71,6 +70,7 @@ if utils.is_jupyter():
 logger = config.logger
 
 __all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions']
+
 
 def get_user_contributions(x, remote_instance=None):
     """ Takes a list of neurons and returns nodes and synapses contributed
@@ -159,7 +159,13 @@ def get_user_contributions(x, remote_instance=None):
     for u in cont.review_contributors:
         stats['nodes_reviewed'][u] = cont.review_contributors[u]
 
-    return pd.DataFrame([[u, stats['nodes'][u], stats['presynapses'][u], stats['postsynapses'][u], stats['nodes_reviewed'][u]] for u in all_users], columns=['user', 'nodes', 'presynapses', 'postsynapses', 'nodes_reviewed']).sort_values('nodes', ascending=False).reset_index(drop=True)
+    return pd.DataFrame([[u, stats['nodes'][u],
+                             stats['presynapses'][u],
+                             stats['postsynapses'][u],
+                             stats['nodes_reviewed'][u]] for u in all_users],
+                         columns=['user', 'nodes', 'presynapses',
+                                  'postsynapses', 'nodes_reviewed']
+                        ).sort_values('nodes', ascending=False).reset_index(drop=True)
 
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10,
@@ -393,7 +399,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         return all_ts
 
 
-def get_user_actions(users=None, neurons=None, start_date=None, end_date=None, remote_instance=None):
+def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
+                     remote_instance=None):
     """ Get timestamps of users' actions (creations, editions, reviews).
 
     Important

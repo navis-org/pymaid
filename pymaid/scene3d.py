@@ -188,7 +188,7 @@ class Viewer:
 
     @property
     def show_legend(self):
-        """Set to ``True`` to hide neuron legend."""
+        """ Set to ``True`` to hide neuron legend."""
         return self.__show_legend
 
     @show_legend.setter
@@ -203,7 +203,7 @@ class Viewer:
 
     @property
     def legend_font_size(self):
-        """Change legend's font size."""
+        """ Change legend's font size."""
         return self.__legend_font_size
 
     @legend_font_size.setter
@@ -213,7 +213,7 @@ class Viewer:
 
     @property
     def picking(self):
-        """ Allow picking."""
+        """ Set to ``True`` to allow picking."""
         return self.__picking
 
     @picking.setter
@@ -427,7 +427,7 @@ class Viewer:
         if volumes:
             visuals += plotting._volume2vispy(volumes, **kwargs)
         if points:
-            visuals += plotting._points2vispy(points, **kwargs)
+            visuals += plotting._points2vispy(points, **kwargs.get('scatter_kws', {}))
 
         if not visuals:
             raise ValueError('No visuals generated.')
@@ -444,7 +444,7 @@ class Viewer:
         # self.update_legend()
 
     def show(self):
-        """ Show canvas. """
+        """ Show viewer. """
         self.canvas.show()
 
     def close(self):
