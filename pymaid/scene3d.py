@@ -448,7 +448,9 @@ class Viewer:
         self.canvas.show()
 
     def close(self):
-        """ Close canvas. """
+        """ Close viewer. """
+        if self == globals().get('viewer', None):
+            globals().pop('viewer')
         self.canvas.close()
 
     def hide_neurons(self, n):
