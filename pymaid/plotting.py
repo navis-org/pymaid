@@ -1740,8 +1740,8 @@ def _neuron2vispy(x, **kwargs):
 
     Parameters
     ----------
-    x :               core.Dotprops | pd.DataFrame
-                      Dotprop(s) to plot.
+    x :               CatmaidNeuron | CatmaidNeuronList
+                      Neuron(s) to plot.
     color :           list | tuple | array
                       Color to use for plotting.
     colormap :        tuple | dict | array
