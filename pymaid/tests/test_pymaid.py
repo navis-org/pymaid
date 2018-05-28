@@ -41,6 +41,7 @@ From shell:
 
 """
 
+import os
 import matplotlib as mpl
 if os.environ.get('DISPLAY','') == '':
     warnings.warn('No display found. Using non-interactive Agg backend.')
@@ -48,7 +49,6 @@ if os.environ.get('DISPLAY','') == '':
 import matplotlib.pyplot as plt
 
 import unittest
-import os
 import datetime
 
 import pymaid
