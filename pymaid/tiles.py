@@ -400,7 +400,8 @@ class LoadTiles:
                     leave=config.pbar_leave)
 
         # Save start value of pbar (in case we have an external pbar)
-        pbar_start = pbar.n
+        # If pbar_hide is True, there is no pbar.n
+        pbar_start = getattr(pbar, 'n', 0)
 
         while len(threads_closed) != len(threads):
             for t in threads:
@@ -413,7 +414,7 @@ class LoadTiles:
             time.sleep(1)
 
             # Update progress bar
-            p_delta = len(threads_closed) - (pbar.n - pbar_start)
+            p_delta = len(threads_closed) - (getattr(pbar, 'n', 0) - pbar_start)
             pbar.update(p_delta)
 
         # Close and clear pbar
