@@ -142,6 +142,12 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
                 If ``return_skdata==True``. Neuron object with
                 ``nodes.parent_dist`` containing the distances to parent.
 
+    See Also
+    --------
+    ``pymaid.CatmaidNeuron.cable_length``
+                Use this attribute to get the cable length of given neuron.
+                Also works with ``CatmaidNeuronList``.
+
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -157,7 +163,9 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
         elif not return_skdata:
             return sum([calc_cable(skdata.loc[i]) for i in range(skdata.shape[0])])
         else:
-            return core.CatmaidNeuronList([calc_cable(skdata.loc[i], return_skdata=return_skdata) for i in range(skdata.shape[0])])
+            return core.CatmaidNeuronList([calc_cable(skdata.loc[i],
+                                                      return_skdata=return_skdata)
+                                           for i in range(skdata.shape[0])])
     else:
         raise Exception('Unable to interpret data of type', type(skdata))
 
@@ -257,7 +265,8 @@ def to_dotproduct(x):
     return dps
 
 
-def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False, min_twig_size=None):
+def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
+                   min_twig_size=None):
     """ Calculates Strahler Index (SI). Starts with SI of 1 at each leaf and
     walks to root. At forks with different incoming SIs, the highest index is
     continued. At forks with the same incoming SI, highest index + 1 is
