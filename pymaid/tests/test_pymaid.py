@@ -41,6 +41,7 @@ From shell:
 
 """
 
+import warnings
 import os
 import matplotlib as mpl
 if os.environ.get('DISPLAY','') == '':
@@ -57,7 +58,6 @@ import numpy as np
 import networkx as nx
 
 import importlib
-import warnings
 
 try:
     import igraph
