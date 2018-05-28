@@ -83,7 +83,7 @@ except:
     logger.error(
         'R library "nat" not found! Please install from within R.')
 
-__all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid',
+__all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
                   'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
 
 # Set up logging
