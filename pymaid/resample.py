@@ -36,108 +36,9 @@ logger = config.logger
 
 __all__ = sorted(['downsample_neuron', 'resample_neuron'])
 
-def _resample_neuron_spline(x, resample_to, inplace=False):
-    """ Resamples neuron(s) by given resolution. Uses spline interpolation.
 
-    Important
-    ---------
-    Currently, this function replaces treenodes without mapping e.g. synapses
-    or tags back!
-
-    Parameters
-    ----------
-    x :                     {CatmaidNeuron,CatmaidNeuronList}
-                             Neuron(s) to downsample.
-    resampling_factor :      int
-                             Factor by which to reduce the node count.
-    inplace :                bool, optional
-                             If True, will modify original neuron. If False, a
-                             downsampled copy is returned.
-    preserve_cn_treenodes :  bool, optional
-                             If True, treenodes that have connectors are
-                             preserved.
-    preserve_tag_treenodes : bool, optional
-                             If True, treenodes with tags are preserved.
-
-    Returns
-    -------
-    x
-                         Downsampled Pandas Dataframe or CatmaidNeuron object.
-
-    """
-    if isinstance(x, core.CatmaidNeuronList):
-        results = [resample_neuron(
-            x.loc[i], resample_to, inplace=inplace) for i in range(x.shape[0])]
-        if not inplace:
-            return core.CatmaidNeuronList(results)
-    elif not isinstance(x, core.CatmaidNeuron):
-        logger.error('Unexpected datatype: %s' % str(type(x)))
-        raise ValueError
-
-    if not inplace:
-        x = x.copy()
-
-    # Prepare nodes for subsetting
-    nodes = x.nodes.set_index('treenode_id')
-
-    # Iterate over segments
-    for i, seg in enumerate(tqdm(x.segments, desc='Working on segments',
-                                 disable=config.pbar_hide, leave=config.pbar_leave)):
-        # Get length of this segment
-        this_length = graph_utils.dist_between(x, seg[0], seg[-1])
-
-        if this_length < resample_to or len(seg) <= 3:
-            continue
-
-        # Get new number of points on the spline
-        n_nodes = int(this_length / resample_to)
-
-        # Get all coordinates of all nodes in this segment
-        coords = nodes.loc[seg, ['x', 'y', 'z']].values
-
-        # Transpose to get in right format
-        data = coords.T.astype(float)
-
-        try:
-            # Get all knots and info about the interpolated spline
-            tck, u = scipy.interpolate.splprep(data)
-        except:
-            logger.warning('Error downsampling segment {0} ({1} nodes, {2} nm) '.format(
-                i, len(seg), int(this_length), n_nodes))
-            continue
-
-        # Interpolate to new resolution
-        new_coords = scipy.interpolate.splev(np.linspace(0, 1, n_nodes), tck)
-
-        # Change back into x/y/z
-        new_coords = np.array(new_coords).T.round()
-
-        # Now that we have new coordinates, we need to "rewire" the neuron
-        # First, add new treenodes (we're starting at the distal node!) and
-        # discard every treenode but the first and the last
-
-        max_tn_id = x.nodes.treenode_id.max() + 1
-        new_ids = seg[:1] + [max_tn_id +
-                             i for i in range(len(new_coords) - 2)] + seg[-1:]
-
-        new_nodes = pd.DataFrame([[tn, pn, None, co[0], co[1], co[2], -1, 5, 'slab'] for tn, pn, co in zip(new_ids[:-1], new_ids[1:], new_coords[:-1])],
-                                 columns=['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z', 'radius', 'confidence', 'type'])
-        new_nodes.loc[0, 'type'] = x.nodes.set_index(
-            'treenode_id').loc[seg[0], 'type']
-
-        # Remove old treenodes
-        x.nodes = x.nodes[~x.nodes.treenode_id.isin(seg[:-1])]
-
-        # Append new treenodes
-        x.nodes = x.nodes.append(new_nodes, ignore_index=True)
-
-    x._clear_temp_attr()
-
-    if not inplace:
-        return x
-
-
-def resample_neuron(x, resample_to, method='linear', inplace=False):
+def resample_neuron(x, resample_to, method='linear', inplace=False,
+                    skip_errors=True):
     """ Resamples neuron(s) to given NM resolution. Preserves root, leafs,
     branchpoints. Tags, connectors and radii > 0 are mapped onto the closest
     new treenode. Columns "confidence" and "creator" of the treenode table
@@ -152,7 +53,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         Neuron(s) to resample.
     resample_to :       int
                         New resolution in NANOMETERS.
@@ -162,6 +63,9 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     inplace :           bool, optional
                         If True, will modify original neuron. If False, a
                         resampled copy is returned.
+    skip_errors :       bool, optional
+                        If True, will skip errors during interpolation and
+                        only print summary.
 
     Returns
     -------
@@ -181,8 +85,10 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
     if isinstance(x, core.CatmaidNeuronList):
         results = [resample_neuron(x.loc[i], resample_to, inplace=inplace)
-                   for i in trange(x.shape[0], desc='Resampl. neurons',
-                                   disable=config.pbar_hide, leave=config.pbar_leave)]
+                   for i in trange(x.shape[0],
+                                   desc='Resampl. neurons',
+                                   disable=config.pbar_hide,
+                                   leave=config.pbar_leave)]
         if not inplace:
             return core.CatmaidNeuronList(results)
     elif not isinstance(x, core.CatmaidNeuron):
@@ -198,6 +104,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
     new_nodes = []
     max_tn_id = x.nodes.treenode_id.max() + 1
 
+    errors = 0
+
     # Iterate over segments
     for i, seg in enumerate(tqdm(x.small_segments, desc='Proc. segments',
                                  disable=config.pbar_hide, leave=False)):
@@ -211,7 +119,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
         path = np.insert(path, 0, 0)
 
         # If path is too short, just keep the first and last treenode
-        if path[-1] < resample_to:
+        if path[-1] < resample_to or (method == 'cubic' and len(seg) <= 3):
             new_nodes += [[seg[0], seg[-1], None, coords[0]
                            [0], coords[0][1], coords[0][2], -1, 5]]
             continue
@@ -220,10 +128,23 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
         n_nodes = int(path[-1] / resample_to)
         interp_coords = np.linspace(path[0], path[-1], n_nodes)
 
-        # Interpolation func for each axis with the path
-        sampleX = scipy.interpolate.interp1d(path, coords[:, 0], kind=method)
-        sampleY = scipy.interpolate.interp1d(path, coords[:, 1], kind=method)
-        sampleZ = scipy.interpolate.interp1d(path, coords[:, 2], kind=method)
+        try:
+            sampleX = scipy.interpolate.interp1d(path, coords[:, 0], 
+                                                 kind=method)
+            sampleY = scipy.interpolate.interp1d(path, coords[:, 1], 
+                                                 kind=method)
+            sampleZ = scipy.interpolate.interp1d(path, coords[:, 2], 
+                                                 kind=method)
+        except ValueError as e:
+            if skip_errors:
+                errors += 1
+                new_nodes += x.nodes.loc[x.nodes.treenode_id.isin(seg[:-1]),
+                                         ['treenode_id', 'parent_id',
+                                          'creator_id', 'x', 'y', 'z',
+                                          'radius', 'confidence']].values.tolist()
+                continue
+            else:
+                raise e
 
         # Sample each dim
         xnew = sampleX(interp_coords)
@@ -243,6 +164,9 @@ def resample_neuron(x, resample_to, method='linear', inplace=False):
 
         # Increase max index
         max_tn_id += len(new_ids)
+
+    if errors:
+        logger.warning('{} ({:.0%}) segments skipped due to errors'.format(errors, errors/i))
 
     # Add root node(s)
     root = x.root
