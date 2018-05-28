@@ -590,14 +590,14 @@ class TestMorpho(unittest.TestCase):
     @try_conditions
     def test_remove_branches(self):
         self.assertIsInstance(pymaid.remove_tagged_branches(self.nl[0],
-                                                            'ends',
+                                                            'not a branch',
                                                             how='segment',
                                                             preserve_connectors=True,
                                                             inplace=False),
                               pymaid.CatmaidNeuron)
 
         self.assertIsInstance(pymaid.remove_tagged_branches(self.nl[0],
-                                                            'ends',
+                                                            'not a branch',
                                                             how='distal',
                                                             preserve_connectors=True,
                                                             inplace=False),
