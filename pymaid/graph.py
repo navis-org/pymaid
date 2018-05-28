@@ -208,7 +208,7 @@ def neuron2nx(x):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
 
     Returns
     -------
@@ -253,7 +253,7 @@ def neuron2igraph(x):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
 
     Returns
     -------
@@ -344,11 +344,11 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
     Parameters
     ----------
     x :         single CatmaidNeuron
-    tree_type : {'c','normal'}, optional
+    tree_type : 'c' | 'normal', optional
                 Type of KDTree:
                   1. 'c' = scipy.spatial.cKDTree (faster)
                   2. 'normal' = scipy.spatial.KDTree (more functions)
-    data :      {'treenodes', 'connectors'}, optional
+    data :      'treenodes' | 'connectors', optional
                 Data to use to generate tree.
     **kwargs
                 Keyword arguments passed at KDTree initialization.

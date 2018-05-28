@@ -51,7 +51,7 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron, CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         Neuron(s) to calculate confidence for.
     confidences :       list of five floats, optional
                         Values by which the confidence of the downstream
@@ -121,7 +121,7 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     Parameters
     ----------
-    skdata :            {int, str, CatmaidNeuron, CatmaidNeuronList}
+    skdata :            int | str | CatmaidNeuron | CatmaidNeuronList
                         If skeleton ID (str or in), 3D skeleton data will be
                         pulled from CATMAID server.
     smoothing :         int, optional
@@ -208,7 +208,7 @@ def to_dotproduct(x):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron}
+    x :         CatmaidNeuron
                 Single neuron
 
     Returns
@@ -274,11 +274,11 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron, CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         E.g. from  ``pymaid.get_neuron()``.
     inplace :           bool, optional
                         If False, a copy of original skdata is returned.
-    method :            {'standard','greedy'}, optional
+    method :            'standard' | 'greedy', optional
                         Method used to calculate strahler indices: 'standard'
                         will use the method described above; 'greedy' will
                         always increase the index at converging branches
@@ -461,8 +461,8 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
 
     Parameters
     ----------
-    x :             {core.CatmaidNeuron, core.CatmaidNeuronList}
-    to_prune :      {int, list, range}, optional
+    x :             CatmaidNeuron | CatmaidNeuronList
+    to_prune :      int | list | range, optional
                     Strahler indices to prune:
 
                       (1) ``to_prune=1`` removes all leaf branches
@@ -565,10 +565,10 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron, CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         Neuron(s) to split into axon, dendrite (and primary
                         neurite).
-    method :            {'centrifugal','centripetal','sum', 'bending'}, optional
+    method :            'centrifugal' | 'centripetal' | 'sum' | 'bending', optional
                         Type of flow centrality to use to split the neuron.
                         There are four flavors: the first three refer to
                         :func:`~pymaid.flow_centrality`, the last
@@ -695,11 +695,11 @@ def segregation_index(x, centrality_method='centrifugal'):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron, CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         Neuron to calculate segregation index (SI). If a
                         NeuronList is provided, will assume that this is a
                         split.
-    centrality_method : {'centrifugal','centripetal','sum', 'bending'}, optional
+    centrality_method : 'centrifugal' | 'centripetal' | 'sum' | 'bending', optional
                         Type of flow centrality to use to split the neuron.
                         There are four flavors: the first three refer to
                         :func:`~pymaid.flow_centrality`, the last
@@ -783,7 +783,7 @@ def bending_flow(x, polypre=False):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) to calculate bending flow for
     polypre :   bool, optional
                 Whether to consider the number of presynapses as a multiple of
@@ -899,9 +899,9 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) to calculate flow centrality for
-    mode :      {'centrifugal','centripetal','sum'}, optional
+    mode :      'centrifugal' | 'centripetal' | 'sum', optional
                 Type of flow centrality to calculate. There are three flavors::
                 (1) centrifugal, counts paths from proximal inputs to distal outputs
                 (2) centripetal, counts paths from distal inputs to proximal outputs
@@ -1062,14 +1062,14 @@ def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
 
     Parameters
     ----------
-    x :                 CatmaidNeuron/CatmaidNeuronList
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         Neurons to stitch.
     tn_to_stitch :      List of treenode IDs, optional
                         If provided, these treenodes will be preferentially
                         used to stitch neurons together. If there are more
                         than two possible treenodes for a single stitching
                         operation, the two closest are used.
-    method :            {'LEAFS','ALL','NONE'}, optional
+    method :            'LEAFS' | 'ALL' | 'NONE', optional
                         Set stitching method:
                             (1) 'LEAFS': only leaf (including root) nodes will
                                 be considered for stitching
@@ -1206,7 +1206,7 @@ def average_neurons(x, limit=10, base_neuron=None):
                     Neurons to be averaged.
     limit :         int, optional
                     Max distance for nearest neighbour search. In microns.
-    base_neuron :   {skeleton_ID, CatmaidNeuron}, optional
+    base_neuron :   skeleton_ID | CatmaidNeuron, optional
                     Neuron to use as template for averaging. If not provided,
                     the first neuron in the list is used as template!
 
@@ -1309,8 +1309,8 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList}
-    seg_length :        {int, float, list}, optional
+    x :                 CatmaidNeuron | CatmaidNeuronList
+    seg_length :        int | float | list, optional
                         Target Segment length(s) L in microns [um]. Will try
                         resampling neuron to this resolution. Please note that
                         the final segment length is restricted by the neuron's
@@ -1323,7 +1323,7 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
 
     Returns
     -------
-    tortuosity :        {float, np.array, pandas.DataFrame}
+    tortuosity :        float | np.array | pandas.DataFrame
                         If x is CatmaidNeuronList, will return DataFrame.
                         If x is single CatmaidNeuron, will return either a
                         single float (if single seg_length is queried) or a
@@ -1396,11 +1396,11 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
 
     Parameters
     ----------
-    x :                   {CatmaidNeuron, CatmaidNeuronList}
+    x :                   CatmaidNeuron | CatmaidNeuronList
                           Neuron(s) to be processed.
-    tag :                 {str}
+    tag :                 str
                           Treeode tag to use.
-    how :                 {'segment', 'distal', 'proximal'}, optional
+    how :                 'segment' | 'distal' | 'proximal', optional
                           Method of removal:
                             1. `segment` removes entire segment
                             2. `distal`/`proximal` removes everything
@@ -1571,9 +1571,9 @@ def despike_neuron(x, sigma=5, inplace=False):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) to be processed.
-    sigma :     {float, int}, optional
+    sigma :     float | int, optional
                 Threshold for spike detection. Smaller sigma = more
                 promiscuous spike detection. See notes.
     inplace :   bool, optional

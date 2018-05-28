@@ -142,7 +142,7 @@ def neuron2json(x, **kwargs):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
     **kwargs
                 Parameters passed to ``json.dumps()`` and
                 ``pandas.DataFrame.to_json()``.
@@ -192,7 +192,7 @@ def json2neuron(s, **kwargs):
 
     Parameters
     ----------
-    s :         {str}
+    s :         str
                 JSON-formatted string.
     **kwargs
                 Parameters passed to ``json.loads()`` and
@@ -268,15 +268,15 @@ def eval_skids(x, remote_instance=None):
 
     Parameters
     ----------
-    x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
+    x :             int | str | CatmaidNeuron | CatmaidNeuronList | DataFrame
                     Your options are either::
                     1. int or list of ints:
                         - will be assumed to be skeleton IDs
                     2. str or list of str:
                         - if convertible to int, will be interpreted as x
-                        - elif start with 'annotation:' will be assumed to be
+                        - if starts with 'annotation:' will be assumed to be
                           annotations
-                        - else, will be assumed to be neuron names
+                        - else will be assumed to be neuron names
                     3. For CatmaidNeuron/List or pandas.DataFrames/Series:
                         - will look for ``skeleton_id`` attribute
     remote_instance : CatmaidInstance, optional
@@ -358,7 +358,7 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
 
     Parameters
     ----------
-    x :         {int, str, list of either}
+    x :         int | str | list of either
                 Users to check.
     user_list : pd.DataFrame, optional
                 User list from :func:`~pymaid.get_user_list`. If you
@@ -408,7 +408,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
 
     Parameters
     ----------
-    x :             {int, str, CatmaidNeuron, CatmaidNeuronList, DataFrame}
+    x :             int | str | CatmaidNeuron | CatmaidNeuronList | DataFrame
                     Your options are either::
                     1. int or list of ints will be assumed to be node IDs
                     2. str or list of str will be checked if convertible to int
@@ -566,7 +566,7 @@ def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
     neuron_id :         int, optional
                         Unique identifier (essentially skeleton ID). If not
                         provided, will generate one from scratch.
-    pre/post_label :    {bool, int}, optional
+    pre/post_label :    bool | int, optional
                         If not ``None``, will try to extract pre-/postsynapses
                         from label column.
 
@@ -661,10 +661,10 @@ def to_swc(x, filename=None, export_synapses=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron, CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         If multiple neurons, will generate a single SWC file
                         for each neurons (see also ``filename``).
-    filename :          (None, str, list), optional
+    filename :          None | str | list, optional
                         If ``None``, will use "neuron_{skeletonID}.swc". Pass
                         filenames as list when processing multiple neurons.
     export_synapses :   bool, optional
@@ -689,7 +689,7 @@ def to_swc(x, filename=None, export_synapses=False):
 
     if not isinstance(x, core.CatmaidNeuron):
         raise ValueError(
-               'Can only process CatmaidNeurons, got "{}"'.format(type(x)))
+                'Can only process CatmaidNeurons, got "{}"'.format(type(x)))
 
     # If not specified, generate generic filename
     if isinstance(filename, type(None)):
@@ -698,7 +698,7 @@ def to_swc(x, filename=None, export_synapses=False):
     # Check if filename is of correct type
     if not isinstance(filename, str):
         raise ValueError(
-               'Filename must be str or None, got "{}"'.format(type(filename)))
+                'Filename must be str or None, got "{}"'.format(type(filename)))
 
     # Make sure file ending is correct
     if not filename.endswith('.swc'):

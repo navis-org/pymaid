@@ -209,7 +209,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        x                   {skeletonID, CatmaidNeuron}
+        x                   skeletonID | CatmaidNeuron
                             Data to construct neuron from.
         remote_instance :   CatmaidInstance, optional
                             Storing this makes it more convenient to retrieve
@@ -795,7 +795,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        new_root :  {int, str}
+        new_root :  int | str
                     Either treenode ID or node tag.
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
@@ -826,7 +826,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        node :      {treenode_id, node_tag}
+        node :      treenode_id | node_tag
                     Provide either treenode ID(s) or a unique tag(s)
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
@@ -860,7 +860,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        node :      {treenode_id, node tag}
+        node :      treenode_id | node tag
                     Provide either a treenode ID or a (unique) tag
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
@@ -896,7 +896,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        to_prune :  {int, list, range}, optional
+        to_prune :  int | list | range, optional
                     Strahler indices to prune.
                     1. ``to_prune = 1`` removes all leaf branches
                     2. ``to_prune = [1,2]`` removes indices 1 and 2
@@ -968,9 +968,9 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        v :         {str, pymaid.Volume, list of either}
+        v :         str | pymaid.Volume | list of either
                     Volume(s) to check for intersection
-        mode :      {'IN','OUT'}, optional
+        mode :      'IN' | 'OUT', optional
                     If 'IN', parts of the neuron inside the volume are kept.
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
@@ -1125,7 +1125,7 @@ class CatmaidNeuron:
 
         Parameters
         ----------
-        filename :      (str, None), optional
+        filename :      str | None, optional
                         If ``None``, will use "neuron_{skeletonID}.swc".
 
         Returns
@@ -1674,7 +1674,7 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        new_root :  {int, str, list of either}
+        new_root :  int | str | list of either
                     Either treenode IDs or node tag(s). If not a list, the
                     same tag is used to reroot all neurons.
         inplace :   bool, optional
@@ -1826,7 +1826,7 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        to_prune :  {int, list, range}, optional
+        to_prune :  int | list | range, optional
                     Strahler indices to prune.
                     1. ``to_prune = 1`` remove all leaf branches
                     2. ``to_prune = [1,2]`` remove indices 1 and 2
@@ -1929,9 +1929,9 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        v :         {str, pymaid.Volume, list of either}
+        v :         str | pymaid.Volume | list of either
                     Volume(s) to check for intersection.
-        mode :      {'IN','OUT'}, optional
+        mode :      'IN' | 'OUT', optional
                     If 'IN', part of the neuron inside the volume(s) is kept.
         inplace :   bool, optional
                     If False, a pruned COPY of this CatmaidNeuronList is
@@ -2184,7 +2184,7 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        x :               {str, list of str}
+        x :               str | list of str
                           Annotation(s) to filter for. Use tilde (~) as prefix
                           to look for neurons WITHOUT given annotation(s).
         intersect :       bool, optional
@@ -2303,7 +2303,7 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        filenames :  (None, str, list), optional
+        filenames :  None | str | list, optional
                      If ``None``, will use "neuron_{skeletonID}.swc". Pass
                      filenames as list when processing multiple neurons.
 
@@ -2635,7 +2635,7 @@ class Volume(dict):
                     Alpha value to influence the gooeyness of the border.
                     Smaller numbers don't fall inward as much as larger
                     numbers. Too large, and you lose everything!
-        view :      {'xy','xz','yz'}, optional
+        view :      'xy' | 'xz' | 'yz', optional
                     Determines if frontal, lateral or top view.
 
         Returns

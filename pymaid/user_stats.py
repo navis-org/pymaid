@@ -198,7 +198,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                         If False, treenodes will not be taken into account
     connectors :        bool, optional
                         If False, connectors will not be taken into account
-    mode :              {'SUM','OVER_TIME','ACTIONS'}, optional
+    mode :              'SUM' | 'OVER_TIME' | 'ACTIONS', optional
                         (1) 'SUM' will return total time invested (in minutes)
                             per user.
                         (2) 'OVER_TIME' will return minutes invested/day over
@@ -416,15 +416,15 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
 
     Parameters
     ----------
-    users :           {list}, optional
-                      List of users (logins) for which to return timestamps.
-    neurons :         {list of skeleton IDs, CatmaidNeuron/List}, optional
+    users :           str | list, optional
+                      Users login(s) for which to return timestamps.
+    neurons :         list of skeleton IDs | CatmaidNeuron/List, optional
                       Neurons for which to return timestamps. If None, will
                       find neurons by user.
-    start_date :      {tuple, datetime.date}, optional
-    end_date :        {tuple, datetime.date}, optional
+    start_date :      tuple | datetime.date, optional
+    end_date :        tuple | datetime.date, optional
                       Start and end date of time window to check.
-    remote_instance : {CatmaidInstance}, optional
+    remote_instance : CatmaidInstance, optional
 
     Return
     ------

@@ -249,7 +249,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     Parameters
     ----------
-    skdata :                 {CatmaidNeuron,CatmaidNeuronList}
+    skdata :                 CatmaidNeuron | CatmaidNeuronList
                              Neuron(s) to downsample.
     resampling_factor :      int
                              Factor by which to reduce the node count.

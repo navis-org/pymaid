@@ -41,14 +41,13 @@ Examples
 import pandas as pd
 import numpy as np
 from pymaid import core, utils, config
-import logging
 import colorsys
 import json
 import os
 
 try:
     import bpy
-except:
+except ImportError:
     raise ImportError(
         'Unable to load bpy - this module only works from within Blender!')
 
@@ -113,35 +112,35 @@ class handler:
                 color=(0, 1, 0)),
         3: dict(name='abutting',
                 color=(1, 0, 1))
-    } #: defines default colours/names for different connector types
+    }  # : defines default colours/names for different connector types
 
     def __init__(self, conversion=1 / 10000):
         self.conversion = conversion
         self.cn_dict = handler.cn_dict
 
     def _selection_helper(self, type):
-        return [ ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == type ]
+        return [ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == type]
 
     def _cn_selection_helper(self, cn_type):
-        return [ ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == 'CONNECTORS' and ob['cn_type'] == cn_type ]
+        return [ob.name for ob in bpy.data.objects if 'type' in ob and ob['type'] == 'CONNECTORS' and ob['cn_type'] == cn_type]
 
     def __getattr__(self, key):
         if key == 'neurons' or key == 'neuron' or key == 'neurites':
-            return object_list( self._selection_helper('NEURON') )
+            return object_list(self._selection_helper('NEURON'))
         elif key == 'connectors' or key == 'connector':
-            return object_list( self._selection_helper('CONNECTORS') )
+            return object_list(self._selection_helper('CONNECTORS'))
         elif key == 'soma' or key == 'somas':
-            return object_list( self._selection_helper('SOMA') )
+            return object_list(self._selection_helper('SOMA'))
         elif key == 'selected':
             return object_list([ob.name for ob in bpy.context.selected_objects if 'catmaid_object' in ob])
         elif key == 'presynapses':
-            return object_list( self._cn_selection_helper(0) )
+            return object_list(self._cn_selection_helper(0))
         elif key == 'postsynapses':
-            return object_list( self._cn_selection_helper(1) )
+            return object_list(self._cn_selection_helper(1))
         elif key == 'gapjunctions':
-            return object_list( self._cn_selection_helper(2) )
+            return object_list(self._cn_selection_helper(2))
         elif key == 'abutting':
-            return object_list( self._cn_selection_helper(3) )
+            return object_list(self._cn_selection_helper(3))
         elif key == 'all':
             return self.neurons + self.connectors + self.soma
         else:
@@ -152,7 +151,7 @@ class handler:
 
         Parameters
         ----------
-        x :             {CatmaidNeuron, CatmaidNeuronList, core.Volume}
+        x :             CatmaidNeuron | CatmaidNeuronList | core.Volume
                         Objects to import into Blender
         neurites :      bool, optional
                         Plot neurites. Default = True
@@ -169,13 +168,13 @@ class handler:
             self._create_neuron(x, neurites=neurites,
                                 soma=soma, connectors=connectors)
         elif isinstance(x, core.CatmaidNeuronList):
-            for i,n in enumerate(x):
+            for i, n in enumerate(x):
                 self._create_neuron(n, neurites=neurites,
                                     soma=soma, connectors=connectors)
                 if redraw:
                     bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
         elif isinstance(x, core.Volume):
-            self._create_mesh( x )
+            self._create_mesh(x)
         else:
             logger.error(
                 'Unable to interpret data type ' + str(type(x)))
@@ -206,7 +205,8 @@ class handler:
     def _create_neurites(self, x, mat):
         """Create neuron branches """
         cu = bpy.data.curves.new(x.neuron_name + ' mesh', 'CURVE')
-        ob = bpy.data.objects.new('#%s - %s' % (x.skeleton_id, x.neuron_name), cu)
+        ob = bpy.data.objects.new('#%s - %s' %
+                                  (x.skeleton_id, x.neuron_name), cu)
         bpy.context.scene.objects.link(ob)
         ob.location = (0, 0, 0)
         ob.show_name = True
@@ -219,11 +219,12 @@ class handler:
         cu.bevel_depth = 0.007
 
         # Create dictionary (MUCH fast lookup)
-        node_locs = { r.treenode_id : (r.x,r.y,r.z) for r in x.nodes.itertuples() }
+        node_locs = {r.treenode_id: (r.x, r.y, r.z)
+                     for r in x.nodes.itertuples()}
 
         for s in x.segments:
             newSpline = cu.splines.new('POLY')
-            coords = np.vstack( [node_locs[tn] for tn in s ] ).astype(float)
+            coords = np.vstack([node_locs[tn] for tn in s]).astype(float)
             coords *= float(self.conversion)
 
             ids = x.nodes.treenode_id.tolist()
@@ -234,7 +235,7 @@ class handler:
             # Move points
             for i, p in enumerate(coords):
                 newSpline.points[i].co = (p[0], p[2], -p[1], 0)
-                #Hijack weight property to store treenode ID
+                # Hijack weight property to store treenode ID
                 newSpline.points[i].weight = int(ids[i])
 
         ob.active_material = mat
@@ -252,7 +253,7 @@ class handler:
                                                            l for l in bpy.context.scene.layers]
                                                        )
         bpy.ops.object.shade_smooth()
-        bpy.context.active_object.name = 'Soma of #{0}'.format( x.skeleton_id )
+        bpy.context.active_object.name = 'Soma of #{0}'.format(x.skeleton_id)
         bpy.context.active_object['type'] = 'SOMA'
         bpy.context.active_object['catmaid_object'] = True
         bpy.context.active_object['skeleton_id'] = x.skeleton_id
@@ -318,7 +319,7 @@ class handler:
 
         Parameters
         ----------
-        volume :    {core.Volume, dict}
+        volume :    core.Volume | dict
                     Must contain 'faces', 'vertices'
         """
         mesh_name = volume.get('name', 'mesh')
@@ -333,7 +334,7 @@ class handler:
         verts[1] *= -1
 
         # Switch y and z
-        blender_verts = verts[[0,2,1]].values.tolist()
+        blender_verts = verts[[0, 2, 1]].values.tolist()
 
         me = bpy.data.meshes.new(mesh_name + '_mesh')
         ob = bpy.data.objects.new(mesh_name, me)
@@ -353,7 +354,7 @@ class handler:
 
         Parameters
         ----------
-        x :     {list of skeleton IDs, CatmaidNeuron/List, pd Dataframe}
+        x :     list of skeleton IDs | CatmaidNeuron/List | pd Dataframe
 
         Returns
         -------
@@ -505,11 +506,11 @@ class object_list:
         self.handler = handler
 
     def __getattr__(self, key):
-        if key in ['neurons','neuron','neurites']:
+        if key in ['neurons', 'neuron', 'neurites']:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'NEURON'])
         elif key in ['connectors', 'connector']:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS'])
-        elif key in ['soma','somas']:
+        elif key in ['soma', 'somas']:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'SOMA'])
         elif key == 'presynapses':
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS' and bpy.data.objects[n]['cn_type'] == 0])
@@ -519,8 +520,8 @@ class object_list:
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS' and bpy.data.objects[n]['cn_type'] == 2])
         elif key == 'abutting':
             return object_list([n for n in self.object_names if n in bpy.data.objects and bpy.data.objects[n]['type'] == 'CONNECTORS' and bpy.data.objects[n]['cn_type'] == 3])
-        elif key in ['skeleton_id','skeleton_ids','skeletonid','skeletonids','skid','skids']:
-            return [ bpy.data.objects[n]['skeleton_id'] for n in self.object_names if n in bpy.data.objects ]
+        elif key in ['skeleton_id', 'skeleton_ids', 'skeletonid', 'skeletonids', 'skid', 'skids']:
+            return [bpy.data.objects[n]['skeleton_id'] for n in self.object_names if n in bpy.data.objects]
         else:
             raise AttributeError('Unknown attribute ' + key)
 
@@ -587,21 +588,21 @@ class object_list:
             if n in bpy.data.objects:
                 bpy.data.objects[n].active_material.diffuse_color = c
 
-    def emit(self,e):
+    def emit(self, e):
         """ Change emit value.
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.active_material.emit = e
 
-    def use_transparency(self,t):
+    def use_transparency(self, t):
         """ Change transparency (True/False)
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.active_material.use_transparency = t
 
-    def alpha(self,a):
+    def alpha(self, a):
         """ Change alpha (0-1).
         """
         for ob in bpy.data.objects:
@@ -656,19 +657,19 @@ class object_list:
                     Filename to save selection to
         """
 
-        neuron_objects = [ n for n in bpy.data.objects if n.name in self.object_names and n['type'] == 'NEURON']
+        neuron_objects = [
+            n for n in bpy.data.objects if n.name in self.object_names and n['type'] == 'NEURON']
 
         data = [dict(skeleton_id=int(n['skeleton_id']),
-                     color="#{:02x}{:02x}{:02x}".format( int(255*n.active_material.diffuse_color[0]),
-                                                         int(255*n.active_material.diffuse_color[1]),
-                                                         int(255*n.active_material.diffuse_color[2]) ),
+                     color="#{:02x}{:02x}{:02x}".format(int(255 * n.active_material.diffuse_color[0]),
+                                                        int(255 *
+                                                            n.active_material.diffuse_color[1]),
+                                                        int(255 * n.active_material.diffuse_color[2])),
                      opacity=1
-                     ) for n in neuron_objects ]
+                     ) for n in neuron_objects]
 
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
         logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
-        print('Selection saved as {0} in {1}'.format( fname, os.getcwd() ) )
-
-
+        print('Selection saved as {0} in {1}'.format(fname, os.getcwd()))

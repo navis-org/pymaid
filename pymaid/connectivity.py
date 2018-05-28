@@ -18,7 +18,6 @@
 """ This module contains functions to analyse connectivity.
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import scipy
@@ -55,7 +54,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                         Currently accepts either:
                          (1) Connectivity table from :func:`~pymaid.get_partners`
                          (2) Adjacency matrix from :func:`~pymaid.adjacency_matrix`
-    restrict_to :       {str, pymaid.Volume, CatmaidNeuronList}
+    restrict_to :       str | pymaid.Volume | CatmaidNeuronList
                         Volume or neurons to restrict connectivity to. Strings
                         will be interpreted as volumes.
     remote_instance :   CATMAID instance, optional
@@ -239,11 +238,11 @@ def cable_overlap(a, b, dist=2, method='min'):
 
     Parameters
     ----------
-    a,b :       {CatmaidNeuron, CatmaidNeuronList}
+    a,b :       CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) for which to compute cable within distance.
     dist :      int, optional
                 Maximum distance in microns.
-    method :    {'min','max','avg'}
+    method :    'min' | 'max' | 'avg'
                 Method by which to calculate the overlapping cable between
                 two cables. Assuming that neurons A and B have 300 and 150
                 um of cable within given distances, respectively:
@@ -347,9 +346,9 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
 
     Parameters
     ----------
-    a,b :       {CatmaidNeuron, CatmaidNeuronList}
+    a,b :       CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) for which to compute potential connectivity.
-    method :    {'possible_contacts'}
+    method :    'possible_contacts'
                 Method to use for calculations. Currently only one implemented.
     **kwargs :  Keyword arguments.
                 1. For method = 'possible_contacts':
@@ -463,7 +462,7 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
 
     Parameters
     ----------
-    a, b :      {core.CatmaidNeuron, core.CatmaidNeuronList, skeleton IDs}
+    a, b :      CatmaidNeuron | CatmaidNeuronList | skeleton IDs
                 Either a or b HAS to be a neuron object.
                 If ``b=None``, will use ``b=a``.
     """
@@ -631,12 +630,13 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
     return matrix
 
 
-def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False, method='SUM'):
+def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
+                 method='SUM'):
     """ Groups adjacency matrix into neuron groups.
 
     Parameters
     ----------
-    mat :               {pandas.DataFrame, numpy.array}
+    mat :               pandas.DataFrame | numpy.array
                         Matrix to group.
     row_groups :        dict, optional
                         Row groups to be formed. Can be either:
@@ -648,7 +648,7 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False, method
     drop_ungrouped :    bool, optional
                         If ungrouped, neurons that are not part of a
                         row/col_group are dropped from the matrix.
-    method :            {'AVERAGE', 'MAX', 'MIN','SUM'}, optional
+    method :            'AVERAGE' | 'MAX' | 'MIN' | 'SUM', optional
                         Method by which values are collapsed into groups.
 
     Returns

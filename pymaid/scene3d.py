@@ -400,7 +400,7 @@ class Viewer:
 
         Parameters
         ----------
-        x :         {skeleton IDs, CatmaidNeuron/List, Dotprops, Volumes, Points, vispy Visuals}
+        x :         skeleton IDs | CatmaidNeuron/List | Dotprops | Volumes | Points | vispy Visuals
                     Object(s) to add to the canvas.
         center :    bool, optional
                     If True re-center camera to all objects on canvas.
@@ -528,7 +528,7 @@ class Viewer:
 
         Parameters
         ----------
-        c :      {tuple, dict}
+        c :      tuple | dict
                  RGB color(s) to apply. Values must be 0-1. Accepted:
                    1. Tuple of single color. Applied to all visible neurons.
                    2. Dictionary mapping skeleton IDs to colors.

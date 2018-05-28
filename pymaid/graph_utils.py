@@ -47,9 +47,9 @@ def _generate_segments(x, weight=None):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron,CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 May contain multiple neurons.
-    weight :    {'weight', None}, optional
+    weight :    'weight' | None, optional
                 If ``"weight"`` use physical length to determine segment
                 length. If ``None`` use number of nodes.
 
@@ -133,7 +133,7 @@ def _break_segments(x):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron,CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 May contain multiple neurons.
 
     Returns
@@ -226,7 +226,7 @@ def classify_nodes(x, inplace=True):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron,CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) whose nodes to classify nodes.
     inplace :   bool, optional
                 If ``False``, nodes will be classified on a copy which is then
@@ -293,7 +293,7 @@ def distal_to(x, a=None, b=None):
     Parameters
     ----------
     x :     CatmaidNeuron
-    a,b :   {single treenode ID, list of treenode IDs, None}, optional
+    a,b :   single treenode ID | list of treenode IDs | None, optional
             If no treenode IDs are provided, will consider all treenodes.
 
     Returns
@@ -385,15 +385,15 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 If list, must contain a SINGLE neuron.
-    tn_ids :    {list, numpy.ndarray}, optional
+    tn_ids :    list | numpy.ndarray, optional
                 Treenode IDs. If provided, will compute distances only FROM
                 this subset to all other nodes.
     directed :  bool, optional
                 If True, pairs without a child->parent path will be returned
                 with ``distance = "inf"``.
-    weight :    {'weight', None}, optional
+    weight :    'weight' | None, optional
                 If ``weight`` distances are given as physical length.
                 if ``None`` distances is number of nodes.
 
@@ -452,7 +452,7 @@ def dist_between(x, a, b):
 
     Parameters
     ----------
-    x :             {CatmaidNeuron, CatmaidNeuronList}
+    x :             CatmaidNeuron | CatmaidNeuronList
                     Neuron containing the nodes.
     a,b :           treenode IDs
                     Treenodes to check.
@@ -522,7 +522,7 @@ def find_main_branchpoint(x, reroot_to_soma=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron, CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         May contain multiple neurons.
     reroot_to_soma :    bool, optional
                         If True, neuron will be rerooted to soma.
@@ -573,7 +573,7 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         May contain only a single neuron.
     n :                 int, optional
                         Number of fragments to split into. Must be >1.
@@ -671,9 +671,9 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
 
     Parameters
     ----------
-    x :                 {CatmaidNeuron,CatmaidNeuronList}
+    x :                 CatmaidNeuron | CatmaidNeuronList
                         May contain only a single neuron.
-    n :                 {int, slice}, optional
+    n :                 int | slice, optional
                         Number of longest neurites to preserve. For example:
                          - ``n=1`` preserves the longest neurites
                          - ``n=2`` preserves two longest neurites
@@ -736,9 +736,9 @@ def reroot_neuron(x, new_root, inplace=False):
 
     Parameters
     ----------
-    x :        {CatmaidNeuron, CatmaidNeuronList}
+    x :        CatmaidNeuron | CatmaidNeuronList
                List must contain a SINGLE neuron.
-    new_root : {int, str}
+    new_root : int | str
                Node ID or tag of the node to reroot to.
     inplace :  bool, optional
                If True the input neuron will be rerooted.
@@ -885,11 +885,11 @@ def cut_neuron(x, cut_node, ret='both'):
 
     Parameters
     ----------
-    x :        {CatmaidNeuron, CatmaidNeuronList}
+    x :        CatmaidNeuron | CatmaidNeuronList
                Must be a single neuron.
-    cut_node : {int, str}
+    cut_node : int | str
                Node ID or a tag of the node to cut.
-    ret :      {'proximal','distal','both'}, optional
+    ret :      'proximal' | 'distal' | 'both', optional
                Define which parts of the neuron to return. Use this to speed
                up processing.
 
@@ -1073,7 +1073,7 @@ def subset_neuron(x, subset, clear_temp=True, keep_connectors=False,
     Parameters
     ----------
     x :               CatmaidNeuron
-    subset :          {np.ndarray, NetworkX.Graph}
+    subset :          np.ndarray | NetworkX.Graph
                       Treenodes to subset the neuron to.
     clear_temp :      bool, optional
                       If True, will reset temporary attributes (graph, node
@@ -1161,7 +1161,7 @@ def generate_list_of_childs(x):
 
     Parameters
     ----------
-    x :     {CatmaidNeuron, CatmaidNeuronList}
+    x :     CatmaidNeuron | CatmaidNeuronList
             If List, must contain a SINGLE neuron.
 
     Returns
@@ -1180,7 +1180,7 @@ def node_label_sorting(x):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron}
+    x :         CatmaidNeuron
 
     Returns
     -------

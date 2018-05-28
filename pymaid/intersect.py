@@ -18,7 +18,6 @@
 """ This module contains functions for intersections.
 """
 
-import logging
 import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -54,12 +53,12 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     Parameters
     ----------
-    x :               {list of tuples, CatmaidNeuron, CatmaidNeuronList}
+    x :               list of tuples | CatmaidNeuron | CatmaidNeuronList
 
                       1. List/numpy.array - ``[ [x1,y1,z1], [x2,y2,z2], .. ]``
                       2. DataFrame - needs to have ``x,y,z`` columns
 
-    volume :          {str, list of str, core.Volume}
+    volume :          str | list of str | core.Volume
                       Name of the CATMAID volume to test OR core.Volume dict
                       as returned by e.g. :func:`~pymaid.get_volume()`.
     inplace :         bool, optional
@@ -67,7 +66,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
                       returned. Does only apply to CatmaidNeuron or
                       CatmaidNeuronList objects. Does apply if multiple
                       volumes are provided.
-    mode :            {'IN','OUT'}, optional
+    mode :            'IN' | 'OUT', optional
                       If 'IN', parts of the neuron that are within the volume
                       are kept.
     remote_instance : CATMAID instance, optional

@@ -50,7 +50,6 @@ Examples
 >>> results.plot( hits = 3 )
 """
 
-import logging
 import os
 import sys
 import time
@@ -97,7 +96,8 @@ def init_rcatmaid(**kwargs):
     ----------
     remote_instance :   CATMAID instance
                         From pymaid.CatmaidInstance(). This is used to
-                        extract credentials. Overrides other credentials provided!
+                        extract credentials. Overrides other credentials
+                        provided!
     server :            str, optional
                         Use this to set server URL if no remote_instance is
                         provided
@@ -267,7 +267,7 @@ def neuron2py(neuron, remote_instance=None):
 
     Parameters
     ----------
-    neuron :            {R neuron, R neuronlist}
+    neuron :            R neuron | R neuronlist
                         Neuron to convert to Python
     remote_instance :   CATMAID instance, optional
                         Provide if you want neuron names to be updated from.
@@ -376,7 +376,7 @@ def neuron2r(neuron, convert_to_um=False):
 
     Parameters
     ----------
-    neuron :        {CatmaidNeuron, CatmaidNeuronList, pandas DataFrame}
+    neuron :        CatmaidNeuron | CatmaidNeuronList | pandas DataFrame
     convert_to_um : bool, optional
                     If True, coordinates are divided by 1000.
 
@@ -499,9 +499,9 @@ def dotprops2py(dp, subset=None):
 
     Parameters
     ----------
-    dp :        {dotprops neuronlist,  neuronlistfh}
-                Dotprops object to convert
-    subset :    {list of str, list of indices }, optional
+    dp :        dotprops neuronlist | neuronlistfh
+                Dotprops object to convert.
+    subset :    list of str | list of indices, optional
                 Neuron names or indices.
 
     Returns
@@ -541,7 +541,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_coun
 
     Parameters
     ----------
-    x :             {skeleton IDs, CatmaidNeuronList, RCatmaid neurons}
+    x :             skeleton IDs | CatmaidNeuronList | RCatmaid neurons
                     Neurons to blast.
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
@@ -688,7 +688,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
                     are on fly's right.
     normalised :    bool, optional
                     Whether to return normalised NBLAST scores.
-    reference :     {string, R file object}, optional
+    reference :     string | R file object, optional
                     Default = 'nat.flybrains::FCWB'
 
     Returns
@@ -910,8 +910,8 @@ class NBLASTresults:
 
         Parameters
         ----------
-        hits :  {int, list of int, str, list of str}, optional
-                nblast hits to plot (default = 5). Can be:
+        hits :  int | str | list thereof, optional
+                Nblast hits to plot (default = 5). Can be:
 
                 1. int: e.g. ``hits=5`` for top 5 hits
                 2 .list of ints: e.g. ``hits=[2,5]`` to plot hits 2 and 5
@@ -983,7 +983,7 @@ class NBLASTresults:
 
         Parameters
         ----------
-        entries :   {int, str, list of int, list of str}, optional
+        entries :   int | str | list thereof, optional
                     Neurons to extract from DPS database. Can be:
 
                     1. int: e.g. ``hits=5`` for top 5 hits

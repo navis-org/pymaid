@@ -49,13 +49,13 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
 
     Parameters
     ----------
-    x :                  {pymaid.CatmaidNeuron}
+    x :                  pymaid.CatmaidNeuron
                          Neuron to cut out.
     output :             str
                          File or folder.
     dimensions :         tuple of int, optional
                          Dimensions of square to cut out in nanometers.
-    interpolate_z_res :  {int, None}, optional
+    interpolate_z_res :  int | None, optional
                          If not none, will interpolate in Z direction to given
                          resolution. Use this to interpolate virtual nodes.
     remote_instance :    pymaid.CatmaidInstance, optional
@@ -144,7 +144,7 @@ class LoadTiles:
 
     Parameters
     ----------
-    bbox :        {list, np.ndarray}
+    bbox :        list | np.ndarray
                   Window to crop: [left, right, top, bottom, z1, z2]
                   If z2 is ommitted, z2 = z1.
     stack_id :    str, optional
@@ -152,7 +152,7 @@ class LoadTiles:
                   fastest server on the project.
     zoom_level :  int, optional
                   Zoom level
-    coords :      {'NM','PIXEL'}, optional
+    coords :      'NM' | 'PIXEL', optional
                   Format of t/l/w/h/z. Can be pixel or nanometers.
     mem_lim :     int, optional
                   Memory limit in megabytes for loading tiles. This restricts
@@ -379,7 +379,7 @@ class LoadTiles:
 
         Parameters
         ----------
-        tiles :     {list, np.ndarray}
+        tiles :     list | np.ndarray
                     Triplets of x/y/z tile indices. E.g. [ (20,10,400 ), (...) ]
         """
         tiles = list(set(tiles))
@@ -516,7 +516,7 @@ class LoadTiles:
         ax :    matplotlib.axes
         font :  PIL font, optional
                 If provided, will write the size below scalebar.
-        pos :   {'lowerleft','upperleft','lowerright','upperright'}, optional
+        pos :   'lowerleft' | 'upperleft' | 'lowerright' | 'upperright', optional
                 Position of scalebar.
         label : bool, optional
                 If True will label scalebar.
@@ -556,11 +556,11 @@ class LoadTiles:
         ax :            matplotlib ax
         slice_x :       int, optional
                         If multi-slice, provide index of slice to label.
-        tn_color :      {str, tuple, dict}
+        tn_color :      str | tuple | dict
                         Map skeleton ID to color.
-        cn_color :      {str, tuple, dict}
+        cn_color :      str | tuple | dict
                         Map connector ID to color.
-        ec :            {str, tuple, dict}
+        ec :            str | tuple | dict
                         Edge color.
         skid_include :  list of int, optional
                         List of skeleton IDs to include.

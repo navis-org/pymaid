@@ -17,7 +17,6 @@
 import numpy as np
 import pandas as pd
 import math
-import logging
 import scipy.cluster
 import scipy.spatial
 import colorsys
@@ -74,13 +73,13 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
     min_nodes :          int, optional
                          Minimum number of nodes for a partners to be
                          considered. Default = 2
-    include_skids :      {see ``x``}, optional
+    include_skids :      see ``x``, optional
                          If filter_skids is not empty, only neurons whose skids
                          are in filter_skids will be considered when
-                         calculating similarity score
-    exclude_skids :      {see ``x``}, optional
+                         calculating similarity score.
+    exclude_skids :      see ``x``, optional
                          Neurons to exclude from calculation of connectivity
-                         similarity
+                         similarity.
     connectivity_table : pd.DataFrame, optional
                          Connectivity table, e.g. from
                          :func:`~pymaid.get_partners`. If provided, will use
@@ -407,11 +406,10 @@ def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000,
     ----------
     (cnA, cnB) :    CatmaidNeuron connector tables
     sigma :         int, optional
-                    Distance in nanometer that is considered to be
-                    "close"
+                    Distance in nanometer that is considered to be "close".
     omega :         int, optional
                     Radius in nanometer over which to calculate
-                    synapse density
+                    synapse density.
 
     Returns
     -------
@@ -500,7 +498,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
     mu_score :          bool, optional
                         If True, score is calculated as mean between A->B and
                         B->A comparison.
-    restrict_cn :       {int, list, None}, optional
+    restrict_cn :       int | list | None, optional
                         Restrict to given connector types:
                             - 0: presynapses
                             - 1: postsynapses
@@ -643,11 +641,11 @@ class ClustResults:
 
         Parameters
         ----------
-        mat :       {np.array, pandas.DataFrame}
+        mat :       numpy.array | pandas.DataFrame
                     Distance or similarity matrix.
         labels :    list, optional
                     Labels for matrix.
-        mat_type :  {'distance','similarity'}, default = 'distance'
+        mat_type :  'distance' | 'similarity', default = 'distance'
                     Sets the type of input matrix:
                       - 'similarity' = high values are more similar
                       - 'distance' = low values are more similar
@@ -779,13 +777,14 @@ class ClustResults:
 
         Parameters
         ----------
-        color_threshold :   {int,float}, optional
-                            Coloring threshold for dendrogram
+        color_threshold :   int | float, optional
+                            Coloring threshold for dendrogram.
         return_dendrogram : bool, optional
-                            If True, dendrogram object is returned instead of figure
+                            If True, dendrogram object is returned instead of
+                            figure.
         labels :            list of str, dict
                             Labels in order of original observation or
-                            dictionary with mapping original labels
+                            dictionary with mapping original labels.
         kwargs
                             Passed to ``scipy.cluster.hierarchy.dendrogram()``
 
@@ -932,18 +931,18 @@ class ClustResults:
 
         Parameters
         ----------
-        k :         {int, float}
-        criterion : {'maxclust','distance'}, optional
-                    If `maxclust`, `k` clusters will be formed. If `distance`,
-                    clusters will be created at threshold `k`.
+        k :         int | float
+        criterion : 'maxclust' | 'distance', optional
+                    If ``maxclust``, ``k`` clusters will be formed. If
+                    ``distance`` clusters will be created at threshold ``k``.
         **kwargs
-                will be passed to plot.plot3d()
-                see help(plot.plot3d) for a list of keywords
+                Will be passed to ``pymaid.plot3d()``. See
+                ``help(plot.plot3d)`` for a list of keywords.
 
         See Also
         --------
-        :func:`pymaid.plot.plot3d`
-                    Function called to generate 3d plot
+        :func:`pymaid.plot3d`
+                    Function called to generate 3d plot.
 
         """
 
@@ -965,11 +964,11 @@ class ClustResults:
         Parameters
         ----------
         fname :     str, optional
-                    Filename to save selection to
-        k :         {int, float}
-        criterion : {'maxclust','distance'}, optional
-                    If `maxclust`, `k` clusters will be formed. If `distance`,
-                    clusters will be created at threshold `k`.
+                    Filename to save selection to.
+        k :         int | float
+        criterion : 'maxclust' | 'distance', optional
+                    If ``maxclust``, ``k`` clusters will be formed. If
+                    ``distance`` clusters will be created at threshold ``k``.
 
         See Also
         --------
@@ -1003,10 +1002,10 @@ class ClustResults:
 
         Parameters
         ----------
-        k :         {int, float}
-        criterion : {'maxclust','distance'}, optional
-                    If `maxclust`, `k` clusters will be formed. If `distance`,
-                    clusters will be created at threshold `k`.
+        k :         int | float
+        criterion : 'maxclust' | 'distance', optional
+                    If ``maxclust``, ``k`` clusters will be formed. If
+                    ``distance`` clusters will be created at threshold ``k``.
 
         Returns
         -------
@@ -1029,11 +1028,12 @@ class ClustResults:
 
         Parameters
         ----------
-        k :             {int, float}
-        criterion :     {'maxclust','distance'}, optional
-                        If `maxclust`, `k` clusters will be formed. If
-                        `distance`, clusters will be created at threshold `k`.
-        return_type :   {'labels','indices','columns','rows'}
+        k :             int | float
+        criterion :     'maxclust' | 'distance', optional
+                        If ``maxclust``, ``k`` clusters will be formed. If
+                        ``distance`` clusters will be created at threshold.
+                        ``k``.
+        return_type :   'labels' | 'indices' | 'columns' | 'rows'
                         Determines what to construct the clusters of. 'labels'
                         only works if labels are provided. 'indices' refers
                         to index in distance matrix. 'columns'/'rows' works

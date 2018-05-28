@@ -167,16 +167,14 @@ def plot2d(x, method='2d', *args, **kwargs):
 
     Parameters
     ----------
-    x :               {skeleton IDs, pymaid.CatmaidNeuron,
-                       pymaid.CatmaidNeuronList, pymaid.CatmaidVolume,
-                       pymaid.Dotprops np.ndarray}
+    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | CatmaidVolume | Dotprops | np.ndarray
                       Objects to plot::
 
                         - int is intepreted as skeleton ID(s)
                         - str is intepreted as volume name(s)
                         - multiple objects can be passed as list (see examples)
                         - numpy array of shape (n,3) is intepreted as scatter
-    method :          {'2d','3d','3d_complex'}
+    method :          '2d' | '3d' | '3d_complex'
                       Method used to generate plot. Comes in three flavours:
                         1. '2d' uses normal matplotlib. Neurons are plotted in
                            the order their are provided. Well behaved when
@@ -189,7 +187,7 @@ def plot2d(x, method='2d', *args, **kwargs):
                            added individually. This allows for more complex
                            crossing patterns to be rendered correctly. Slows
                            down rendering though.
-    remote_instance : Catmaid Instance, optional
+    remote_instance : CatmaidInstance, optional
                       Need this too if you are passing only skids
     *args
                       See Notes for permissible arguments.
@@ -837,7 +835,7 @@ def plot3d(x, *args, **kwargs):
     Parameters
     ----------
 
-    x :               {skeleton IDs, CatmaidNeuron, CatmaidNeuronList, pymaid.Dotprops, pymaid.Volumes}
+    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | pymaid.Dotprops | pymaid.Volumes
                       Objects to plot::
 
                         - int is interpreted as skeleton ID(s)
@@ -847,7 +845,7 @@ def plot3d(x, *args, **kwargs):
     remote_instance : CATMAID Instance, optional
                       Will try using globally defined CatmaidInstance if not
                       provided.
-    backend :         {'vispy','plotly'}, default = 'vispy'
+    backend :         'vispy' | 'plotly', default = 'vispy'
        | ``vispy`` uses OpenGL to generate high-performance 3D plots.
        | ``plotly`` generates 3D plots in html format.
 
@@ -864,7 +862,7 @@ def plot3d(x, *args, **kwargs):
     clear3d :         bool, default=False
                       If True, canvas is cleared before plotting (only for
                       vispy).
-    color :           {tuple, dict}, default=random
+    color :           tuple | dict, default=random
                       Use single tuple (r,g,b) to give all neurons the same
                       color. Use dict to give individual colors to neurons:
                       ``{ skid : (r,g,b), ... }``. R/G/B must be 0-255
@@ -1362,7 +1360,7 @@ def plot_network(x, *args, **kwargs):
                       6. NetworkX Graph
     remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids.
-    layout :          {str, function}, default = nx.spring_layout
+    layout :          str | function, default = nx.spring_layout
                       Layout function. See https://networkx.github.io/documentation/latest/reference/drawing.html
                       for available layouts. Use either the function directly
                       or its name.
@@ -1373,7 +1371,7 @@ def plot_network(x, *args, **kwargs):
     groups :          dict
                       Use to group neurons. Format:
                       ``{ 'Group A' : [skid1, skid2, ..], }``
-    colormap :        {str, tuple, dict }
+    colormap :        str | tuple, dict
                 | Set to 'random' (default) to assign random colors to neurons
                 | Use single tuple to assign the same color to all neurons:
                 | e.g. ``( (220,10,50) )``
@@ -1388,7 +1386,7 @@ def plot_network(x, *args, **kwargs):
     node_hover_text : dict
                       Provide custom hover text for neurons:
                       ``{ neuron1 : 'hover text', .. }``
-    node_size :       {int, dict}
+    node_size :       int | dict
                       | Use int to set node size once.
                       | Use dict to set size for individual nodes:
                       | ``{ neuron1 : 20, neuron2 : 5,  .. }``
@@ -1588,10 +1586,10 @@ def plot1d(x, ax=None, color=None, **kwargs):
 
     Parameters
     ----------
-    x :         {CatmaidNeuron, CatmaidNeuronList}
+    x :         CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) to plot.
     ax :        matplotlib.ax, optional
-    cmap :      {tuple, dict}
+    cmap :      tuple | dict
                 Color. If dict must map skeleton ID to color.
     **kwargs
                 Will be passed to ``matplotlib.patches.Rectangle``.
@@ -1742,11 +1740,11 @@ def _neuron2vispy(x, **kwargs):
 
     Parameters
     ----------
-    x :               {core.Dotprops, pd.DataFrame }
+    x :               core.Dotprops | pd.DataFrame
                       Dotprop(s) to plot.
-    color :           {list, tuple, array}
+    color :           list | tuple | array
                       Color to use for plotting.
-    colormap :        {tuple, dict, array}
+    colormap :        tuple | dict | array
                       Color to use for plotting. Dictionaries should be mapped
                       by skeleton ID. Overrides ``color``.
     connectors :      bool, optional
@@ -1988,9 +1986,9 @@ def _dp2vispy(x, **kwargs):
 
     Parameters
     ----------
-    x :             {core.Dotprops, pd.DataFrame }
+    x :             core.Dotprops | pd.DataFrame
                     Dotprop(s) to plot.
-    colormap :      {tuple, dict, array}
+    colormap :      tuple | dict | array
                     Color to use for plotting. Dictionaries should be mapped
                     by gene name.
     scale_vect :    int, optional
@@ -2081,7 +2079,7 @@ def _points2vispy(x, **kwargs):
     ----------
     x :             list of arrays
                     Points to plot.
-    color :         {tuple, array}
+    color :         tuple | array
                     Color to use for plotting.
     size :          int, optional
                     Marker size.
