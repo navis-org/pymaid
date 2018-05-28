@@ -1,3 +1,2 @@
 git+git://github.com/schlegelp/pymaid@master
-ipywidgets --upgrade
 jupyter_contrib_nbextensions
