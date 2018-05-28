@@ -1589,16 +1589,23 @@ def plot1d(x, ax=None, color=None, **kwargs):
     Parameters
     ----------
     x :         {CatmaidNeuron, CatmaidNeuronList}
-                Neurons to plot.
+                Neuron(s) to plot.
     ax :        matplotlib.ax, optional
     cmap :      {tuple, dict}
                 Color. If dict must map skeleton ID to color.
     **kwargs
-                Will be passed to ``matplotlib.patches.Rectanglez``.
+                Will be passed to ``matplotlib.patches.Rectangle``.
 
     Returns
     -------
     matplotlib.ax
+
+    Examples
+    --------
+    >>> import matplotlib.pyplot as plt
+    >>> n = pymaid.get_neuron(16)
+    >>> ax = pymaid.plot1d(n)
+    >>> plt.show()
 
     """
 
