@@ -18,7 +18,6 @@
 """ This module contains functions to manipulate neuron morphology.
 """
 
-import logging
 import pandas as pd
 import numpy as np
 import scipy
@@ -166,14 +165,15 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         max_tn_id += len(new_ids)
 
     if errors:
-        logger.warning('{} ({:.0%}) segments skipped due to errors'.format(errors, errors/i))
+        logger.warning('{} ({:.0%}) segments skipped due to errors'.format(errors, errors / i))
 
     # Add root node(s)
     root = x.root
     if not isinstance(root, (np.ndarray, list)):
         root = [x.root]
     root = x.nodes.loc[x.nodes.treenode_id.isin(root), [
-        'treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z', 'radius', 'confidence']]
+                        'treenode_id', 'parent_id', 'creator_id', 'x', 'y',
+                        'z', 'radius', 'confidence']]
     new_nodes += [list(r) for r in root.values]
 
     # Generate new nodes dataframe
@@ -184,8 +184,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
                              )
 
     # Convert columns to appropriate dtypes
-    dtypes = {'treenode_id': int, 'parent_id': object, 'x': int, 'y': int, 'z': int,
-              'radius': int, 'confidence': int}
+    dtypes = {'treenode_id': int, 'parent_id': object, 'x': int, 'y': int,
+              'z': int, 'radius': int, 'confidence': int}
 
     for k, v in dtypes.items():
         new_nodes[k] = new_nodes[k].astype(v)
@@ -242,14 +242,16 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         return x
 
 
-def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_treenodes=True, preserve_tag_treenodes=False):
+def downsample_neuron(x, resampling_factor, inplace=False,
+                      preserve_cn_treenodes=True,
+                      preserve_tag_treenodes=False):
     """ Downsamples neuron(s) by a given factor. Preserves root, leafs,
     branchpoints by default. Preservation of treenodes with synapses can
     be toggled.
 
     Parameters
     ----------
-    skdata :                 CatmaidNeuron | CatmaidNeuronList
+    x :                      CatmaidNeuron | CatmaidNeuronList
                              Neuron(s) to downsample.
     resampling_factor :      int
                              Factor by which to reduce the node count.
@@ -264,9 +266,8 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
 
     Returns
     -------
-    skdata
-                             Downsampled Pandas Dataframe or CatmaidNeuron
-                             object.
+    CatmaidNeuron/List
+                             Downsampled neuron.
 
     Notes
     -----
@@ -280,61 +281,50 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
                              resolution.
 
     """
-
-    if isinstance(skdata, pd.DataFrame):
-        return pd.DataFrame([downsample_neuron(skdata.loc[i], resampling_factor, inplace=inplace) for i in range(skdata.shape[0])])
-    elif isinstance(skdata, core.CatmaidNeuronList):
-        return core.CatmaidNeuronList([downsample_neuron(n, resampling_factor, inplace=inplace) for n in skdata])
-    elif isinstance(skdata, pd.Series):
+    if isinstance(x, core.CatmaidNeuronList):
+        return core.CatmaidNeuronList([downsample_neuron(n, resampling_factor, inplace=inplace) for n in x])
+    elif isinstance(x, core.CatmaidNeuron):
         if not inplace:
-            df = skdata.copy()
-            df.nodes = df.nodes.copy()
-            df.connectors = df.connectors.copy()
-        else:
-            df = skdata
-    elif isinstance(skdata, core.CatmaidNeuron):
-        if not inplace:
-            df = core.CatmaidNeuron(skdata)
-        else:
-            df = skdata
+            x = x.copy()
     else:
-        logger.error('Unexpected datatype: %s' % str(type(skdata)))
+        logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
 
     # If no resampling, simply return neuron
     if resampling_factor <= 1:
-        logger.warning(
-            'Unable to downsample: resampling_factor must be > 1')
-        return df
+        raise ValueError('Resampling factor must be > 1.')
 
-    if df.nodes.shape[0] == 0:
-        logger.warning('Unable to downsample: no nodes in neuron')
-        return df
+    if x.nodes.shape[0] <= 1:
+        logger.warning('No nodes in neuron {}. Skipping...'.format(x.skeleton_id))
+        if not inplace:
+            return x
+        else:
+            return
 
     logger.debug('Preparing to downsample neuron...')
 
     list_of_parents = {
-        n.treenode_id: n.parent_id for n in df.nodes.itertuples()}
+        n.treenode_id: n.parent_id for n in x.nodes.itertuples()}
     list_of_parents[None] = None
 
-    if 'type' not in df.nodes:
-        graph_utils.classify_nodes(df)
+    if 'type' not in x.nodes:
+        graph_utils.classify_nodes(x)
 
-    selection = df.nodes.type != 'slab'
+    selection = x.nodes.type != 'slab'
 
     if preserve_cn_treenodes:
-        selection = selection | df.nodes.treenode_id.isin(
-            df.connectors.treenode_id)
+        selection = selection | x.nodes.treenode_id.isin(
+            x.connectors.treenode_id)
 
     if preserve_tag_treenodes:
-        with_tags = [t for l in df.tags.values() for t in l]
-        selection = selection | df.nodes.treenode_id.isin(with_tags)
+        with_tags = [t for l in x.tags.values() for t in l]
+        selection = selection | x.nodes.treenode_id.isin(with_tags)
 
-    fix_points = df.nodes[selection].treenode_id.values
+    fix_points = x.nodes[selection].treenode_id.values
 
     # Add soma node
-    if not isinstance(df.soma, type(None)) and df.soma not in fix_points:
-        fix_points = np.append(fix_points, df.soma)
+    if not isinstance(x.soma, type(None)) and x.soma not in fix_points:
+        fix_points = np.append(fix_points, x.soma)
 
     # Walk from all fix points to the root - jump N nodes on the way
     new_parents = {}
@@ -367,7 +357,7 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
                 new_parents[this_node] = None
                 break
 
-    new_nodes = df.nodes[df.nodes.treenode_id.isin(
+    new_nodes = x.nodes[x.nodes.treenode_id.isin(
         list(new_parents.keys()))].copy()
     new_nodes.loc[:, 'parent_id'] = [new_parents[tn]
                                      for tn in new_nodes.treenode_id]
@@ -383,15 +373,14 @@ def downsample_neuron(skdata, resampling_factor, inplace=False, preserve_cn_tree
     # Reassign parent_id None to root node
     new_nodes.loc[root_ix, 'parent_id'] = None
 
-    logger.debug('Nodes before/after: %i/%i ' %
-                        (len(df.nodes), len(new_nodes)))
+    logger.debug('Nodes before/after: {}/{}'.format(len(x.nodes), len(new_nodes)))
 
-    df.nodes = new_nodes
+    x.nodes = new_nodes
 
     # This is essential -> otherwise e.g. graph.neuron2graph will fail
-    df.nodes.reset_index(inplace=True, drop=True)
+    x.nodes.reset_index(inplace=True, drop=True)
 
-    df._clear_temp_attr()
+    x._clear_temp_attr()
 
     if not inplace:
-        return df
+        return x
