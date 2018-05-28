@@ -118,7 +118,7 @@ def get_viewer():
 def clear3d():
     """ Clear viewer 3D canvas.
     """
-    viewer = get_viewer
+    viewer = get_viewer()
 
     if viewer:
         viewer.clear()
