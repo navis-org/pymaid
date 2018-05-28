@@ -41,6 +41,12 @@ From shell:
 
 """
 
+import matplotlib as mpl
+if os.environ.get('DISPLAY','') == '':
+    warnings.warn('No display found. Using non-interactive Agg backend.')
+    mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 import unittest
 import os
 import datetime
@@ -52,12 +58,6 @@ import networkx as nx
 
 import importlib
 import warnings
-
-import matplotlib as mpl
-if os.environ.get('DISPLAY','') == '':
-    warnings.warn('No display found. Using non-interactive Agg backend.')
-    mpl.use('Agg')
-import matplotlib.pyplot as plt
 
 try:
     import igraph
