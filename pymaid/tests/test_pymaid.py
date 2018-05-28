@@ -874,13 +874,15 @@ class TestPlot(unittest.TestCase):
 
         self.vol = pymaid.get_volume(config_test.test_volume)
 
+    """
     @try_conditions
     def test_plot3d_plotly(self):
         self.assertIsNotNone(self.nl.plot3d(backend='plotly'))
         self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))
         self.assertIsNotNone(pymaid.plot3d(
             [self.nl, self.vol], backend='plotly'))
-
+    """
+    
     @try_conditions
     def test_plot2d(self):
         plt.close()
