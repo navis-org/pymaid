@@ -881,17 +881,6 @@ class TestPlot(unittest.TestCase):
         self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))
         self.assertIsNotNone(pymaid.plot3d(
             [self.nl, self.vol], backend='plotly'))
-    """
-
-    @try_conditions
-    def test_plot2d(self):
-        plt.close()
-        self.assertIsNotNone(self.nl.plot2d(method='2d'))
-        plt.close()
-        self.assertIsNotNone(self.nl.plot2d(method='3d_complex'))
-        plt.close()
-        self.assertIsNotNone(self.nl.plot2d(method='3d'))
-        plt.close()
 
     @try_conditions
     def test_plot3d_vispy(self):
@@ -904,6 +893,17 @@ class TestPlot(unittest.TestCase):
         # pymaid.close3d()
         self.assertIsNotNone(pymaid.plotting._neuron2vispy(self.nl))
         self.assertIsNotNone(pymaid.plotting._volume2vispy(self.vol))
+    """
+
+    @try_conditions
+    def test_plot2d(self):
+        plt.close()
+        self.assertIsNotNone(self.nl.plot2d(method='2d'))
+        plt.close()
+        self.assertIsNotNone(self.nl.plot2d(method='3d_complex'))
+        plt.close()
+        self.assertIsNotNone(self.nl.plot2d(method='3d'))
+        plt.close()
 
     def tearDown(self):
         plt.close()
