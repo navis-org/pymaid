@@ -184,11 +184,10 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
 
-                        If you pass skeleton data (i.e. CatmaidNeurons), this
-                        data is used to calculate time invested. You can
-                        exploit this to get time invested into a given
-                        compartment of a neurons, e.g. by pruning it to a
-                        corresponding volume.
+                        If you pass a CatmaidNeuron/List, its data is used
+                        calculate time invested. You can exploit this to get
+                        time invested into a given compartment of a neurons,
+                        e.g. by pruning it to a volume.
     remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
     minimum_actions :   int, optional

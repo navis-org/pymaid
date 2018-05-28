@@ -619,10 +619,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     tag_flag :          0 | False | 1 | True, optional
                         Set if tags should be retrieved.
     get_history:        bool, optional
-                        If True, the returned skeleton data will contain
-                        creation date ([8]) and last modified ([9]) for each
-                        node -> compact-details url the 'with_history' option
-                        is used in this case
+                        If True, the returned node data will contain
+                        creation date and last modified for each
+                        node.
 
                         ATTENTION: if ``get_history=True``, nodes/connectors
                         that have been moved since their creation will have
@@ -630,7 +629,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
                         Each state has the date it was modified as creation
                         date and the next state's date as last modified. The
                         most up to date state has the original creation date
-                        as last modified (full circle).
+                        as last modified.
                         The creator_id is always the original creator though.
     get_abutting:       bool, optional
                         If True, will retrieve abutting connectors.
@@ -3077,7 +3076,7 @@ def get_review_details(x, remote_instance=None):
 
 
 def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
-             search=''):
+             search=""):
     """ Retrieve logs (same data as in log widget).
 
     Parameters
@@ -3093,8 +3092,8 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
     entries :           int, optional
                         Number of entries to retrieve.
     display_start :     int, optional
-                        Sets range of entries:
-                        ``display_start`` -> ``display_start + entries``.
+                        Sets range of entries to return:
+                        ``display_start`` to ``display_start + entries``.
     search :            str, optional
                         Use to filter results for e.g. a specific skeleton ID
                         or neuron name.
@@ -3184,7 +3183,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
 
 
 def get_contributor_statistics(x, remote_instance=None, separate=False,
-                               _split=500):
+                               split=500):
     """ Retrieve contributor statistics for given skeleton ids.
     By default, stats are given over all neurons.
 
@@ -3201,7 +3200,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
                         If not passed directly, will try using global.
     separate :          bool, optional
                         If true, stats are given per neuron
-    _split :            int, optional
+    split :             int, optional
                         Splits the data requests into bouts of X neurons to
                         prevent time outs.
 
@@ -3261,11 +3260,11 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
         with tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide,
                   leave=config.pbar_leave) as pbar:
             stats = []
-            for j in range(0, len(x), _split):
+            for j in range(0, len(x), split):
                 pbar.update(j)
                 get_statistics_postdata = {}
 
-                for i in range(j, min(len(x), j + _split)):
+                for i in range(j, min(len(x), j + split)):
                     key = 'skids[%i]' % i
                     get_statistics_postdata[key] = x[i]
 
@@ -4512,21 +4511,17 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
 
     Returns
     -------
-    paths :     ``list``
+    paths :     list
                 List of skeleton IDs that constitute paths from
                 sources to targets::
 
-                    [ [ source1, , ... , target1 ], [source2, ... , target2 ], ...  ]
+                    [[source1, ..., target1], [source2, ..., target2], ...]
 
-    ``NetworkX.DiGraph``
-                If ``return_graph=True``: Graph object containing the
-                neurons that connect sources and targets. Does only contain
+    networkx.DiGraph
+                Only if ``return_graph=True``. Graph contains all neurons that
+                connect sources and targets. **Important** Does only contain
                 edges that connect sources and targets via max ``n_hops``!
-
-    Important
-    ---------
-    The returned iGraph graph does **only** contain the edges that connnect
-    sources and targets. Other edges have been removed.
+                Other edges have been removed.
 
     Examples
     --------
@@ -4789,7 +4784,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     Parameters
     ----------
     coords :                list | np.ndarray | pandas.DataFrame
-                            ``x``,``y``,``z`` coordinates.
+                            ``x``, ``y``, ``z`` coordinates.
     stack_id :              int | list/array of ints
                             ID of the image stack you want to link to.
                             Depending on your setup this parameter might be
@@ -4804,12 +4799,20 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     remote_instance :       CatmaidInstance, optional
                             If not passed directly, will try using global.
 
-
     Returns
     -------
-    {str or list of str}
+    str | list of str
                 URL(s) to the coordinates provided.
 
+    Examples
+    --------
+    >>> # Get URL for a single coordinate
+    >>> url = pymaid.url_to_coordinates([1000,1000,1000], stack_id=5)
+    >>> # Get URLs for all presynapses of a neuron
+    >>> n = pymaid.get_neuron(16)
+    >>> urls = pymaid.url_to_coordinates( n.presynapses[['x','y','z']],
+                                          stack_id = 5,
+                                          active_node_id = n.presynapses.connector_id.values)
     """
 
     def gen_url(c, stid, nid, sid):
@@ -4848,7 +4851,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
             coords = coords[['x', 'y', 'z']].values
         except:
             raise ValueError(
-                'Pandas DataFrames/Series must have "x","y","z" columns.')
+                'Pandas DataFrames must have "x","y" and "z" columns.')
     elif isinstance(coords, list):
         coords = np.array(coords)
 
@@ -4874,7 +4877,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    new_names :         list, dict
+    new_names :         str | list | dict
                         New name(s). If renaming multiple neurons this
                         needs to be a dict mapping skeleton IDs to new
                         names or a list of the same size as provided skeleton
@@ -4986,8 +4989,8 @@ def get_label_list(remote_instance=None):
 
 
 def get_transactions(range_start=None, range_length=25, remote_instance=None):
-    """ Retrieve individual transactions with server. This API endpoint is
-    extremely slow!
+    """ Retrieve individual transactions with server. **This API endpoint is
+    extremely slow!**
 
     Parameters
     ----------

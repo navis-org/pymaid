@@ -1390,9 +1390,10 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
     return T.mean()
 
 
-def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inplace=False):
+def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
+                           inplace=False):
     """ Removes branches from neuron(s) that have been tagged with a given
-    treenode tag (e.g. 'not a branch').
+    treenode tag (e.g. ``not a branch``).
 
     Parameters
     ----------
@@ -1402,14 +1403,14 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False, inp
                           Treeode tag to use.
     how :                 'segment' | 'distal' | 'proximal', optional
                           Method of removal:
-                            1. `segment` removes entire segment
-                            2. `distal`/`proximal` removes everything
+                            1. `'segment'` removes entire segment
+                            2. `'distal'`/`'proximal'` removes everything
                                distal/proximal to tagged node(s), including
                                that node.
     preserve_connectors : bool, optional
                           If True, connectors that got disconnected during
                           branch removal will be reattached to the closest
-                          surviving node parent.
+                          surviving downstream node.
     inplace :             bool, optional
                           If False, a copy of the neuron is returned.
 

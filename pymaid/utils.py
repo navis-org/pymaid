@@ -574,6 +574,11 @@ def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
     -------
     CatmaidNeuron
 
+    See Also
+    --------
+    :func:`pymaid.to_swc`
+                        Export neurons as SWC files.
+
     """
     if not neuron_id:
         neuron_id = uuid.uuid4().int
@@ -676,6 +681,11 @@ def to_swc(x, filename=None, export_synapses=False):
     Returns
     -------
     Nothing
+
+    See Also
+    --------
+    :func:`pymaid.from_swc`
+                        Import SWC files.
 
     """
     if isinstance(x, core.CatmaidNeuronList):

@@ -754,6 +754,12 @@ def reroot_neuron(x, new_root, inplace=False):
                 Quick access to reroot directly from CatmaidNeuron/List
                 objects.
 
+    Examples
+    --------
+    >>> n = pymaid.get_neuron(16)
+    >>> # Reroot neuron to its soma
+    >>> n2 = pymaid.reroot_neuron(n, n.soma)
+
     """
 
     if new_root is None:
@@ -1066,23 +1072,24 @@ def _cut_networkx(x, cut_node, ret):
         return prox
 
 
-def subset_neuron(x, subset, clear_temp=True, keep_connectors=False,
+def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
                   inplace=False):
     """ Subsets a neuron to a set of treenodes.
 
     Parameters
     ----------
-    x :               CatmaidNeuron
-    subset :          np.ndarray | NetworkX.Graph
-                      Treenodes to subset the neuron to.
-    clear_temp :      bool, optional
-                      If True, will reset temporary attributes (graph, node
-                      classification, etc. ). In general, you should leave
-                      this at ``True``.
-    keep_connectors : bool, optional
-                      If True, will NOT remove DISCONNECTED connectors.
-    inplace :         bool, optional
-                      If False, a copy of the neuron is returned.
+    x :                   CatmaidNeuron
+    subset :              np.ndarray | NetworkX.Graph
+                          Treenodes to subset the neuron to.
+    clear_temp :          bool, optional
+                          If True, will reset temporary attributes (graph,
+                          node classification, etc. ). In general, you should
+                          leave this at ``True``.
+    remove_disconnected : bool, optional
+                          If True, will remove disconnected connectors that
+                          have "lost" their parent treenode.
+    inplace :             bool, optional
+                          If False, a copy of the neuron is returned.
 
     Returns
     -------
@@ -1125,7 +1132,7 @@ def subset_neuron(x, subset, clear_temp=True, keep_connectors=False,
                          axis=1)
 
     # Filter connectors
-    if not keep_connectors:
+    if remove_disconnected:
         x.connectors = x.connectors[x.connectors.treenode_id.isin(subset)]
 
     # Filter tags

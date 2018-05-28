@@ -339,15 +339,15 @@ def _find_all_paths(g, start, end, mode='OUT', maxlen=None):
 
 
 def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
-    """ Turns a neuron into scipy.spatial.cKDTree.
+    """ Turns a neuron into scipy KDTree.
 
     Parameters
     ----------
     x :         single CatmaidNeuron
     tree_type : 'c' | 'normal', optional
                 Type of KDTree:
-                  1. 'c' = scipy.spatial.cKDTree (faster)
-                  2. 'normal' = scipy.spatial.KDTree (more functions)
+                  1. ``'c'`` = ``scipy.spatial.cKDTree`` (faster)
+                  2. ``'normal'`` = ``scipy.spatial.KDTree`` (more functions)
     data :      'treenodes' | 'connectors', optional
                 Data to use to generate tree.
     **kwargs
@@ -356,7 +356,7 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
 
     Returns
     -------
-    scipy.spatial.cKDTree or scipy.spatial.KDTree
+    ``scipy.spatial.cKDTree`` or ``scipy.spatial.KDTree``
 
     """
 

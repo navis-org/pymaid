@@ -48,8 +48,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
     Order of columns/rows may change during filtering.
 
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     x :                 Connectivity object
                         Currently accepts either:
                          (1) Connectivity table from :func:`~pymaid.get_partners`
@@ -349,7 +349,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
     a,b :       CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) for which to compute potential connectivity.
     method :    'possible_contacts'
-                Method to use for calculations. Currently only one implemented.
+                Method to use for calculations. See Notes.
     **kwargs :  Keyword arguments.
                 1. For method = 'possible_contacts':
                     - `dist` to set distance between connectors and treenodes

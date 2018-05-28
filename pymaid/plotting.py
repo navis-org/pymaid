@@ -153,7 +153,7 @@ def _orthogonal_proj(zfront, zback):
                      [0, 0, -0.0001, zback]])
 
 
-def plot2d(x, method='2d', *args, **kwargs):
+def plot2d(x, method='2d', **kwargs):
     """ Generate 2D plots of neurons and neuropils. The main advantage of this
     is that you can save plot as vector graphics.
 
@@ -189,8 +189,6 @@ def plot2d(x, method='2d', *args, **kwargs):
                            down rendering though.
     remote_instance : CatmaidInstance, optional
                       Need this too if you are passing only skids
-    *args
-                      See Notes for permissible arguments.
     **kwargs
                       See Notes for permissible keyword arguments.
 
@@ -233,27 +231,27 @@ def plot2d(x, method='2d', *args, **kwargs):
     Notes
     -----
 
-    Optional ``*args`` and ``**kwargs``:
+    Optional keyword arguments:
 
-    ``connectors`` (boolean, default = True )
+    ``connectors`` (boolean, default = True)
        Plot connectors (synapses, gap junctions, abutting)
 
     ``connectors_only`` (boolean, default = False)
        Plot only connectors, not the neuron.
 
-    ``scalebar`` (int/float, default=False)
+    ``scalebar`` (int | float, default=False)
        Adds scale bar. Provide integer/float to set size of scalebar in um.
        For methods '3d' and '3d_complex', this will create an axis object.
 
     ``ax`` (matplotlib ax, default=None)
        Pass an ax object if you want to plot on an existing canvas.
 
-    ``color`` (tuple/list/str, dict)
+    ``color`` (tuple | list | str | dict)
       Tuples/lists (r,g,b) and str (color name) are interpreted as a single
       colors that will be applied to all neurons. Dicts will be mapped onto
       neurons by skeleton ID.
 
-    ``group_neurons`` (bool, default=False)
+    ``group_neurons`` (bool, default = False)
       If True, neurons will be grouped. Works with SVG export (not PDF).
       Does NOT work with ``method='3d_complex'``.
 
@@ -828,24 +826,22 @@ def _fibonacci_sphere(samples=1, randomize=True):
     return points
 
 
-def plot3d(x, *args, **kwargs):
+def plot3d(x, **kwargs):
     """ Generates 3D plot using either vispy (default, http://vispy.org) or
     plotly (http://plot.ly)
 
     Parameters
     ----------
 
-    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | pymaid.Dotprops | pymaid.Volumes
+    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | pymaid.Dotprops | pymaid.Volume | numpy.array
                       Objects to plot::
 
                         - int is interpreted as skeleton ID(s)
                         - str is interpreted as volume name(s)
+                        - numpy.array (N,3) is plotted as scatter plot
                         - multiple objects can be passed as list (see examples)
 
-    remote_instance : CATMAID Instance, optional
-                      Will try using globally defined CatmaidInstance if not
-                      provided.
-    backend :         'vispy' | 'plotly', default = 'vispy'
+    backend :         'vispy' | 'plotly', default='vispy'
        | ``vispy`` uses OpenGL to generate high-performance 3D plots.
        | ``plotly`` generates 3D plots in html format.
 
@@ -864,8 +860,8 @@ def plot3d(x, *args, **kwargs):
                       vispy).
     color :           tuple | dict, default=random
                       Use single tuple (r,g,b) to give all neurons the same
-                      color. Use dict to give individual colors to neurons:
-                      ``{ skid : (r,g,b), ... }``. R/G/B must be 0-255
+                      color. Use ``dict`` to give individual colors to neurons:
+                      ``{skid: (r, g, b), ... }``. RGB must be 0-255
     use_neuron_color : bool, default=False
                       If True, will try using the ``.color`` attribute of
                       CatmaidNeurons.
@@ -877,9 +873,12 @@ def plot3d(x, *args, **kwargs):
                       For plotly only! Autoscale figure size.
                       Attention: autoscale overrides width and height
     scatter_kws :     dict, optional
-                      Use to modify point plots. Accepted parameters are:
-                        - 'size' to adjust size of dots
-                        - 'color' to adjust color
+                      Use to modify scatter plots. Accepted parameters are:
+                        - ``'size'`` to adjust size of dots
+                        - ``'color'`` to adjust color
+    remote_instance : CATMAID Instance, optional
+                      Will try using globally defined CatmaidInstance if not
+                      provided.
 
     Returns
     --------
@@ -899,16 +898,16 @@ def plot3d(x, *args, **kwargs):
     This assumes that you have alread initialised a remote instance as ``rm``
 
     >>> # Plot single neuron
-    >>> nl = pymaid.get_neuron(16, remote_instance=rm)
-    >>> pymaid.plot3d(nl)
+    >>> nl = pymaid.get_neuron(16)
+    >>> v = pymaid.plot3d(nl)
     >>> # Clear canvas
     >>> pymaid.clear3d()
     >>> # Plot3D can deal with combinations of objects
-    >>> nl2 = pymaid.get_neuron('annotation:glomerulus DA1', remote_instance=rm)
+    >>> nl2 = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> vol = pymaid.get_volume('v13.LH_R')
     >>> vol['color'] = (255,0,0,.5)
     >>> # This plots two neuronlists, two volumes and a single neuron
-    >>> pymaid.plot3d( [ nl1, nl2, vol, 'v13.AL_R', 233007 ] )
+    >>> pymaid.plot3d([nl1, nl2, vol, 'v13.AL_R', 233007])
     >>> # Pass kwargs
     >>> pymaid.plot3d(nl1, connectors=True, clear3d=True)
 
@@ -1343,7 +1342,7 @@ def plot3d(x, *args, **kwargs):
         return _plot3d_vispy()
 
 
-def plot_network(x, *args, **kwargs):
+def plot_network(x, **kwargs):
     """ Uses NetworkX to generate a Plotly network plot.
 
     Parameters
@@ -1389,7 +1388,7 @@ def plot_network(x, *args, **kwargs):
     node_size :       int | dict
                       | Use int to set node size once.
                       | Use dict to set size for individual nodes:
-                      | ``{ neuron1 : 20, neuron2 : 5,  .. }``
+                      | ``{ neuron1 : 20, neuron2 : 5,  .. }``    
 
     Returns
     -------
