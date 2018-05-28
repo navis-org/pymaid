@@ -44,7 +44,7 @@ From shell:
 import warnings
 import os
 import matplotlib as mpl
-if os.environ.get('DISPLAY','') == '':
+if os.environ.get('DISPLAY', '') == '':
     warnings.warn('No display found. Using non-interactive Agg backend.')
     mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -97,6 +97,7 @@ else:
 
 class TestModules(unittest.TestCase):
     """Test individual module import. """
+
     def test_imports(self):
         mods = ['morpho', 'core', 'plotting', 'graph', 'graph_utils', 'core',
                 'connectivity', 'user_stats', 'cluster', 'resample',
@@ -108,6 +109,7 @@ class TestModules(unittest.TestCase):
 
 class TestFetch(unittest.TestCase):
     """Test pymaid.fetch """
+
     def setUp(self):
         self.rm = pymaid.CatmaidInstance(
             config_test.server_url,
@@ -119,10 +121,11 @@ class TestFetch(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
-            #if igraph:
+            # if igraph:
             #    pymaid.config.use_igraph = True
             #    res2 = func(self, *args, **kwargs)
             #    self.assertEqual(res1, res2)
@@ -258,6 +261,7 @@ class TestFetch(unittest.TestCase):
         n = pymaid.get_neuron(config_test.test_skids[0])
         self.assertIsInstance(pymaid.get_skid_from_treenode(n.nodes.iloc[0].treenode_id),
                               dict)
+
     @try_conditions
     def test_get_edges(self):
         self.assertIsInstance(pymaid.get_edges(config_test.test_skids),
@@ -344,6 +348,7 @@ class TestCore(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
@@ -493,6 +498,7 @@ class TestMorpho(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
@@ -571,6 +577,38 @@ class TestMorpho(unittest.TestCase):
         self.assertIsInstance(pymaid.tortuosity(self.nl),
                               pd.DataFrame)
 
+    @try_conditions
+    def test_arbor_confidence(self):
+        self.assertIsInstance(pymaid.arbor_confidence(self.nl[0],
+                                                      inplace=False),
+                              pymaid.CatmaidNeuron)
+
+    @try_conditions
+    def test_calc_cable(self):
+        self.assertIsNotNone(pymaid.calc_cable(self.nl[0]))
+
+    @try_conditions
+    def test_remove_branches(self):
+        self.assertIsInstance(pymaid.remove_tagged_branches(self.nl[0],
+                                                            'ends',
+                                                            how='segment',
+                                                            preserve_connectors=True,
+                                                            inplace=False),
+                              pymaid.CatmaidNeuron)
+
+        self.assertIsInstance(pymaid.remove_tagged_branches(self.nl[0],
+                                                            'ends',
+                                                            how='distal',
+                                                            preserve_connectors=True,
+                                                            inplace=False),
+                              pymaid.CatmaidNeuron)
+
+    @try_conditions
+    def test_despike_neuron(self):
+        self.assertIsInstance(pymaid.despike_neuron(self.nl[0],
+                                                    inplace=False),
+                              pymaid.CatmaidNeuron)
+
 
 class TestGraphs(unittest.TestCase):
     """Test pymaid.graph and pymaid.graph_utils """
@@ -578,6 +616,7 @@ class TestGraphs(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
@@ -675,6 +714,7 @@ class TestConnectivity(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
@@ -711,14 +751,15 @@ class TestConnectivity(unittest.TestCase):
 
     @try_conditions
     def test_adjacency_matrix2(self):
-        nl = pymaid.get_neurons(self.cn_table[self.cn_table.relation == 'upstream'].iloc[:10].skeleton_id.values)
+        nl = pymaid.get_neurons(
+            self.cn_table[self.cn_table.relation == 'upstream'].iloc[:10].skeleton_id.values)
         self.assertIsInstance(pymaid.adjacency_matrix(nl, use_connectors=True),
                               pd.DataFrame)
 
     @try_conditions
     def test_group_matrix(self):
         gr_adj = pymaid.group_matrix(self.adj,
-                                     row_groups={n : 'group1' for n in self.adj.index.values})
+                                     row_groups={n: 'group1' for n in self.adj.index.values})
         self.assertIsInstance(gr_adj, pd.DataFrame)
 
     @try_conditions
@@ -761,6 +802,7 @@ class TestCluster(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
@@ -808,6 +850,7 @@ class TestPlot(unittest.TestCase):
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
+
         def wrapper(self, *args, **kwargs):
             pymaid.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
@@ -835,7 +878,8 @@ class TestPlot(unittest.TestCase):
     def test_plot3d_plotly(self):
         self.assertIsNotNone(self.nl.plot3d(backend='plotly'))
         self.assertIsNotNone(pymaid.plot3d(self.nl, backend='plotly'))
-        self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol], backend='plotly'))
+        self.assertIsNotNone(pymaid.plot3d(
+            [self.nl, self.vol], backend='plotly'))
 
     @try_conditions
     def test_plot2d(self):
@@ -847,19 +891,49 @@ class TestPlot(unittest.TestCase):
         self.assertIsNotNone(self.nl.plot2d(method='3d'))
         plt.close()
 
-        """
+    @try_conditions
     def test_plot3d_vispy(self):
         self.assertIsNotNone(self.nl.plot3d(backend='vispy'))
         pymaid.close3d()
         self.assertIsNotNone(pymaid.plot3d(self.nl, backend='vispy'))
         pymaid.close3d()
-        self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol], backend='vispy'))
+        self.assertIsNotNone(pymaid.plot3d([self.nl, self.vol],
+                                           backend='vispy'))
         pymaid.close3d()
 
     def tearDown(self):
         pymaid.close3d()
-        plt.clf()
-    """
+        plt.close()
+
+
+class TestTiles(unittest.TestCase):
+    """Test pymaid.tiles """
+
+    def setUp(self):
+        self.rm = pymaid.CatmaidInstance(config_test.server_url,
+                                         config_test.http_user,
+                                         config_test.http_pw,
+                                         config_test.token,
+                                         logger_level='ERROR')
+
+    def test_tiles(self):
+        from pymaid import tiles
+        # Generate the job
+        job = tiles.LoadTiles([119000, 119500, 36000, 36500, 4050],
+                              coords='PIXEL')
+        # Load, stich and crop the required EM image tiles
+        job.generate_img()
+        # Render image
+        ax = job.render_im(slider=False, figsize=(12, 12))
+        # Add treenodes
+        job.render_nodes(ax, treenodes=True, connectors=False)
+        # Add scalebar
+        job.scalebar(size=1000, ax=ax, label=False)
+        # Show
+        plt.close()
+
+    def tearDown(self):
+        plt.close()
 
 
 class TestUserStats(unittest.TestCase):
@@ -906,7 +980,6 @@ class TestUserStats(unittest.TestCase):
                                                end_date=datetime.date.today())
 
         self.assertIsInstance(user_actions, pd.DataFrame)
-
 
 
 if __name__ == '__main__':
