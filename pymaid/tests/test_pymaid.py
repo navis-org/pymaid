@@ -50,15 +50,20 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
-import matplotlib.pyplot as plt
-
 import importlib
+import warnings
+
+import matplotlib as mpl
+if os.environ.get('DISPLAY','') == '':
+    warnings.warn('No display found. Using non-interactive Agg backend.')
+    mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 try:
     import igraph
 except BaseException:
     igraph = None
-    print('iGraph library not found. Will test only with NetworkX.')
+    warnings.warn('iGraph library not found. Will test only with NetworkX.')
 
 # Silence module loggers
 pymaid.set_loggers('ERROR')
