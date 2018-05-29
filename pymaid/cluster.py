@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 
-from pymaid import fetch, core, plotting, utils, config
+from pymaid import fetch, core, utils, config
 
 from tqdm import tqdm
 if utils.is_jupyter():
@@ -945,6 +945,8 @@ class ClustResults:
                     Function called to generate 3d plot.
 
         """
+
+        from pymaid import plotting
 
         if 'neurons' not in self.__dict__:
             logger.error(
