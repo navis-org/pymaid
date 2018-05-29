@@ -1511,10 +1511,10 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
 
         # Subset to remaining nodes - skip the last node in each segment
         graph_utils.subset_neuron(x,
-                                  subset=x.nodes[~x.nodes.treenode_id.isin(
+                                  subset = x.nodes[~x.nodes.treenode_id.isin(
                                       to_remove)].treenode_id.values,
-                                  keep_connectors=preserve_connectors,
-                                  inplace=True)
+                                  remove_disconnected = preserve_connectors == False,
+                                  inplace = True)
 
         if not inplace:
             return x
@@ -1550,10 +1550,10 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
 
             # Subset to remaining nodes
             graph_utils.subset_neuron(x,
-                                      subset=x.nodes[~x.nodes.treenode_id.isin(
+                                      subset = x.nodes[~x.nodes.treenode_id.isin(
                                           to_remove)].treenode_id.values,
-                                      keep_connectors=preserve_connectors,
-                                      inplace=True)
+                                      remove_disconnected = preserve_connectors == False,
+                                      inplace = True)
 
         if not inplace:
             return x
@@ -1595,11 +1595,13 @@ def despike_neuron(x, sigma=5, inplace=False):
         if not inplace:
             x = x.copy()
 
-        for n in tqdm(x, desc='Despiking', disable=config.pbar_hide, leave=config.pbar_leave):
+        for n in tqdm(x, desc='Despiking', disable=config.pbar_hide,
+                      leave=config.pbar_leave):
             despike_neuron(n, sigma=sigma, inplace=True)
 
         if not inplace:
             return x
+        return
     elif not isinstance(x, core.CatmaidNeuron):
         raise TypeError(
             'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
