@@ -30,6 +30,9 @@ if utils.is_jupyter():
     tqdm = tqdm_notebook
     trange = tnrange
 
+# Set up logging -> has to be before try statement!
+logger = config.logger
+
 try:
     from pyoctree import pyoctree
 except:
@@ -37,9 +40,6 @@ except:
                             ConvexHull for intersection calculations.")
 
 __all__ = sorted(['in_volume'])
-
-# Set up logging
-logger = config.logger
 
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     """ Test if points are within a given CATMAID volume.
