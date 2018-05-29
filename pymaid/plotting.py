@@ -1149,6 +1149,20 @@ def plot3d(x, **kwargs):
                 )
                 )
 
+        # Add scatter plots
+        for p in points:
+            trace_data.append(go.Scatter3d(
+                                x=-p[:,0],
+                                y=-p[:,2], # Z and Y are swapped
+                                z=-p[:,1],
+                                mode='markers',
+                                marker=dict(
+                                    size=scatter_kws.get('size',3),
+                                    color='rgb' + str(scatter_kws.get('color',(0,0,0))),
+                                    opacity=scatter_kws.get('opacity',12))
+                                          )
+                             )
+
         layout = dict(
             width=width,
             height=height,
@@ -1946,7 +1960,8 @@ def _neuron2vispy(x, **kwargs):
                     con = scene.visuals.Markers()
 
                     con.set_data(pos=np.array(pos),
-                                 face_color=color, edge_color=color, size=1)
+                                 face_color=color, edge_color=color,
+                                 size=syn_lay.get('size', 1))
 
                     visuals.append(con)
 
