@@ -180,17 +180,24 @@ def _in_volume_ray(points, volume):
     mx = np.array(volume['vertices']).max(axis=0)
     mn = np.array(volume['vertices']).min(axis=0)
 
+    # Get points outside of bounding box
+    out = (points > mx).any(axis=1) | (points < mn).any(axis=1)
+    isin = ~out
+    in_points = points[~out]
+
+    # Perform ray intersection on points inside bounding box
     rayPointList = np.array(
-        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in points], dtype=np.float32)
+        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in in_points], dtype=np.float32)
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # to those that occur "above" the point we are querying
     intersections = [len([i for i in tree.rayIntersection(
-        ray) if i.p[2] >= points[k][2]]) for k, ray in enumerate(rayPointList)]
+        ray) if i.p[2] >= in_points[k][2]]) for k, ray in enumerate(rayPointList)]
 
     # Count intersections and return True for odd counts
     # [i % 2 != 0 for i in intersections]
-    return np.remainder(list(intersections), 2) != 0
+    isin[~out] = np.remainder(list(intersections), 2) != 0
+    return isin
 
 
 def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
