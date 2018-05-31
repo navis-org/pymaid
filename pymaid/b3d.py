@@ -146,7 +146,8 @@ class handler:
         else:
             raise AttributeError('Unknown attribute ' + key)
 
-    def add(self, x, neurites=True, soma=True, connectors=True, redraw=True):
+    def add(self, x, neurites=True, soma=True, connectors=True, redraw=True,
+            use_radii=False):
         """ Add neuron(s) to scene
 
         Parameters
@@ -162,15 +163,19 @@ class handler:
         redraw :        bool, optional
                         If True, will redraw update window after each neuron.
                         May slow down loading!
+        use_radii :     bool, optional
+                        If True, will use treenode radii.
         """
 
         if isinstance(x, core.CatmaidNeuron):
             self._create_neuron(x, neurites=neurites,
-                                soma=soma, connectors=connectors)
+                                soma=soma, connectors=connectors,
+                                use_radii=use_radii)
         elif isinstance(x, core.CatmaidNeuronList):
             for i, n in enumerate(x):
                 self._create_neuron(n, neurites=neurites,
-                                    soma=soma, connectors=connectors)
+                                    soma=soma, connectors=connectors,
+                                    use_radii=use_radii)
                 if redraw:
                     bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
         elif isinstance(x, core.Volume):
@@ -186,7 +191,8 @@ class handler:
         """ Clear all neurons """
         self.all.delete()
 
-    def _create_neuron(self, x, neurites=True, soma=True, connectors=True):
+    def _create_neuron(self, x, neurites=True, soma=True, connectors=True,
+                       use_radii=False):
         """Create neuron object """
 
         mat_name = ('M#' + x.neuron_name)[:59]
@@ -195,14 +201,14 @@ class handler:
                                      bpy.data.materials.new(mat_name))
 
         if neurites:
-            self._create_neurites(x, mat)
+            self._create_neurites(x, mat, use_radii=use_radii)
         if soma and x.soma:
             self._create_soma(x, mat)
         if connectors:
             self._create_connectors(x)
         return
 
-    def _create_neurites(self, x, mat):
+    def _create_neurites(self, x, mat, use_radii=False):
         """Create neuron branches """
         cu = bpy.data.curves.new(x.neuron_name + ' mesh', 'CURVE')
         ob = bpy.data.objects.new('#%s - %s' %
@@ -218,8 +224,13 @@ class handler:
         cu.bevel_resolution = 5
         cu.bevel_depth = 0.007
 
-        # Create dictionary (MUCH fast lookup)
+        # Create dictionary (MUCH faster lookup)
         node_locs = {r.treenode_id: (r.x, r.y, r.z)
+                     for r in x.nodes.itertuples()}
+
+        if use_radii:
+            cu.bevel_depth = 1
+            radii = {r.treenode_id: r.radius
                      for r in x.nodes.itertuples()}
 
         for s in x.segments:
@@ -238,6 +249,9 @@ class handler:
                 # Hijack weight property to store treenode ID
                 newSpline.points[i].weight = int(ids[i])
 
+                if use_radii:
+                    newSpline.points[i].radius = max(radii[s[i]], 10) * self.conversion
+
         ob.active_material = mat
 
         return
@@ -245,9 +259,9 @@ class handler:
     def _create_soma(self, x, mat):
         """ Create soma """
         s = x.nodes.set_index('treenode_id').ix[x.soma]
-        loc = s[['x', 'y', 'z']].as_matrix() * self.conversion
+        loc = s[['x', 'y', 'z']].values * self.conversion
         rad = s.radius * self.conversion
-        soma_ob = bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, size=rad / 2, view_align=False,
+        soma_ob = bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, size=rad, view_align=False,
                                                        enter_editmode=False, location=(loc[0], loc[2], -loc[1]), rotation=(0, 0, 0),
                                                        layers=[
                                                            l for l in bpy.context.scene.layers]
@@ -270,8 +284,8 @@ class handler:
             if con.empty:
                 continue
 
-            cn_coords = con[['x', 'y', 'z']].as_matrix()
-            cn_coords *= self.conversion
+            cn_coords = con[['x', 'y', 'z']].values.astype(float)
+            cn_coords *= float(self.conversion)
 
             tn_coords = x.nodes.set_index('treenode_id').ix[
                 con.treenode_id.tolist()][['x', 'y', 'z']].values.astype(float)
