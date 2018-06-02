@@ -4113,7 +4113,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     neurons = []
 
     for v in volumes:
-        logger.info('Retrieving nodes in volume {0}'.format(v['name']))
+        logger.info('Retrieving nodes in volume {0}'.format(v.name))
         temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
                                    remote_instance=remote_instance)
 
@@ -4136,7 +4136,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
         neurons = [n for n in neurons if soma[n] is True]
 
     logger.info('Done. {0} unique neurons found in volume(s) {1}'.format(
-        len(neurons), ','.join([v['name'] for v in volumes])))
+        len(neurons), ','.join([v.name for v in volumes])))
 
     return neurons
 

@@ -206,7 +206,7 @@ class TestFetch(unittest.TestCase):
     @try_conditions
     def test_get_volume(self):
         self.assertIsInstance(pymaid.get_volume(
-            config_test.test_volume, remote_instance=self.rm), dict)
+            config_test.test_volume, remote_instance=self.rm), pymaid.Volume)
 
     @try_conditions
     def test_get_logs(self):
