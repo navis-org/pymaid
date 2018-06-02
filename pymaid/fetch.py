@@ -60,15 +60,6 @@ import networkx as nx
 from pymaid import core, graph, utils, config
 from pymaid.intersect import in_volume
 
-from tqdm import tqdm, trange
-
-# We need to keep this because tqdm_notebook is only a wrapper (type "function")
-tqdm_class = tqdm
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_3D_skeleton', 'get_3D_skeletons',
                   'get_annotation_details', 'get_annotation_id',
@@ -506,10 +497,10 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
 
     start = cur_time = time.time()    
 
-    if isinstance(external_pbar, tqdm_class):
+    if isinstance(external_pbar, config.tqdm_class):
         pbar = external_pbar
     else:
-        pbar = tqdm(total=len(threads), desc=desc,
+        pbar = config.tqdm(total=len(threads), desc=desc,
                     disable=config.pbar_hide or disable_pbar or len(threads) == 1,
                     leave=config.pbar_leave)
 
@@ -702,7 +693,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
         get_merge_history = get_merge_history == 1
 
     # Start a progress bar
-    with tqdm(total=len(x), desc='Get neurons',
+    with config.tqdm(total=len(x), desc='Get neurons',
               disable=config.pbar_hide or len(x) == 1,
               leave=config.pbar_leave) as pbar:
         collection = []
@@ -888,7 +879,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
 
     skdata = []
 
-    for s in tqdm(x, desc='Retrieving arbors', disable=config.pbar_hide,
+    for s in config.tqdm(x, desc='Retrieving arbors', disable=config.pbar_hide,
                   leave=config.pbar_leave):
         # Create URL for retrieving example skeleton from server
         remote_compact_arbor_url = remote_instance._get_compact_arbor_url(
@@ -1043,7 +1034,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
     adj_mat = pd.DataFrame(np.zeros((len(unique_skids), len(unique_skids))),
                            columns=unique_skids, index=unique_skids)
 
-    for i, e in enumerate(tqdm(unique_edges, disable=config.pbar_hide,
+    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide,
                                desc='Adj. matrix', leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.loc[str(e[0]), str(e[1])] = counts[i]
@@ -1373,7 +1364,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     data = dict()
 
-    with tqdm(total=len(node_ids), disable=config.pbar_hide,
+    with config.tqdm(total=len(node_ids), disable=config.pbar_hide,
               desc='Nodes', leave=config.pbar_leave) as pbar:
         for ix in range(0, len(node_ids), chunk_size):
             get_node_details_postdata = dict()
@@ -1437,7 +1428,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
 
     data = []
 
-    with tqdm(total=len(treenode_ids), disable=config.pbar_hide,
+    with config.tqdm(total=len(treenode_ids), disable=config.pbar_hide,
               desc='Nodes', leave=config.pbar_leave) as pbar:
         for ix in range(0, len(treenode_ids), chunk_size):
             urls = [remote_instance._get_skid_from_tnid(
@@ -1514,7 +1505,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     all_tables = []
 
-    for i, nl in enumerate(tqdm(node_list,
+    for i, nl in enumerate(config.tqdm(node_list,
                                 desc='Creating table',
                                 leave=config.pbar_leave,
                                 disable=config.pbar_hide)):
@@ -1766,7 +1757,7 @@ def get_connector_details(x, remote_instance=None):
     DATA_UPLOAD_MAX_NUMBER_FIELDS = min(50000, len(connector_ids))
 
     connectors = []
-    with tqdm(total=len(connector_ids), desc='CN details',
+    with config.tqdm(total=len(connector_ids), desc='CN details',
               disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         for b in range(0, len(connector_ids), DATA_UPLOAD_MAX_NUMBER_FIELDS):
             get_connectors_postdata = {}
@@ -1939,7 +1930,7 @@ def get_review(x, remote_instance=None):
 
     CHUNK_SIZE = 1000
 
-    with tqdm(total=len(x), disable=config.pbar_hide, desc='Rev. status',
+    with config.tqdm(total=len(x), disable=config.pbar_hide, desc='Rev. status',
               leave=config.pbar_leave) as pbar:
         for j in range(0, len(x), CHUNK_SIZE):
             get_review_postdata = {}
@@ -3256,7 +3247,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
 
     if not separate:
-        with tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide,
+        with config.tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide,
                   leave=config.pbar_leave) as pbar:
             stats = []
             for j in range(0, len(x), split):
@@ -3408,7 +3399,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
     if not isinstance(user, type(None)):
         if utils._is_iterable(user):
             skid_list = list()
-            for u in tqdm(user, desc='Get user', disable=config.pbar_hide,
+            for u in config.tqdm(user, desc='Get user', disable=config.pbar_hide,
                           leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=u,
@@ -3431,7 +3422,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
     if not isinstance(reviewed_by, type(None)):
         if utils._is_iterable(reviewed_by):
             skid_list = list()
-            for u in tqdm(reviewed_by, desc='Get revs',
+            for u in config.tqdm(reviewed_by, desc='Get revs',
                           disable=config.pbar_hide,
                           leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
@@ -3595,7 +3586,7 @@ def get_history(remote_instance=None,
         rounds = [(start_date, end_date)]
 
     data = []
-    for r in tqdm(rounds, desc='Retrieving history', disable=config.pbar_hide,
+    for r in config.tqdm(rounds, desc='Retrieving history', disable=config.pbar_hide,
                   leave=config.pbar_leave):
         get_history_GET_data = {'self.project_id': remote_instance.project_id,
                                 'start_date': r[0],
@@ -3913,7 +3904,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         logger.debug(
             'Retrieving skids for annotationed neurons')
 
-        for an_id in tqdm(annotation_ids.values(), desc='Get annot',
+        for an_id in config.tqdm(annotation_ids.values(), desc='Get annot',
                           disable=config.pbar_hide, leave=config.pbar_leave):
             annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
                                'range_length': 500, 'with_annotations': False}
@@ -3927,7 +3918,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by user
     if users:
         by_users = []
-        for u in tqdm(users, desc='Get by usr', disable=config.pbar_hide,
+        for u in config.tqdm(users, desc='Get by usr', disable=config.pbar_hide,
                       leave=config.pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['created_by'] = u
@@ -3948,7 +3939,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by reviewer
     if reviewed_by:
-        for u in tqdm(reviewed_by, desc='Get by revs',
+        for u in config.tqdm(reviewed_by, desc='Get by revs',
                       disable=config.pbar_hide, leave=config.pbar_leave):
             get_skeleton_list_GET_data = {'nodecount_gt': min_size}
             get_skeleton_list_GET_data['reviewed_by'] = u
@@ -3968,7 +3959,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get by volume
     if volumes:
-        for v in tqdm(volumes, desc='Get by vols', disable=config.pbar_hide,
+        for v in config.tqdm(volumes, desc='Get by vols', disable=config.pbar_hide,
                       leave=config.pbar_leave):
             if not isinstance(v, core.Volume):
                 vol = get_volume(v, remote_instance)
@@ -4212,7 +4203,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
     boxes = _subset_volume(bbox, max_vol=50**3)
 
     node_list = []
-    with tqdm(desc='Retr. nodes in box volume', total=len(boxes),
+    with config.tqdm(desc='Retr. nodes in box volume', total=len(boxes),
               leave=config.pbar_leave, disable=config.pbar_hide) as pbar:
         while boxes.any():
             pbar.total = len(boxes)

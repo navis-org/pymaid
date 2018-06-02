@@ -54,7 +54,7 @@ def set_loggers(level='INFO'):
     config.logger.setLevel(level)
 
 
-def set_pbars(hide=None, leave=None):
+def set_pbars(hide=None, leave=None, jupyter=None):
     """ Set global progress bar behaviours.
 
     Parameters
@@ -63,6 +63,9 @@ def set_pbars(hide=None, leave=None):
                 Set to True to hide all progress bars.
     leave :     bool, optional
                 Set to False to clear progress bars after they have finished.
+    jupyter :   bool, optional
+                Set to False to force using of classic tqdm even if in
+                Jupyter environment.
 
     Returns
     -------
@@ -75,6 +78,17 @@ def set_pbars(hide=None, leave=None):
 
     if isinstance(leave, bool):
         config.pbar_leave = leave
+
+    if isinstance(jupyter, bool):
+        if jupyter:
+            if not is_jupyter():
+                logger.error('No Jupyter environment detected.')
+            else:
+                config.tqdm = config.tqdm_notebook
+                config.trange = config.tnrange
+        else:
+            config.tqdm = config.tqdm_classic
+            config.trange = config.trange_classic
 
 
 def _make_iterable(x, force_type=None):

@@ -14,7 +14,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-
 import logging
 logger = logging.getLogger('pymaid')
 logger.setLevel(logging.INFO)
@@ -36,3 +35,36 @@ pbar_leave = True
 #   If False, will ignore iGraph even if present
 # Primarily used for debugging
 use_igraph = True
+
+
+def _type_of_script():
+    """ Returns context in which pymaid is run. """
+    try:
+        ipy_str = str(type(get_ipython()))
+        if 'zmqshell' in ipy_str:
+            return 'jupyter'
+        if 'terminal' in ipy_str:
+            return 'ipython'
+    except BaseException:
+        return 'terminal'
+
+
+def is_jupyter():
+    """ Test if pymaid is run in a Jupyter notebook."""
+    return _type_of_script() == 'jupyter'
+
+# Here, we import tqdm and determine whether we use classic notebook tbars
+from tqdm import tqdm_notebook, tnrange
+from tqdm import tqdm as tqdm_classic
+from tqdm import trange as trange_classic
+
+# Keep this because `tqdm_notebook` is only a wrapper (type "function")
+tqdm_class = tqdm_classic
+
+if is_jupyter():
+    from tqdm import tqdm_notebook, tnrange
+    tqdm = tqdm_notebook
+    trange = tnrange
+else:
+    tqdm = tqdm_classic
+    trange = trange_classic

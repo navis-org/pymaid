@@ -29,12 +29,6 @@ import itertools
 
 from pymaid import fetch, core, graph_utils, graph, utils, config
 
-from tqdm import tqdm, trange
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 # Set up logging
 logger = config.logger
 
@@ -42,7 +36,8 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'stitch_neurons', 'arbor_confidence', 'split_axon_dendrite',
                   'bending_flow', 'flow_centrality', 'segregation_index',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
-                  'remove_tagged_branches', 'despike_neuron'])
+                  'remove_tagged_branches', 'despike_neuron', 'guess_radii'])
+
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
     """ Calculates confidence for each treenode by walking from root to leafs
@@ -101,7 +96,7 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
     nodes = x.nodes.set_index('treenode_id')
     nodes.loc[x.root, 'arbor_confidence'] = 1
 
-    with tqdm(total=len(x.segments), desc='Calc confidence', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
+    with config.tqdm(total=len(x.segments), desc='Calc confidence', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
         for r in x.root:
             for c in loc[r]:
                 walk_to_leafs(c)
@@ -317,7 +312,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             x = x.loc[0]
         else:
             res = []
-            for i in trange(0, x.shape[0]):
+            for i in config.trange(0, x.shape[0]):
                 res.append(strahler_index(
                     x.loc[i], inplace=inplace, method=method))
 
@@ -1338,7 +1333,7 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
     if isinstance(x, core.CatmaidNeuronList):
         if not isinstance(seg_length, (list, np.ndarray, tuple)):
             seg_length = [seg_length]
-        df = pd.DataFrame([tortuosity(n, seg_length) for n in tqdm(x, desc='Tortuosity', disable=config.pbar_hide, leave=config.pbar_leave)],
+        df = pd.DataFrame([tortuosity(n, seg_length) for n in config.tqdm(x, desc='Tortuosity', disable=config.pbar_hide, leave=config.pbar_leave)],
                           index=x.skeleton_id, columns=seg_length).T
         df.index.name = 'seg_length'
         return df
@@ -1453,7 +1448,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         if not inplace:
             x = x.copy()
 
-        for n in tqdm(x, desc='Removing', disable=config.pbar_hide, leave=config.pbar_leave):
+        for n in config.tqdm(x, desc='Removing', disable=config.pbar_hide, leave=config.pbar_leave):
             remove_tagged_branches(n, tag,
                                    how=how,
                                    preserve_connectors=preserve_connectors,
@@ -1595,7 +1590,7 @@ def despike_neuron(x, sigma=5, inplace=False):
         if not inplace:
             x = x.copy()
 
-        for n in tqdm(x, desc='Despiking', disable=config.pbar_hide,
+        for n in config.tqdm(x, desc='Despiking', disable=config.pbar_hide,
                       leave=config.pbar_leave):
             despike_neuron(n, sigma=sigma, inplace=True)
 

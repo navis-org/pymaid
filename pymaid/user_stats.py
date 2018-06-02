@@ -60,12 +60,6 @@ import pandas as pd
 import numpy as np
 import datetime
 
-from tqdm import tqdm, trange
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 # Set up logging
 logger = config.logger
 
@@ -184,7 +178,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
 
-                        If you pass a CatmaidNeuron/List, its data is used
+                        If you pass a CatmaidNeuron/List, its data is used 
                         calculate time invested. You can exploit this to get
                         time invested into a given compartment of a neurons,
                         e.g. by pruning it to a volume.
@@ -339,19 +333,19 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         }
 
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
             stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get reconstruction time spent
-        for u in tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=config.pbar_hide, leave=False):
             stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get edition time spent
-        for u in tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=config.pbar_hide, leave=False):
             stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
         # Get time spent reviewing
-        for u in tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=config.pbar_hide, leave=False):
             stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
                 'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
 
@@ -363,7 +357,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
             this_ts = all_timestamps[all_timestamps.user == u].set_index(
                 'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
             this_ts.columns = [user_list.loc[u, 'login']]
@@ -383,7 +377,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
             minutes_counting = (all_timestamps[all_timestamps.user == u].set_index(
                 'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions)
             minutes_counting = minutes_counting[minutes_counting.timestamp == True]

@@ -24,22 +24,17 @@ from scipy.spatial import ConvexHull
 
 from pymaid import fetch, core, utils, graph_utils, config
 
-from tqdm import tqdm
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 # Set up logging -> has to be before try statement!
 logger = config.logger
 
 try:
     from pyoctree import pyoctree
-except:
+except BaseException:
     logger.warning("Module pyoctree not found. Falling back to scipy's \
                             ConvexHull for intersection calculations.")
 
 __all__ = sorted(['in_volume'])
+
 
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     """ Test if points are within a given CATMAID volume.
@@ -117,7 +112,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
             volume = {v['name']: v for v in volume}
 
         data = dict()
-        for v in tqdm(volume, desc='Volumes', disable=config.pbar_hide, leave=config.pbar_leave):
+        for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide, leave=config.pbar_leave):
             data[v] = in_volume(
                 x, volume[v], remote_instance=remote_instance, inplace=False, mode=mode)
         return data

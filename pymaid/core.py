@@ -83,12 +83,6 @@ import six
 
 from pymaid import graph, morpho, fetch, graph_utils, resample, intersect, utils, config
 
-from tqdm import tqdm, trange
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
 # Set up logging
@@ -1196,9 +1190,10 @@ class CatmaidNeuronList:
     nodes :             ``pandas.DataFrame``
                         Merged treenode table.
     connectors :        ``pandas.DataFrame``
-                        Merged connector table.
+                        Merged connector table. This also works for
+                        `presynapses`, `postsynapses` and `gap_junctions`.
     tags :              np.array of dict
-                        Treenode tags
+                        Treenode tags.
     annotations :       np.array of list
     partners :          pd.DataFrame
                         Connectivity table for these neurons.
@@ -1212,11 +1207,11 @@ class CatmaidNeuronList:
     n_end_nodes :       np.array of int
     n_open_ends :       np.array of int
     cable_length :      np.array of float
-                        Cable lengths in micrometers [um]
+                        Cable lengths in micrometers [um].
     soma :              np.array of treenode_ids
     root :              np.array of treenode_ids
     n_cores :           int
-                        Number of cores to use. Default is os.cpu_count()-1
+                        Number of cores to use. Default ``os.cpu_count()-1``.
     _use_threading :    bool (default=True)
                         If True, will use parallel threads. Should be slightly
                         up to a lot faster depending of the numbers of cores.
@@ -1333,7 +1328,7 @@ class CatmaidNeuronList:
 
                     futures = e.map(CatmaidNeuron, [n[0] for n in to_convert])
 
-                    converted = [n for n in tqdm(futures,
+                    converted = [n for n in config.tqdm(futures,
                                                  total=len(to_convert),
                                                  desc='Make nrn',
                                                  disable=config.pbar_hide,
@@ -1343,7 +1338,7 @@ class CatmaidNeuronList:
                         self.neurons[c[2]] = converted[i]
 
             else:
-                for n in tqdm(to_convert, desc='Make nrn',
+                for n in config.tqdm(to_convert, desc='Make nrn',
                               disable=config.pbar_hide,
                               leave=config.pbar_leave):
                     self.neurons[n[2]] = CatmaidNeuron(
@@ -1596,7 +1591,7 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, resample_to) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._resample_helper, combinations,
+            x.neurons = list(config.tqdm(pool.imap(x._resample_helper, combinations,
                                             chunksize=10),
                                   total=len(combinations),
                                   desc='Downsampling',
@@ -1606,7 +1601,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Resampling',
+            for n in config.tqdm(x.neurons, desc='Resampling',
                           disable=config.pbar_hide, leave=config.pbar_leave):
                 n.resample(resample_to=resample_to, inplace=True)
 
@@ -1648,7 +1643,7 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, factor, kwargs)
                             for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._downsample_helper, combinations,
+            x.neurons = list(config.tqdm(pool.imap(x._downsample_helper, combinations,
                                             chunksize=10),
                                   desc='Downsampling',
                                   disable=config.pbar_hide,
@@ -1657,7 +1652,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Downsampling',
+            for n in config.tqdm(x.neurons, desc='Downsampling',
                           disable=config.pbar_hide, leave=config.pbar_leave):
                 n.downsample(factor=factor, inplace=True, **kwargs)
 
@@ -1711,7 +1706,7 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, new_root[i]) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._reroot_helper, combinations,
+            x.neurons = list(config.tqdm(pool.imap(x._reroot_helper, combinations,
                                             chunksize=10),
                                   total=len(combinations),
                                   desc='Rerooting',
@@ -1721,7 +1716,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for i, n in enumerate(tqdm(x.neurons, desc='Rerooting',
+            for i, n in enumerate(config.tqdm(x.neurons, desc='Rerooting',
                                        disable=config.pbar_hide,
                                        leave=config.pbar_leave)):
                 n.reroot(new_root[i], inplace=True)
@@ -1756,7 +1751,7 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, tag) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_distal_helper,
+            x.neurons = list(config.tqdm(pool.imap(x._prune_distal_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations),
                                   desc='Pruning',
@@ -1766,7 +1761,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+            for n in config.tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
                           leave=config.pbar_leave):
                 n.prune_distal_to(tag, inplace=True)
 
@@ -1797,7 +1792,7 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, tag) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_proximal_helper,
+            x.neurons = list(config.tqdm(pool.imap(x._prune_proximal_helper,
                                             combinations,
                                             chunksize=10),
                                   total=len(combinations),
@@ -1808,7 +1803,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+            for n in config.tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
                           leave=config.pbar_leave):
                 n.prune_proximal_to(tag, inplace=True)
 
@@ -1849,7 +1844,7 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, to_prune) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_strahler_helper,
+            x.neurons = list(config.tqdm(pool.imap(x._prune_strahler_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations),
                                   desc='Pruning',
@@ -1859,7 +1854,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+            for n in config.tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
                           leave=config.pbar_leave):
                 n.prune_by_strahler(to_prune=to_prune, inplace=True)
 
@@ -1900,7 +1895,7 @@ class CatmaidNeuronList:
             pool = mp.Pool(x.n_cores)
             combinations = [(neuron, n, reroot_to_soma)
                             for i, neuron in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(self._prune_neurite_helper,
+            x.neurons = list(config.tqdm(pool.imap(self._prune_neurite_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations),
                                   desc='Pruning',
@@ -1910,7 +1905,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for neuron in tqdm(x.neurons, desc='Pruning',
+            for neuron in config.tqdm(x.neurons, desc='Pruning',
                                disable=config.pbar_hide,
                                leave=config.pbar_leave):
                 neuron.prune_by_longest_neurite(
@@ -1954,7 +1949,7 @@ class CatmaidNeuronList:
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
             combinations = [(n, v, mode) for i, n in enumerate(x.neurons)]
-            x.neurons = list(tqdm(pool.imap(x._prune_by_volume_helper,
+            x.neurons = list(config.tqdm(pool.imap(x._prune_by_volume_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations), desc='Pruning',
                                   disable=config.pbar_hide,
@@ -1963,7 +1958,7 @@ class CatmaidNeuronList:
             pool.close()
             pool.join()
         else:
-            for n in tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
+            for n in config.tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
                           leave=config.pbar_leave):
                 n.prune_by_volume(v, mode=mode, inplace=True)
 
@@ -2054,7 +2049,7 @@ class CatmaidNeuronList:
                 self.neurons) if 'segments' not in n.__dict__]
 
             pool = mp.Pool(self.n_cores)
-            update = list(tqdm(pool.imap(self._generate_segments_helper,
+            update = list(config.tqdm(pool.imap(self._generate_segments_helper,
                                          to_retrieve, chunksize=10),
                                total=len(to_retrieve), desc='Gen. segments',
                                disable=config.pbar_hide,
@@ -2065,7 +2060,7 @@ class CatmaidNeuronList:
             for ix, n in zip(to_retrieve_ix, update):
                 self.neurons[ix] = n
         else:
-            for n in tqdm(self.neurons, desc='Gen. segments',
+            for n in config.tqdm(self.neurons, desc='Gen. segments',
                           disable=config.pbar_hide, leave=config.pbar_leave):
                 if 'segments' not in n.__dict__:
                     _ = n.segments
@@ -2096,7 +2091,7 @@ class CatmaidNeuronList:
             skdata = fetch.get_neuron([n.skeleton_id for n in to_update],
                                       remote_instance=self._remote_instance,
                                       return_df=True).set_index('skeleton_id')
-            for n in tqdm(to_update, desc='Processing neurons',
+            for n in config.tqdm(to_update, desc='Processing neurons',
                           disable=config.pbar_hide, leave=config.pbar_leave):
 
                 n.nodes = skdata.loc[str(n.skeleton_id), 'nodes']

@@ -46,16 +46,10 @@ from vispy import scene
 from vispy.geometry import create_sphere
 from vispy.gloo.util import _screenshot
 
-from tqdm import tqdm
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 try:
     # Try setting vispy backend to PyQt5
     vispy.use(app='PyQt5')
-except:
+except BaseException:
     pass
 
 __all__ = ['plot3d', 'plot2d', 'plot1d', 'plot_network',
@@ -402,7 +396,7 @@ def plot2d(x, method='2d', **kwargs):
                 lim.append(verts.min(axis=0))
 
     # Create lines from segments
-    for i, neuron in enumerate(tqdm(skdata.itertuples(), desc='Plot neurons',
+    for i, neuron in enumerate(config.tqdm(skdata.itertuples(), desc='Plot neurons',
                                     total=skdata.shape[0], leave=False,
                                     disable=config.pbar_hide)):
         this_color = colormap[neuron.skeleton_id]
@@ -504,7 +498,7 @@ def plot2d(x, method='2d', **kwargs):
             lim.append(coords.max(axis=0))
             lim.append(coords.min(axis=0))
 
-    for neuron in tqdm(dotprops.itertuples(), desc='Plt dotprops',
+    for neuron in config.tqdm(dotprops.itertuples(), desc='Plt dotprops',
                        total=dotprops.shape[0], leave=False,
                        disable=config.pbar_hide):
         # Prepare lines - this is based on nat:::plot3d.dotprops
@@ -1402,7 +1396,7 @@ def plot_network(x, **kwargs):
     node_size :       int | dict
                       | Use int to set node size once.
                       | Use dict to set size for individual nodes:
-                      | ``{ neuron1 : 20, neuron2 : 5,  .. }``    
+                      | ``{ neuron1 : 20, neuron2 : 5,  .. }``
 
     Returns
     -------
@@ -1640,7 +1634,7 @@ def plot1d(x, ax=None, color=None, **kwargs):
                    })
 
     max_x = []
-    for ix, n in enumerate(tqdm(x, desc='Processing',
+    for ix, n in enumerate(config.tqdm(x, desc='Processing',
                                 disable=config.pbar_hide,
                                 leave=config.pbar_leave)):
         if isinstance(color, dict):

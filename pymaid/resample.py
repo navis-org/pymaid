@@ -24,12 +24,6 @@ import scipy
 import scipy.interpolate
 from pymaid import core, graph_utils, utils, config
 
-from tqdm import tqdm, trange
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 # Set up logging
 logger = config.logger
 
@@ -84,7 +78,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
 
     if isinstance(x, core.CatmaidNeuronList):
         results = [resample_neuron(x.loc[i], resample_to, inplace=inplace)
-                   for i in trange(x.shape[0],
+                   for i in config.trange(x.shape[0],
                                    desc='Resampl. neurons',
                                    disable=config.pbar_hide,
                                    leave=config.pbar_leave)]
@@ -106,7 +100,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     errors = 0
 
     # Iterate over segments
-    for i, seg in enumerate(tqdm(x.small_segments, desc='Proc. segments',
+    for i, seg in enumerate(config.tqdm(x.small_segments, desc='Proc. segments',
                                  disable=config.pbar_hide, leave=False)):
         coords = locs.loc[seg].values.astype(float)
 

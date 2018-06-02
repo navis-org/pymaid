@@ -26,19 +26,14 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 import json
 
-from pymaid import fetch, core, utils, config
-
-from tqdm import tqdm
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
+from pymaid import fetch, core, plotting, utils, config
 
 # Set up logging
 logger = config.logger
 
 __all__ = sorted(['cluster_by_connectivity', 'cluster_by_synapse_placement',
                   'cluster_xyz', 'ClustResults'])
+
 
 def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                             downstream=True, threshold=1, include_skids=None,
@@ -182,7 +177,7 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
         with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
             futures = e.map(_unpack_connectivity_helper, combinations)
 
-            matching_indices = [n for n in tqdm(futures, total=len(combinations),
+            matching_indices = [n for n in config.tqdm(futures, total=len(combinations),
                                                 desc=d,
                                                 disable=config.pbar_hide,
                                                 leave=config.pbar_leave)]
@@ -541,7 +536,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
     with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
         futures = e.map(_unpack_synapse_helper, combinations)
 
-        scores = [n for n in tqdm(futures, total=len(combinations),
+        scores = [n for n in config.tqdm(futures, total=len(combinations),
                                   desc='Processing',
                                   disable=config.pbar_hide,
                                   leave=config.pbar_leave)]
@@ -945,8 +940,6 @@ class ClustResults:
                     Function called to generate 3d plot.
 
         """
-
-        from pymaid import plotting
 
         if 'neurons' not in self.__dict__:
             logger.error(

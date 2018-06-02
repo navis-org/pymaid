@@ -33,12 +33,6 @@ import urllib
 
 import threading
 
-from tqdm import trange, tqdm
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 # Set up logging
 logger = config.logger
 
@@ -394,7 +388,7 @@ class LoadTiles:
             threads[coords] = t
 
         # Initialise progress bar
-        pbar = tqdm(total=len(threads),
+        pbar = config.tqdm(total=len(threads),
                     desc='Loading tiles',
                     disable=config.pbar_hide,
                     leave=config.pbar_leave)
@@ -435,7 +429,7 @@ class LoadTiles:
 
         # Assemble tiles into the requested images
         images = []
-        for l, im in enumerate(tqdm(self.image_coords, 'Stitching', leave=config.pbar_leave, disable=config.pbar_hide)):
+        for l, im in enumerate(config.tqdm(self.image_coords, 'Stitching', leave=config.pbar_leave, disable=config.pbar_hide)):
             # Get a list of all tiles that remain to be used and are not currently part of the tiles
             remaining_tiles = [t for img in self.image_coords[l:]
                                for t in img['tiles_to_load']]
