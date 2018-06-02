@@ -36,7 +36,7 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'stitch_neurons', 'arbor_confidence', 'split_axon_dendrite',
                   'bending_flow', 'flow_centrality', 'segregation_index',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
-                  'remove_tagged_branches', 'despike_neuron', 'guess_radii'])
+                  'remove_tagged_branches', 'despike_neuron', 'guess_radius'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
@@ -1635,6 +1635,106 @@ def despike_neuron(x, sigma=5, inplace=False):
 
     # Reassign treenode table
     x.nodes = this_treenodes.reset_index(drop=False)
+
+    if not inplace:
+        return x
+
+
+def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
+    """ Tries guessing radii for all treenodes. Uses distance between
+    connectors and treenodes and interpolate for all treenodes. Fills in
+    ``radius`` column in treenode table.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron | CatmaidNeuronList
+                    Neuron(s) to be processed.
+    method :        str, optional
+                    Method to be used to interpolate unknown radii. See
+                    ``pandas.DataFrame.interpolate`` for details.
+    limit :         int, optional
+                    Maximum number of consecutive missing radii to fill.
+                    Must be greater than 0.
+    smooth :        bool | int, optional
+                    If True, will smooth radii after interpolation using a
+                    rolling window. If ``int``, will use to define size of
+                    window.
+    inplace :       bool, optional
+                    If True, will use and return copy of original neuron(s).
+
+    Returns
+    -------
+    CatmaidNeuron/List
+                    If ``inplace=False``.
+
+    TODO
+    ----
+    - teach other functions (e.g. resample) to preserve radii
+
+    """
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if not inplace:
+            x = x.copy()
+
+        for n in config.tqdm(x, desc='Guessing', disable=config.pbar_hide,
+                      leave=config.pbar_leave):
+            guess_radius(n, method=method, limit=limit, smooth=smooth,
+                        inplace=True)
+
+        if not inplace:
+            return x
+        return
+
+    elif not isinstance(x, core.CatmaidNeuron):
+        raise TypeError(
+            'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
+
+    if not inplace:
+        x = x.copy()
+
+    # Set default rolling window size
+    if isinstance(smooth, bool) and smooth:
+        smooth = 5
+
+    # Collect connectors and calc distances
+    cn = x.connectors.copy()
+
+    # For each connector (pre and post), get the X/Y distance to its treenode
+    nodes = x.nodes.set_index('treenode_id')
+    cn_locs = cn[['x', 'y']].values
+    tn_locs = nodes.loc[cn.treenode_id.values,
+                        ['x', 'y']].values
+    dist = np.sqrt(np.sum((tn_locs - cn_locs) ** 2, axis=1).astype(int))
+    cn['dist'] = dist
+
+    # Get max distance per treenode (in case of multiple connectors per treenode)
+    cn_grouped = cn.groupby('treenode_id').max()
+
+    # Set undefined radii to None
+    nodes.loc[nodes.radius <= 0, 'radius'] = None
+
+    # Assign radii to treenodes
+    nodes.loc[cn_grouped.index, 'radius'] = cn_grouped.dist.values
+
+    # Go over each segment and interpolate radii
+    for s in config.tqdm(x.segments, desc='Interp.', disable=config.pbar_hide,
+                  leave=config.pbar_leave):
+        this_radii = nodes.loc[s, 'radius']
+        interp = this_radii.interpolate(method=method, limit_direction='both',
+                                        limit=limit)
+
+        if smooth:
+            interp = interp.rolling(smooth,
+                                    min_periods=1).max()
+
+        nodes.loc[s, 'radius'] = interp
+
+    # Set non-interpolated radii back to -1
+    nodes.loc[nodes.radius.isnull(), 'radius'] = -1
+
+    # Reassign nodes
+    x.nodes = nodes.reset_index(drop=False)
 
     if not inplace:
         return x

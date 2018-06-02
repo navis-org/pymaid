@@ -62,6 +62,7 @@ Manipulation
     ~pymaid.average_neurons
     ~pymaid.remove_tagged_branches
     ~pymaid.despike_neuron
+    ~pymaid.guess_radius
 
 Resampling
 ----------
