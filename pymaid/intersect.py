@@ -109,7 +109,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
         # Turn into dict
         if not isinstance(volume, dict):
-            volume = {v['name']: v for v in volume}
+            volume = {v.name: v for v in volume}
 
         data = dict()
         for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide, leave=config.pbar_leave):
@@ -161,19 +161,18 @@ def _in_volume_ray(points, volume):
     CATMAID volume.
     """
 
-    if 'pyoctree' in volume:
-        # Use store octree if available
-        tree = volume['pyoctree']
-    else:
+    tree = getattr(volume, 'pyoctree', None)
+
+    if not tree:
         # Create octree from scratch
-        tree = pyoctree.PyOctree(np.array(volume['vertices'], dtype=float),
-                                 np.array(volume['faces'], dtype=np.int32)
+        tree = pyoctree.PyOctree(np.array(volume.vertices, dtype=float),
+                                 np.array(volume.faces, dtype=np.int32)
                                  )
-        volume['pyoctree'] = tree
+        volume.pyoctree = tree
 
     # Get min max of volume
-    mx = np.array(volume['vertices']).max(axis=0)
-    mn = np.array(volume['vertices']).min(axis=0)
+    mx = np.array(volume.vertices).max(axis=0)
+    mn = np.array(volume.vertices).min(axis=0)
 
     # Get points outside of bounding box
     out = (points > mx).any(axis=1) | (points < mn).any(axis=1)
@@ -206,7 +205,7 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False, i
     if isinstance(volume, str):
         volume = fetch.get_volume(volume, remote_instance)
 
-    verts = volume['vertices']
+    verts = volume.vertices
 
     if not approximate:
         intact_hull = ConvexHull(verts)

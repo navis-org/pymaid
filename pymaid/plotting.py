@@ -366,7 +366,7 @@ def plot2d(x, method='2d', **kwargs):
 
     if volumes:
         for v in volumes:
-            c = v.get('color', (0.9, 0.9, 0.9))
+            c = getattr(v, 'color', (0.9, 0.9, 0.9))
 
             if not isinstance(c, tuple):
                 c = tuple(c)
@@ -381,16 +381,16 @@ def plot2d(x, method='2d', **kwargs):
                     closed=True, lw=0, fill=True, fc=c, alpha=1)
                 ax.add_patch(vpatch)
             elif method in ['3d', '3d_complex']:
-                verts = np.vstack(v['vertices'])
+                verts = np.vstack(v.vertices)
                 # Invert y-axis
                 verts[:, 1] *= -1
                 # Add alpha
                 if len(c) == 3:
                     c = (c[0], c[1], c[2], .1)
-                ts = ax.plot_trisurf(verts[:, 0], verts[:, 2], v['faces'],
-                                     verts[:, 1], label=v['name'],
+                ts = ax.plot_trisurf(verts[:, 0], verts[:, 2], v.faces,
+                                     verts[:, 1], label=v.name,
                                      color=c)
-                ts.set_gid(v['name'])
+                ts.set_gid(v.name)
                 # Keep track of limits
                 lim.append(verts.max(axis=0))
                 lim.append(verts.min(axis=0))
@@ -1124,24 +1124,29 @@ def plot3d(x, **kwargs):
 
         # Now add neuropils:
         for v in volumes_data:
-            if volumes_data[v]['verts']:
-                trace_data.append(go.Mesh3d(
-                    x=[-v[0] for v in volumes_data[v]['verts']],
-                    # y and z are switched
-                    y=[-v[2] for v in volumes_data[v]['verts']],
-                    z=[-v[1] for v in volumes_data[v]['verts']],
+            # Skip empty data
+            if isinstance(volumes_data[v].vertices, np.ndarray):
+                if not volumes_data[v].vertices.any():
+                    continue
+            elif not volumes_data[v].vertices:
+                continue
+            trace_data.append(go.Mesh3d(
+                x=[-v[0] for v in volumes_data[v].vertices],
+                # y and z are switched
+                y=[-v[2] for v in volumes_data[v].vertices],
+                z=[-v[1] for v in volumes_data[v].vertices],
 
-                    i=[f[0] for f in volumes_data[v]['faces']],
-                    j=[f[1] for f in volumes_data[v]['faces']],
-                    k=[f[2] for f in volumes_data[v]['faces']],
+                i=[f[0] for f in volumes_data[v].faces],
+                j=[f[1] for f in volumes_data[v].faces],
+                k=[f[2] for f in volumes_data[v].faces],
 
-                    opacity=.5,
-                    color='rgb' + str(volumes_data[v]['color']),
-                    name=v,
-                    showlegend=True,
-                    hoverinfo='none'
-                )
-                )
+                opacity=.5,
+                color='rgb' + str(volumes_data[v]['color']),
+                name=v,
+                showlegend=True,
+                hoverinfo='none'
+            )
+            )
 
         # Add scatter plots
         for p in points:
@@ -1329,8 +1334,8 @@ def plot3d(x, **kwargs):
             else:
                 v = fetch.get_volume(v, remote_instance)
 
-        volumes_data[v['name']] = {'verts': v['vertices'],
-                                   'faces': v['faces'], 'color': v['color']}
+        volumes_data[v.name] = {'verts': v.vertices,
+                                   'faces': v.faces, 'color': v.color}
 
     logger.debug('Preparing neurons for plotting...')
     # First downsample neurons
@@ -1714,7 +1719,7 @@ def _volume2vispy(x, **kwargs):
 
         object_id = uuid.uuid4()
 
-        color = np.array(v['color'], dtype=float)
+        color = np.array(v.color, dtype=float)
 
         # Add alpha
         if len(color) < 4:
@@ -1733,7 +1738,7 @@ def _volume2vispy(x, **kwargs):
         # Add custom attributes
         s.unfreeze()
         s._object_type = 'catmaid_volume'
-        s._volume_name = v['name']
+        s._volume_name = v.name
         s._object_id = object_id
         s.freeze()
 

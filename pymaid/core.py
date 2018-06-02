@@ -1445,9 +1445,12 @@ class CatmaidNeuronList:
             return np.array([n.skeleton_id for n in self.neurons])
         elif key in ['nodes', 'connectors', 'presynapses', 'postsynapses', 'gap_junctions']:
             self.get_skeletons(skip_existing=True)
-            return pd.concat([getattr(n, key) for n in self.neurons],
-                             axis=0,
-                             ignore_index=True)
+            data = []
+            for n in self.neurons:
+                this_n = getattr(n, key)
+                this_n['skeleton_id'] = n.skeleton_id
+                data.append(this_n)
+            return pd.concat(data, axis=0, ignore_index=True)
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]
@@ -2431,14 +2434,21 @@ class Dotprops(pd.DataFrame):
     """
 
 
-class Volume(dict):
-    """ Class to hold CATMAID meshes. This is essentially a dictionary with a
-    few additional perks (see below).
+class Volume:
+    """ Class to hold CATMAID meshes.
 
-    Important
-    ---------
-    Due to this being a subclass of ``dict``, using
-    ``isinstance(Volume, dict)`` will return ``True``!
+    Parameters
+    ----------
+    vertices :  list | array
+                Vertices coordinates. Must be shape (N,3).
+    faces :     list | array
+                Indexed faceset.
+    name :      str, optional
+                Name of volume.
+    color :     tuple, optional
+                RGB color.
+    volume_id : int, optional
+                CATMAID volume ID.
 
     See Also
     --------
@@ -2452,6 +2462,14 @@ class Volume(dict):
 
     Attributes could be: .volume, .bbox, .color
     """
+
+    def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+                 volume_id=None, **kwargs):
+        self.name = name
+        self.vertices = vertices
+        self.faces = faces
+        self.color = color
+        self.volume_id = volume_id
 
     @classmethod
     def combine(self, x, name='comb_vol', color=(120, 120, 120, .6)):
@@ -2488,9 +2506,9 @@ class Volume(dict):
         # Reindex faces
         for vol in x:
             offs = len(vertices)
-            vertices += vol['vertices']
+            vertices += vol.vertices
             faces += [[f[0] + offs, f[1] + offs, f[2] + offs]
-                      for f in vol['faces']]
+                      for f in vol.faces]
 
         return Volume(vertices=vertices, faces=faces, name=name, color=color)
 
@@ -2501,53 +2519,101 @@ class Volume(dict):
                          self.vertices.max(axis=0)]).T
 
     @property
+    def vertices(self):
+        return self.__vertices
+
+    @vertices.setter
+    def vertices(self, v):
+        if not isinstance(v, np.ndarray):
+            v = np.array(v)
+
+        if not v.shape[1] == 3:
+            raise ValueError('Vertices must be of shape N,3.')
+
+        self.__vertices = v
+
+    @property
+    def verts(self):
+        """Legacy access to ``.vertices``."""
+        return self.vertices
+
+    @verts.setter
+    def verts(self, v):
+        self.vertices = v
+
+    @property
+    def faces(self):
+        """Legacy access to ``.vertices``."""
+        return self.__faces
+
+    @faces.setter
+    def faces(self, v):
+        if not isinstance(v, np.ndarray):
+            v = np.array(v)
+        self.__faces = v
+
+    @property
     def center(self):
         """ Center of mass."""
         return np.mean(self.vertices, axis=0)
 
-    @property
-    def vertices(self):
-        """ Vertices. """
-        return np.array(self['vertices'])
+    def __deepcopy__(self):
+        return self.copy()
 
-    @property
-    def faces(self):
-        """ Faces. """
-        return np.array(self['faces'])
+    def __copy__(self):
+        return self.copy()
+
+    def copy(self):
+        """Return copy of this volume. Does not maintain generic values."""
+        return Volume(self.vertices, self.faces, self.name,
+                      self.color, self.volume_id)
 
     def __str__(self):
         return self.__repr__()
 
     def __repr__(self):
         return '{0} "{1}" at {2}: {3} vertices, {4} faces'.format(type(self),
-                                                                  self.get('name', ''),
+                                                                  self.name,
                                                                   hex(id(self)),
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
 
-    def resize(self, x):
+    def resize(self, x, inplace=True):
         """ Resize volume by given factor.
 
         Parameters
         ----------
-        x :     int
-                Resizing factor
-        """
+        x :         int
+                    Resizing factor
+        inplace :   bool, optional
+                    If False, will return resized copy.
 
-        if not isinstance(self['vertices'], np.ndarray):
-            self['vertices'] = np.array(self['vertices'])
+        Returns
+        -------
+        None
+                    If ``inplace=False``.
+        :class:`pymaid.Volume`
+                    Resized copy of original volume. Only if ``inplace=True``.
+        """
+        if not inplace:
+            x = self.copy()
+        else:
+            x = self
 
         # Get the center
-        cn = np.mean(self['vertices'], axis=0)
+        cn = np.mean(x.vertices, axis=0)
 
         # Get vector from center to each vertex
-        vec = self['vertices'] - cn
+        vec = x.vertices - cn
 
         # Multiply vector by resize factor
         vec *= x
 
         # Recalculate vertex positions
-        self['vertices'] = vec + cn
+        x.vertices = vec + cn
+
+        if not inplace:
+            return x
 
     def plot3d(self, **kwargs):
         """Plot neuron using :func:`pymaid.plot3d`.
@@ -2572,7 +2638,7 @@ class Volume(dict):
         from pymaid import plotting
 
         if 'color' in kwargs:
-            self['color'] = kwargs['color']
+            self.color = kwargs['color']
 
         return plotting.plot3d(self, **kwargs)
 
@@ -2591,7 +2657,7 @@ class Volume(dict):
             raise ImportError(
                 'Unable to import trimesh. Please make sure it is installed properly')
 
-        return trimesh.Trimesh(vertices=self['vertices'], faces=self['faces'])
+        return trimesh.Trimesh(vertices=self.vertices, faces=self.faces)
 
     def _outlines_3d(self, view='xy', **kwargs):
         """ Generate 3d outlines along a given view (see `.to_2d()`).
