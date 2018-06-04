@@ -29,7 +29,8 @@ logger = config.logger
 
 try:
     from pyoctree import pyoctree
-except BaseException:
+except ImportError:
+    pyoctree = None
     logger.warning("Module pyoctree not found. Falling back to scipy's \
                             ConvexHull for intersection calculations.")
 
@@ -148,9 +149,10 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     else:
         points = x
 
-    try:
+
+    if pyoctree:
         return _in_volume_ray(points, volume)
-    except:
+    else:
         logger.warning(
             'Package pyoctree not found. Falling back to ConvexHull.')
         return _in_volume_convex(points, volume, approximate=False)
