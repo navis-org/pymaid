@@ -149,6 +149,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     else:
         points = x
 
+    if points.ndim != 2 or points.shape[1] != 3:
+        raise ValueError('Points must be array of shape (N,3).')
 
     if pyoctree:
         return _in_volume_ray(points, volume)
