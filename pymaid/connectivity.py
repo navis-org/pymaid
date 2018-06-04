@@ -102,8 +102,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                 upstream = upstream[upstream.connector_id.isin(
                     restrict_to.connectors.connector_id.values)]
             elif isinstance(restrict_to, core.Volume):
-                upstream = upstream[intersect.in_volume(
-                    upstream.connector_loc.values, restrict_to)]
+                cn_locs = np.vstack(upstream.connector_loc.values)
+                upstream = upstream[intersect.in_volume(cn_locs, restrict_to)]
         else:
             upstream = None
 
@@ -118,8 +118,9 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                 downstream = downstream[downstream.connector_id.isin(
                     restrict_to.connectors.connector_id.values)]
             elif isinstance(restrict_to, core.Volume):
+                cn_locs = np.vstack(downstream.connector_loc.values)
                 downstream = downstream[intersect.in_volume(
-                    downstream.connector_loc.values, restrict_to)]
+                    cn_locs, restrict_to)]
         else:
             downstream = None
 
@@ -145,8 +146,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
             cn_data = cn_data[cn_data.connector_id.isin(
                 restrict_to.connectors.connector_id.values)]
         elif isinstance(restrict_to, core.Volume):
-            cn_data = cn_data[intersect.in_volume(
-                cn_data.connector_loc.values, restrict_to)]
+            cn_locs = np.vstack(cn_data.connector_loc.values)
+            cn_data = cn_data[intersect.in_volume(cn_locs, restrict_to)]
 
     if cn_data.empty:
         logger.warning('No connectivity left after filtering')
