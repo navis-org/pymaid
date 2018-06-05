@@ -336,9 +336,9 @@ class handler:
         volume :    core.Volume | dict
                     Must contain 'faces', 'vertices'
         """
-        mesh_name = volume.get('name', 'mesh')
+        mesh_name = getattr(volume, 'name', 'mesh')
 
-        verts = volume['vertices']
+        verts = volume.vertices
 
         if not isinstance(verts, pd.DataFrame):
             verts = pd.DataFrame(verts)
@@ -358,7 +358,7 @@ class handler:
         scn.objects.active = ob
         ob.select = True
 
-        me.from_pydata(blender_verts, [], volume['faces'])
+        me.from_pydata(list(blender_verts), [], volume.faces)
         me.update()
 
         bpy.ops.object.shade_smooth()
