@@ -6,6 +6,13 @@ Installation instructions come in two flavors:
 1. **Quick install**: if you know what you are doing.
 2. **Installation 101** : step-by-step instructions.
 
+.. note::
+   If you simply want to try out pymaid, you can do so on 
+   `Binder <https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=tree>`_.   
+   Don't fall into despair if it takes ~10mins to start up - that just means
+   that you are the first to test the current build on Binder. Once your
+   server has started, navigate to and open `examples/start_here.ipynb`. 
+
 Quick install
 -------------
 
@@ -21,17 +28,18 @@ most recent version use:
    pip install git+git://github.com/schlegelp/pymaid@master
 
 
-There are two (optional) dependencies that you might want to install manually:
-pyoctree and rpy2 (see Requirements below). The latter is only relevant if
-you intend to use pymaid's R bindings.
+.. note::
+   There are two optional dependencies that you might want to install manually:
+   pyoctree and rpy2 (see *Requirements* below). The latter is only relevant if
+   you intend to use pymaid's R bindings.
 
 
-Installing from source
-**********************
+**Installing from source**
+
 Instead of using PIP to install from Github, you can also install manually:
 
-1. Download the source (tar.gz file) from
-   https://github.com/schlegelp/PyMaid/tree/master/dist
+1. Download the source (e.g a ``tar.gz`` file from
+   https://github.com/schlegelp/PyMaid/tree/master/dist)
 
 2. Unpack and change directory to the source directory
    (the one with ``setup.py``).
@@ -42,45 +50,51 @@ Instead of using PIP to install from Github, you can also install manually:
 Installation 101
 ----------------
 
-1. Check if Python 3 is installed and install if necessary. Linux and Mac 
+1. **Check if Python 3 is installed and install if necessary**. Linux and Mac 
    should come with Python distribution(s) but you need to figure out if 
-   you have Python 2, Python 3 or both. Open a terminal, type in ``python`` 
-   and press enter:
+   you have Python 2, Python 3 or both. 
 
-    a) You get something along the lines of ``command not found``, see below
-       note on installing Python 3.
-    b) A Python console opens but it says e.g. ``Python 2.7.14``. Exit the Python 
-       console (``exit()``) and try ``python3``. If this works, your default
-       distribution is Python 2.x. That's fine but you have to be careful to
-       specify which Python you want packages to be installed for. Concretely,
-       you need to replace ``pip install ...`` with ``pip3 install ...``.
-       If ``python3`` throws ``command not found``, see below note on installing 
-       Python 3.
-    c) A Python 3 console opens. Proceed with step 2.
+   Open a terminal, type in ``python``, press enter and one of three things should happen:
 
-2. Get the Python package manager `PIP <https://pip.pypa.io/en/stable/installing/>`_. 
-   Try ``pip`` in a terminal and if that throws an error, go to above URL to
-   download and install pip. In a nutshell:
-    a) Open above URL
-    b) Download the ``get-pip.py`` to your Downloads folder by right-clicking
+    a) You get something along the lines of ``command not found``:  
+
+       No Python installed. See below note on how to install Python 3.
+
+    b) A Python console opens but it says e.g. ``Python 2.7``: 
+
+         Exit the Python console (``exit()``) and try ``python3`` instead. One
+         of two things should happen: 
+          
+          i) It works and a Python 3 console shows up. This means your default
+             distribution is Python 2.x. That's fine but you have to be careful
+             to specify which Python you want packages to be installed for.
+             Concretely, you need to replace ``pip install ...`` with 
+             ``pip3 install ...`` in below code. 
+          ii) ``python3`` throws ``command not found``: No Python 3 installed.
+              See below note on how to install.
+    c) A Python 3 console opens. Great! Proceed with step 2.
+
+2. **Get the Python package manager** `PIP <https://pip.pypa.io>`_.
+   Try ``pip`` in a terminal and if that throws an error, follow this 
+   `link <https://pip.pypa.io/en/stable/installing/>`_ to download and install
+   pip. In a nutshell:
+    a) Open above link.
+    b) Download the ``get-pip.py`` file to your Downloads folder by right-clicking
        it and selecting `Save File As`.
     c) Open a terminal, navigate to your Downloads folder (e.g.
        ``cd Downloads``) and run ``python get-pip.py``.
 
-3. Install pymaid and its dependencies. Open a terminal and run 
-   ``pip install git+git://github.com/schlegelp/pymaid@master`` to install
-   the most recent version from Github. Remember to use ``pip3`` instead if
-   your default distribution is Python 2. This *should* take care of all
-   required dependencies. If anything fails, find the culprit in below 
-   Requirements and install the dependency manually before attempting to
+3. **Install pymaid and its dependencies**. Open a terminal and run::
+
+     pip install git+git://github.com/schlegelp/pymaid@master
+
+   to install the most recent version from Github. Remember to use ``pip3`` 
+   instead if your default distribution is Python 2. This *should* take care
+   of all required dependencies. If something fails, find the culprit in below 
+   *Requirements* and install the dependency manually before attempting to
    install pymaid again.
 
-4. Go to *Introduction* and try some of the basic tutorials.
-
-.. note::
-   There are two (optional) dependencies that you might want to install manually:
-   pyoctree and rpy2 (see Requirements below). The latter is only relevant if
-   you intend to use pymaid's R bindings.
+4. **Done**. Go to *Introduction* and try some of the basic tutorials.
 
 .. note::
    **Installing Python 3**: 
@@ -94,6 +108,11 @@ Installation 101
    scientific Python distribution that comes with "batteries included". 
    `Anaconda <https://www.continuum.io/downloads>`_ is a widespread solution
    that comes with its own package manager ``conda``.
+
+.. note::
+   There are two optional dependencies that you might want to install manually:
+   pyoctree and rpy2 (see *Requirements* below). The latter is only relevant if
+   you intend to use pymaid's R bindings.
 
 
 Requirements
