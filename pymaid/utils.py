@@ -315,6 +315,9 @@ def eval_skids(x, remote_instance=None):
             if x.startswith('annotation:'):
                 return fetch.get_skids_by_annotation(x[11:],
                                                      remote_instance=remote_instance)
+            elif x.startswith('annotations:'):
+                return fetch.get_skids_by_annotation(x[12:],
+                                                     remote_instance=remote_instance)
             elif x.startswith('name:'):
                 return fetch.get_skids_by_name(x[5:],
                                                remote_instance=remote_instance,
