@@ -1,66 +1,100 @@
 Install
 =======
 
-PyMaid requires Python 3.4 or higher. It heavily depends on other
-scientific packages (e.g. `scipy` and `numpy`). If you do not already
-have a Python environment configured on your computer, please see the
-instructions for installing the full `scientific Python stack
-<https://scipy.org/install.html>`_.
+Installation instructions come in two flavors:
 
-.. note::
-   If you are on Windows I strongly recommend installing a scientific Python
-   distribution that comes with many of the key dependencies preinstalled:
-   `Anaconda <https://www.continuum.io/downloads>`_,
-   `Enthought Canopy <https://www.enthought.com/products/canopy/>`_,
-   `Python(x,y) <http://python-xy.github.io/>`_,
-   `WinPython <https://winpython.github.io/>`_, or
-   `Pyzo <http://www.pyzo.org/>`_.
-   If you already use one of these Python distribution, please refer to their
-   online documentation on how to install additional packages.
+1. **Quick install**: if you know what you are doing.
+2. **Installation 101** : step-by-step instructions.
 
 Quick install
 -------------
 
+If you don't already have it, get `PIP <https://pip.pypa.io/en/stable/installing/>`_.
+
 PyMaid is **NOT** listed in the Python Packaging Index (PyPI). There is a
 `pymaid` package on PyPI but that is something else! Hence, you will have to
 install from `Github <https://github.com/schlegelp/PyMaid>`_. To get the
-most recent version please use:
+most recent version use:
 
 ::
 
    pip install git+git://github.com/schlegelp/pymaid@master
 
-See `here <https://pip.pypa.io/en/stable/installing/>`_ how to get PIP.
 
-Depending on your default Python version you may have to specify that you want
-PyMaid to be installed for Python 3:
+There are two (optional) dependencies that you might want to install manually:
+pyoctree and rpy2 (see Requirements below). The latter is only relevant if
+you intend to use pymaid's R bindings.
 
-::
-
-   pip3 install git+git://github.com/schlegelp/pymaid@master
-
-.. important::
-   One of the dependencies ``pyoctree`` requires ``numpy`` to be installed. If
-   pip fails with ``ImportError: No module named 'numpy'`` you have to manually
-   install numpy first by running ``pip install numpy``. Then retry installing
-   PyMaid via ``pip``.
-
-.. note::
-   The :mod:`pymaid.rmaid` module requires `rpy2 <https://rpy2.readthedocs.io>`_.
-   As ``rpy2`` installation fails if no R is installed, it is not a default
-   dependency. If you want to use the interface between R's nat, catnat and elmr
-   you have have to install ``rpy2`` manually *after* R has been set up.
 
 Installing from source
-----------------------
+**********************
+Instead of using PIP to install from Github, you can also install manually:
 
 1. Download the source (tar.gz file) from
- https://github.com/schlegelp/PyMaid/tree/master/dist
+   https://github.com/schlegelp/PyMaid/tree/master/dist
 
 2. Unpack and change directory to the source directory
- (the one with setup.py).
+   (the one with ``setup.py``).
 
-3. Run :samp:`python setup.py install` to build and install
+3. Run ``python setup.py install`` to build and install
+
+
+Installation 101
+----------------
+
+1. Check if Python 3 is installed and install if necessary. Linux and Mac 
+   should come with Python distribution(s) but you need to figure out if 
+   you have Python 2, Python 3 or both. Open a terminal, type in ``python`` 
+   and press enter:
+
+    a) You get something along the lines of ``command not found``, see below
+       note on installing Python 3.
+    b) A Python console opens but it says e.g. ``Python 2.7.14``. Exit the Python 
+       console (``exit()``) and try ``python3``. If this works, your default
+       distribution is Python 2.x. That's fine but you have to be careful to
+       specify which Python you want packages to be installed for. Concretely,
+       you need to replace ``pip install ...`` with ``pip3 install ...``.
+       If ``python3`` throws ``command not found``, see below note on installing 
+       Python 3.
+    c) A Python 3 console opens. Proceed with step 2.
+
+2. Get the Python package manager `PIP <https://pip.pypa.io/en/stable/installing/>`_. 
+   Try ``pip`` in a terminal and if that throws an error, go to above URL to
+   download and install pip. In a nutshell:
+    a) Open above URL
+    b) Download the ``get-pip.py`` to your Downloads folder by right-clicking
+       it and selecting `Save File As`.
+    c) Open a terminal, navigate to your Downloads folder (e.g.
+       ``cd Downloads``) and run ``python get-pip.py``.
+
+3. Install pymaid and its dependencies. Open a terminal and run 
+   ``pip install git+git://github.com/schlegelp/pymaid@master`` to install
+   the most recent version from Github. Remember to use ``pip3`` instead if
+   your default distribution is Python 2. This *should* take care of all
+   required dependencies. If anything fails, find the culprit in below 
+   Requirements and install the dependency manually before attempting to
+   install pymaid again.
+
+4. Go to *Introduction* and try some of the basic tutorials.
+
+.. note::
+   There are two (optional) dependencies that you might want to install manually:
+   pyoctree and rpy2 (see Requirements below). The latter is only relevant if
+   you intend to use pymaid's R bindings.
+
+.. note::
+   **Installing Python 3**: 
+
+   On **Linux** and **OSX (Mac)**, simply visit e.g. https://www.python.org and 
+   download + install Python 3.4 or later.
+   
+   On **Windows**, things are bit more tricky. While pymaid is written in pure
+   Python, some of its dependencies are written in C for speed and need to be 
+   compiled - which a pain on Windows. I strongly recommend installing a 
+   scientific Python distribution that comes with "batteries included". 
+   `Anaconda <https://www.continuum.io/downloads>`_ is a widespread solution
+   that comes with its own package manager ``conda``.
+
 
 Requirements
 ------------
@@ -83,7 +117,8 @@ which should come with "batteries included".
   Used to visualise neurons in 3D. This requires you to have *one* of
   the supported `backends <http://vispy.org/installation.html#backend-requirements>`_
   installed. During automatic installation PyMaid will try installing the
-  PyQt5 backend to fullfil this requirement.
+  `PyQt5 <http://pyqt.sourceforge.net/Docs/PyQt5/installation.html>`_ backend 
+  to fullfil this requirement.
 
 `Plotly <https://plot.ly/python/getting-started/>`_
   Used to visualise neurons in 3D. Alternative to Vispy based on WebGL.

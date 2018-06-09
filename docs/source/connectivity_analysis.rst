@@ -1,7 +1,9 @@
 Connectivity analyses
 +++++++++++++++++++++
 
-Getting connectivity information for a set of neurons is pretty straight forward. You can get connectivity tables, edges between neurons, connectors between neurons. Check out functions below and in "Fetching data from the 
+Getting connectivity information for a set of neurons is pretty straight 
+forward. You can get connectivity tables, edges between neurons, connectors
+between neurons. Check out functions below and in "Fetching data from the 
 server"!
 
 Here, we will focus on more complex examples: restricting connectivity
@@ -36,7 +38,8 @@ and dendrites separately:
 >>> ax = sns.heatmap(adj_merged)
 >>> plt.show()
 
-Following up on above example, we will next subset the connectivity table to connections in a given CATMAID volume:
+Following up on above example, we will next subset the connectivity table to
+connections in a given CATMAID volume:
 
 >>> # Get a CATMAID volume
 >>> vol = pymaid.get_volume('LH_R')
