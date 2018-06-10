@@ -27,6 +27,8 @@ See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for 
 
 Alternatively click on the *launch binder* badge above to try out pymaid hosted by [mybinder](https://mybinder.org)!
 
+![pymaid example](https://user-images.githubusercontent.com/7161148/41200671-4e4320ec-6ca1-11e8-90a2-2feda2d9372d.gif)
+
 ## License:
 This code is under GNU GPL V3
 
