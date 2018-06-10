@@ -16,8 +16,8 @@ Blender comes with its own Python 3.5, so you need to install PyMaid specificall
 
 There are several ways to install additional packages for Blender's built-in Python. The easiest way is probably this:
 
-1. Download `PIPs <https://pip.pypa.io/en/stable/installing/>`_ get-pip.py and save e.g. in your downloads directory
-2. run get-pip.py from Blender Python console:
+1. Download `PIPs <https://pip.pypa.io/en/stable/installing/>`_ ``get-pip.py`` and save e.g. in your downloads directory
+2. Execute ``get-pip.py`` from Blender Python console:
 
 >>> with open('/Users/YOURNAME/Downloads/get-pip.py') as source_file:
 ...     exec(source_file.read())
@@ -31,7 +31,7 @@ Alternatively run Blender's Python from a Terminal. In MacOS do:
 
 1. Make sure Blender is in your Applications folder
 2. Right click on Blender icon -> **Show Package Contents**
-3. Navigate to **Contents/Resources/2.XX/python/bin** and run **python3.5m** by drag&dropping it into a Terminal
+3. Navigate to **Contents/Resources/2.XX/python/bin** and run **python3.5m** by dragging & dropping it into a terminal
 4. Try above steps from the Python shell 
 
 Quickstart
