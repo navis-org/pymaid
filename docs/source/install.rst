@@ -62,7 +62,7 @@ Installation 101
 
     b) A Python console opens but it says e.g. ``Python 2.7``: 
 
-         Exit the Python console (``exit()``) and try ``python3`` instead. One
+         Exit the Python console via ``exit()`` and try ``python3`` instead. One
          of two things should happen: 
           
           i) It works and a Python 3 console shows up. This means your default

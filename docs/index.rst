@@ -4,11 +4,11 @@ PyMaid
 :Release: |version|
 :Date: |today|
 
-PyMaid is a Python 3 package for working with CATMAID data.
+PyMaid is a Python 3 package for working with neurons generated with CATMAID.
 It allows you to fetch, analyse and plot data from a CATMAID server.
-The package is under heavy development, I strongly recommend
-watching its `Github repository <https://github.com/schlegelp/PyMaid>`_.
-Also, make sure that your ``pymaid.__version__`` is up-to-date (see
+The package is (sort of) stable for now but I recommend watching its 
+`Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
+Make sure that your ``pymaid.__version__`` is up-to-date (see
 **Release** above).
 
 Features
