@@ -346,6 +346,16 @@ User statistics
     ~pymaid.get_transactions
 
 
+Image data (tiles)
+++++++++++++++++++
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.tiles.LoadTiles
+    pymaid.tiles.crop_neuron    
+
+
 R interface (rMAID)
 +++++++++++++++++++
 

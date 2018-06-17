@@ -54,6 +54,7 @@ Table of Contents
    source/connectivity_analysis
    source/blender
    source/rmaid_doc
+   source/tiles.ipynb
    source/user_stats
    source/api
    source/troubleshooting
