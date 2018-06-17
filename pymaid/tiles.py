@@ -36,10 +36,9 @@ import threading
 # Set up logging
 logger = config.logger
 
-
 def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
                 remote_instance=None):
-    """ Crops EM tiles following a neuron's segments.
+    """ Crops and saves EM tiles following a neuron's segments.
 
     Parameters
     ----------
@@ -542,7 +541,10 @@ class LoadTiles:
                     verticalalignment='center',
                     **label_kws)
 
-    def render_nodes(self, ax, treenodes=True, connectors=True, slice_ix=None, tn_color='yellow', cn_color='none', tn_ec=None, cn_ec='orange', skid_include=[], cn_include=[], tn_kws={}, cn_kws={}):
+    def render_nodes(self, ax, treenodes=True, connectors=True, slice_ix=None,
+                     tn_color='yellow', cn_color='none', tn_ec=None,
+                     cn_ec='orange', skid_include=[], cn_include=[], tn_kws={},
+                     cn_kws={}):
         """ Renders nodes onto image.
 
         Parameters
@@ -561,16 +563,16 @@ class LoadTiles:
         cn_include :    list of int, optional
                         List of connector IDs to include.
         tn_kws :        dict, optional
-                        Keywords passed on to matplotlib.pyplot.scatter for
+                        Keywords passed to ``matplotlib.pyplot.scatter`` for
                         treenodes.
         cn_kws :        dict, optional
-                        Keywords passed on to matplotlib.pyplot.scatter for
+                        Keywords passed to ``matplotlib.pyplot.scatter`` for
                         connectors.
         """
 
-        if slice_ix == None and len(self.image_coords) == 1:
+        if slice_ix is None and len(self.image_coords) == 1:
             slice_ix = 0
-        elif slice_ix == None:
+        elif slice_ix is None:
             raise ValueError(
                 'Please provide index of the slice you want nodes to be rendered for.')
 
@@ -616,8 +618,10 @@ class LoadTiles:
 
         # Filter if provided
         if len(skid_include) > 0:
+            skid_include = np.array(skid_include).astype(int)
             self.nodes = self.nodes[self.nodes.skeleton_id.isin(skid_include)]
         if len(cn_include) > 0:
+            cn_include = np.array(cn_include).astype(int)
             self.connectors = self.connectors[self.connectors.skeleton_id.isin(
                 node_include)]
 
@@ -799,14 +803,14 @@ def test_response_time(url, calls=5):
     for i in range(calls):
         start = time.time()
         try:
-            resp = urllib.request.urlopen(url)
+            _ = urllib.request.urlopen(url)
             resp_times.append(time.time() - start)
         except urllib.error.HTTPError as err:
             if err.code == 404:
                 return float('inf')
             if err.code == 401:
                 resp_times.append(time.time() - start)
-        except:
+        except BaseException:
             return float('inf')
 
     return np.mean(resp_times)
@@ -820,7 +824,7 @@ class _retrieveTileThreaded(threading.Thread):
         try:
             self.url = url
             threading.Thread.__init__(self)
-        except:
+        except BaseException:
             logger.error(
                 'Failed to initiate thread for ' + self.url)
 
@@ -837,7 +841,7 @@ class _retrieveTileThreaded(threading.Thread):
         try:
             threading.Thread.join(self)
             return self.tile
-        except:
+        except BaseException:
             logger.error(
                 'Failed to join thread for ' + self.url)
             return None
