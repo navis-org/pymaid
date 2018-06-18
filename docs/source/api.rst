@@ -169,7 +169,7 @@ Plotting
     ~pymaid.plot_network
     ~pymaid.clear3d
     ~pymaid.close3d
-    ~pymaid.get_canvas
+    ~pymaid.get_viewer
     ~pymaid.screenshot
     ~pymaid.Volume
     ~pymaid.Viewer
@@ -250,6 +250,7 @@ User stats
     ~pymaid.get_contributor_statistics
     ~pymaid.get_logs
     ~pymaid.get_transactions
+    ~pymaid.get_team_contributions
 
 Volumes
 -------
