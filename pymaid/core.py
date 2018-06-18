@@ -2268,8 +2268,8 @@ class CatmaidNeuronList:
         nl = CatmaidNeuronList([e['skeleton_id'] for e in data])
 
         # Add colors
-        for e in data:
-            nl.skid[e['skeleton_id']].color = tuple(
+        for k, e in enumerate(data):
+            nl[k].color = tuple(
                 int(e['color'].lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
 
         return nl
