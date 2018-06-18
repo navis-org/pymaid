@@ -44,12 +44,14 @@ from pymaid import core, utils, config
 import colorsys
 import json
 import os
+import time
 
 try:
     import bpy
+    import bmesh
 except ImportError:
     raise ImportError(
-        'Unable to load bpy - this module only works from within Blender!')
+        'Unable to load Blender API - this module only works from within Blender!')
 
 logger = config.logger
 
@@ -148,7 +150,7 @@ class handler:
 
     def add(self, x, neurites=True, soma=True, connectors=True, redraw=True,
             use_radii=False):
-        """ Add neuron(s) to scene
+        """ Add neuron(s) to scene.
 
         Parameters
         ----------
@@ -166,6 +168,7 @@ class handler:
         use_radii :     bool, optional
                         If True, will use treenode radii.
         """
+        start = time.time()
 
         if isinstance(x, core.CatmaidNeuron):
             self._create_neuron(x, neurites=neurites,
@@ -184,6 +187,8 @@ class handler:
             logger.error(
                 'Unable to interpret data type ' + str(type(x)))
             raise AttributeError('Unable to add data of type' + str(type(x)))
+
+        print('Import done in {:.2}s'.format(time.time()-start))
 
         return
 
@@ -208,12 +213,76 @@ class handler:
             self._create_connectors(x)
         return
 
+    def _create_neurites2(self, x, mat, use_radii=False):
+        """ This function generates a mesh first, then converts to curve.
+        I thought it might be faster that way but turns out no. Will keep
+        this code just in case it becomes useful elsewhere.
+        """
+        mesh = bpy.data.meshes.new(x.neuron_name + ' mesh')
+
+        nodes = x.nodes.set_index('treenode_id')
+
+        verts = []
+        edges = []
+        n_verts = 0
+        for i, s in enumerate(x.segments):
+            # Get and convert coordinates
+            coords = nodes.loc[s, ['x','y','z']].values.astype(float)
+            coords *= float(self.conversion)
+
+            # Compute edge indices
+            eg = list(zip(range(0, coords.shape[0]),
+                          range(1, coords.shape[0]))
+                      )
+
+            # Offset indices by existing verts
+            eg = np.array(eg) + n_verts
+
+            verts.append(coords)
+            edges.append(eg)
+            n_verts += coords.shape[0]
+
+        # Convert to array of shape (N,3) and (N,2) respectively
+        verts = np.vstack(verts)
+        edges = np.vstack(edges)
+
+        # Swap z and y and invert y coords
+        verts = verts[:,[0,2,1]] * np.array([1,1,-1])
+
+        # Add all data at once
+        mesh.from_pydata(verts, edges.astype(int), [])
+        mesh.update()
+
+        # Generate the object
+        ob = bpy.data.objects.new('#%s - %s' %
+                                  (x.skeleton_id, x.neuron_name), mesh)
+        ob.location = (0, 0, 0)
+        ob.show_name = True
+        ob['type'] = 'NEURON'
+        ob['catmaid_object'] = True
+        ob['skeleton_id'] = x.skeleton_id
+
+        # Link object to scene - this needs to happen BEFORE we convert to curve
+        bpy.context.scene.objects.link(ob)
+
+        # Select and make active object
+        ob.select=True
+        bpy.context.scene.objects.active = ob
+
+        # Convert from mesh to curve
+        bpy.ops.object.convert(target='CURVE')
+
+        ob.data.dimensions = '3D'
+        ob.data.fill_mode = 'FULL'
+        ob.data.bevel_resolution = 5
+        ob.data.bevel_depth = 0.007
+        ob.active_material = mat
+
     def _create_neurites(self, x, mat, use_radii=False):
-        """Create neuron branches """
+        """Create neuron branches. """
         cu = bpy.data.curves.new(x.neuron_name + ' mesh', 'CURVE')
         ob = bpy.data.objects.new('#%s - %s' %
                                   (x.skeleton_id, x.neuron_name), cu)
-        bpy.context.scene.objects.link(ob)
         ob.location = (0, 0, 0)
         ob.show_name = True
         ob['type'] = 'NEURON'
@@ -224,48 +293,56 @@ class handler:
         cu.bevel_resolution = 5
         cu.bevel_depth = 0.007
 
-        # Create dictionary (MUCH faster lookup)
-        node_locs = {r.treenode_id: (r.x, r.y, r.z)
-                     for r in x.nodes.itertuples()}
-
-        if use_radii:
-            cu.bevel_depth = 1
-            radii = {r.treenode_id: r.radius
-                     for r in x.nodes.itertuples()}
+        #DO NOT touch this: lookup via dict is >10X faster!
+        tn_coords = {r.treenode_id: (r.x * self.conversion, r.z * self.conversion, r.y * -self.conversion) for r in x.nodes.itertuples()}
 
         for s in x.segments:
-            newSpline = cu.splines.new('POLY')
-            coords = np.vstack([node_locs[tn] for tn in s]).astype(float)
-            coords *= float(self.conversion)
+            sp = cu.splines.new('POLY')
 
-            ids = x.nodes.treenode_id.tolist()
+            coords = np.array([tn_coords[tn] for tn in s])
 
             # Add points
-            newSpline.points.add(len(coords) - 1)
+            sp.points.add(len(coords) - 1)
 
-            # Move points
-            for i, p in enumerate(coords):
-                newSpline.points[i].co = (p[0], p[2], -p[1], 0)
-                # Hijack weight property to store treenode ID
-                newSpline.points[i].weight = int(ids[i])
+            # Add this weird fourth coordinate
+            coords = np.c_[coords, [0]*coords.shape[0]]
 
-                if use_radii:
-                    newSpline.points[i].radius = max(radii[s[i]], 10) * self.conversion
+            # Set point coordinates
+            sp.points.foreach_set('co', coords.ravel())
+            sp.points.foreach_set('weight', s)
+
+            if use_radii:
+                sp.points.foreach_set('radius',
+                                       nodes.loc[s,'radius'].values * self.conversion)
 
         ob.active_material = mat
+
+        bpy.context.scene.objects.link(ob)
 
         return
 
     def _create_soma(self, x, mat):
         """ Create soma """
         s = x.nodes.set_index('treenode_id').ix[x.soma]
-        loc = s[['x', 'y', 'z']].values * self.conversion
+        loc = s[['x', 'z', 'y']].values * self.conversion * [1,1,-1]
         rad = s.radius * self.conversion
-        soma_ob = bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=8, size=rad, view_align=False,
-                                                       enter_editmode=False, location=(loc[0], loc[2], -loc[1]), rotation=(0, 0, 0),
-                                                       layers=[
-                                                           l for l in bpy.context.scene.layers]
-                                                       )
+
+        mesh = bpy.data.meshes.new('Soma of #{0} - mesh'.format(x.skeleton_id))
+        soma_ob = bpy.data.objects.new('Soma of #{0}'.format(x.skeleton_id), mesh)
+
+        # Add the object into the scene.
+        bpy.context.scene.objects.link(soma_ob)
+        bpy.context.scene.objects.active = soma_ob
+
+        soma_ob.location=loc
+        soma_ob.select = True
+
+        # Construct the bmesh cube and assign it to the blender mesh.
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, diameter=rad)
+        bm.to_mesh(mesh)
+        bm.free()
+
         bpy.ops.object.shade_smooth()
         bpy.context.active_object.name = 'Soma of #{0}'.format(x.skeleton_id)
         bpy.context.active_object['type'] = 'SOMA'
@@ -284,12 +361,23 @@ class handler:
             if con.empty:
                 continue
 
-            cn_coords = con[['x', 'y', 'z']].values.astype(float)
+            # Get & scale coordinates and invert y
+            cn_coords = con[['x', 'z', 'y']].values.astype(float)
             cn_coords *= float(self.conversion)
+            cn_coords *= [1, 1, -1]
 
-            tn_coords = x.nodes.set_index('treenode_id').ix[
-                con.treenode_id.tolist()][['x', 'y', 'z']].values.astype(float)
+            tn_coords = x.nodes.set_index('treenode_id').loc[con.treenode_id.values,
+                                                             ['x', 'z', 'y']].values.astype(float)
             tn_coords *= float(self.conversion)
+            tn_coords *= [1, 1, -1]
+
+            # Add 4th coordinate for blender
+            cn_coords = np.c_[cn_coords, [0] * con.shape[0]]
+            tn_coords = np.c_[tn_coords, [0] * con.shape[0]]
+
+            # Combine cn and tn coords in pairs
+            # This will have to be transposed to get pairs of cn and tn (see below)
+            coords = np.dstack([cn_coords, tn_coords])
 
             ob_name = '%s of %s' % (self.cn_dict[i]['name'], x.skeleton_id)
 
@@ -308,15 +396,15 @@ class handler:
             cu.bevel_depth = 0.007
             cu.resolution_u = 0
 
-            for cn in zip(cn_coords, tn_coords):
-                newSpline = cu.splines.new('POLY')
+            #for cn in zip(cn_coords, tn_coords):
+            for cn in coords:
+                sp = cu.splines.new('POLY')
 
                 # Add a second point
-                newSpline.points.add(1)
+                sp.points.add(1)
 
                 # Move points
-                newSpline.points[0].co = (cn[0][0], cn[0][2], -cn[0][1], 0)
-                newSpline.points[1].co = (cn[1][0], cn[1][2], -cn[1][1], 0)
+                sp.points.foreach_set('co', cn.T.ravel())
 
             mat_name = '%s of #%s' % (
                 self.cn_dict[i]['name'], str(x.skeleton_id))
