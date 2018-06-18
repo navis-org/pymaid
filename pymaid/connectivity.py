@@ -236,7 +236,7 @@ def cable_overlap(a, b, dist=2, method='min'):
     a,b :       CatmaidNeuron | CatmaidNeuronList
                 Neuron(s) for which to compute cable within distance.
     dist :      int, optional
-                Maximum distance in microns.
+                Maximum distance in microns [um].
     method :    'min' | 'max' | 'avg'
                 Method by which to calculate the overlapping cable between
                 two cables. Assuming that neurons A and B have 300 and 150
@@ -335,27 +335,27 @@ def cable_overlap(a, b, dist=2, method='min'):
     return matrix
 
 
-def predict_connectivity(a, b, method='possible_contacts', remote_instance=None, **kwargs):
-    """ Calculates potential synapses between neurons A -> B. Based on a
-    concept by Alex Bates.
+def predict_connectivity(source, target, method='possible_contacts', remote_instance=None, **kwargs):
+    """ Calculates potential synapses from source onto target neurons.
+    Based on a concept by Alex Bates.
 
     Parameters
     ----------
-    a,b :       CatmaidNeuron | CatmaidNeuronList
-                Neuron(s) for which to compute potential connectivity.
-    method :    'possible_contacts'
-                Method to use for calculations. See Notes.
-    **kwargs :  Keyword arguments.
-                1. For method = 'possible_contacts':
-                    - `dist` to set distance between connectors and treenodes
-                      manually.
-                    - `stdev` to set number of standard-deviations of average
-                      distance. Default = 2.
-
+    source,target : CatmaidNeuron | CatmaidNeuronList
+                    Neuron(s) for which to compute potential connectivity.
+                    This is unidirectional: source -> target.
+    method :        'possible_contacts'
+                    Method to use for calculations. See Notes.
+    **kwargs
+                    1. For method = 'possible_contacts':
+                        - ``dist`` to set distance between connectors and
+                          treenodes manually.
+                        - ``stdev`` to set number of standard-deviations of
+                          average distance. Default = 2.
 
     Notes
     -----
-    Method ``possible_contacts`` works by:
+    Method ``possible_contacts``:
         1. Calculating mean distance ``d`` (connector->treenode) at which connections
            between neurons A and neurons B occur.
         2. For all presynapses of neurons A, check if they are within `stdev`
@@ -377,33 +377,36 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
 
     """
 
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
     if not remote_instance:
         try:
-            remote_instance = a._remote_instance
+            remote_instance = source._remote_instance
         except:
             pass
 
-    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)) \
-       or not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise TypeError('Need to pass CatmaidNeurons')
+    for _ in [source, target]:
+        if not isinstance(_, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+            raise TypeError('Need CatmaidNeuron/List, got "{}"'.format(type(_)))
 
-    if isinstance(a, core.CatmaidNeuron):
-        a = core.CatmaidNeuronList(a)
+    if isinstance(source, core.CatmaidNeuron):
+        source = core.CatmaidNeuronList(source)
 
-    if isinstance(b, core.CatmaidNeuron):
-        b = core.CatmaidNeuronList(b)
+    if isinstance(target, core.CatmaidNeuron):
+        target = core.CatmaidNeuronList(target)
 
     allowed_methods = ['possible_contacts']
     if method not in allowed_methods:
         raise ValueError('Unknown method "{0}". Allowed methods: "{0}"'.format(
             method, ','.join(allowed_methods)))
 
-    matrix = pd.DataFrame(
-        np.zeros((a.shape[0], b.shape[0])), index=a.skeleton_id, columns=b.skeleton_id)
+    matrix = pd.DataFrame(np.zeros((source.shape[0], target.shape[0])),
+                          index=source.skeleton_id,
+                          columns=target.skeleton_id)
 
     # First let's calculate at what distance synapses are being made
-    cn_between = fetch.get_connectors_between(
-        a, b, remote_instance=remote_instance)
+    cn_between = fetch.get_connectors_between(source, target,
+                                              remote_instance=remote_instance)
 
     if kwargs.get('dist', None):
         distances = kwargs.get('dist')
@@ -418,24 +421,24 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
             'Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(), distances.std()))
     else:
         logger.warning('No existing connectors to calculate average \
-                               connector->treenode distance found. Falling \
-                               back to default of 1um. Use <stdev> argument\
-                               to set manually.')
+                        connector->treenode distance found. Falling \
+                        back to default of 1um. Use <stdev> argument\
+                        to set manually.')
         distances = 1000
 
     # Calculate distances threshold
     n_std = kwargs.get('n_std', 2)
     dist_threshold = np.mean(distances) + n_std * np.std(distances)
 
-    with config.tqdm(total=len(b), desc='Predicting', disable=config.pbar_hide,
+    with config.tqdm(total=len(target), desc='Predicting', disable=config.pbar_hide,
               leave=config.pbar_leave) as pbar:
-        for nB in b:
-            # Create cKDTree for nB
+        for t in target:
+            # Create cKDTree for target
             tree = scipy.spatial.cKDTree(
-                nB.nodes[['x', 'y', 'z']].values, leafsize=10)
-            for nA in a:
+                t.nodes[['x', 'y', 'z']].values, leafsize=10)
+            for s in source:
                 # Query against presynapses
-                dist, ix = tree.query(nA.presynapses[['x', 'y', 'z']].values,
+                dist, ix = tree.query(s.presynapses[['x', 'y', 'z']].values,
                                       k=1,
                                       distance_upper_bound=dist_threshold,
                                       n_jobs=-1
@@ -444,7 +447,7 @@ def predict_connectivity(a, b, method='possible_contacts', remote_instance=None,
                 # Calculate possible contacts
                 possible_contacts = sum(dist != float('inf'))
 
-                matrix.at[nA.skeleton_id, nB.skeleton_id] = possible_contacts
+                matrix.at[s.skeleton_id, t.skeleton_id] = possible_contacts
 
             pbar.update(1)
 
@@ -490,47 +493,48 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
     return edges
 
 
-def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_groups={}, syn_threshold=None, syn_cutoff=None, use_connectors=False):
-    """ Generate adjacency matrix for synaptic connections between neuronsA
-    -> neuronsB (unidirectional!).
+def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
+                     target_grp={}, syn_threshold=None, syn_cutoff=None,
+                     use_connectors=False):
+    """ Generate adjacency matrix for synaptic connections between sets of
+    neurons. Directional: sources = rows, targets = columns.
 
     Parameters
     ----------
-    n_a
+    s
                         Source neurons as single or list of either:
 
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    n_b
+    t
                         Optional. Target neurons as single or list of either:
 
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
-                        3. annotation: e.g. 'annotation:PN right'
+                        3. annotation: e.g. ``'annotation:PN right'`
                         4. CatmaidNeuron or CatmaidNeuronList object
 
-                        If not provided, `source neurons = target neurons`.
+                        If not provided, ``source neurons = target neurons``.
     remote_instance :   CATMAID instance, optional
     syn_cutoff :        int, optional
                         If set, will cut off connections above given value.
     syn_threshold :     int, optional
                         If set, will ignore connections with less synapses.
-    row_groups :        dict, optional
-                        Use to collapse neuronsA/B into groups. Can be either:
-                          1. ``{ group name : [ neuron1, neuron2, ... ], .. }``
-                          2. ``{ neuron1 : group1, neuron2 : group2, .. }``
+    source_grp :        dict, optional
+                        Use to collapse sources into groups. Can be either:
+                          1. ``{group1: [neuron1, neuron2, ... ], ..}``
+                          2. ``{neuron1: group1, neuron2 : group2, ..}``
 
-                        `syn_cutoff` and `syn_threshold` are applied BEFORE
-                        grouping!
-
-    col_groups :        dict, optional
-                        See row_groups
+                        ``syn_cutoff`` and ``syn_threshold`` are applied
+                        BEFORE grouping!
+    target_grp :        dict, optional
+                        See ``source_grp`` for possible formats.
     use_connectors :    bool, optional
-                        If True AND ``n_a`` or ``n_b`` are CatmaidNeuron(s),
-                        use restrict adjacency matrix to their connectors. Use
-                        if e.g. you've pruned neurons.
+                        If True AND ``s`` or ``t`` are ``CatmaidNeuron/List``,
+                        restrict adjacency matrix to their connectors. Use
+                        if e.g. you are using pruned neurons.
 
     Returns
     -------
@@ -560,11 +564,11 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if n_b is None:
-        n_b = n_a
+    if t is None:
+        t = s
 
-    neuronsA = utils.eval_skids(n_a, remote_instance=remote_instance)
-    neuronsB = utils.eval_skids(n_b, remote_instance=remote_instance)
+    neuronsA = utils.eval_skids(s, remote_instance=remote_instance)
+    neuronsB = utils.eval_skids(t, remote_instance=remote_instance)
 
     if not isinstance(neuronsA, list):
         neuronsA = [neuronsA]
@@ -582,9 +586,10 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     logger.info('Retrieving and filtering connectivity...')
 
-    if use_connectors and (isinstance(n_a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or isinstance(n_b, (core.CatmaidNeuron, core.CatmaidNeuronList))):
+    if use_connectors and (isinstance(s, (core.CatmaidNeuron, core.CatmaidNeuronList))
+                           or isinstance(t, (core.CatmaidNeuron, core.CatmaidNeuronList))):
         edges = _edges_from_connectors(
-            n_a, n_b, remote_instance=remote_instance)
+            s, t, remote_instance=remote_instance)
     else:
         edges = fetch.get_edges(neurons, remote_instance=remote_instance)
 
@@ -614,10 +619,10 @@ def adjacency_matrix(n_a, n_b=None, remote_instance=None, row_groups={}, col_gro
 
     matrix.datatype = 'adjacency_matrix'
 
-    if col_groups or row_groups:
+    if source_grp or target_grp:
         matrix = group_matrix(matrix,
-                              row_groups,
-                              col_groups,
+                              source_grp,
+                              target_grp,
                               drop_ungrouped=False)
 
     logger.info('Finished!')
@@ -635,11 +640,11 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
                         Matrix to group.
     row_groups :        dict, optional
                         Row groups to be formed. Can be either:
-                          1. ``{ group name : [ neuron1, neuron2, ... ], .. }``
-                          2. ``{ neuron1 : group1, neuron2 : group2, .. }``
+                          1. ``{group1 : [neuron1, neuron2, ...], ...}``
+                          2. ``{neuron1 : group1, neuron2: group2, ...}``
                         If grouping numpy arrays, use indices!
     col_groups :        dict, optional
-                        Col groups. See `row_groups` for details.
+                        Col groups. See ``row_groups`` for details.
     drop_ungrouped :    bool, optional
                         If ungrouped, neurons that are not part of a
                         row/col_group are dropped from the matrix.
