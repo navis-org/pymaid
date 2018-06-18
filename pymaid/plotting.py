@@ -595,7 +595,7 @@ def plot2d(x, method='2d', **kwargs):
                 default_settings = dict(
                     c='black',
                     zorder=4,
-                    edge_color='none',
+                    edgecolor='none',
                     s=1
                 )
                 default_settings.update(scatter_kws)
