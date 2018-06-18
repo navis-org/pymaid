@@ -90,4 +90,5 @@ Reference
 	~pymaid.get_user_list
 	~pymaid.get_user_actions
 	~pymaid.get_transactions
+    ~pymaid.get_team_contributions
     
