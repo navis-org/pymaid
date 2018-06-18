@@ -114,6 +114,11 @@ Installation 101
    pyoctree and rpy2 (see *Requirements* below). The latter is only relevant if
    you intend to use pymaid's R bindings.
 
+.. important::
+   If you are running Python 3.6 on MacOS Sierra and get a
+   ``SSL: CERTIFICATE_VERIFY_FAILED`` error everytime you try fetching data,
+   have a look at this `blog post <http://www.cdotson.com/2017/01/sslerror-with-python-3-6-x-on-macos-sierra/>`_.
+
 
 Requirements
 ------------

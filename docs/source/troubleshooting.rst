@@ -15,6 +15,15 @@ PyOctree fails compiling because of ``fopenmp``.
 3. Open a terminal, navigate to the directory containing ``setup.py`` and run ``python setup.py install`` (if your default Python is 2.7, use ``python3``)
 
 
+Fetching data
+-------------
+
+**Problem**:
+Fetching any data throws an exception ``<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate very failed>``.
+
+**Solution**: 
+Have a look at this `blog post <http://www.cdotson.com/2017/01/sslerror-with-python-3-6-x-on-macos-sierra/>`_.
+
 Plotting
 --------
 
