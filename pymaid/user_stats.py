@@ -63,7 +63,242 @@ import datetime
 # Set up logging
 logger = config.logger
 
-__all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions']
+__all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions',
+           'get_team_contributions']
+
+
+def get_team_contributions(teams, neurons=None, remote_instance=None):
+    """ Get contributions by teams.
+
+    Notes
+    -----
+     1. Time calculation uses defaults from :func:`pymaid.get_time_invested`.
+     2. Time does not take edits into account.
+     3. ``total_reviews`` > ``total_nodes`` is possible if nodes have been
+        reviewed multiple times by different users. Similarly,
+        ``total_reviews`` = ``total_nodes`` does not imply that the neuron
+        is fully reviewed!
+
+    Parameters
+    ----------
+    teams               dict
+                        Teams to group contributions for. Users must be logins.
+                        Format can be either:
+
+                          1. Simple user assignments. For example::
+
+                              ``{'teamA': ['user1', 'user2'], 'team2': ['user3'], ...]}``
+
+                          2. Users with start and end dates. Start and end date
+                             must be either ``datetime.date`` or a single
+                             ``pandas.date_range`` object. For example::
+
+                              {
+                               'team1': {
+                                        'user1': (datetime.date(2017, 1, 1), datetime.date(2018, 1, 1)),
+                                        'user2': (datetime.date(2016, 6, 1), datetime.date(2018, 1, 1)
+                                        }
+                               'team2': {
+                                        'user3': pandas.date_range('2017-1-1', '2018-1-1'),
+                                        }
+                              }
+
+                        Mixing both styles is permissible. For second style,
+                        use e.g. ``'user1': None`` for no date restrictions
+                        on that user.
+
+    neuron              skeleton ID(s) | CatmaidNeuron/List, optional
+                        Restrict check to given set of neurons. If
+                        CatmaidNeuron/List, will use this neurons nodes/
+                        connectors. You subset contributions e.g. to a given
+                        neuropil by pruning neurons.
+    remote_instance :   Catmaid Instance, optional
+                        Either pass explicitly or define globally.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in which each row represents a neuron. Example for two teams,
+        ``teamA`` and ``teamB``:
+
+        >>> df
+           skeleton_id  total_nodes  teamA_nodes  teamB_nodes  ...
+        0
+        1
+           total_reviews teamA_reviews  teamB_reviews  ...
+        0
+        1
+           total_connectors  teamA_connectors  teamB_connectors ...
+        0
+        1
+           total_time  teamA_time  teamB_time
+        0
+        1
+
+    Examples
+    --------
+    >>> from datetime import date
+    >>> import pandas as pd
+    >>> teams = {'teamA': ['user1', 'user2'],
+    ...          'teamB': {'user3': None,
+    ...                    'user4': (date(2017, 1, 1), date(2018, 1, 1))},
+    ...          'teamC': {'user5': pd.date_range('2015-1-1', '2018-1-1')}}
+    >>> stats = pymaid.get_team_contributions(teams)
+
+    See Also
+    --------
+    :func:`~pymaid.get_contributor_statistics`
+                           Gives you more basic info on neurons of interest
+                           such as total reconstruction/review time.
+    :func:`~pymaid.get_time_invested`
+                           Time invested by individual users. Gives you more
+                           control over how time is calculated.
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    # Prepare teams
+    if not isinstance(teams, dict):
+        raise TypeError('Expected teams of type dict, got {}'.format(type(teams)))
+
+    beginning_of_time = datetime.date(1900, 1, 1)
+    today = datetime.date.today()
+    all_time = pd.date_range(beginning_of_time, today)
+
+    for t in teams:
+        if isinstance(teams[t], list):
+            teams[t] = {u: all_time for u in teams[t]}
+        elif isinstance(teams[t], dict):
+            for u in teams[t]:
+                if isinstance(teams[t][u], type(None)):
+                    teams[t][u] = all_time
+                elif isinstance(teams[t][u], (tuple, list)):
+                    try:
+                        teams[t][u] = pd.date_range(*teams[t][u])
+                    except BaseException:
+                        raise Exception('Error converting "{}" to pandas.date_range'.format(teams[t][u]))
+                elif isinstance(teams[t][u],
+                                pd.core.indexes.datetimes.DatetimeIndex):
+                    pass
+                else:
+                    TypeError('Expected user dates to be either None, tuple of datetimes or pandas.date_range, got {}'.format(type(teams[t][u])))
+        else:
+            raise TypeError('Expected teams to be either lists or dicts of users, got {}'.format(type(teams[t])))
+
+    # Get all users
+    all_users = [u for t in teams for u in teams[t]]
+
+    # Prepare neurons - download if neccessary
+    if not isinstance(neurons, type(None)):
+        if isinstance(neurons, core.CatmaidNeuron):
+            neurons = core.CatmaidNeuronList(neurons)
+        elif isinstance(neurons, core.CatmaidNeuronList):
+            pass
+        else:
+            neurons = fetch.get_neurons(neurons)
+    else:
+        all_dates = [d.date() for t in teams for u in teams[t] for d in teams[t][u]]
+        neurons = fetch.find_neurons(users=all_users,
+                                     from_date=min(all_dates),
+                                     to_date=max(all_dates))
+        neurons.get_skeletons()
+
+    # Get user list
+    user_list = fetch.get_user_list(remote_instance).set_index('login')
+
+    for u in all_users:
+        if u not in user_list.index:
+            raise ValueError('User "{}" not found in user list'.format(u))
+
+    interval = 3
+    bin_width = '%iMin' % interval
+    minimum_actions = 10 * interval
+    stats = []
+    for n in config.tqdm(neurons, desc='Processing',
+                         disable=config.pbar_hide, leave=config.pbar_leave):
+        # Get node details
+        tn_ids = n.nodes.treenode_id.values.astype(str)
+        cn_ids = n.connectors.connector_id.values.astype(str)
+
+        current_status = config.pbar_hide
+        config.pbar_hide=True
+        node_details = fetch.get_node_details(np.append(tn_ids, cn_ids),
+                                              remote_instance=remote_instance)
+        config.pbar_hide = current_status
+
+        # Extract node creation
+        node_creation = node_details.loc[node_details.treenode_id.isin(tn_ids),
+                                         ['user', 'creation_time']].values
+        node_creation = np.c_[node_creation, ['node_creation'] * node_creation.shape[0]]
+
+        # Extract connector creation
+        cn_creation = node_details.loc[node_details.treenode_id.isin(cn_ids),
+                                         ['user', 'creation_time']].values
+        cn_creation = np.c_[cn_creation, ['cn_creation'] * cn_creation.shape[0]]
+
+        # Extract review times
+        reviewers = [u for l in node_details.reviewers.tolist() for u in l]
+        timestamps = [ts for l in node_details.review_times.tolist() for ts in l]
+        node_review = np.c_[reviewers, timestamps, ['review'] * len(reviewers)]
+
+        # Merge all timestamps (ignore edits for now) to get time_invested
+        all_ts = pd.DataFrame(np.vstack([node_creation,
+                                         node_review,
+                                         cn_creation]),
+                              columns=['user', 'timestamp', 'type'])
+
+        # Add column with just the date and make it the index
+        all_ts['date'] = [v.date() for v in all_ts.timestamp.astype(datetime.date).values]
+        all_ts.index = pd.to_datetime(all_ts.date)
+
+        # Fill in teams for each timestamp based on user + date
+        all_ts['team'] = None
+        for t in teams:
+            for u in teams[t]:
+                # Assign all timestamps by this user in the right time to
+                # this team
+                existing_dates = (teams[t][u] & all_ts.index).unique()
+                ss = (all_ts.index.isin(existing_dates)) & (all_ts.user.values == user_list.loc[u, 'id'])
+                all_ts.loc[ss, 'team'] = t
+
+        # Get total
+        total_time = sum(all_ts.timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+
+        this_neuron = [n.skeleton_id, n.n_nodes, n.n_connectors,
+                       node_review.shape[0], total_time]
+        # Go over the teams and collect values
+        for t in teams:
+            # Subset to team
+            this_team = all_ts[all_ts.team == t]
+            if this_team.shape[0] > 0:
+                # Subset to user ID
+                team_time = sum(this_team.timestamp.to_frame().set_index(
+                    'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+                team_nodes = this_team[this_team['type'] == 'node_creation'].shape[0]
+                team_cn = this_team[this_team['type'] == 'cn_creation'].shape[0]
+                team_rev = this_team[this_team['type'] == 'review'].shape[0]
+            else:
+                team_nodes = team_cn = team_rev = team_time = 0
+
+            this_neuron += [team_nodes, team_cn, team_rev, team_time]
+
+        stats.append(this_neuron)
+
+    cols = ['skeleton_id', 'total_nodes', 'total_connectors',
+            'total_reviews', 'total_time']
+
+    for t in teams:
+        for s in ['nodes', 'connectors', 'reviews', 'time']:
+            cols += ['{}_{}'.format(t, s)]
+
+    stats = pd.DataFrame(stats, columns=cols)
+
+    cols_ordered = ['skeleton_id'] + ['{}_{}'.format(t, v) for v in
+                    ['nodes', 'connectors', 'reviews', 'time']for t in ['total'] + list(teams)]
+    stats = stats[cols_ordered]
+
+    return stats
 
 
 def get_user_contributions(x, teams=None, remote_instance=None):
