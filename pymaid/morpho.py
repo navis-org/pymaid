@@ -1642,6 +1642,9 @@ def despike_neuron(x, sigma=5, inplace=False):
     # Reassign treenode table
     x.nodes = this_treenodes.reset_index(drop=False)
 
+    # The weights in the graph have changed, we need to update that
+    x._clear_temp_attr(exclude=['segments', 'small_segments','classify_nodes'])
+
     if not inplace:
         return x
 
