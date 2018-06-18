@@ -149,7 +149,7 @@ class handler:
             raise AttributeError('Unknown attribute ' + key)
 
     def add(self, x, neurites=True, soma=True, connectors=True, redraw=True,
-            use_radii=False):
+            use_radii=False, skip_existing=False):
         """ Add neuron(s) to scene.
 
         Parameters
@@ -167,20 +167,30 @@ class handler:
                         May slow down loading!
         use_radii :     bool, optional
                         If True, will use treenode radii.
+        skip_existing : bool, optional
+                        If True, will skip neurons that are already loaded.
         """
         start = time.time()
 
-        if isinstance(x, core.CatmaidNeuron):
-            self._create_neuron(x, neurites=neurites,
-                                soma=soma, connectors=connectors,
-                                use_radii=use_radii)
-        elif isinstance(x, core.CatmaidNeuronList):
+        if skip_existing:
+            exists = [ob.get('skeleton_id', None) for ob in bpy.data.objects]
+
+        if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+            if isinstance(x, core.CatmaidNeuron):
+                x = [x]
+            wm = bpy.context.window_manager
+            wm.progress_begin(0, len(x))
             for i, n in enumerate(x):
+                # Skip existing if applicable
+                if skip_existing and n.skeleton_id in exists:
+                    continue
                 self._create_neuron(n, neurites=neurites,
                                     soma=soma, connectors=connectors,
                                     use_radii=use_radii)
                 if redraw:
                     bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
+                wm.progress_update(i)
+            wm.progress_end()
         elif isinstance(x, core.Volume):
             self._create_mesh(x)
         else:
@@ -208,7 +218,8 @@ class handler:
         if neurites:
             self._create_neurites(x, mat, use_radii=use_radii)
         if soma and x.soma:
-            self._create_soma(x, mat)
+            if isinstance(x, int):
+                self._create_soma(x, mat)
         if connectors:
             self._create_connectors(x)
         return
