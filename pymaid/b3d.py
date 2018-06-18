@@ -218,7 +218,7 @@ class handler:
         if neurites:
             self._create_neurites(x, mat, use_radii=use_radii)
         if soma and x.soma:
-            if isinstance(x, int):
+            if isinstance(x.soma, int):
                 self._create_soma(x, mat)
         if connectors:
             self._create_connectors(x)
