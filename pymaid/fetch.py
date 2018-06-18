@@ -49,7 +49,12 @@ import urllib
 import json
 import time
 import base64
+
 import threading
+import asyncio
+import concurrent.futures
+import multiprocessing
+
 import datetime
 import re
 import pandas as pd
@@ -111,6 +116,10 @@ class CatmaidInstance:
     time_out :      int | None
                     Time in seconds after which fetching data will time-out
                     (so as to not block the system).
+    max_threads :   int | None
+                    Maximum parallel threads to be used. Note that some
+                    functions (e.g. :func:`pymaid.get_skid_from_treenode`)
+                    override this parameter.
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
                     adding it as module 'remote_instance' to sys.modules.
@@ -140,7 +149,11 @@ class CatmaidInstance:
 
     def __init__(self, server, authname, authpassword, authtoken,
                  project_id=1, logger_level='INFO', time_out=None,
-                 set_global=True):
+                 max_threads=100, set_global=True):
+        # Catch too many backslashes
+        if server.endswith('/'):
+            server = server[:-1]
+
         self.server = server
         self.authname = authname
         self.authpassword = authpassword
@@ -148,6 +161,7 @@ class CatmaidInstance:
         self.opener = urllib.request.build_opener(
             urllib.request.HTTPRedirectHandler())
         self.time_out = time_out
+        self.max_threads = max_threads
         self.project_id = project_id
 
         if set_global:
@@ -175,8 +189,8 @@ class CatmaidInstance:
                                "Token {}".format(self.authtoken))
 
     def fetch(self, url, post=None, method=None):
-        """ Requires the url to connect to and the variables for POST, 
-        if any, in a dictionary. 
+        """ Requires the url to connect to and the variables for POST,
+        if any, in a dictionary.
         """
         if post:
             # Convert bools into lower case str
@@ -445,8 +459,67 @@ class CatmaidInstance:
         return self.djangourl("/" + str(self.project_id) + "/labels/stats")
 
 
+async def _getURLasync(urls, remote_instance, post_data=None, method=None,
+                       external_pbar=None, disable_pbar=False, max_threads=None):
+
+
+    # Generate progress bar if not provided
+    if isinstance(external_pbar, config.tqdm_class):
+        pbar = external_pbar
+    else:
+        pbar = config.tqdm(total=len(urls), desc=desc,
+                           disable=config.pbar_hide or \
+                                   disable_pbar or len(urls) == 1,
+                           leave=config.pbar_leave)
+
+    max_threads = max_threads if max_threads else remote_instance.max_threads
+
+    responses = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+        loop = asyncio.get_event_loop()
+        futures = [
+            loop.run_in_executor(
+                executor,
+                remote_instance.fetch,
+                u, p, method
+            )
+            for u, p in zip(urls, post_data)
+        ]
+        for r in await asyncio.gather(*futures):
+            pbar.update(1)
+            responses.append(r)
+
+    return responses
+
+
+def _get_urls_threaded2(urls, remote_instance, post_data=[], desc='Get',
+                        external_pbar=None, disable_pbar=False,
+                        max_threads=None):
+
+    if not post_data:
+        post_data = [None] * len(urls)
+    elif len(post_data) != len(urls):
+        raise ValueError('Must provide POST data for every URL.')
+
+    if not post_data:
+        post_data = [None] * len(urls)
+
+    loop = asyncio.get_event_loop()
+    res = loop.run_until_complete(_getURLasync(urls,
+                                               remote_instance,
+                                               post_data=post_data,
+                                               method=None,
+                                               external_pbar=external_pbar,
+                                               disable_pbar=disable_pbar,
+                                               max_threads=max_threads
+                                               ))
+
+    return res
+
+
 def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
-                       external_pbar=None, disable_pbar=False):
+                       external_pbar=None, disable_pbar=False,
+                       max_threads=None):
     """ Retrieve a list of urls in parallel using threads.
 
     Parameters
@@ -464,6 +537,10 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
                         this one.
     disable_pbar :      bool, optional
                         Force disabling of progressbar.
+    max_threads :       int, optional
+                        Max number of parallel threads. Overrides
+                        ``CatmaidInstance.max_threads``.
+
     Returns
     -------
     data
@@ -471,17 +548,37 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
 
     """
 
+    # Generate progress bar if not provided
+    if isinstance(external_pbar, config.tqdm_class):
+        pbar = external_pbar
+    else:
+        pbar = config.tqdm(total=len(urls), desc=desc,
+                           disable=config.pbar_hide or \
+                                   disable_pbar or len(urls) == 1,
+                           leave=config.pbar_leave)
+
+    logger.debug('Creating {} threads to retrieve data'.format(len(urls)))
+    # If we are trying to fetch more than max urls, chop into bouts
+    max_threads = max_threads if max_threads else remote_instance.max_threads
+    if max_threads and len(urls) > max_threads:
+        data = [_get_urls_threaded(urls[i: i + int(max_threads)],
+                                   remote_instance,
+                                   post_data=post_data[i:i + int(max_threads)],
+                                   desc=desc,
+                                   max_threads=max_threads,
+                                   external_pbar=pbar,
+                                   disable_pbar=disable_pbar)
+                for i in range(0, len(urls), int(max_threads))
+                ]
+        return [d for l in data for d in l]
+
     data = [None for u in urls]
     threads = {}
     threads_closed = []
 
-    if remote_instance.time_out is None:
-        time_out = float('inf')
-    else:
-        time_out = remote_instance.time_out
+    time_out = float('inf') if not remote_instance.time_out \
+                               else remote_instance.time_out
 
-    logger.debug(
-        'Creating %i threads to retrieve data' % len(urls))
     for i, url in enumerate(urls):
         if post_data:
             t = _retrieveUrlThreaded(
@@ -491,18 +588,9 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
         t.start()
         threads[str(i)] = t
         logger.debug('Threads: %i' % len(threads))
-    logger.debug('%i threads generated.' % len(threads))
+    logger.debug('%i threads generated. Now joining threads.' % len(threads))
 
-    logger.debug('Joining threads...')
-
-    start = cur_time = time.time()    
-
-    if isinstance(external_pbar, config.tqdm_class):
-        pbar = external_pbar
-    else:
-        pbar = config.tqdm(total=len(threads), desc=desc,
-                    disable=config.pbar_hide or disable_pbar or len(threads) == 1,
-                    leave=config.pbar_leave)
+    start = cur_time = time.time()
 
     # Save start value of pbar (in case we have an external pbar)
     pbar_start = getattr(pbar, 'n', None)
@@ -527,7 +615,7 @@ def _get_urls_threaded(urls, remote_instance, post_data=[], desc='Get',
 
             logger.debug('Closing Threads: {0} ({1:.0f}s until time out)'.format(
                 len(threads_closed), time_out - (cur_time - start)))
-    except:
+    except BaseException:
         raise
     finally:
         # Close pbar if it is not an external pbar
@@ -562,7 +650,7 @@ class _retrieveUrlThreaded(threading.Thread):
             self.connector_flag = 1
             self.tag_flag = 1
             self.remote_instance = remote_instance
-        except:
+        except BaseException:
             logger.error(
                 'Failed to initiate thread for ' + self.url)
 
@@ -577,16 +665,15 @@ class _retrieveUrlThreaded(threading.Thread):
         return
 
     def join(self):
-        try:
-            threading.Thread.join(self)
-            return self.data
-        except:
-            logger.error(
-                'Failed to join thread for ' + self.url)
-            return None
+        threading.Thread.join(self)
+        if not self.data:
+            logger.error('No data received for url {}'.format(self.url))
+        return self.data
 
 
-def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_history=False, get_merge_history=False, get_abutting=False, return_df=False, kwargs={}):
+def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
+               get_history=False, get_merge_history=False, get_abutting=False,
+               return_df=False, kwargs={}):
     """ Retrieve 3D skeleton data.
 
     Parameters
@@ -696,103 +783,96 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1, get_histor
     with config.tqdm(total=len(x), desc='Get neurons',
               disable=config.pbar_hide or len(x) == 1,
               leave=config.pbar_leave) as pbar:
-        collection = []
-        # Go over requested neurons in batches of 100s
-        for ix in range(0, len(x), 100):
-            to_retrieve = x[ix:ix + 100]
 
-            # Generate URLs to retrieve
-            urls = []
-            for i, skeleton_id in enumerate(to_retrieve):
-                # Create URL for retrieving skeleton data from server with history
-                # details
-                remote_compact_skeleton_url = remote_instance._get_compact_details_url(
-                    skeleton_id)
-                # For compact-details, parameters have to passed as GET
-                remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode({'with_history': str(get_history).lower(),
-                                                                               'with_tags': str(tag_flag).lower(),
-                                                                               'with_connectors': str(connector_flag).lower(),
-                                                                               'with_merge_history': str(get_merge_history).lower()})
-                # 'True'/'False' needs to be lower case
-                urls.append(remote_compact_skeleton_url)
+        # Generate URLs to retrieve
+        urls = []
+        for i, skeleton_id in enumerate(x):
+            # Create URL for retrieving skeleton data from server with history
+            # details
+            remote_compact_skeleton_url = remote_instance._get_compact_details_url(skeleton_id)
+            # For compact-details, parameters have to passed as GET
+            remote_compact_skeleton_url += '?%s' % urllib.parse.urlencode({'with_history': str(get_history).lower(),
+                                                                           'with_tags': str(tag_flag).lower(),
+                                                                           'with_connectors': str(connector_flag).lower(),
+                                                                           'with_merge_history': str(get_merge_history).lower()})
+            # 'True'/'False' needs to be lower case
+            urls.append(remote_compact_skeleton_url)
 
-            skdata = _get_urls_threaded(
-                urls, remote_instance, external_pbar=pbar)
+        skdata = _get_urls_threaded(
+            urls, remote_instance, external_pbar=pbar)
 
-            # Retrieve abutting
-            if get_abutting:
-                urls_abut = []
-                logger.debug(
-                    'Retrieving abutting connectors for %i neurons' % len(to_retrieve))
+        # Retrieve abutting
+        if get_abutting:
+            urls_abut = []
+            logger.debug(
+                'Retrieving abutting connectors for %i neurons' % len(x))
 
-                for s in to_retrieve:
-                    get_connectors_GET_data = {'skeleton_ids[0]': str(s),
-                                               'relation_type': 'abutting'}
-                    urls_abut.append(remote_instance._get_connector_links_url() + '?%s' %
-                                     urllib.parse.urlencode(get_connectors_GET_data))
+            for s in x:
+                get_connectors_GET_data = {'skeleton_ids[0]': str(s),
+                                           'relation_type': 'abutting'}
+                urls_abut.append(remote_instance._get_connector_links_url() + '?%s' %
+                                 urllib.parse.urlencode(get_connectors_GET_data))
 
-                cn_data = _get_urls_threaded(
-                    urls_abut, remote_instance, disable_pbar=False)
+            cn_data = _get_urls_threaded(
+                urls_abut, remote_instance, disable_pbar=False)
 
-                # Add abutting to other connectors in skdata with type == 3
-                for i, cn in enumerate(cn_data):
-                    if not get_history:
-                        skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
-                                         for c in cn['links']]
-                    else:
-                        skdata[i][1] += [[c[7], c[1], 3, c[2], 
-                                          c[3], c[4], c[8], None]
-                                         for c in cn['links']]
+            # Add abutting to other connectors in skdata with type == 3
+            for i, cn in enumerate(cn_data):
+                if not get_history:
+                    skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
+                                     for c in cn['links']]
+                else:
+                    skdata[i][1] += [[c[7], c[1], 3, c[2],
+                                      c[3], c[4], c[8], None]
+                                     for c in cn['links']]
 
-            # Get neuron names
-            names = get_names(to_retrieve, remote_instance)
+        # Get neuron names
+        names = get_names(x, remote_instance)
 
-            if not get_history:
-                df = pd.DataFrame([[
-                    names[str(to_retrieve[i])],
-                    str(to_retrieve[i]),
-                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
-                                                'creator_id', 'x', 'y', 'z',
-                                                'radius', 'confidence'],
-                                 dtype=object),
-                    pd.DataFrame(n[1], columns=['treenode_id', 'connector_id',
-                                                'relation', 'x', 'y', 'z'],
-                                 dtype=object),
-                    n[2]]
-                    for i, n in enumerate(skdata)
-                ],
-                    columns=['neuron_name', 'skeleton_id',
-                             'nodes', 'connectors', 'tags'],
-                    dtype=object
-                )
-            else:
-                df = pd.DataFrame([[
-                    names[str(to_retrieve[i])],
-                    str(to_retrieve[i]),
-                    pd.DataFrame(n[0], columns=['treenode_id', 'parent_id',
-                                                'creator_id', 'x', 'y', 'z',
-                                                'radius', 'confidence',
-                                                'last_modified',
-                                                'creation_date'],
-                                 dtype=object),
-                    pd.DataFrame(n[1], columns=['treenode_id', 'connector_id',
-                                                'relation', 'x', 'y', 'z',
-                                                'last_modified',
-                                                'creation_date'],
-                                 dtype=object),
-                    n[2]]
-                    for i, n in enumerate(skdata)
-                ],
-                    columns=['neuron_name', 'skeleton_id',
-                             'nodes', 'connectors', 'tags'],
-                    dtype=object
-                )
-
-            # Collect this batch
-            collection.append(df)
-
-        # Combine batches into a single DataFrame
-        df = pd.concat(collection, ignore_index=True)
+        if not get_history:
+            df = pd.DataFrame([[
+                names[str(x[i])],
+                str(x[i]),
+                pd.DataFrame(n[0],
+                             columns=['treenode_id', 'parent_id',
+                                      'creator_id', 'x', 'y', 'z',
+                                      'radius', 'confidence'],
+                             dtype=object),
+                pd.DataFrame(n[1],
+                             columns=['treenode_id', 'connector_id',
+                                      'relation', 'x', 'y', 'z'],
+                             dtype=object),
+                n[2]]
+                for i, n in enumerate(skdata)
+            ],
+                columns=['neuron_name', 'skeleton_id',
+                         'nodes', 'connectors', 'tags'],
+                dtype=object
+            )
+        else:
+            df = pd.DataFrame([[
+                names[str(x[i])],
+                str(x[i]),
+                pd.DataFrame(n[0],
+                             columns=['treenode_id', 'parent_id',
+                                      'creator_id', 'x', 'y', 'z',
+                                      'radius', 'confidence',
+                                      'last_modified',
+                                      'creation_date'],
+                             dtype=object),
+                pd.DataFrame(n[1],
+                             columns=['treenode_id', 'connector_id',
+                                      'relation', 'x', 'y', 'z',
+                                      'last_modified',
+                                      'creation_date'],
+                             dtype=object),
+                n[2]]
+                for i, n in enumerate(skdata)
+            ],
+                columns=['neuron_name', 'skeleton_id',
+                         'nodes', 'connectors', 'tags'],
+                dtype=object
+            )
 
     # Convert data to respective dtypes
     dtypes = {'treenode_id': int, 'parent_id': object,
@@ -1357,7 +1437,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    logger.info(
+    logger.debug(
         'Retrieving details for %i nodes...' % len(node_ids))
 
     remote_nodes_details_url = remote_instance._get_node_info_url()
@@ -1365,7 +1445,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     data = dict()
 
     with config.tqdm(total=len(node_ids), disable=config.pbar_hide,
-              desc='Nodes', leave=config.pbar_leave) as pbar:
+              desc='Nodes', leave=False) as pbar:
         for ix in range(0, len(node_ids), chunk_size):
             get_node_details_postdata = dict()
 
@@ -1383,7 +1463,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
                     'editor', 'reviewers', 'review_times']
 
     df = pd.DataFrame(
-        [[e] + [data[e][k] for k in data_columns] for e in data.keys()],
+        [[e] + [d[k] for k in data_columns] for e, d in data.items()],
         columns=['treenode_id'] + data_columns,
         dtype=object
     )
@@ -1398,7 +1478,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     return df
 
 
-def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
+def get_skid_from_treenode(treenode_ids, remote_instance=None, max_threads=100):
     """ Retrieve skeleton IDs from a list of nodes.
 
     Parameters
@@ -1407,9 +1487,10 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
                         Treenode ID(s) to retrieve skeleton IDs for.
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
-    chunk_size :        int, optional
+    max_threads :       int, optional
                         Querying large number of nodes will result in server
                         errors. We will thus query them in amenable bouts.
+                        This override ``CatmaidInstance.max_threads``.
 
     Returns
     -------
@@ -1426,17 +1507,11 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None, chunk_size=100):
     if not isinstance(treenode_ids, (list, np.ndarray)):
         treenode_ids = [treenode_ids]
 
-    data = []
+    urls = [remote_instance._get_skid_from_tnid(tn) for tn in treenode_ids]
 
-    with config.tqdm(total=len(treenode_ids), disable=config.pbar_hide,
-              desc='Nodes', leave=config.pbar_leave) as pbar:
-        for ix in range(0, len(treenode_ids), chunk_size):
-            urls = [remote_instance._get_skid_from_tnid(
-                tn) for tn in treenode_ids[ix:ix + chunk_size]]
-
-            data += _get_urls_threaded(urls,
-                                       remote_instance=remote_instance,
-                                       external_pbar=pbar)
+    data = _get_urls_threaded(urls,
+                              remote_instance=remote_instance,
+                              max_threads=max_threads)
 
     return {treenode_ids[i]: d['skeleton_id'] for i, d in enumerate(data)}
 
@@ -2493,12 +2568,13 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     for n in names:
         urls.append(remote_instance._get_annotated_url())
-        post_data.append({'name': str(n), 'rangey_start': 0,
-                          'range_length': 500, 'with_annotations': False}
+        post_data.append({'name': str(n), 'with_annotations': False}
                          )
 
-    results = _get_urls_threaded(
-        urls, remote_instance, post_data=post_data, desc='Get nms')
+    results = _get_urls_threaded(urls,
+                                 remote_instance,
+                                 post_data=post_data,
+                                 desc='Get nms')
 
     match = []
     for i, r in enumerate(results):
@@ -2584,8 +2660,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
         'Retrieving skids for annotationed neurons...')
     for an_id in annotation_ids.values():
         #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
-        annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
-                           'range_length': 500, 'with_annotations': False}
+        annotation_post = {'annotated_with0': an_id, 'with_annotations': False}
         remote_annotated_url = remote_instance._get_annotated_url()
         neuron_list = remote_instance.fetch(
             remote_annotated_url, annotation_post)
@@ -3173,7 +3248,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
 
 
 def get_contributor_statistics(x, remote_instance=None, separate=False,
-                               split=500):
+                               max_threads=500):
     """ Retrieve contributor statistics for given skeleton ids.
     By default, stats are given over all neurons.
 
@@ -3190,14 +3265,14 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
                         If not passed directly, will try using global.
     separate :          bool, optional
                         If true, stats are given per neuron
-    split :             int, optional
-                        Splits the data requests into bouts of X neurons to
-                        prevent time outs.
+    max_threads :       int, optional
+                        Maximum parallel data requests. Overrides
+                        ``CatmaidInstance.max_threads``.
 
     Returns
     -------
     pandas.DataFrame or pandas.Series
-        Series (if ``separate=False``), otherwise DataFrame:
+        Series, if ``separate=False``. DataFrame, if ``separate=True``:
 
         >>> df
            skeleton_id  node_contributors  multiuser_review_minutes  ..
@@ -3250,11 +3325,11 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
         with config.tqdm(total=len(x), desc='Contr. stats', disable=config.pbar_hide,
                   leave=config.pbar_leave) as pbar:
             stats = []
-            for j in range(0, len(x), split):
+            for j in range(0, len(x), max_threads):
                 pbar.update(j)
                 get_statistics_postdata = {}
 
-                for i in range(j, min(len(x), j + split)):
+                for i in range(j, min(len(x), j + max_threads)):
                     key = 'skids[%i]' % i
                     get_statistics_postdata[key] = x[i]
 
@@ -3867,8 +3942,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by name
     if names:
         urls = [remote_instance._get_annotated_url() for n in names]
-        post_data = [{'name': str(n), 'rangey_start': 0,
-                      'range_length': 500, 'with_annotations': False}
+        post_data = [{'name': str(n), 'with_annotations': 'false'}
                      for n in names]
 
         results = _get_urls_threaded(
@@ -3904,58 +3978,46 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         logger.debug(
             'Retrieving skids for annotationed neurons')
 
-        for an_id in config.tqdm(annotation_ids.values(), desc='Get annot',
-                          disable=config.pbar_hide, leave=config.pbar_leave):
-            annotation_post = {'annotated_with0': an_id, 'rangey_start': 0,
-                               'range_length': 500, 'with_annotations': False}
-            remote_annotated_url = remote_instance._get_annotated_url()
-            data = remote_instance.fetch(
-                remote_annotated_url, annotation_post)
-            this_annotation = [e['skeleton_ids'][0]
-                               for e in data['entities'] if e['type'] == 'neuron']
-            sets_of_skids.append(set(this_annotation))
+        urls = [remote_instance._get_annotated_url() for an in annotation_ids]
+        post_data = [{'annotated_with0': str(an), 'with_annotations': 'false'}
+                     for an in annotation_ids.values()]
+        results = _get_urls_threaded(
+            urls, remote_instance, post_data=post_data, desc='Get annot')
+        sets_of_skids.append(set([e['skeleton_ids'][0] for res in results for e in res['entities'] if e['type'] == 'neuron']))
 
     # Get skids by user
     if users:
         by_users = []
-        for u in config.tqdm(users, desc='Get by usr', disable=config.pbar_hide,
-                      leave=config.pbar_leave):
-            get_skeleton_list_GET_data = {'nodecount_gt': min_size}
-            get_skeleton_list_GET_data['created_by'] = u
 
-            if from_date and to_date:
-                get_skeleton_list_GET_data['from'] = ''.join(
-                    [str(d) for d in from_date])
-                get_skeleton_list_GET_data['to'] = ''.join(
-                    [str(d) for d in to_date])
+        urls = [remote_instance._get_list_skeletons_url() for u in users]
+        GET_data = [{'nodecount_gt': min_size,
+                     'created_by': u} for u in users]
 
-            remote_get_list_url = remote_instance._get_list_skeletons_url()
-            remote_get_list_url += '?%s' % urllib.parse.urlencode(
-                get_skeleton_list_GET_data)
+        if from_date and to_date:
+            dates = {'from' : ''.join([str(d) for d in from_date]),
+                     'to': ''.join([str(d) for d in to_date])}
+            GET_data = [d.update(dates) for d in GET_data]
+        urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
-            by_users += remote_instance.fetch(remote_get_list_url)
+        results = _get_urls_threaded(urls, remote_instance, desc='Get users')
 
-        sets_of_skids.append(set(by_users))
+        sets_of_skids.append(set([s for res in results for s in res]))
 
     # Get skids by reviewer
     if reviewed_by:
-        for u in config.tqdm(reviewed_by, desc='Get by revs',
-                      disable=config.pbar_hide, leave=config.pbar_leave):
-            get_skeleton_list_GET_data = {'nodecount_gt': min_size}
-            get_skeleton_list_GET_data['reviewed_by'] = u
+        urls = [remote_instance._get_list_skeletons_url() for u in reviewed_by]
+        GET_data = [{'nodecount_gt': min_size,
+                     'reviewed_by': u} for u in reviewed_by]
 
-            if from_date and to_date:
-                get_skeleton_list_GET_data['from'] = ''.join(
-                    [str(d) for d in from_date])
-                get_skeleton_list_GET_data['to'] = ''.join(
-                    [str(d) for d in to_date])
+        if from_date and to_date:
+            dates = {'from' : ''.join([str(d) for d in from_date]),
+                     'to': ''.join([str(d) for d in to_date])}
+            GET_data = [d.update(dates) for d in GET_data]
+        urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
-            remote_get_list_url = remote_instance._get_list_skeletons_url()
-            remote_get_list_url += '?%s' % urllib.parse.urlencode(
-                get_skeleton_list_GET_data)
-            this_reviewer = set(remote_instance.fetch(remote_get_list_url))
+        results = _get_urls_threaded(urls, remote_instance, desc='Get reviewers')
 
-            sets_of_skids.append(this_reviewer)
+        sets_of_skids.append(set([s for res in results for s in res]))
 
     # Get by volume
     if volumes:
@@ -4177,10 +4239,13 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    MAX_THREADS = 50
+    MAX_THREADS = remote_instance.max_threads
+
+    if not MAX_THREADS:
+        MAX_THREADS = float('inf')
 
     if remote_instance.time_out is None:
-        time_out = max([MAX_THREADS, 30])
+        time_out = float('inf')
     else:
         time_out = remote_instance.time_out
 
