@@ -604,11 +604,14 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
     elif isinstance(x, core.CatmaidNeuronList):
-        nl = [split_axon_dendrite(n, method=method,
-                                  primary_neurite=primary_neurite,
-                                  reroot_soma=reroot_soma,
-                                  return_point=return_point)
-              for n in x]
+        nl = []
+        for n in config.tqdm(x, desc='Splitting', disable=config.pbar_hide,
+                             leave=config.pbar_leave):
+            nl.append(split_axon_dendrite(n,
+                                          method=method,
+                                          primary_neurite=primary_neurite,
+                                          reroot_soma=reroot_soma,
+                                          return_point=return_point))
         return core.CatmaidNeuronList([n for l in nl for n in l])
 
     if not isinstance(x, core.CatmaidNeuron):
@@ -967,10 +970,13 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
     # We will be processing a super downsampled version of the neuron to
     # speed up calculations
     current_level = logger.level
+    current_state = config.pbar_hide
     logger.setLevel('ERROR')
+    config.pbar_hide = True
     y = x.copy()
     y.downsample(1000000)
     logger.setLevel(current_level)
+    config.pbar_hide = current_state
 
     if polypre:
         # Get details for all presynapses
