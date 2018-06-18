@@ -66,7 +66,7 @@ logger = config.logger
 __all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions']
 
 
-def get_user_contributions(x, remote_instance=None):
+def get_user_contributions(x, teams=None, remote_instance=None):
     """ Takes a list of neurons and returns nodes and synapses contributed
     by each user.
 
@@ -86,6 +86,14 @@ def get_user_contributions(x, remote_instance=None):
                         2. neuron name (str, must be exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
+    teams               dict, optional
+                        Teams to group contributions for. Users must be logins::
+
+                            {'teamA': ['user1', 'user2'], 'team2': ['user3'], ...]}
+
+                        Users not part of any team, will be grouped as team
+                        ``'others'``.
+
     remote_instance :   Catmaid Instance, optional
                         Either pass explicitly or define globally.
 
@@ -95,7 +103,7 @@ def get_user_contributions(x, remote_instance=None):
         DataFrame in which each row represents a user
 
         >>> df
-        ...   user nodes presynapses  postsynapses nodes_reviewed
+        ...   user  nodes  presynapses  postsynapses  nodes_reviewed
         ... 0
         ... 1
 
@@ -116,7 +124,7 @@ def get_user_contributions(x, remote_instance=None):
     >>> # Normalise
     >>> cont_rel = cont / cont.sum(axis=0).values
     >>> # Plot contributors with >5% node contributions
-    >>> ax = cont_rel[ cont_rel.nodes > .05 ].plot(kind='bar')
+    >>> ax = cont_rel[cont_rel.nodes > .05].plot(kind='bar')
     >>> plt.show()
 
     See Also
@@ -126,6 +134,18 @@ def get_user_contributions(x, remote_instance=None):
                            such as total reconstruction/review time.
 
     """
+
+    if not isinstance(teams, type(None)):
+        # Prepare teams
+        if not isinstance(teams, dict):
+            raise TypeError('Expected teams of type dict, got {}'.format(type(teams)))
+
+        for t in teams:
+            if not isinstance(teams[t], list):
+                raise TypeError('Teams need to list of user logins, got {}'.format(type(teams[t])))
+
+        # Turn teams into a login -> team dict
+        teams = {u : t for t in teams for u in teams[t]}
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
@@ -153,13 +173,19 @@ def get_user_contributions(x, remote_instance=None):
     for u in cont.review_contributors:
         stats['nodes_reviewed'][u] = cont.review_contributors[u]
 
-    return pd.DataFrame([[u, stats['nodes'][u],
+    stats = pd.DataFrame([[u, stats['nodes'][u],
                              stats['presynapses'][u],
                              stats['postsynapses'][u],
                              stats['nodes_reviewed'][u]] for u in all_users],
                          columns=['user', 'nodes', 'presynapses',
                                   'postsynapses', 'nodes_reviewed']
                         ).sort_values('nodes', ascending=False).reset_index(drop=True)
+
+    if isinstance(teams, type(None)):
+        return stats
+
+    stats['team'] = [teams.get(u, 'others') for u in stats.user.values]
+    return stats.groupby('team').sum()
 
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10,
@@ -178,7 +204,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
 
-                        If you pass a CatmaidNeuron/List, its data is used 
+                        If you pass a CatmaidNeuron/List, its data is used
                         calculate time invested. You can exploit this to get
                         time invested into a given compartment of a neurons,
                         e.g. by pruning it to a volume.
