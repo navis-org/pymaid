@@ -266,6 +266,13 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
 
     """
 
+    def _extract_timestamps(ts, desc='Calc'):
+        temp_stats = {}
+        for u in config.tqdm( set(ts.user.unique()) & set(relevant_users), desc=desc, disable=config.pbar_hide, leave=False):
+            temp_stats[u] = sum(ts[ts.user == u].timestamp.to_frame().set_index(
+                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+        return temp_stats
+
     if mode not in ['SUM', 'OVER_TIME', 'ACTIONS']:
         raise ValueError('Unknown mode "%s"' % str(mode))
 
@@ -324,32 +331,27 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
 
     all_timestamps.sort_values('timestamp', inplace=True)
 
+    relevant_users = all_timestamps.groupby('user').count()
+    relevant_users = relevant_users[ relevant_users.timestamp >= minimum_actions ].index.values
+
     if mode == 'SUM':
         stats = {
-            'total': {u: 0 for u in all_timestamps.user.unique()},
-            'creation': {u: 0 for u in all_timestamps.user.unique()},
-            'edition': {u: 0 for u in all_timestamps.user.unique()},
-            'review': {u: 0 for u in all_timestamps.user.unique()}
+            'total': {u: 0 for u in relevant_users},
+            'creation': {u: 0 for u in relevant_users},
+            'edition': {u: 0 for u in relevant_users},
+            'review': {u: 0 for u in relevant_users}
         }
+        stats['total'].update(_extract_timestamps(all_timestamps, desc='Calc total'))
+        stats['creation'].update(_extract_timestamps(creation_timestamps, desc='Calc creation'))
+        stats['edition'].update(_extract_timestamps(edition_timestamps, desc='Calc edition'))
+        stats['review'].update(_extract_timestamps(review_timestamps, desc='Calc review'))
 
-        # Get total time spent
-        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
-            stats['total'][u] += sum(all_timestamps[all_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-        # Get reconstruction time spent
-        for u in config.tqdm(creation_timestamps.user.unique(), desc='Calc. reconst.', disable=config.pbar_hide, leave=False):
-            stats['creation'][u] += sum(creation_timestamps[creation_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-        # Get edition time spent
-        for u in config.tqdm(edition_timestamps.user.unique(), desc='Calc. edition', disable=config.pbar_hide, leave=False):
-            stats['edition'][u] += sum(edition_timestamps[edition_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-        # Get time spent reviewing
-        for u in config.tqdm(review_timestamps.user.unique(), desc='Calc. review', disable=config.pbar_hide, leave=False):
-            stats['review'][u] += sum(review_timestamps[review_timestamps.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
-
-        return pd.DataFrame([[user_list.loc[u, 'login'], stats['total'][u], stats['creation'][u], stats['edition'][u], stats['review'][u]] for u in all_timestamps.user.unique()], columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
+        return pd.DataFrame([[user_list.loc[u, 'login'],
+                              stats['total'][u],
+                              stats['creation'][u],
+                              stats['edition'][u],
+                              stats['review'][u]] for u in relevant_users],
+                            columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
 
     elif mode == 'ACTIONS':
         all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(
