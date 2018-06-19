@@ -3987,8 +3987,6 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by user
     if users:
-        by_users = []
-
         urls = [remote_instance._get_list_skeletons_url() for u in users]
         GET_data = [{'nodecount_gt': min_size,
                      'created_by': u} for u in users]
@@ -3996,7 +3994,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         if from_date and to_date:
             dates = {'from' : ''.join([str(d) for d in from_date]),
                      'to': ''.join([str(d) for d in to_date])}
-            GET_data = [d.update(dates) for d in GET_data]
+            GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
         results = _get_urls_threaded(urls, remote_instance, desc='Get users')
@@ -4012,7 +4010,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         if from_date and to_date:
             dates = {'from' : ''.join([str(d) for d in from_date]),
                      'to': ''.join([str(d) for d in to_date])}
-            GET_data = [d.update(dates) for d in GET_data]
+            GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
         results = _get_urls_threaded(urls, remote_instance, desc='Get reviewers')
