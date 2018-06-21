@@ -1,4 +1,4 @@
-__version__ = "0.8"
+__version__ = "0.81"
 
 from pymaid import config
 
@@ -8,7 +8,7 @@ logger = config.logger
 
 try:
     from pymaid.fetch import *
-except Exception as error:    
+except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.fetch:\n' + str(error))
 
