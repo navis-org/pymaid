@@ -115,8 +115,7 @@ class TestFetch(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
@@ -287,13 +286,13 @@ class TestFetch(unittest.TestCase):
     @try_conditions
     def test_treenode_info(self):
         n = pymaid.get_neuron(config_test.test_skids[0])
-        self.assertIsInstance(pymaid.get_treenode_info(n.nodes.treenode_id.values[0:100]),
+        self.assertIsInstance(pymaid.get_treenode_info(n.nodes.treenode_id.values[0:50]),
                               pd.DataFrame)
 
     @try_conditions
     def test_treenode_tags(self):
         n = pymaid.get_neuron(config_test.test_skids[0])
-        self.assertIsInstance(pymaid.get_node_tags(n.nodes.treenode_id.values[0:100],
+        self.assertIsInstance(pymaid.get_node_tags(n.nodes.treenode_id.values[0:50],
                                                    node_type='TREENODE'),
                               dict)
 
@@ -364,8 +363,7 @@ class TestCore(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
         self.nl = pymaid.get_neuron('annotation:%s' % config_test.test_annotations[
             0], remote_instance=self.rm)
@@ -514,8 +512,7 @@ class TestMorpho(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
         self.nl = pymaid.get_neuron(config_test.test_skids,
                                     remote_instance=self.rm)
@@ -632,8 +629,7 @@ class TestGraphs(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
         self.nl = pymaid.get_neuron(config_test.test_skids[0:2],
                                     remote_instance=self.rm)
@@ -730,8 +726,7 @@ class TestConnectivity(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
         self.n = pymaid.get_neuron(config_test.test_skids[0],
                                    remote_instance=self.rm)
@@ -818,8 +813,7 @@ class TestCluster(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
     @try_conditions
     def test_connectivity_cluster(self):
@@ -866,8 +860,7 @@ class TestPlot(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
         self.nl = pymaid.get_neuron(config_test.test_skids,
                                     remote_instance=self.rm)
@@ -916,8 +909,7 @@ class TestTiles(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(config_test.server_url,
                                          config_test.http_user,
                                          config_test.http_pw,
-                                         config_test.token,
-                                         logger_level='ERROR')
+                                         config_test.token)
 
     def test_tiles(self):
         from pymaid import tiles
@@ -947,8 +939,7 @@ class TestUserStats(unittest.TestCase):
             config_test.server_url,
             config_test.http_user,
             config_test.http_pw,
-            config_test.token,
-            logger_level='ERROR')
+            config_test.token)
 
         self.n = pymaid.get_neuron(config_test.test_skids[0],
                                    remote_instance=self.rm)
