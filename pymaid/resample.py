@@ -22,7 +22,7 @@ import pandas as pd
 import numpy as np
 import scipy
 import scipy.interpolate
-from pymaid import core, graph_utils, utils, config
+from pymaid import core, graph_utils, config
 
 # Set up logging
 logger = config.logger
@@ -62,8 +62,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
 
     Returns
     -------
-    x
-                        Downsampled CatmaidNeuron/List object
+    CatmaidNeuron/List
+                        Downsampled neuron(s). Only if ``inplace=False``.
 
     See Also
     --------
@@ -79,9 +79,9 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     if isinstance(x, core.CatmaidNeuronList):
         results = [resample_neuron(x.loc[i], resample_to, inplace=inplace)
                    for i in config.trange(x.shape[0],
-                                   desc='Resampl. neurons',
-                                   disable=config.pbar_hide,
-                                   leave=config.pbar_leave)]
+                                          desc='Resampl. neurons',
+                                          disable=config.pbar_hide,
+                                          leave=config.pbar_leave)]
         if not inplace:
             return core.CatmaidNeuronList(results)
     elif not isinstance(x, core.CatmaidNeuron):
@@ -101,7 +101,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
 
     # Iterate over segments
     for i, seg in enumerate(config.tqdm(x.small_segments, desc='Proc. segments',
-                                 disable=config.pbar_hide, leave=False)):
+                                        disable=config.pbar_hide, leave=False)):
         coords = locs.loc[seg].values.astype(float)
 
         # vecs between subsequently measured points
@@ -122,11 +122,11 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         interp_coords = np.linspace(path[0], path[-1], n_nodes)
 
         try:
-            sampleX = scipy.interpolate.interp1d(path, coords[:, 0], 
+            sampleX = scipy.interpolate.interp1d(path, coords[:, 0],
                                                  kind=method)
-            sampleY = scipy.interpolate.interp1d(path, coords[:, 1], 
+            sampleY = scipy.interpolate.interp1d(path, coords[:, 1],
                                                  kind=method)
-            sampleZ = scipy.interpolate.interp1d(path, coords[:, 2], 
+            sampleZ = scipy.interpolate.interp1d(path, coords[:, 2],
                                                  kind=method)
         except ValueError as e:
             if skip_errors:
@@ -159,15 +159,16 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         max_tn_id += len(new_ids)
 
     if errors:
-        logger.warning('{} ({:.0%}) segments skipped due to errors'.format(errors, errors / i))
+        logger.warning(
+            '{} ({:.0%}) segments skipped due to errors'.format(errors, errors / i))
 
     # Add root node(s)
     root = x.root
     if not isinstance(root, (np.ndarray, list)):
         root = [x.root]
     root = x.nodes.loc[x.nodes.treenode_id.isin(root), [
-                        'treenode_id', 'parent_id', 'creator_id', 'x', 'y',
-                        'z', 'radius', 'confidence']]
+        'treenode_id', 'parent_id', 'creator_id', 'x', 'y',
+        'z', 'radius', 'confidence']]
     new_nodes += [list(r) for r in root.values]
 
     # Generate new nodes dataframe
@@ -236,9 +237,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         return x
 
 
-def downsample_neuron(x, resampling_factor, inplace=False,
-                      preserve_cn_treenodes=True,
-                      preserve_tag_treenodes=False):
+def downsample_neuron(x, resampling_factor, preserve_cn_treenodes=True,
+                      preserve_tag_treenodes=False, inplace=False,):
     """ Downsamples neuron(s) by a given factor. Preserves root, leafs,
     branchpoints by default. Preservation of treenodes with synapses can
     be toggled.
@@ -249,19 +249,19 @@ def downsample_neuron(x, resampling_factor, inplace=False,
                              Neuron(s) to downsample.
     resampling_factor :      int
                              Factor by which to reduce the node count.
-    inplace :                bool, optional
-                             If True, will modify original neuron. If False, a
-                             downsampled copy is returned.
     preserve_cn_treenodes :  bool, optional
                              If True, treenodes that have connectors are
                              preserved.
     preserve_tag_treenodes : bool, optional
                              If True, treenodes with tags are preserved.
+    inplace :                bool, optional
+                             If True, will modify original neuron. If False, a
+                             downsampled copy is returned.
 
     Returns
     -------
     CatmaidNeuron/List
-                             Downsampled neuron.
+                             Downsampled neuron. Only if ``inplace=False``.
 
     Notes
     -----
@@ -289,7 +289,8 @@ def downsample_neuron(x, resampling_factor, inplace=False,
         raise ValueError('Resampling factor must be > 1.')
 
     if x.nodes.shape[0] <= 1:
-        logger.warning('No nodes in neuron {}. Skipping...'.format(x.skeleton_id))
+        logger.warning(
+            'No nodes in neuron {}. Skipping...'.format(x.skeleton_id))
         if not inplace:
             return x
         else:
@@ -367,7 +368,8 @@ def downsample_neuron(x, resampling_factor, inplace=False,
     # Reassign parent_id None to root node
     new_nodes.loc[root_ix, 'parent_id'] = None
 
-    logger.debug('Nodes before/after: {}/{}'.format(len(x.nodes), len(new_nodes)))
+    logger.debug(
+        'Nodes before/after: {}/{}'.format(len(x.nodes), len(new_nodes)))
 
     x.nodes = new_nodes
 

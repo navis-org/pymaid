@@ -130,12 +130,11 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
 
     Returns
     -------
-    cable_length
-                Cable in micrometers [um]
-
-    skdata
-                If ``return_skdata==True``. Neuron object with
-                ``nodes.parent_dist`` containing the distances to parent.
+    float
+                Cable in micrometers [um]. If ``return_skdata==False``.
+    CatmaidNeuron
+                Neuron object with a new column in ``x.nodes``:
+                ``'parent_dist'``. If ``return_skdata==True``.
 
     See Also
     --------
@@ -697,11 +696,12 @@ def segregation_index(x, centrality_method='centrifugal'):
                         Neuron to calculate segregation index (SI). If a
                         NeuronList is provided, will assume that this is a
                         split.
-    centrality_method : 'centrifugal' | 'centripetal' | 'sum' | 'bending', optional
+    centrality_method : 'centrifugal' | 'centripetal' | 'sum' | 'bending'
                         Type of flow centrality to use to split the neuron.
-                        There are four flavors: the first three refer to
-                        :func:`~pymaid.flow_centrality`, the last
-                        refers to :func:`~pymaid.bending_flow`.
+                        There are four flavors:
+                            - for the first three, see
+                              :func:`~pymaid.flow_centrality`
+                            - for `bending`, see :func:`~pymaid.bending_flow`
 
                         Will try using stored centrality, if possible.
 
@@ -805,7 +805,7 @@ def bending_flow(x, polypre=False):
 
     Returns
     -------
-    Adds a new column 'flow_centrality' to ``x.nodes``. Branch points only!
+    Adds a new column ``'flow_centrality'`` to ``x.nodes``. Branch points only!
 
     """
     logger.info(
@@ -1417,7 +1417,8 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
 
     Returns
     -------
-    CatmaidNeuron/CatmaidNeuronList (if `inplace=False`)
+    CatmaidNeuron/List
+                           Pruned neuron(s). Only if ``inplace=False``.
 
     Examples
     --------
@@ -1583,7 +1584,8 @@ def despike_neuron(x, sigma=5, inplace=False):
 
     Returns
     -------
-    CatmaidNeuron/CatmaidNeuronList (if ``inplace=False``)
+    CatmaidNeuron/List
+                Despiked neuron(s). Only if ``inplace=False``.
 
     """
 

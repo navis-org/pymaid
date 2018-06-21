@@ -38,7 +38,7 @@ __all__ = sorted(['in_volume'])
 
 
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
-    """ Test if points are within a given CATMAID volume.
+    """ Test if points/neurons are within a given CATMAID volume.
 
     Important
     ---------
@@ -51,12 +51,12 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     ----------
     x :               list of tuples | CatmaidNeuron | CatmaidNeuronList
 
-                      1. List/numpy.array - ``[ [x1,y1,z1], [x2,y2,z2], .. ]``
-                      2. DataFrame - needs to have ``x,y,z`` columns
+                      - if ``list/numpy.array``: needs to be shape (N,3):
+                        ``[[x1,y1,z1], [x2,y2,z2], ..]``
+                      - if ``pandas.DataFrame``: needs to have ``x,y,z`` columns
 
     volume :          str | list of str | core.Volume
-                      Name of the CATMAID volume to test OR core.Volume dict
-                      as returned by e.g. :func:`~pymaid.get_volume()`.
+                      :class:`pymaid.Volume` or name of a CATMAID volume to test.
     inplace :         bool, optional
                       If False, a copy of the original DataFrames/Neuron is
                       returned. Does only apply to CatmaidNeuron or
@@ -72,28 +72,31 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     -------
     CatmaidNeuron
                       If input is CatmaidNeuron or CatmaidNeuronList, will
-                      return parts of the neuron (nodes and connectors) that
-                      are within the volume.
+                      return subset of the neuron (nodes and connectors) that
+                      are within given volume.
     list of bools
                       If input is list or DataFrame, returns boolean: ``True``
                       if in volume, ``False`` if not.
     dict
                       If multiple volumes are provided as list of strings,
-                      results will be returned as dict of above returns.
+                      results will be returned in dictionary with volumes as
+                      keys.
 
     Examples
     --------
-    >>> # Advanced example (assumes you already set up a CATMAID instance)
-    >>> # Check with which antennal lobe glomeruli a neuron intersects
-    >>> # First get names of glomeruli
-    >>> all_volumes = remote_instance.fetch( remote_instance._get_volumes() )
-    >>> right_gloms = [ v['name'] for v in all_volumes if v['name'].endswith('glomerulus') ]
-    >>> # Neuron to check
-    >>> n = pymaid.get_neuron('name:PN unknown glomerulus', remote_instance = remote_instance )
-    >>> # Get intersections
-    >>> res = pymaid.in_volume( n, right_gloms, remote_instance = remote_instance )
+    Advanced example: Check with which antennal lobe glomeruli a neuron
+    intersects.
+
+    >>> # First prepare some volume names
+    >>> gloms = ['DA1','DA2', 'DA3', 'DA4l' ,'DL4', 'VA2', 'DC3', 'VM7v',
+    ... 'DC4', 'DC1', 'DM5', 'D', 'VM2', 'VC4', 'VL1', 'DM3', 'DL1', 'DP1m']
+    >>> # Get neuron to check
+    >>> n = pymaid.get_neuron('name:PN unknown glomerulus',
+    ...                       remote_instance = remote_instance )
+    >>> # Calc intersections with each of the above glomeruli
+    >>> res = pymaid.in_volume(n, gloms, remote_instance=remote_instance)
     >>> # Extract cable
-    >>> cable = { v : res[v].cable_length for v in res  }
+    >>> cable = {v: res[v].cable_length for v in res}
     >>> # Plot graph
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt

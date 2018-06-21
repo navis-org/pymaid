@@ -222,7 +222,7 @@ def _edge_count_to_root(x):
 
 def classify_nodes(x, inplace=True):
     """ Classifies neuron's treenodes into end nodes, branches, slabs
-    or root. Adds 'type' column to ``x.nodes``.
+    or root. Adds ``'type'`` column to ``x.nodes``.
 
     Parameters
     ----------
@@ -235,7 +235,7 @@ def classify_nodes(x, inplace=True):
     Returns
     -------
     CatmaidNeuron/List
-                Copy of original input. Only if ``inplace=False``.
+                Copy of original neuron. Only if ``inplace=False``.
 
     """
 
@@ -400,7 +400,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
     Returns
     -------
     pd.DataFrame
-            Geodesic distance matrix. Distances in nanometres.
+                Geodesic distance matrix. Distances in nanometres.
 
     See Also
     --------
@@ -687,7 +687,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     Returns
     -------
     CatmaidNeuron
-                        Contains only node data of the longest neurite.
+                        Pruned neuron. Only if ``inplace==False``.
 
     See Also
     --------
@@ -745,8 +745,8 @@ def reroot_neuron(x, new_root, inplace=False):
 
     Returns
     -------
-    CatmaidNeuron object
-               Containing the rerooted neuron.
+    CatmaidNeuron
+               Rerooted neuron. Only if ``inplace=False``.
 
     See Also
     --------
@@ -901,10 +901,12 @@ def cut_neuron(x, cut_node, ret='both'):
 
     Returns
     -------
-    neuron_dist
-                Part of the neuron distal to the cut.
-    neuron_prox
-                Part of the neuron proximal to the cut.
+    (distal, proximal)
+                Distal and proximal part of the neuron. Only if ``ret='both'``.
+    distal
+                Distal part of the neuron. Only if ``ret='distal'``.
+    proximal
+                Proximal part of the neuron. Only if ``ret='proximal'``.
 
     Examples
     --------
@@ -921,6 +923,7 @@ def cut_neuron(x, cut_node, ret='both'):
     --------
     :func:`~pymaid.CatmaidNeuron.prune_distal_to`
     :func:`~pymaid.CatmaidNeuron.prune_proximal_to`
+            ``CatmaidNeuron/List`` shorthands to this function.
     :func:`~pymaid.subset_neuron`
             Returns a neuron consisting of a subset of its treenodes.
 

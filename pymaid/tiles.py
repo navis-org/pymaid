@@ -36,6 +36,8 @@ import threading
 # Set up logging
 logger = config.logger
 
+__all__ = sorted(['crop_neuron', 'LoadTiles'])
+
 def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
                 remote_instance=None):
     """ Crops and saves EM tiles following a neuron's segments.

@@ -424,11 +424,14 @@ class CatmaidNeuron:
         Parameters
         ----------
         **kwargs
-                    Will be passed to pymaid.get_neuron()
-                    e.g. to get the full treenode history use:
-                    n.get_skeleton( with_history = True )
-                    or to get abutting connectors:
-                    n.get_skeleton( get_abutting = True )
+                    Will be passed to :func:`pymaid.get_neuron` e.g. to get
+                    the full treenode history use::
+
+                        n.get_skeleton(with_history = True)
+
+                    or to get abutting connectors::
+
+                        n.get_skeleton(get_abutting = True)
 
         See Also
         --------
@@ -617,13 +620,13 @@ class CatmaidNeuron:
         return self.annotations
 
     def plot2d(self, **kwargs):
-        """Plot neuron using pymaid.plot2d().
+        """Plot neuron using :func:`pymaid.plot2d`.
 
         Parameters
         ----------
         **kwargs
-                Will be passed to plot2d()
-                See help(pymaid.plot3d) for a list of keywords
+                Will be passed to :func:`pymaid.plot2d`.
+                See ``help(pymaid.plot3d)`` for a list of keywords
 
         See Also
         --------
@@ -639,13 +642,13 @@ class CatmaidNeuron:
         return plotting.plot2d(self, **kwargs)
 
     def plot3d(self, **kwargs):
-        """Plot neuron using pymaid.plot3d().
+        """Plot neuron using :func:`pymaid.plot3d`.
 
         Parameters
         ----------
         **kwargs
-                Keyword arguments. Will be passed to plot3d().
-                See help(pymaid.plot3d) for a list of keywords.
+                Keyword arguments. Will be passed to :func:`pymaid.plot3d`.
+                See ``help(pymaid.plot3d)`` for a list of keywords.
 
         See Also
         --------
@@ -1303,7 +1306,7 @@ class CatmaidNeuronList:
             self.neurons = [n for n in x.neurons]
         elif utils._is_iterable(x):
             # If x is a list of mixed objects we need to unpack/flatten that
-            # E.g. x = [CatmaidNeuronList, CatmaidNeuronList, CatmaidNeuron, skeletonID ]
+            # E.g. x = [CatmaidNeuronList, CatmaidNeuronList, CatmaidNeuron, skeletonID]
 
             to_unpack = [e for e in x if isinstance(e, CatmaidNeuronList)]
             x = [e for e in x if not isinstance(e, CatmaidNeuronList)]
@@ -1325,14 +1328,14 @@ class CatmaidNeuronList:
         if to_convert:
             if self._use_threading:
                 with ThreadPoolExecutor(max_workers=self.n_cores) as e:
-
-                    futures = e.map(CatmaidNeuron, [n[0] for n in to_convert])
+                    futures = e.map(CatmaidNeuron,
+                                    [n[0] for n in to_convert])
 
                     converted = [n for n in config.tqdm(futures,
-                                                 total=len(to_convert),
-                                                 desc='Make nrn',
-                                                 disable=config.pbar_hide,
-                                                 leave=config.pbar_leave)]
+                                                        total=len(to_convert),
+                                                        desc='Make nrn',
+                                                        disable=config.pbar_hide,
+                                                        leave=config.pbar_leave)]
 
                     for i, c in enumerate(to_convert):
                         self.neurons[c[2]] = converted[i]
@@ -2134,7 +2137,7 @@ class CatmaidNeuronList:
             n._remote_instance = remote_instance
 
     def plot3d(self, **kwargs):
-        """Plot neuron in 3D.
+        """Plot neuron in 3D using :func:`pymaid.plot3d`.
 
         Parameters
         ---------
@@ -2453,7 +2456,7 @@ class Volume:
     See Also
     --------
     :func:`~pymaid.get_volume`
-        Retrieves volumes from CATMAID and returns :class:`pymaid.Volume`
+        Retrieves volumes from CATMAID and returns :class:`pymaid.Volume`.
 
     Notes
     -----
