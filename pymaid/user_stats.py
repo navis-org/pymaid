@@ -489,8 +489,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     Creation/Edition/Review times can overlap! This is why total time spent
     is not just creation + edition + review.
 
-    Please note that this does currently not take placement of postsynaptic
-    nodes or creation of connector links into account!
+    Please note that this does currently not take placement of
+    pre-/postsynaptic nodes into account!
 
     Be aware of the ``minimum_actions`` parameter: at low settings even
     a single actions (e.g. connecting a node) will add considerably to time
@@ -572,13 +572,22 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     node_details = fetch.get_node_details(
         node_ids + connector_ids, remote_instance=remote_instance)
 
+    # Get details for links
+    link_details = fetch.get_connector_links(skdata)
+
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = pd.DataFrame(
-        node_details[['user', 'creation_time']].values, columns=['user', 'timestamp'])
+    creation_timestamps = np.append(node_details[['user','creation_time']].values,
+                                    link_details[['creator_id','creation_time']].values,
+                                    axis=0)
+    creation_timestamps = pd.DataFrame(creation_timestamps,
+                                       columns=['user', 'timestamp'])
 
     # Dataframe for edition times
-    edition_timestamps = pd.DataFrame(
-        node_details[['editor', 'edition_time']].values, columns=['user', 'timestamp'])
+    edition_timestamps = np.append(node_details[['user','edition_time']].values,
+                                    link_details[['creator_id','edition_time']].values,
+                                    axis=0)
+    edition_timestamps = pd.DataFrame(edition_timestamps,
+                                       columns=['user', 'timestamp'])
 
     # Generate dataframe for reviews
     reviewers = [u for l in node_details.reviewers.tolist() for u in l]
@@ -745,7 +754,9 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     node_details = fetch.get_node_details(
         node_ids + connector_ids, remote_instance=remote_instance)
 
-    # Extract timestamps
+    # Get details for links
+    link_details = fetch.get_connector_links(neurons)
+
     # Dataframe for creation (i.e. the actual generation of the nodes)
     creation_timestamps = node_details[['user', 'creation_time']]
     creation_timestamps.loc[:, 'action'] = 'creation'
@@ -756,6 +767,11 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     edition_timestamps.loc[:, 'action'] = 'edition'
     edition_timestamps.columns = ['user', 'timestamp', 'action']
 
+    # DataFrame for linking
+    linking_timestamps =  link_details[['creator_id','creation_time']]
+    linking_timestamps.loc[:, 'action'] = 'linking'
+    linking_timestamps.columns = ['user', 'timestamp', 'action']
+
     # Generate dataframe for reviews
     reviewers = [u for l in node_details.reviewers.tolist() for u in l]
     timestamps = [ts for l in node_details.review_times.tolist() for ts in l]
@@ -763,8 +779,11 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
         reviewers, timestamps)], columns=['user', 'timestamp', 'action'])
 
     # Merge all timestamps
-    all_timestamps = pd.concat(
-        [creation_timestamps, edition_timestamps, review_timestamps], axis=0).reset_index(drop=True)
+    all_timestamps = pd.concat([creation_timestamps,
+                                edition_timestamps,
+                                review_timestamps,
+                                linking_timestamps],
+                                axis=0).reset_index(drop=True)
 
     # Map login onto user ID
     all_timestamps.user = [user_dict[u] for u in all_timestamps.user.values]
