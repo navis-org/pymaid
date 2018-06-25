@@ -872,11 +872,6 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     neuronsA = utils.eval_skids(s, remote_instance=remote_instance)
     neuronsB = utils.eval_skids(t, remote_instance=remote_instance)
 
-    if not isinstance(neuronsA, list):
-        neuronsA = [neuronsA]
-    if not isinstance(neuronsB, list):
-        neuronsB = [neuronsB]
-
     # Make sure neurons are strings, not integers
     neurons = list(set([str(n) for n in (neuronsA + neuronsB)]))
     neuronsA = [str(n) for n in neuronsA]

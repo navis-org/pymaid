@@ -298,7 +298,7 @@ def eval_skids(x, remote_instance=None):
 
     Returns
     -------
-    list of str
+    list
                     List containing skeleton IDs as strings.
 
     """
@@ -306,11 +306,11 @@ def eval_skids(x, remote_instance=None):
     remote_instance = _eval_remote_instance(remote_instance)
 
     if isinstance(x, (int, np.int64, np.int32, np.int)):
-        return str(x)
+        return [str(x)]
     elif isinstance(x, (str, np.str)):
         try:
             int(x)
-            return str(x)
+            return [str(x)]
         except BaseException:
             if x.startswith('annotation:'):
                 return fetch.get_skids_by_annotation(x[11:],
@@ -451,7 +451,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         except BaseException:
             raise TypeError(
                 'Unable to extract node ID from string <%s>' % str(x))
-    elif isinstance(x, (list, np.ndarray)):
+    elif isinstance(x, (set, list, np.ndarray)):
         # Check non-integer entries
         ids = []
         for e in x:

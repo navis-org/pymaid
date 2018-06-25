@@ -580,9 +580,6 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
     # Update from kwargs if available
     tag_flag = kwargs.get('tag_flag', tag_flag)
     connector_flag = kwargs.get('connector_flag', connector_flag)
@@ -762,9 +759,6 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
     skdata = []
 
     for s in config.tqdm(x, desc='Retrieving arbors', disable=config.pbar_hide,
@@ -863,9 +857,6 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     # First, get list of connectors
     cn_data = get_connectors(x, remote_instance=remote_instance)
@@ -1062,8 +1053,6 @@ def get_partners(x, remote_instance=None, threshold=1,
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    x = utils._make_iterable(x, force_type=str)
-
     remote_connectivity_url = remote_instance._get_connectivity_url()
 
     connectivity_post = {}
@@ -1181,9 +1170,6 @@ def get_names(x, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     x = list(set(x))
 
@@ -1357,9 +1343,6 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
     logger.info(
         'Retrieving %i treenode table(s)...' % len(x))
 
@@ -1450,9 +1433,6 @@ def get_edges(x, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
     remote_get_edges_url = remote_instance._get_edges_url()
 
     get_edges_postdata = {}
@@ -1518,9 +1498,6 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 
     if not isinstance(x, type(None)):
         x = utils.eval_skids(x, remote_instance=remote_instance)
-
-        if not isinstance(x, (list, np.ndarray)):
-            x = [x]
 
     remote_get_connectors_url = remote_instance._get_connectors_url()
 
@@ -1720,11 +1697,6 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
     a = utils.eval_skids(a, remote_instance=remote_instance)
     b = utils.eval_skids(b, remote_instance=remote_instance)
 
-    if not isinstance(a, (list, np.ndarray)):
-        a = [a]
-    if not isinstance(b, (list, np.ndarray)):
-        b = [b]
-
     if len(a) == 0:
         raise ValueError('No source neurons provided')
 
@@ -1794,9 +1766,6 @@ def get_review(x, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     remote_get_reviews_url = remote_instance._get_review_status_url()
 
@@ -1940,7 +1909,6 @@ def add_annotations(x, annotations, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    x = utils._make_iterable(x)
     annotations = utils._make_iterable(annotations)
 
     add_annotations_url = remote_instance._get_add_annotations_url()
@@ -2087,9 +2055,6 @@ def get_annotation_details(x, remote_instance=None):
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(skids, (list, np.ndarray)):
-        skids = [skids]
-
     # This works with neuron_id NOT skeleton_id
     # neuron_id can be requested via neuron_names
     url_list = list()
@@ -2172,9 +2137,6 @@ def get_annotations(x, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     remote_get_annotations_url = remote_instance._get_annotations_for_skid_list2()
 
@@ -2296,9 +2258,6 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     skdata = get_neuron(x,
                         remote_instance=remote_instance,
@@ -2498,8 +2457,10 @@ def neuron_exists(x, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if isinstance(x, (list, np.ndarray)):
+    if len(x) > 1:
         return {n: neuron_exists(n) for n in x}
+    else:
+        x = x[0]
 
     remote_get_neuron_name = remote_instance._get_single_neuronname_url(x)
     response = remote_instance.fetch(remote_get_neuron_name)
@@ -2633,9 +2594,11 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if isinstance(x, (list, np.ndarray)):
-        return {n: delete_neuron(n,
-                                 remote_instance=remote_instance) for n in x}
+    if len(x) > 1:
+        return {n: delete_neuron(n, remote_instance=remote_instance)
+                for n in x}
+    else:
+        x = x[0]
 
     # Need to get the neuron ID
     remote_get_neuron_name = remote_instance._get_single_neuronname_url(x)
@@ -2841,9 +2804,6 @@ def get_segments(x, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
-
     urls = []
     post_data = []
 
@@ -2891,9 +2851,6 @@ def get_review_details(x, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     node_list = []
     urls = []
@@ -3106,8 +3063,6 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    x = utils._make_iterable(x)
 
     columns = ['skeleton_id', 'n_nodes', 'node_contributors', 'n_presynapses',
                'pre_contributors', 'n_postsynapses', 'post_contributors',
@@ -3730,8 +3685,6 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     if not isinstance(skids, type(None)):
         skids = utils.eval_skids(skids)
-        if not isinstance(skids, (list, set, np.ndarray)):
-            skids = [skids]
         sets_of_skids.append(set(skids))
 
     # Get skids by name
@@ -4631,9 +4584,6 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
-
-    if not isinstance(x, (list, np.ndarray)):
-        x = [x]
 
     if isinstance(new_names, dict):
         # First make sure that dictionary maps strings

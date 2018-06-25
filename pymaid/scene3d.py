@@ -240,7 +240,7 @@ class Viewer:
 
     @selected.setter
     def selected(self, val):
-        skids = utils._make_iterable(utils.eval_skids(val))
+        skids = utils.eval_skids(val)
 
         if not isinstance(skids, np.ndarray):
             skids = np.array(skids)
@@ -455,7 +455,7 @@ class Viewer:
 
     def hide_neurons(self, n):
         """ Hide given neuron(s). """
-        skids = utils._make_iterable(utils.eval_skids(n))
+        skids = utils.eval_skids(n)
 
         neurons = self.neurons
 
@@ -469,7 +469,7 @@ class Viewer:
     def unhide_neurons(self, n=None, check_alpha=False):
         """ Unhide given neuron(s). Use ``n`` to unhide specific neurons. """
         if not isinstance(n, type(None)):
-            skids = utils._make_iterable(utils.eval_skids(n))
+            skids = utils.eval_skids(n)
         else:
             skids = list(self.neurons.keys())
 
@@ -506,7 +506,7 @@ class Viewer:
 
     def toggle_select(self, n):
         """ Toggle selected of given neuron. """
-        skids = utils._make_iterable(utils.eval_skids(n))
+        skids = utils.eval_skids(n)
 
         neurons = self.neurons
 
