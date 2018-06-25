@@ -114,7 +114,7 @@ class CatmaidInstance:
                     override this parameter.
     set_global :    bool, optional
                     If True, this remote instance will be set as global by
-                    adding it as module 'remote_instance' to sys.modules.
+                    adding it as module ``'remote_instance'`` to ``sys.modules``.
 
     Examples
     --------
@@ -230,7 +230,10 @@ class CatmaidInstance:
         else:
             return response
 
-    def make_url(self, *args):
+    def make_url(self, *args, **GET):
+        """ Generates URL from *args. **GET are assumed to be arguments
+        for GET requests and will be added.
+        """
         # Generate the URL
         url = self.server
         for arg in args:
@@ -238,260 +241,263 @@ class CatmaidInstance:
             joiner = '' if url.endswith('/') else '/'
             relative = arg_str[1:] if arg_str.startswith('/') else arg_str
             url = requests.compat.urljoin(url + joiner, relative)
+        if GET:
+            url += '?{}'.format(urllib.parse.urlencode(kwargs))
         return url
 
-    def _get_catmaid_version(self):
+    def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
-        return self.make_url('version')
+        return self.make_url('version', **GET)
 
-    def _get_stack_info_url(self, stack_id):
+    def _get_stack_info_url(self, stack_id, **GET):
         """ Use to parse url for retrieving stack infos. """
-        return self.make_url(self.project_id, 'stack', stack_id, 'info')
+        return self.make_url(self.project_id, 'stack', stack_id, 'info', **GET)
 
-    def _get_projects_url(self):
+    def _get_projects_url(self, **GET):
         """ Use to get list of available projects on server. Does not need postdata."""
-        return self.make_url('projects')
+        return self.make_url('projects', **GET)
 
-    def _get_stacks_url(self):
+    def _get_stacks_url(self, **GET):
         """ Use to get list of available image stacks for the project. Does not need postdata."""
-        return self.make_url(self.project_id, 'stacks')
+        return self.make_url(self.project_id, 'stacks', **GET)
 
-    def _get_treenode_info_url(self, tn_id):
+    def _get_treenode_info_url(self, tn_id, **GET):
         """ Use to parse url for retrieving skeleton info from treenodes."""
-        return self.make_url(self.project_id, 'treenodes', tn_id, 'info')
+        return self.make_url(self.project_id, 'treenodes', tn_id, 'info', **GET)
 
-    def _get_node_labels_url(self):
+    def _get_node_labels_url(self, **GET):
         """ Use to parse url for retrieving treenode infos. Needs postdata!"""
-        return self.make_url(self.project_id, 'labels-for-nodes')
+        return self.make_url(self.project_id, 'labels-for-nodes', **GET)
 
-    def _get_skeleton_nodes_url(self, skid):
+    def _get_skeleton_nodes_url(self, skid, **GET):
         """ Use to parse url for retrieving skeleton nodes (no info on parents or synapses, does need post data). """
-        return self.make_url(self.project_id, 'treenode', 'table', skid, 'content')
+        return self.make_url(self.project_id, 'treenode', 'table', skid, 'content', **GET)
 
-    def _get_skeleton_for_3d_viewer_url(self, skid):
+    def _get_skeleton_for_3d_viewer_url(self, skid, **GET):
         """ ATTENTION: this url doesn't work properly anymore as of 07/07/14
         use compact-skeleton instead
         Used to parse url for retrieving all info the 3D viewer gets (does NOT need post data)
         Format: name, nodes, tags, connectors, reviews
         """
-        return self.make_url(self.project_id, 'skeleton', skid, 'compact-json')
+        return self.make_url(self.project_id, 'skeleton', skid, 'compact-json', **GET)
 
-    def _get_add_annotations_url(self):
+    def _get_add_annotations_url(self, **GET):
         """ Use to parse url to add annotations to skeleton IDs. """
-        return self.make_url(self.project_id, 'annotations', 'add')
+        return self.make_url(self.project_id, 'annotations', 'add', **GET)
 
-    def _get_remove_annotations_url(self):
+    def _get_remove_annotations_url(self, **GET):
         """ Use to parse url to add annotations to skeleton IDs. """
-        return self.make_url(self.project_id, 'annotations', 'remove')
+        return self.make_url(self.project_id, 'annotations', 'remove', **GET)
 
-    def _get_connectivity_url(self):
+    def _get_connectivity_url(self, **GET):
         """ Use to parse url for retrieving connectivity (does need post data). """
-        return self.make_url(self.project_id, 'skeletons', 'connectivity')
+        return self.make_url(self.project_id, 'skeletons', 'connectivity', **GET)
 
-    def _get_connector_links_url(self):
+    def _get_connector_links_url(self, **GET):
         """ Use to retrieve list of connectors either pre- or postsynaptic a set of neurons - GET request
         Format: { 'links': [ skeleton_id, connector_id, x,y,z, S(?),
                 confidence, creator, treenode_id, creation_date ], 'tags':[] }
         """
-        return self.make_url(self.project_id, 'connectors', 'links/')
+        return self.make_url(self.project_id, 'connectors', 'links/', **GET)
 
-    def _get_connectors_url(self):
+    def _get_connectors_url(self, **GET):
         """ Use to retrieve list of connectors - POST request
         """
-        return self.make_url(self.project_id, 'connectors/')
+        return self.make_url(self.project_id, 'connectors/', **GET)
 
-    def _get_connector_types_url(self):
+    def _get_connector_types_url(self, **GET):
         """ Use to retrieve dictionary of connector types in the project
         """
-        return self.make_url(self.project_id, 'connectors', 'types')
+        return self.make_url(self.project_id, 'connectors', 'types', **GET)
 
-    def _get_connectors_between_url(self):
+    def _get_connectors_between_url(self, **GET):
         """ Use to retrieve list of connectors linking sets of neurons
         """
-        return self.make_url(self.project_id, 'connector', 'list', 'many_to_many')
+        return self.make_url(self.project_id, 'connector', 'list', 'many_to_many', **GET)
 
-    def _get_connector_details_url(self):
+    def _get_connector_details_url(self, **GET):
         """ Use to parse url for retrieving info connectors (does need post data). """
-        return self.make_url(self.project_id, 'connector', 'skeletons')
+        return self.make_url(self.project_id, 'connector', 'skeletons', **GET)
 
-    def _get_neuronnames(self):
+    def _get_neuronnames(self, **GET):
         """ Use to parse url for names for a list of skeleton ids
         (does need post data: self.project_id, skid). """
-        return self.make_url(self.project_id, 'skeleton', 'neuronnames')
+        return self.make_url(self.project_id, 'skeleton', 'neuronnames', **GET)
 
-    def _get_list_skeletons_url(self):
+    def _get_list_skeletons_url(self, **GET):
         """ Use to parse url for names for a list of skeleton ids. GET request. """
-        return self.make_url(self.project_id, 'skeletons/')
+        return self.make_url(self.project_id, 'skeletons/', **GET)
 
-    def _get_graph_dps_url(self):
+    def _get_graph_dps_url(self, **GET):
         """ Use to parse url for getting connections between source and targets. """
-        return self.make_url(self.project_id, 'graph', 'dps')
+        return self.make_url(self.project_id, 'graph', 'dps', **GET)
 
-    def _get_completed_connector_links(self):
+    def _get_completed_connector_links(self, **GET):
         """ Use to parse url for retrieval of completed connector links by
         given user GET request:
         Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id,
         link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id,
         link2_confidence, creator_id ]
         """
-        return self.make_url(self.project_id, 'connector', 'list')
+        return self.make_url(self.project_id, 'connector', 'list', **GET)
 
-    def _get_user_list_url(self):
+    def _get_user_list_url(self, **GET):
         """ Get user list for project. """
-        return self.make_url('user-list')
+        return self.make_url('user-list', **GET)
 
-    def _get_single_neuronname_url(self, skid):
+    def _get_single_neuronname_url(self, skid, **GET):
         """ Use to parse url for a SINGLE neuron (will also give you neuronID). """
-        return self.make_url(self.project_id, 'skeleton', skid, 'neuronname')
+        return self.make_url(self.project_id, 'skeleton', skid, 'neuronname', **GET)
 
-    def _get_review_status_url(self):
+    def _get_review_status_url(self, **GET):
         """ Use to get skeletons review status. """
-        return self.make_url(self.project_id, 'skeletons', 'review-status')
+        return self.make_url(self.project_id, 'skeletons', 'review-status', **GET)
 
-    def _get_review_details_url(self, skid):
+    def _get_review_details_url(self, skid, **GET):
         """ Use to retrieve review status for every single node of a skeleton.
         For some reason this needs to be fetched as POST (even though actual POST data is not necessary)
         Returns list of arbors, the nodes contained and who has been reviewing them at what time
         """
-        return self.make_url(self.project_id, 'skeletons', skid, 'review')
+        return self.make_url(self.project_id, 'skeletons', skid, 'review', **GET)
 
-    def _get_reviewed_neurons_url(self):
+    def _get_reviewed_neurons_url(self, **GET):
         """ Use to retrieve review status for every single node of a skeleton.
         For some reason this needs to fetched as POST (even though actual POST data is not necessary)
         Returns list of arbors, the nodes the contain and who has been reviewing them at what time
         """
-        return self.make_url(self.project_id, 'skeletons', skid, 'review')
+        return self.make_url(self.project_id, 'skeletons', skid, 'review', **GET)
 
-    def _get_annotation_table_url(self):
+    def _get_annotation_table_url(self, **GET):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
-        return self.make_url(self.project_id, 'annotations', 'table-list')
+        return self.make_url(self.project_id, 'annotations', 'table-list', **GET)
 
-    def _get_intersects(self, vol_id, x, y, z):
+    def _get_intersects(self, vol_id, x, y, z, **GET):
         """ Use to test if point intersects with volume."""
-        return self.make_url(self.project_id, 'volumes', vol_id, 'intersect') + '?%s' % urllib.parse.urlencode({'x': x, 'y': y, 'z': z})
+        GET.update({'x': x, 'y': y, 'z': z})
+        return self.make_url(self.project_id, 'volumes', vol_id, 'intersect', **GET)
 
-    def _get_volumes(self):
+    def _get_volumes(self, **GET):
         """ Get list of all volumes in project. """
-        return self.make_url(self.project_id, 'volumes/')
+        return self.make_url(self.project_id, 'volumes/', **GET)
 
-    def _get_volume_details(self, volume_id):
+    def _get_volume_details(self, volume_id, **GET):
         """ Get details on a given volume (mesh). """
-        return self.make_url(self.project_id, 'volumes', volume_id)
+        return self.make_url(self.project_id, 'volumes', volume_id, **GET)
 
-    def _get_annotations_for_skid_list(self):
+    def _get_annotations_for_skid_list(self, **GET):
         """ ATTENTION: This does not seem to work anymore as of 20/10/2015
         -> although it still exists in CATMAID code
         use get_annotations_for_skid_list2
         Use to get annotations for given neuron. DOES need skid as postdata
         """
-        return self.make_url(self.project_id, 'annotations', 'skeletons', 'list')
+        return self.make_url(self.project_id, 'annotations', 'skeletons', 'list', **GET)
 
-    def _get_annotations_for_skid_list2(self):
+    def _get_annotations_for_skid_list2(self, **GET):
         """ Use to get annotations for given neuron. DOES need skid as postdata. """
-        return self.make_url(self.project_id, 'skeleton', 'annotationlist')
+        return self.make_url(self.project_id, 'skeleton', 'annotationlist', **GET)
 
-    def _get_logs_url(self):
+    def _get_logs_url(self, **GET):
         """ Use to get logs. DOES need skid as postdata. """
-        return self.make_url(self.project_id, 'logs', 'list')
+        return self.make_url(self.project_id, 'logs', 'list', **GET)
 
-    def _get_transactions_url(self):
+    def _get_transactions_url(self, **GET):
         """ Use to get transactions. GET request."""
-        return self.make_url(self.project_id, 'transactions/')
+        return self.make_url(self.project_id, 'transactions/', **GET)
 
-    def _get_annotation_list(self):
+    def _get_annotation_list(self, **GET):
         """ Use to parse url for retrieving list of all annotations
         (and their IDs!!!).
         """
-        return self.make_url(self.project_id, 'annotations/')
+        return self.make_url(self.project_id, 'annotations/', **GET)
 
-    def _get_contributions_url(self):
+    def _get_contributions_url(self, **GET):
         """ Use to parse url for retrieving contributor statistics for given
         skeleton (does need post data). """
-        return self.make_url(self.project_id, 'skeleton', 'contributor_statistics_multiple')
+        return self.make_url(self.project_id, 'skeleton', 'contributor_statistics_multiple', **GET)
 
-    def _get_annotated_url(self):
+    def _get_annotated_url(self, **GET):
         """ Use to parse url for retrieving annotated neurons (NEEDS post data). """
-        return self.make_url(self.project_id, 'annotations', 'query-targets')
+        return self.make_url(self.project_id, 'annotations', 'query-targets', **GET)
 
-    def _get_skid_from_tnid(self, treenode_id):
+    def _get_skid_from_tnid(self, treenode_id, **GET):
         """ Use to parse url for retrieving the skeleton id to a single
         treenode id (does not need postdata) API returns dict:
         {"count": integer, "skeleton_id": integer}
         """
-        return self.make_url(self.project_id, 'skeleton', 'node', treenode_id, 'node_count')
+        return self.make_url(self.project_id, 'skeleton', 'node', treenode_id, 'node_count', **GET)
 
-    def _get_node_list_url(self):
+    def _get_node_list_url(self, **GET):
         """ Use to parse url for retrieving list of nodes (NEEDS post data). """
-        return self.make_url(self.project_id, 'node', 'list')
+        return self.make_url(self.project_id, 'node', 'list', **GET)
 
-    def _get_node_info_url(self):
+    def _get_node_info_url(self, **GET):
         """ Use to parse url for retrieving user info on a single node (needs post data). """
-        return self.make_url(self.project_id, 'node', 'user-info')
+        return self.make_url(self.project_id, 'node', 'user-info', **GET)
 
-    def _treenode_add_tag_url(self, treenode_id):
+    def _treenode_add_tag_url(self, treenode_id, **GET):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
-        return self.make_url(self.project_id, 'label', 'treenode', treenode_id, 'update')
+        return self.make_url(self.project_id, 'label', 'treenode', treenode_id, 'update', **GET)
 
-    def _delete_neuron_url(self, neuron_id):
+    def _delete_neuron_url(self, neuron_id, **GET):
         """ Use to parse url for deleting a single neurons"""
-        return self.make_url(self.project_id, 'label', 'treenode', treenode_id, 'update')
+        return self.make_url(self.project_id, 'label', 'treenode', treenode_id, 'update', **GET)
 
-    def _delete_treenode_url(self):
+    def _delete_treenode_url(self, **GET):
         """ Use to parse url for deleting treenodes"""
-        return self.make_url(self.project_id, 'treenode', 'delete')
+        return self.make_url(self.project_id, 'treenode', 'delete', **GET)
 
-    def _delete_connector_url(self):
+    def _delete_connector_url(self, **GET):
         """ Use to parse url for deleting connectors"""
-        return self.make_url(self.project_id, 'connector', 'delete')
+        return self.make_url(self.project_id, 'connector', 'delete', **GET)
 
-    def _connector_add_tag_url(self, treenode_id):
+    def _connector_add_tag_url(self, treenode_id, **GET):
         """ Use to parse url adding labels (tags) to a given treenode (needs post data)."""
-        return self.make_url(self.project_id, 'label', 'connector', treenode_id, 'update')
+        return self.make_url(self.project_id, 'label', 'connector', treenode_id, 'update', **GET)
 
-    def _get_compact_skeleton_url(self, skid, connector_flag=1, tag_flag=1):
+    def _get_compact_skeleton_url(self, skid, connector_flag=1, tag_flag=1, **GET):
         """ Use to parse url for retrieving all info the 3D viewer gets (does NOT need post data).
         Returns, in JSON, [[nodes], [connectors], [tags]], with connectors and tags being empty when 0 == with_connectors and 0 == with_tags, respectively.
         Deprecated but kept for backwards compability!
         """
-        return self.make_url(self.project_id, skid, connector_flag, tag_flag, 'compact-skeleton')
+        return self.make_url(self.project_id, skid, connector_flag, tag_flag, 'compact-skeleton', **GET)
 
-    def _get_compact_details_url(self, skid):
+    def _get_compact_details_url(self, skid, **GET):
         """ Similar to compact-skeleton but if 'with_history':True is passed as GET request, returned data will include all positions a nodes/connector has ever occupied plus the creation time and last modified.
         """
-        return self.make_url(self.project_id, 'skeletons', skid, 'compact-detail')
+        return self.make_url(self.project_id, 'skeletons', skid, 'compact-detail', **GET)
 
-    def _get_compact_arbor_url(self, skid, nodes_flag=1, connector_flag=1, tag_flag=1):
+    def _get_compact_arbor_url(self, skid, nodes_flag=1, connector_flag=1, tag_flag=1, **GET):
         """ The difference between this function and get_compact_skeleton is that the connectors contain the whole chain from the skeleton of interest to the
         partner skeleton: contains [treenode_id, confidence_to_connector, connector_id, confidence_from_connector, connected_treenode_id, connected_skeleton_id, relation1, relation2]
         relation1 = 1 means presynaptic (this neuron is upstream), 0 means postsynaptic (this neuron is downstream)
         """
-        return self.make_url(self.project_id, skid, nodes_flag, connector_flag, tag_flag, 'compact-arbor')
+        return self.make_url(self.project_id, skid, nodes_flag, connector_flag, tag_flag, 'compact-arbor', **GET)
 
-    def _get_edges_url(self):
+    def _get_edges_url(self, **GET):
         """ Use to parse url for retrieving edges between given skeleton ids (does need postdata).
         Returns list of edges: [source_skid, target_skid, weight]
         """
-        return self.make_url(self.project_id, 'skeletons', 'confidence-compartment-subgraph')
+        return self.make_url(self.project_id, 'skeletons', 'confidence-compartment-subgraph', **GET)
 
-    def _get_skeletons_from_neuron_id(self, neuron_id):
+    def _get_skeletons_from_neuron_id(self, neuron_id, **GET):
         """ Use to get all skeletons of a given neuron (neuron_id). """
-        return self.make_url(self.project_id, 'neuron', neuron_id, 'get-all-skeletons')
+        return self.make_url(self.project_id, 'neuron', neuron_id, 'get-all-skeletons', **GET)
 
-    def _get_history_url(self):
+    def _get_history_url(self, **GET):
         """ Use to get user history. """
-        return self.make_url(self.project_id, 'stats', 'user-history')
+        return self.make_url(self.project_id, 'stats', 'user-history', **GET)
 
-    def _get_stats_node_count(self):
+    def _get_stats_node_count(self, **GET):
         """ Use to get nodecounts per user. """
-        return self.make_url(self.project_id, 'stats', 'nodecount')
+        return self.make_url(self.project_id, 'stats', 'nodecount', **GET)
 
-    def _rename_neuron_url(self, neuron_id):
+    def _rename_neuron_url(self, neuron_id, **GET):
         """ Use to rename a single neuron. Does need postdata."""
-        return self.make_url(self.project_id, 'neurons', neuron_id, 'rename')
+        return self.make_url(self.project_id, 'neurons', neuron_id, 'rename', **GET)
 
-    def _get_label_list_url(self):
+    def _get_label_list_url(self, **GET):
         """ Use to rename a single neuron. Does need postdata."""
-        return self.make_url(self.project_id, 'labels', 'stats')
+        return self.make_url(self.project_id, 'labels', 'stats', **GET)
 
 
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
