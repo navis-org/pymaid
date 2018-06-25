@@ -964,12 +964,18 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
     return df.reset_index(drop=True)
 
 
-def get_partners(x, remote_instance=None, threshold=1,
-                 min_size=2, filt=[],
-                 directions=['incoming', 'outgoing',
-                             'gapjunctions', 'attachments']):
+def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
+                 min_confidence=1, directions=['incoming', 'outgoing',
+                 'gapjunctions', 'attachments']):
     """ Retrieve partners connected by synapses, gap junctions or attachments
     to a set of neurons.
+
+    Note
+    ----
+    This function treats multiple fragments with the same skeleton ID
+    (e.g. from splits into axon & dendrites) as a single neuron when fetching
+    data from the server. For "fragmented" connectivity use
+    :func:`~pymaid.cn_table_from_connectors` instead.
 
     Parameters
     ----------
@@ -983,15 +989,15 @@ def get_partners(x, remote_instance=None, threshold=1,
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     threshold :         int, optional
-                        Does not seem to have any effect on CATMAID API and is
-                        therefore filtered afterwards. This threshold is
-                        applied to the total number of synapses.
+                        Minimum # of links (synapses/gap-junctions/etc).
     min_size :          int, optional
                         Minimum node count of partner
                         (default=2 to hide single-node partners).
     filt :              list of str, optional
                         Filters partners for neuron names (must be exact) or
                         skeleton_ids.
+    min_confidence :    int | None, optional
+                        If set, edges with lower confidence will be ignored.
     directions :        'incoming' | 'outgoing' | 'gapjunctions' | 'attachments', optional
                         Use to restrict to either up- or downstream partners.
 
@@ -1008,8 +1014,8 @@ def get_partners(x, remote_instance=None, threshold=1,
         2   name3         skid3      node_count3  gapjunction n_syn  n_syn  .
         ... ...
 
-        ``relation`` can be ``'upstream'`` (incoming), ``'downstream'`` (outgoing),
-        ``'attachment'`` or ``'gapjunction'`` (gap junction)
+        ``relation`` can be ``'upstream'`` (incoming), ``'downstream'``
+        (outgoing), ``'attachment'`` or ``'gapjunction'`` (gap junction).
 
     Warning
     -------
@@ -1038,16 +1044,17 @@ def get_partners(x, remote_instance=None, threshold=1,
                     Use if you need an adjacency matrix instead of a table.
     :func:`~pymaid.get_partners_in_volume`
                     Use if you only want connectivity within a given volume.
+    :func:`~pymaid.filter_connectivity`
+                   Use to restrict connector table to given part of a neuron
+                   or a volume.
+    :func:`~cn_table_from_connectors`
+                   Returns "fragmented" connectivity. Use e.g. if you are working
+                   with multiple fragments from the same neuron.
 
     """
 
-    def _constructor_helper(entry, skid):
-        """ Helper to extract connectivity from data returned by CATMAID server
-        """
-        try:
-            return entry['skids'][str(skid)]
-        except BaseException:
-            return 0
+    if not isinstance(min_confidence, (float, int)) or min_confidence < 0 or min_confidence > 5:
+        raise ValueError('min_confidence must be 0-5.')
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
@@ -1072,26 +1079,7 @@ def get_partners(x, remote_instance=None, threshold=1,
     connectivity_data.update(
         {d: [] for d in connectivity_data if d not in directions})
 
-    # As of 08/2015, # of synapses is returned as list of nodes with 0-5 confidence: {'skid': [0,1,2,3,4,5]}
-    # This is being collapsed into a single value before returning it:
-
-    for d in connectivity_data:
-        pop = set()
-        for entry in connectivity_data[d]:
-            if sum([sum(connectivity_data[d][entry]['skids'][n]) for n in connectivity_data[d][entry]['skids']]) >= threshold:
-                for skid in connectivity_data[d][entry]['skids']:
-                    connectivity_data[d][entry]['skids'][skid] = sum(
-                        connectivity_data[d][entry]['skids'][skid])
-            else:
-                pop.add(entry)
-
-            if min_size > 1:
-                if connectivity_data[d][entry]['num_nodes'] < min_size:
-                    pop.add(entry)
-
-        for n in pop:
-            connectivity_data[d].pop(n)
-
+    # Get neurons' names
     names = get_names([n for d in connectivity_data for n in connectivity_data[
                       d]] + list(x), remote_instance)
 
@@ -1105,13 +1093,17 @@ def get_partners(x, remote_instance=None, threshold=1,
         'attachments': 'attachment'
     }
 
+    # Number of synapses is returned as list of links with 0-5 confidence:
+    # {'skid': [0,1,2,3,4,5]}
+    # This is being collapsed into a single value before returning it.
     for d in relations:
         df_temp = pd.DataFrame([[
             names[str(n)],
             str(n),
             int(connectivity_data[d][n]['num_nodes']),
             relations[d]]
-            + [_constructor_helper(connectivity_data[d][n], s) for s in x]
+            + [sum(connectivity_data[d][n]['skids'].get(str(s),
+                                                        [0, 0, 0, 0, 0])[min_confidence - 1:]) for s in x]
             for i, n in enumerate(connectivity_data[d])
         ],
             columns=['neuron_name', 'skeleton_id', 'num_nodes',
@@ -1122,6 +1114,9 @@ def get_partners(x, remote_instance=None, threshold=1,
         df = pd.concat([df, df_temp], axis=0)
 
     df['total'] = df[x].sum(axis=1).values
+
+    # Now filter for synapse threshold and size
+    df = df[(df.num_nodes >= min_size) & (df.total >= threshold)]
 
     df.sort_values(['relation', 'total'], inplace=True, ascending=False)
 
