@@ -82,7 +82,7 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_connectors_between', 'url_to_coordinates',
                   'rename_neurons', 'get_label_list', 'find_neurons',
                   'get_skid_from_treenode', 'get_transactions',
-                  'remove_annotations'])
+                  'remove_annotations', 'get_connector_links'])
 
 # Set up logging
 logger = config.logger
@@ -1562,6 +1562,117 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     return df
 
 
+def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None):
+    """ Retrieve connectors links for a set of neurons.
+
+    Note
+    ----
+    In essence, this will get you all "arrows" that point from a connector to
+    your neuron or from your neuron to a connector. It does NOT give you the
+    entire battery of connectors for a set of connectors. For that you have
+    to use :func:`~pymaid.get_connector_details`.
+
+    Parameters
+    ----------
+    x :                 list of connector IDs | CatmaidNeuron | CatmaidNeuronList
+                        Connector ID(s) to retrieve details for. If
+                        CatmaidNeuron/List, will use their connectors.
+    with_tags :         bool, optional
+                        If True will also return dictionary of connector tags.
+    chunk_size :        int, optional
+                        Neurons are split into chunks of this size and then
+                        queried sequentially to prevent server from returning
+                        an error.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in which each row represents a connector link:
+
+        >>> df
+        ...   skeleton_id  relation  connector_id  x  y  z  confidence
+        ... 0
+        ... 1
+        ... 2
+        ...
+        ...   creator_id  treenode_id  creation_time  edition_time
+        ... 0
+        ... 1
+        ... 2
+
+    (links, tags)
+            If ``with_tags=True``, will return above DataFrame and tags dict.
+
+    See Also
+    --------
+    :func:`~pymaid.get_connectors`
+        If you just need the connector table (ID, x, y, z, creator, etc).
+    :func:`~pymaid.get_connector_details`
+        Get the same data but by connector, not by link.
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    df_collection = []
+    tags = {}
+    with config.tqdm(desc='Fetching links', total=len(skids),
+                     disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
+        for chunk in [skids[i:i+chunk_size] for i in range(0, len(skids), chunk_size)]:
+            # Generate URLs
+            GET = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(chunk)}
+            link_types = ['presynaptic_to', 'postsynaptic_to',
+                          'abutting', 'gapjunction_with']
+            urls = [remote_instance._get_connector_links_url(relation_type=cn,
+                                                             **GET) for cn in link_types]
+
+            # Fetch data
+            responses = remote_instance.fetch(urls, disable_pbar=True)
+
+            # Extract tags
+            if with_tags:
+                for r in responses:
+                    tags.update(r['tags'])
+
+            # Generate separate DataFrames
+            data = [pd.DataFrame(r['links'],
+                                 columns=['skeleton_id', 'connector_id', 'x', 'y', 'z',
+                                          'confidence', 'creator_id', 'treenode_id',
+                                          'creation_time', 'edition_time']
+                                ) for r in responses]
+
+            # Add link type to each DataFrame
+            for t, d in zip(link_types, data):
+                d['relation'] = t
+
+            # Concatenate DataFrames
+            df = pd.concat(data, axis=0)
+
+            # Store
+            df_collection.append(df)
+
+            # Update progress bar
+            pbar.update(len(chunk))
+
+    # Merge DataFrames
+    df = pd.concat(df_collection, axis=0)
+
+    # Convert to timestamps
+    df['creation_time'] = [datetime.datetime.strptime(
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
+    df['edition_time'] = [datetime.datetime.strptime(
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
+
+    if with_tags:
+        return df, tags
+
+    return df
+
+
 def get_connector_details(x, remote_instance=None):
     """ Retrieve details on sets of connectors.
 
@@ -1593,6 +1704,8 @@ def get_connector_details(x, remote_instance=None):
     --------
     :func:`~pymaid.get_connectors`
         If you just need the connector table (ID, x, y, z, creator, etc).
+    :func:`~pymaid.get_connector_links`
+        Get the same data but by link, not by connector.
 
     """
 

@@ -233,6 +233,7 @@ Connectivity
     ~pymaid.get_connectors
     ~pymaid.get_connector_details
     ~pymaid.get_connectors_between
+    ~pymaid.get_connector_links
     ~pymaid.get_edges
     ~pymaid.get_partners
     ~pymaid.get_partners_in_volume
