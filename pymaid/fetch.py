@@ -242,7 +242,7 @@ class CatmaidInstance:
             relative = arg_str[1:] if arg_str.startswith('/') else arg_str
             url = requests.compat.urljoin(url + joiner, relative)
         if GET:
-            url += '?{}'.format(urllib.parse.urlencode(kwargs))
+            url += '?{}'.format(urllib.parse.urlencode(GET))
         return url
 
     def _get_catmaid_version(self, **GET):
