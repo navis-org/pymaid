@@ -110,8 +110,9 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
     neuron              skeleton ID(s) | CatmaidNeuron/List, optional
                         Restrict check to given set of neurons. If
                         CatmaidNeuron/List, will use this neurons nodes/
-                        connectors. You subset contributions e.g. to a given
-                        neuropil by pruning neurons.
+                        connectors. Use to subset contributions e.g. to a given
+                        neuropil by pruning neurons before passing to this
+                        function.
     remote_instance :   Catmaid Instance, optional
                         Either pass explicitly or define globally.
 
@@ -340,7 +341,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
         >>> df
         ...   user  nodes  presynapses  postsynapses  nodes_reviewed
         ... 0
-        ... 1
+        ... 1d
 
     Examples
     --------
@@ -515,7 +516,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     ...         "labels" : stats.user.tolist(), "type" : "pie" } ] }
     >>> plotly.offline.plot(fig)
 
-    Plot reconstruction efforts over time
+    Plot reconstruction efforts over time:
 
     >>> stats = pymaid.get_time_invested( skids, mode='OVER_TIME' )
     >>> # Plot time invested over time
@@ -666,7 +667,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
 
 def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
                      remote_instance=None):
-    """ Get timestamps of users' actions (creations, editions, reviews).
+    """ Get timestamps of users' actions (creations, editions, reviews,
+    linking).
 
     Important
     ---------
@@ -675,9 +677,9 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
       1. The API endpoint used for finding neurons worked on by a given user
          (:func:`pymaid.find_neurons`) does not return single-node neurons.
          Hence, placing e.g. postsynaptic nodes is not taken into account.
-      2. Connecting a node to a connector is not taken into account as there
-         is no API endpoint for getting timestamps of the creation of
-         connector links.
+      2. Any creation is also an edit. However, only the last edit is kept
+         track of. So each creation counts as an edit for the creator until a
+         different user makes an edit.
 
     Parameters
     ----------
@@ -701,6 +703,9 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
 
     Examples
     --------
+    In the first example we will have a look at how active a user is over
+    the course of a day.
+
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
     >>> # Get all actions for a single user
@@ -708,7 +713,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     >>> # Group by hour and see what time of the day user is usually active
     >>> actions.set_index(pd.DatetimeIndex(actions.timestamp), inplace=True )
     >>> hours = actions.groupby(actions.index.hour).count()
-    >>> hours.action.plot()
+    >>> ax = hours.action.plot()
     >>> plt.show()
 
     >>> # Plot day-by-day activity

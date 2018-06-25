@@ -746,7 +746,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
 
         >>> df
         ...  neuron_name   skeleton_id   nodes      connectors   tags
-        ... 0  str             str      node_df      conn_df     dict
+        ... 0  str             str     DataFrame     DataFrame   dict
 
     Notes
     -----
@@ -842,9 +842,9 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
 
         >>> df
         ...  neuron_name  skeleton_id  num_nodes   relation     skid1  skid2 ...
-        ... 1  name1         skid1    node_count1  upstream     n_syn  n_syn ...
-        ... 2  name2         skid2    node_count2  downstream   n_syn  n_syn ...
-        ... 3  name3         skid3    node_count3  gapjunction  n_syn  n_syn ...
+        ... 1  name1         skid1    node_count1  upstream     n_syn  n_syn ..
+        ... 2  name2         skid2    node_count2  downstream   n_syn  n_syn .
+        ... 3  name3         skid3    node_count3  gapjunction  n_syn  n_syn .
 
         - Relation can be: upstream (incoming), downstream (outgoing) of the neurons of interest or gap junction
         - partners can show up multiple times if they are e.g. pre- AND postsynaptic
@@ -1464,7 +1464,8 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-                        5. None if you want all fetch connectors that match other criteria
+                        5. ``None`` if you want all fetch connectors that
+                           match other criteria
     relation_type :     'presynaptic_to' | 'postsynaptic_to' | 'gapjunction_with' | 'abutting' | 'attached_to', optional
                         If provided, will filter for these connection types.
     tags :              str | list of str, optional
@@ -1492,6 +1493,8 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
         If you need details about the connectivity of a connector
     :func:`~pymaid.get_connectors_between`
         If you need to find the connectors between sets of neurons.
+    :func:`~pymaid.get_connector_links`
+        If you ned details about links for each connector.
 
     """
 
@@ -1946,7 +1949,6 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    x = utils._make_iterable(x)
     annotations = utils._make_iterable(annotations)
 
     # Translate into annotations ID
@@ -2114,7 +2116,7 @@ def get_user_annotations(x, remote_instance=None):
                       )
 
     df['annotated_on'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['annotated_on'].tolist()]
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['annotated_on'].values]
 
     return df.sort_values('times_used').reset_index(drop=True)
 
@@ -2566,7 +2568,6 @@ def neuron_exists(x, remote_instance=None):
                         ``{ skid1 : True, skid2 : False, ... }``
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)

@@ -1596,6 +1596,12 @@ def plot_network(x, **kwargs):
 def plot1d(x, ax=None, color=None, **kwargs):
     """ Plot neuron topology in 1D according to Cuntz et al. (2010).
 
+    Note
+    ----
+    This function breaks a neurons into segments between branch points.
+    See Cuntz et al., PLoS Computational Biology (2010) for detailed explanation.
+    For very complex neurons, the neuron "barcode"
+
     Parameters
     ----------
     x :         CatmaidNeuron | CatmaidNeuronList
