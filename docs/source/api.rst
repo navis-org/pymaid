@@ -237,6 +237,8 @@ Connectivity
     ~pymaid.get_partners
     ~pymaid.get_partners_in_volume
     ~pymaid.get_paths
+    ~pymaid.adjacency_from_connectors
+    ~pymaid.cn_table_from_connectors
 
 User stats
 ----------
@@ -354,7 +356,7 @@ Image data (tiles)
     :toctree: generated/
 
     pymaid.tiles.LoadTiles
-    pymaid.tiles.crop_neuron    
+    pymaid.tiles.crop_neuron
 
 
 R interface (rMAID)

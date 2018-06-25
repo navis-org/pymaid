@@ -948,7 +948,7 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 
     """
 
-    logger.info(
+    logger.debug(
         'Calculating flow centrality for neuron #{0}'.format(x.skeleton_id))
 
     start_time = time.time()

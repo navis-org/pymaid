@@ -29,7 +29,8 @@ from pymaid import fetch, core, intersect, utils, config
 logger = config.logger
 
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
-                  'predict_connectivity', 'adjacency_matrix', 'group_matrix'])
+                  'predict_connectivity', 'adjacency_matrix', 'group_matrix',
+                  'adjacency_from_connectors', 'cn_table_from_connectors'])
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
@@ -39,6 +40,9 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
     Important
     ---------
+    Duplicate skeleton IDs (e.g. two fragments from the same neuron) will be
+    collapsed back into a single neuron! Use only a single fragment per neuron.
+    For multiple fragments/neuron see :func:`~pymaid.adjacency_from_connectors`.
     Order of columns/rows may change during filtering.
 
 
@@ -57,6 +61,11 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
     Returns
     -------
     Restricted connectivity data
+
+    See Also
+    --------
+    :func:`~pymaid.adjacency_from_connectors`
+            Use this function if you have multiple fragments per neuron.
 
     """
 
@@ -172,7 +181,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                            columns=unique_skids, index=unique_skids)
 
     # Fill in values
-    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide, desc='Adj. matrix', leave=config.pbar_leave)):
+    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide, desc='Regenerating', leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.at[str(e[0]), str(e[1])] = counts[i]
 
@@ -335,7 +344,8 @@ def cable_overlap(a, b, dist=2, method='min'):
     return matrix
 
 
-def predict_connectivity(source, target, method='possible_contacts', remote_instance=None, **kwargs):
+def predict_connectivity(source, target, method='possible_contacts',
+                         remote_instance=None, **kwargs):
     """ Calculates potential synapses from source onto target neurons.
     Based on a concept by Alex Bates.
 
@@ -365,14 +375,14 @@ def predict_connectivity(source, target, method='possible_contacts', remote_inst
     Returns
     -------
     pandas.DataFrame
-            Matrix holding possible synaptic contacts. Neurons A are rows,
-            neurons B are columns.
+            Matrix holding possible synaptic contacts. Sources are rows,
+            targets are columns.
 
             >>> df
-                        skidB1   skidB2  skidB3 ...
-                skidA1    5        1        0
-                skidA2    10       20       5
-                skidA3    4        3        15
+                        target1  target2  target3  ...
+                source1    5        1        0
+                source2    10       20       5
+                source3    4        3        15
                 ...
 
     """
@@ -452,6 +462,269 @@ def predict_connectivity(source, target, method='possible_contacts', remote_inst
             pbar.update(1)
 
     return matrix.astype(int)
+
+
+def cn_table_from_connectors(x, remote_instance=None):
+    """ Generate connectivity table from neurons' connectors.
+
+    Notes
+    -----
+    This function creates the connectivity table from scratch using just the
+    neurons' connectors. This function is able to deal with non-unique
+    skeleton IDs (most other functions won't). Use it e.g. when you
+    split neurons into multiple fragments. *The order of the input
+    CatmaidNeuronList is preserved!*
+
+    Parameters
+    ----------
+    x :         CatmaidNeuron | CatmaidNeuronList
+                Neuron(s) for which to generate connectivity table.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in which each row represents a neuron and the number of
+        synapses with the query neurons:
+
+        >>> df
+          neuron_name  skeleton_id   relation    total  skid1  skid2 ...
+        0   name1         skid1      upstream    n_syn  n_syn  ...
+        1   name2         skid2     downstream   n_syn  n_syn  ..
+        2   name3         skid3      usptream    n_syn  n_syn  .
+        ... ...
+
+        ``relation`` can be ``'upstream'`` (incoming), ``'downstream'``
+        (outgoing), ``'attachment'`` or ``'gapjunction'`` (gap junction).
+
+    See Also
+    --------
+    :func:`~pymaid.get_partners`
+            If you are working with "intact" neurons. Much faster!
+    :func:`~pymaid.filter_connectivity`
+            Use this function if you have only a single fragment per neuron
+            (e.g. just the axon). Also way faster.
+
+    Examples
+    --------
+    >>> # Fetch some neurons
+    >>> x = pymaid.get_neuron('annotation:PD2a1/b1')
+    >>> # Split into axon / dendrites
+    >>> x.reroot(x.soma)
+    >>> split = pymaid.split_axon_dendrite(x)
+    >>> # Regenerate cn_table
+    >>> cn_table = pymaid.cn_table_from_connectors(split)
+    >>> # Skeleton IDs are non-unique but column order = input order:
+    >>> # in this example, the first occurrence is axon, the second dendrites
+    >>> cn_table.head()
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        raise TypeError('Need CatmaidNeuron/List, got "{}"'.format(type(x)))
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = core.CatmaidNeuronList(x)
+
+    # Get connector details for all neurons
+    all_cn = x.connectors.connector_id.values
+    cn_details = fetch.get_connector_details(all_cn)
+
+    # Remove connectors for which there are either no pre- or no postsynaptic
+    # neurons
+    cn_details = cn_details[cn_details.postsynaptic_to.apply(len) != 0]
+    cn_details = cn_details[~cn_details.presynaptic_to.isnull()]
+
+    # We need to map treenode ID to skeleton ID in cases where there are more
+    # links (postsynaptic_to_node) than targets (postsynaptic_to)
+    multi_links = cn_details[cn_details.postsynaptic_to.apply(len) < cn_details.postsynaptic_to_node.apply(len)]
+    if not multi_links.empty:
+        tn_to_fetch = [tn for l in multi_links.postsynaptic_to_node for tn in l]
+        tn_to_skid = fetch.get_skid_from_treenode(tn_to_fetch,
+                                                  remote_instance=remote_instance)
+    else:
+        tn_to_skid = {}
+
+    # Collect all pre and postsynaptic neurons
+    all_pre = cn_details[~cn_details.presynaptic_to.isin(x.skeleton_id.astype(int))]
+    all_post = cn_details[cn_details.presynaptic_to.isin(x.skeleton_id.astype(int))]
+
+    all_partners = np.append(all_pre.presynaptic_to.values,
+                             [n for l in all_post.postsynaptic_to.values for n in l])
+
+    us_dict = {}
+    ds_dict = {}
+    # Go over over all neurons and process connectivity
+    for i, n in enumerate(config.tqdm(x, desc='Processing',
+                          disable=config.pbar_hide, leave=config.pbar_leave)):
+
+        # First prepare upstream partners:
+        # Get all treenodes
+        this_tn = set(n.nodes.treenode_id.values)
+        # Prepare upstream partners
+        this_us = all_pre[all_pre.connector_id.isin(n.connectors.connector_id.values)]
+        # Get the number of all links per connector
+        this_us['n_links'] = [len(this_tn & set(r.postsynaptic_to_node))
+                                           for r in this_us.itertuples()]
+        # Group by input and store as dict
+        us_dict[n] = this_us.groupby('presynaptic_to').n_links.sum().to_dict()
+        this_us = this_us.groupby('presynaptic_to').n_links.sum()
+
+        # Now prepare downstream partners:
+        # Get all downstream connectors
+        this_ds = all_post[all_post.presynaptic_to==int(n.skeleton_id)]
+        # Prepare dict
+        ds_dict[n] = {p: 0 for p in all_partners}
+        # Easy cases first (single link to target per connector)
+        is_single = this_ds.postsynaptic_to.apply(len) >= this_ds.postsynaptic_to_node.apply(len)
+        for r in this_ds[is_single].itertuples():
+            for s in r.postsynaptic_to:
+                ds_dict[n][s] += 1
+        # Now hard cases - will have to look up skeleton ID via treenode ID
+        for r in this_ds[~is_single].itertuples():
+            for s in r.postsynaptic_to_node:
+                ds_dict[n][tn_to_skid[s]] += 1
+
+    # Now that we have all data, let's generate the table
+    us_table = pd.DataFrame.from_dict(us_dict)
+    ds_table = pd.DataFrame.from_dict(ds_dict)
+
+    # Make sure we keep the order of the original neuronlist
+    us_table = us_table[[n for n in x]]
+    us_table.columns=[n.skeleton_id for n in us_table.columns]
+    ds_table = ds_table[[n for n in x]]
+    ds_table.columns=[n.skeleton_id for n in ds_table.columns]
+
+    ds_table['relation'] = 'downstream'
+    us_table['relation'] = 'upstream'
+
+    # Generate table
+    cn_table = pd.concat([us_table,ds_table], axis=0)
+
+    # Replace NaN with 0
+    cn_table = cn_table.fillna(0)
+
+    # Make skeleton ID a column
+    cn_table = cn_table.reset_index(drop=False)
+    cn_table.columns = ['skeleton_id'] + list(cn_table.columns[1:])
+
+    # Add names
+    names = fetch.get_names(cn_table.skeleton_id.values)
+    cn_table['neuron_name'] = [names[str(s)] for s in cn_table.skeleton_id.values]
+    cn_table['total'] = cn_table[x.skeleton_id].sum(axis=1)
+
+    # Sort by number of synapses
+    cn_table = cn_table.sort_values(['relation', 'total'], ascending=False)
+
+    # Sort columnes
+    cn_table = cn_table[['neuron_name', 'skeleton_id', 'relation', 'total'] + list(set(x.skeleton_id))]
+
+    return cn_table
+
+
+def adjacency_from_connectors(source, target=None, remote_instance=None):
+    """ Regenerates adjacency matrices from neurons' connectors.
+
+    Notes
+    -----
+    This function creates an adjacency matrix from scratch using just the
+    neurons' connectors. This function is able to deal with non-unique
+    skeleton IDs (most other functions are not). Use it e.g. when you
+    split neurons into multiple fragments.
+
+    Parameters
+    ----------
+    source,target : CatmaidNeuron | CatmaidNeuronList
+                    Neuron(s) for which to generate adjacency matrix.
+                    If ``target==None``, will use ``targets=sources``.
+
+    Returns
+    -------
+    pandas.DataFrame
+            Matrix holding possible synaptic contacts. Sources are rows,
+            targets are columns. Labels are skeleton IDs. Order is preserved.
+
+            >>> df
+                        target1  target2  target3  ...
+                source1    5        1        0
+                source2    10       20       5
+                source3    4        3        15
+                ...
+
+    See Also
+    --------
+    :func:`~pymaid.adjacency_matrix`
+            If you are working with "intact" neurons. Much faster!
+    :func:`~pymaid.filter_connectivity`
+            Use this function if you have only a single fragment per neuron
+            (e.g. just the axon). Also way faster.
+
+    Examples
+    --------
+    >>> # Fetch some neurons
+    >>> x = pymaid.get_neuron('annotation:PD2a1/b1')
+    >>> # Split into axon / dendrites
+    >>> x.reroot(x.soma)
+    >>> split = pymaid.split_axon_dendrite(x)
+    >>> # Regenerate all-by-all adjacency matrix
+    >>> adj = pymaid.adjacency_from_connectors(split)
+    >>> # Skeleton IDs are non-unique but column/row order = input order:
+    >>> # in this example, the first occurrence is axon, the second dendrites
+    >>> adj.head()
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(target, type(None)):
+        target = source
+
+    for _ in [source, target]:
+        if not isinstance(_, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+            raise TypeError('Need CatmaidNeuron/List, got "{}"'.format(type(_)))
+
+    if isinstance(source, core.CatmaidNeuron):
+        source = core.CatmaidNeuronList(source)
+
+    if isinstance(target, core.CatmaidNeuron):
+        target = core.CatmaidNeuronList(target)
+
+    # Generate empty adjacency matrix
+    adj = np.zeros((len(source), len(target)))
+
+    # Get connector details for all neurons
+    all_cn = list(set(np.append(source.connectors.connector_id.values,
+                           target.connectors.connector_id.values)))
+    cn_details = fetch.get_connector_details(all_cn)
+
+    # Now go over all source neurons and process connections
+    for i, s in enumerate(config.tqdm(source, desc='Processing',
+                          disable=config.pbar_hide, leave=config.pbar_leave)):
+
+        # Get all connectors presynaptic for this source
+        this_cn = cn_details[(cn_details.presynaptic_to == int(s.skeleton_id)) &
+                             (cn_details.connector_id.isin(s.connectors.connector_id))
+                             ]
+
+        # Go over all target neurons
+        for k, t in enumerate(target):
+            t_tn = set(t.nodes.treenode_id.values)
+            t_post = t.postsynapses.connector_id.values
+
+            # Extract number of connections from source to this target
+            this_t = this_cn[this_cn.connector_id.isin(t_post)]
+
+            # Now figure out how many links are between this connector and
+            # the target
+            n_links = sum([len(t_tn & set(r.postsynaptic_to_node))
+                                    for r in this_t.itertuples()])
+
+            adj[i][k] = n_links
+
+    return pd.DataFrame(adj,
+                        index=source.skeleton_id,
+                        columns=target.skeleton_id)
 
 
 def _edges_from_connectors(a, b=None, remote_instance=None):
@@ -534,7 +807,9 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     use_connectors :    bool, optional
                         If True AND ``s`` or ``t`` are ``CatmaidNeuron/List``,
                         restrict adjacency matrix to their connectors. Use
-                        if e.g. you are using pruned neurons.
+                        if e.g. you are using pruned neurons. **Important**:
+                        This does not work if you have multiple fragments per
+                        neuron!
 
     Returns
     -------
@@ -544,10 +819,13 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     --------
     :func:`~pymaid.group_matrix`
                 More fine-grained control over matrix grouping.
+    :func:`~pymaid.adjacency_from_connectors`
+                Use this function if you are working with multiple fragments
+                per neuron.
 
     Examples
     --------
-    Generate and plot a adjacency matrix
+    Generate and plot a adjacency matrix:
 
     >>> import seaborn as sns
     >>> import matplotlib.pyplot as plt
@@ -558,6 +836,30 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     >>> g = sns.heatmap(adj_mat, square=True)
     >>> g.set_yticklabels(g.get_yticklabels(), rotation = 0, fontsize = 7)
     >>> g.set_xticklabels(g.get_xticklabels(), rotation = 90, fontsize = 7)
+    >>> plt.show()
+
+    Cut neurons into axon dendrites and compare their connectivity:
+
+    >>> # Get a set of neurons
+    >>> nl = pymaid.get_neurons('annnotation:type_16_candidates')
+    >>> # Split into axon dendrite by using a tag
+    >>> nl.reroot(nl.soma)
+    >>> nl_axon = nl.prune_proximal_to('axon', inplace=False)
+    >>> nl_dend = nl.prune_distal_to('axon', inplace=False)
+    >>> # Get a list of the downstream partners
+    >>> cn_table = pymaid.get_partners(nl)
+    >>> ds_partners = cn_table[ cn_table.relation == 'downstream' ]
+    >>> # Take the top 10 downstream partners
+    >>> top_ds = ds_partners.iloc[:10].skeleton_id.values
+    >>> # Generate separate adjacency matrices for axon and dendrites
+    >>> adj_axon = pymaid.adjacency_matrix(nl_axon, top_ds, use_connectors=True )
+    >>> adj_dend = pymaid.adjacency_matrix(nl_dend, top_ds, use_connectors=True )
+    >>> # Rename rows and merge dataframes
+    >>> adj_axon.index += '_axon'
+    >>> adj_dend.index += '_dendrite'
+    >>> adj_merged = pd.concat([adj_axon, adj_dend], axis=0)
+    >>> # Plot heatmap using seaborn
+    >>> ax = sns.heatmap(adj_merged)
     >>> plt.show()
 
     """
