@@ -614,6 +614,9 @@ def cn_table_from_connectors(x, remote_instance=None):
     cn_table['neuron_name'] = [names[str(s)] for s in cn_table.skeleton_id.values]
     cn_table['total'] = cn_table[x.skeleton_id].sum(axis=1)
 
+    # Drop rows with 0 synapses (e.g. if neuron is only up- but not downstream)
+    cn_table = cn_table[cn_table.total > 0]
+
     # Sort by number of synapses
     cn_table = cn_table.sort_values(['relation', 'total'], ascending=False)
 
