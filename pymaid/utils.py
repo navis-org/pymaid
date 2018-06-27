@@ -273,6 +273,13 @@ def _eval_remote_instance(remote_instance, raise_error=True):
                     'Please either pass a CATMAID instance or define globally as "remote_instance" ')
             else:
                 logger.warning('No global remote instance found.')
+    elif not isinstance(remote_instance, fetch.CatmaidInstance):
+        error = 'Expected None or CatmaidInstance, got {}'.format(type(remote_instance))
+        if raise_error:
+            raise TypeError(error)
+        else:
+            logger.warning(error)
+
     return remote_instance
 
 
@@ -312,11 +319,9 @@ def eval_skids(x, remote_instance=None):
             int(x)
             return [str(x)]
         except BaseException:
-            if x.startswith('annotation:'):
-                return fetch.get_skids_by_annotation(x[11:],
-                                                     remote_instance=remote_instance)
-            elif x.startswith('annotations:'):
-                return fetch.get_skids_by_annotation(x[12:],
+            if x.startswith('annotation:') or x.startswith('annotations:'):
+                an = x[x.index(':') + 1 : ]
+                return fetch.get_skids_by_annotation(an,
                                                      remote_instance=remote_instance)
             elif x.startswith('name:'):
                 return fetch.get_skids_by_name(x[5:],

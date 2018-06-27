@@ -2309,30 +2309,29 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
     logger.debug('Retrieving list of annotations...')
 
     remote_annotation_list_url = remote_instance._get_annotation_list()
-    annotation_list = remote_instance.fetch(remote_annotation_list_url)
+    an_list = remote_instance.fetch(remote_annotation_list_url)
 
-    if not isinstance(annotations, (list, np.ndarray)):
-        annotations = [annotations]
+    # Turn into pandas array
+    an_list = pd.DataFrame.from_records(an_list['annotations'])
 
+    annotations = utils._make_iterable(annotations)
     annotation_ids = {}
-    annotations_matched = set()
+    for an in annotations:
+        # '/' indicates regex
+        if an.startswith('/'):
+            re_str = an[1:]
+        # If allow partial just use the raw string
+        elif allow_partial:
+            re_str = an
+        # If exact match, encode this in regex
+        else:
+            re_str = '^{}$'.format(an)
 
-    for d in annotation_list['annotations']:
-        if d['name'] in annotations and allow_partial is False:
-            annotation_ids[d['name']] = d['id']
-            annotations_matched.add(d['name'])
-            logger.debug(
-                'Found matching annotation: %s' % d['name'])
-        elif True in [a in d['name'] for a in annotations] and allow_partial is True:
-            annotation_ids[d['name']] = d['id']
-            annotations_matched |= set(
-                [a for a in annotations if a in d['name']])
-            logger.debug(
-                'Found matching annotation: %s' % d['name'])
-
-    if len(annotations) != len(annotations_matched):
-        logger.warning('Could not retrieve annotation id(s) for: ' + str(
-            [a for a in annotations if a not in annotations_matched]))
+        # Search for matches
+        res = an_list[an_list.name.str.match(re_str)].set_index('name').id.to_dict()
+        if not res:
+            logger.warning('No annotation found for "{}"'.format(an))
+        annotation_ids.update(res)
 
     return annotation_ids
 
@@ -2345,10 +2344,11 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     x
                         Neurons which to check for a soma. Can be either:
 
-                        1. list of skeleton ID(s) (int or str)
-                        2. list of neuron name(s) (str, exact match)
-                        3. an annotation: e.g. 'annotation:PN right'
+                        1. skeleton ID(s) (int or str)
+                        2. neuron name(s) (str)
+                        3. annotation(s): e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
+
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     tag :               str | None, optional
@@ -2427,37 +2427,28 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     """
 
-    """
-    logger.warning(
-            "Deprecationwarning: get_skids_by_name() is deprecated, use find_neurons() instead."
-        )
-    """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if isinstance(names, str):
-        names = [names]
+    # Prepare names for regex search on the backend
+    re_str = []
+    for n in utils._make_iterable(names, force_type=str):
+        # '/' indicates regex - not necessary for the backend, so remove
+        if n.startswith('/'):
+            re_str.append(n[1:])
+        # If allow partial just use the raw string
+        elif allow_partial:
+            re_str.append(n)
+        # If exact match, encode this in regex
+        else:
+            re_str.append('^{}$'.format(n))
 
-    urls = []
-    POST = []
+    urls = [remote_instance._get_annotated_url() for n in re_str]
+    POST = [{'name': n, 'with_annotations': False} for n in re_str]
+    responses = remote_instance.fetch(urls, post=POST, desc='Get nms')
 
-    for n in names:
-        urls.append(remote_instance._get_annotated_url())
-        POST.append({'name': str(n), 'with_annotations': False})
-
-    results = remote_instance.fetch(urls, post=POST, desc='Get nms')
-
-    match = []
-    for i, r in enumerate(results):
-        for e in r['entities']:
-            if allow_partial and e['type'] == 'neuron' and names[i].lower() in e['name'].lower():
-                match.append([e['name'], e['skeleton_ids'][0]])
-            if not allow_partial and e['type'] == 'neuron' and e['name'] == names[i]:
-                match.append([e['name'], e['skeleton_ids'][0]])
-
-    df = pd.DataFrame(match,
-                      columns=['name', 'skeleton_id']
-                      )
+    df = pd.DataFrame([[n['name'], n['skeleton_ids'][0]] for res in responses for
+                        n in res['entities'] if n['type'] == 'neuron'],
+                      columns=['name', 'skeleton_id'])
 
     return df.sort_values(['name']).reset_index(drop=True)
 
@@ -2492,10 +2483,10 @@ def get_skids_by_annotation(annotations, remote_instance=None,
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    logger.info(
-        'Looking for Annotation(s): ' + str(annotations))
+    logger.debug(
+        'Looking for annotation(s): ' + str(annotations))
 
-    if intersect and isinstance(annotations, (list, np.ndarray)):
+    if intersect and utils._is_iterable(annotations):
         current_level = logger.level
         logger.setLevel('WARNING')
         skids = set.intersection(*[set(get_skids_by_annotation(a,
@@ -2519,7 +2510,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     if allow_partial is True:
         logger.debug(
             'Found id(s): %s (partial matches included)' % len(annotation_ids))
-    elif isinstance(annotations, (list, np.ndarray)):
+    elif utils._is_iterable(annotations):
         logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
             str(annotation_ids), len(annotations) - len(annotation_ids)))
     elif isinstance(annotations, str):
