@@ -1428,7 +1428,8 @@ class CatmaidNeuronList:
         return prange_iter(self.neurons, 0)
 
     def __len__(self):
-        return len(self.neurons)
+        """Use skeleton ID here, otherwise this is terribly slow."""
+        return len(self.skeleton_id)
 
     def __getattr__(self, key):
         if key == 'shape':
