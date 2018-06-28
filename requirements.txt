@@ -4,7 +4,7 @@ Shapely==1.5.17.post1
 tqdm==4.15.0
 numpy==1.14.3
 six==1.11.0
-setuptools==39.0.1
+setuptools==39.2.0
 imageio==2.2.0
 vispy==0.5.3
 pandas==0.22.0
