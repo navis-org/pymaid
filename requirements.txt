@@ -1,0 +1,25 @@
+decorator>=4.1.0
+matplotlib==2.2.2
+Shapely==1.5.17.post1
+tqdm==4.15.0
+numpy==1.14.3
+six==1.11.0
+setuptools==39.0.1
+imageio==2.2.0
+vispy==0.5.3
+pandas==0.22.0
+seaborn==0.8.1
+requests==2.19.1
+requests_futures==0.9.7
+networkx==2.1
+scipy==1.0.0
+plotly==2.5.1
+pyqt5
+pypng==0.0.18
+
+# Below are optional dependencies
+# py2cytoscape==0.7.0
+# pyoctree==0.2.2
+# ete3==3.0.0b35
+# trimesh==2.20.16
+# rpy2==2.8.6

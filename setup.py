@@ -7,7 +7,7 @@ except:
 import re
 
 
-VERSIONFILE="pymaid/__init__.py"
+VERSIONFILE = "pymaid/__init__.py"
 verstrline = open(VERSIONFILE, "rt").read()
 VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(VSRE, verstrline, re.M)
@@ -16,19 +16,21 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
+    requirements = [l for l in requirements if not l.startswith('#')]
 
 setup(
     name='pymaid',
     version=verstr,
-    packages=['pymaid',],
+    packages=['pymaid', ],
     license='GNU GPL V3',
     description='Python interface with CATMAID',
     long_description=open('README.md').read(),
-    url = 'https://github.com/schlegelp/pymaid',
+    url='https://github.com/schlegelp/pymaid',
     author='Philipp Schlegel',
-    author_email = 'pms70@cam.ac.uk',
+    author_email='pms70@cam.ac.uk',
     keywords='CATMAID interface neuron blender3d',
-
     classifiers=[
         'Development Status :: 5 - Production/Stable',
 
@@ -42,26 +44,7 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
-
-    install_requires=[
-        "decorator>=4.1.0", # This is required for networkx -> if not present, readthedocs acts up
-        "scipy>=1.0.0",
-        "numpy>=1.13.0",
-        "matplotlib>=2.2.0",
-        "plotly>=2.4.0",
-        "pandas>=0.22.0",
-        "vispy>=0.5.3",
-        "tqdm>=4.14.0",
-        "pyqt5",
-        "pypng",
-        "networkx>=2.1",
-        "seaborn",
-        "requests",
-        "requests-futures"
-        #"rpy2>=2.8.5", #This throws an error when no R is installed on the system
-    ],
-
+    install_requires=requirements,
     python_requires='>=3.4',
-
-    zip_safe = False
+    zip_safe=False
 )
