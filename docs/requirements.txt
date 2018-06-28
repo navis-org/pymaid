@@ -1,4 +1,4 @@
 ###### Requirements without Version Specifiers ######
-numpydoc
+numpydoc==0.8.0
 nbsphinx
 ipykernel
