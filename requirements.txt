@@ -14,7 +14,7 @@ requests_futures==0.9.7
 networkx==2.1
 scipy==1.0.0
 plotly==2.5.1
-pyqt5
+pyqt5==5.10.1
 pypng==0.0.18
 
 # Below are optional dependencies
