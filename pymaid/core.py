@@ -280,6 +280,19 @@ class CatmaidNeuron:
                 except BaseException:
                     pass
 
+    def __dir__(self):
+        """ Custom __dir__ to add some parameters that we want to make
+        searchable.
+        """
+        add_attributes = ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
+                          'cable_length', 'root', 'neuron_name',
+                          'nodes', 'annotations', 'partners', 'review_status',
+                          'connectors', 'presynapses', 'postsynapses',
+                          'gap_junctions', 'soma', 'root', 'tags',
+                          'n_presynapses', 'n_postsynapses', 'n_connectors']
+
+        return list(set(super().__dir__() + add_attributes))
+
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
         if 'nodes' in self.__dict__ and \
@@ -346,36 +359,43 @@ class CatmaidNeuron:
                     + self.tags.get('soma', [])
                 return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed])
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_branch_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'branch'].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_end_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'end'].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes.shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_connectors':
             if 'connectors' in self.__dict__:
                 return self.connectors.shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_presynapses':
             if 'connectors' in self.__dict__:
                 return self.connectors[self.connectors.relation == 0].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_postsynapses':
             if 'connectors' in self.__dict__:
                 return self.connectors[self.connectors.relation == 1].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
@@ -386,6 +406,7 @@ class CatmaidNeuron:
                     w = nx.get_edge_attributes(self.graph, 'weight').values()
                 return sum(w) / 1000
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         else:
             raise AttributeError('Attribute "%s" not found' % key)
@@ -1432,6 +1453,20 @@ class CatmaidNeuronList:
     def __len__(self):
         """Use skeleton ID here, otherwise this is terribly slow."""
         return len(self.skeleton_id)
+
+    def __dir__(self):
+        """ Custom __dir__ to add some parameters that we want to make
+        searchable.
+        """
+        add_attributes = ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
+                          'cable_length', 'root', 'neuron_name',
+                          'nodes', 'annotations', 'partners', 'review_status',
+                          'connectors', 'presynapses', 'postsynapses',
+                          'gap_junctions', 'soma', 'root', 'tags',
+                          'n_presynapses', 'n_postsynapses', 'n_connectors',
+                          'skeleton_id', 'empty', 'shape']
+
+        return list(set(super().__dir__() + add_attributes))
 
     def __getattr__(self, key):
         if key == 'shape':
