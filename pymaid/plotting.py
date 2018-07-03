@@ -23,6 +23,7 @@ import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.mplot3d import proj3d
+from matplotlib.collections import LineCollection
 import matplotlib.colors as mcl
 
 import random
@@ -217,7 +218,6 @@ def plot2d(x, method='2d', **kwargs):
     >>> # Move camera closer (will make image bigger)
     >>> ax.dist = 5
 
-
     Returns
     --------
     fig, ax :      matplotlib figure and axis object
@@ -233,6 +233,15 @@ def plot2d(x, method='2d', **kwargs):
     ``connectors_only`` (boolean, default = False)
        Plot only connectors, not the neuron.
 
+    ``cn_size`` (int | float, default = 1)
+      Size of connectors.
+
+    ``linewidth`` (int | float, default = .5)
+      Width of neurites.
+
+    ``linestyle`` (str, default = '-')
+      Line style of neurites.
+
     ``scalebar`` (int | float, default=False)
        Adds scale bar. Provide integer/float to set size of scalebar in um.
        For methods '3d' and '3d_complex', this will create an axis object.
@@ -244,6 +253,13 @@ def plot2d(x, method='2d', **kwargs):
       Tuples/lists (r,g,b) and str (color name) are interpreted as a single
       colors that will be applied to all neurons. Dicts will be mapped onto
       neurons by skeleton ID.
+
+    ``depth_coloring`` (bool, default = False)
+      If True, will color encode depth (Z). Overrides ``color``. Only works
+      with ``method = '2d'``.
+
+    ``cn_mesh_colors`` (bool, default = False)
+      If True, will use the neuron's color for its connectors too.
 
     ``group_neurons`` (bool, default = False)
       If True, neurons will be grouped. Works with SVG export (not PDF).
@@ -267,11 +283,11 @@ def plot2d(x, method='2d', **kwargs):
     _ACCEPTED_KWARGS = ['remote_instance', 'connectors', 'connectors_only',
                         'ax', 'color', 'view', 'scalebar', 'cn_mesh_colors',
                         'linewidth', 'cn_size', 'group_neurons', 'scatter_kws',
-                        'figsize', 'linestyle', 'alpha']
+                        'figsize', 'linestyle', 'alpha', 'depth_coloring']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
-            ','.join(wrong_kwargs), ','.join(_ACCEPTED_KWARGS)))
+            ','.join(wrong_kwargs), ', '.join(_ACCEPTED_KWARGS)))
 
     _METHOD_OPTIONS = ['2d', '3d', '3d_complex']
     if method not in _METHOD_OPTIONS:
@@ -295,6 +311,7 @@ def plot2d(x, method='2d', **kwargs):
     scalebar = kwargs.get('scalebar', None)
     group_neurons = kwargs.get('group_neurons', False)
     alpha = kwargs.get('alpha', .9)
+    depth_coloring = kwargs.get('depth_coloring', False)
 
     scatter_kws = kwargs.get('scatter_kws', {})
 
@@ -364,6 +381,13 @@ def plot2d(x, method='2d', **kwargs):
         elif method == '2d' and ax.name == '3d':
             raise TypeError('Axis must be 2d.')
 
+    # Prepare some stuff for depth coloring
+    if depth_coloring and method != '2d':
+        raise logger.warning('Depth coloring unavailable for method "{}"'.format(method))
+    elif depth_coloring:
+        all_co = skdata.nodes[['x', 'y', 'z']]
+        norm = plt.Normalize(vmin=all_co.z.min(), vmax=all_co.z.max())
+
     if volumes:
         for v in volumes:
             c = getattr(v, 'color', (0.9, 0.9, 0.9))
@@ -409,20 +433,37 @@ def plot2d(x, method='2d', **kwargs):
                 neuron, neuron.segments, modifier=(1, -1, 1))
 
             if method == '2d':
-                # We have to add (None,None,None) to the end of each slab to
-                # make that line discontinuous there
-                coords = np.vstack(
-                    [np.append(t, [[None] * 3], axis=0) for t in coords])
+                if not depth_coloring:
+                    # We have to add (None, None, None) to the end of each slab to
+                    # make that line discontinuous there
+                    coords = np.vstack(
+                        [np.append(t, [[None] * 3], axis=0) for t in coords])
 
-                this_line = mlines.Line2D(coords[:, 0], coords[:, 1],
-                                          lw=linewidth, ls=linestyle,
-                                          alpha=alpha, color=this_color,
-                                          label='{} - #{}'.format(neuron.neuron_name,
-                                                                  neuron.skeleton_id))
+                    this_line = mlines.Line2D(coords[:, 0], coords[:, 1],
+                                              lw=linewidth, ls=linestyle,
+                                              alpha=alpha, color=this_color,
+                                              label='{} - #{}'.format(neuron.neuron_name,
+                                                                      neuron.skeleton_id))
 
-                ax.add_line(this_line)
+                    ax.add_line(this_line)
+                else:
+                    coords = _tn_pairs_to_coords(neuron, modifier=(1, -1, 1))
+                    lc = LineCollection(coords[:, :, [0, 1]],
+                                        cmap='viridis',
+                                        norm=norm)
+                    lc.set_array(neuron.nodes.loc[~neuron.nodes.parent_id.isnull(),
+                                                  'z'].values)
+                    lc.set_linewidth(linewidth)
+                    lc.set_alpha(alpha)
+                    lc.set_linestyle(linestyle)
+                    lc.set_label('{} - #{}'.format(neuron.neuron_name,
+                                                   neuron.skeleton_id))
+                    line = ax.add_collection(lc)
 
                 for n in soma.itertuples():
+                    if depth_coloring:
+                        this_color = mpl.cm.viridis(norm(n.z))
+
                     s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius,
                                         alpha=alpha, fill=True, fc=this_color,
                                         zorder=4, edgecolor='none')
@@ -441,7 +482,8 @@ def plot2d(x, method='2d', **kwargs):
                         lc.set_gid(neuron.neuron_name)
                     ax.add_collection3d(lc)
 
-                # For complex scenes, add each segment as a single collection -> help preventing Z-order errors
+                # For complex scenes, add each segment as a single collection
+                # -> help preventing Z-order errors
                 elif method == '3d_complex':
                     for c in coords:
                         lc = Line3DCollection([c[:, [0, 2, 1]]],
@@ -693,6 +735,9 @@ def plot2d(x, method='2d', **kwargs):
             sbar_z.set_gid('{0}_um'.format(scalebar))
             """
 
+    if depth_coloring and method == '2d':
+        fig.colorbar(line, ax=ax, fraction=.075, shrink=.5, label='Z')
+
     plt.axis('off')
 
     logger.debug('Done. Use matplotlib.pyplot.show() to show plot.')
@@ -714,6 +759,39 @@ def _fix_default_dict(x):
             _ = [x.pop(v) for v in to_delete]
 
     return x
+
+
+def _tn_pairs_to_coords(x, modifier=(1, 1, 1)):
+    """Returns pairs of treenode -> parent node coordinates.
+
+    Parameters
+    ----------
+    x :         {pandas DataFrame, CatmaidNeuron}
+                Must contain the nodes
+    modifier :  ints, optional
+                Use to modify/invert x/y/z axes.
+
+    Returns
+    -------
+    coords :    np.array
+                [ [[x1,y1,z1], [x2,y2,z2]], [[x3,y3,y4], [x4,y4,z4]] ]
+
+    """
+
+    if not isinstance(modifier, np.ndarray):
+        modifier = np.array(modifier)
+
+    nodes = x.nodes[~x.nodes.parent_id.isnull()]
+    tn_co = nodes.loc[:, ['x', 'y', 'z']].values
+    parent_co = x.nodes.set_index('treenode_id').loc[nodes.parent_id.values,
+                                                     ['x', 'y', 'z']].values
+
+    tn_co *= modifier
+    parent_co *= modifier
+
+    coords = np.append(tn_co, parent_co, axis=1)
+
+    return coords.reshape((coords.shape[0], 2, 3))
 
 
 def _segments_to_coords(x, segments, modifier=(1, 1, 1)):
