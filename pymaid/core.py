@@ -493,7 +493,9 @@ class CatmaidNeuron:
         for a in [at for at in temp_att if at not in exclude]:
             try:
                 delattr(self, a)
+                logger.debug('Neuron {}: {} cleared'.format(self.skeleton_id, a))
             except BaseException:
+                logger.debug('Neuron {}: Unable to clear temporary attribute "{}"'.format(self.skeleton_id, a))
                 pass
 
         temp_node_cols = ['flow_centrality', 'strahler_index']
@@ -867,10 +869,11 @@ class CatmaidNeuron:
 
         for n in node:
             prox = graph_utils.cut_neuron(x, n, ret='proximal')
+            # Reinitialise with proximal data
             x.__init__(prox, x._remote_instance, x.meta_data)
-
-        # Clear temporary attributes is done by cut_neuron
-        # x._clear_temp_attr()
+            # Remove potential "left over" attributes (happens if we use a copy)
+            x._clear_temp_attr(exclude=['graph', 'igraph', 'type',
+                                        'classify_nodes'])
 
         if not inplace:
             return x
@@ -902,7 +905,11 @@ class CatmaidNeuron:
 
         for n in node:
             dist = graph_utils.cut_neuron(x, n, ret='distal')
+            # Reinitialise with distal data
             x.__init__(dist, x._remote_instance, x.meta_data)
+            # Remove potential "left over" attributes (happens if we use a copy)
+            x._clear_temp_attr(exclude=['graph', 'igraph', 'type',
+                                        'classify_nodes'])
 
         # Clear temporary attributes is done by cut_neuron
         # x._clear_temp_attr()
