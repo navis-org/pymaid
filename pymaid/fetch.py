@@ -1578,9 +1578,8 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
     Parameters
     ----------
-    x :                 list of connector IDs | CatmaidNeuron | CatmaidNeuronList
-                        Connector ID(s) to retrieve details for. If
-                        CatmaidNeuron/List, will use their connectors.
+    x :                 int | CatmaidNeuron | CatmaidNeuronList
+                        Neurons/Skeleton IDs to retrieve link details for.
     with_tags :         bool, optional
                         If True will also return dictionary of connector tags.
     chunk_size :        int, optional
