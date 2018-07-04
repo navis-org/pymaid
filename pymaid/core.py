@@ -289,7 +289,8 @@ class CatmaidNeuron:
                           'nodes', 'annotations', 'partners', 'review_status',
                           'connectors', 'presynapses', 'postsynapses',
                           'gap_junctions', 'soma', 'root', 'tags',
-                          'n_presynapses', 'n_postsynapses', 'n_connectors']
+                          'n_presynapses', 'n_postsynapses', 'n_connectors',
+                          'bbox']
 
         return list(set(super().__dir__() + add_attributes))
 
@@ -405,6 +406,12 @@ class CatmaidNeuron:
                 else:
                     w = nx.get_edge_attributes(self.graph, 'weight').values()
                 return sum(w) / 1000
+            else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                return 'NA'
+        elif key == 'bbox':
+            if 'nodes' in self.__dict__:
+                return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
@@ -1471,7 +1478,7 @@ class CatmaidNeuronList:
                           'connectors', 'presynapses', 'postsynapses',
                           'gap_junctions', 'soma', 'root', 'tags',
                           'n_presynapses', 'n_postsynapses', 'n_connectors',
-                          'skeleton_id', 'empty', 'shape']
+                          'skeleton_id', 'empty', 'shape', 'bbox']
 
         return list(set(super().__dir__() + add_attributes))
 
@@ -1500,6 +1507,8 @@ class CatmaidNeuronList:
                 this_n['skeleton_id'] = n.skeleton_id
                 data.append(this_n)
             return pd.concat(data, axis=0, ignore_index=True)
+        elif key == 'bbox':
+            return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]
