@@ -739,8 +739,8 @@ def to_swc(x, filename=None, export_synapses=False):
     # Make copy of nodes
     this_tn = x.nodes.copy()
 
-    # Add an index column
-    this_tn.loc[:, 'index'] = list(range(this_tn.shape[0]))
+    # Add an index column (must start with "1", not "0")
+    this_tn.loc[:, 'index'] = list(range(1, this_tn.shape[0] + 1))
 
     # Make a dictionary
     this_tn = this_tn.set_index('treenode_id')

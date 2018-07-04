@@ -467,7 +467,12 @@ def neuron2r(neuron, convert_to_um=False):
         else:
             n_py['connectors'] = robjects.r('NULL')
 
-        n_py['tags'] = robjects.ListVector(n.tags)
+        if n.tags:
+            # Make sure we have integers (not e.g. np.int64)
+            tags = {k : [int(t) for t in v] for k, v in n.tags.items()}
+            n_py['tags'] = robjects.ListVector(tags)
+        else:
+            n_py['tags'] = robjects.r('NULL')
 
         # R neuron objects contain information about URL and response headers
         # -> since we don't have that (yet), we will create the entries but
@@ -535,24 +540,29 @@ def dotprops2py(dp, subset=None):
     return core.Dotprops(df)
 
 
-def nblast_allbyall(x, normalize=True, remote_instance=None, n_cores=os.cpu_count(), UseAlpha=False):
+def nblast_allbyall(x, normalize=True, remote_instance=None,
+                    n_cores=os.cpu_count(), UseAlpha=False):
     """ Wrapper to use R's ``nat:nblast_allbyall``
     (https://github.com/jefferislab/nat.nblast/).
 
+    Notes
+    -----
+    Neurons are automatically resampled to 1 micron.
+
     Parameters
     ----------
-    x :             skeleton IDs | CatmaidNeuronList | RCatmaid neurons
-                    Neurons to blast.
+    x :                 skeleton IDs | CatmaidNeuronList | RCatmaid neurons
+                        Neurons to blast.
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
-    normalize :     bool, optional
-                    If true, matrix is normalized using z-score.
-    n_cores :       int, optional
-                    Number of cores to use for nblasting. Default is
-                    ``os.cpu_count()``.
-    UseAlpha :      bool, optional
-                    Emphasises neurons' straight parts (backbone) over parts
-                    that have lots of branches.
+    normalize :         bool, optional
+                        If true, matrix is normalized using z-score.
+    n_cores :           int, optional
+                        Number of cores to use for nblasting. Default is
+                        ``os.cpu_count()``.
+    UseAlpha :          bool, optional
+                        Emphasises neurons' straight parts (backbone) over
+                        parts that have lots of branches.
 
     Returns
     -------
@@ -652,6 +662,10 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     neuron to nblast either as skeleton ID or neuron object. This essentially
     recapitulates what elmr's (https://github.com/jefferis/elmr) nblast_fafb
     does.
+
+    Notes
+    -----
+    Neurons are automatically resampled to 1 micron.
 
     Parameters
     ----------
