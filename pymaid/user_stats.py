@@ -68,7 +68,7 @@ __all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions',
 
 
 def get_team_contributions(teams, neurons=None, remote_instance=None):
-    """ Get contributions by teams.
+    """ Get contributions by teams: nodes, reviews, connectors, time invested.
 
     Notes
     -----
@@ -87,21 +87,23 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
                           1. Simple user assignments. For example::
 
-                              ``{'teamA': ['user1', 'user2'], 'team2': ['user3'], ...]}``
+                              {'teamA': ['user1', 'user2'],
+                               'team2': ['user3'], ...]}
 
                           2. Users with start and end dates. Start and end date
                              must be either ``datetime.date`` or a single
                              ``pandas.date_range`` object. For example::
 
-                              {
-                               'team1': {
-                                        'user1': (datetime.date(2017, 1, 1), datetime.date(2018, 1, 1)),
-                                        'user2': (datetime.date(2016, 6, 1), datetime.date(2018, 1, 1)
+                               {'team1': {
+                                        'user1': (datetime.date(2017, 1, 1),
+                                                  datetime.date(2018, 1, 1)),
+                                        'user2': (datetime.date(2016, 6, 1),
+                                                  datetime.date(2017, 1, 1)
                                         }
-                               'team2': {
-                                        'user3': pandas.date_range('2017-1-1', '2018-1-1'),
-                                        }
-                              }
+                                'team2': {
+                                        'user3': pandas.date_range('2017-1-1',
+                                                                   '2018-1-1'),
+                                        }}
 
                         Mixing both styles is permissible. For second style,
                         use e.g. ``'user1': None`` for no date restrictions
@@ -426,7 +428,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
 
 def get_time_invested(x, remote_instance=None, minimum_actions=10,
                       treenodes=True, connectors=True, mode='SUM',
-                      max_inactive_time=3):
+                      max_inactive_time=3, start_date=None, end_date=None):
     """ Takes a list of neurons and calculates the time individual users
     have spent working on this set of neurons.
 
@@ -462,6 +464,10 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                             (node/connectors placed/edited) per day.
     max_inactive_time : int, optional
                         Maximal time inactive in minutes.
+    start_date :        None | tuple | datetime.date, optional
+    end_date :          None | tuple | datetime.date, optional
+                        Restricts time invested to window. Applies to creation
+                        but not edition time!
 
     Returns
     -------
@@ -560,6 +566,12 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     elif isinstance(x, core.CatmaidNeuronList):
         skdata = x
 
+    if not isinstance(end_date, (datetime.date, type(None))):
+        end_date = datetime.date(*end_date)
+
+    if not isinstance(start_date, (datetime.date, type(None))):
+        start_date = datetime.date(*start_date)
+
     # Extract connector and node IDs
     node_ids = []
     connector_ids = []
@@ -575,6 +587,22 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
 
     # Get details for links
     link_details = fetch.get_connector_links(skdata)
+
+    # link_details contains all links. We have to subset this to existing
+    # connectors in case the input neurons have been pruned
+    link_details = link_details[link_details.connector_id.isin(connector_ids)]
+
+    # Remove timestamps outside of date range (if provided)
+    if start_date:
+        node_details = node_details[node_details.creation_time >= np.datetime64(
+            start_date)]
+        link_details = link_details[link_details.creation_time >= np.datetime64(
+            start_date)]
+    if end_date:
+        node_details = node_details[node_details.creation_time <= np.datetime64(
+            end_date)]
+        link_details = link_details[link_details.creation_time <= np.datetime64(
+            end_date)]
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
     creation_timestamps = np.append(node_details[['user','creation_time']].values,

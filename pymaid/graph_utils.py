@@ -887,7 +887,12 @@ def reroot_neuron(x, new_root, inplace=False):
 
 
 def cut_neuron(x, cut_node, ret='both'):
-    """ Split neuron at given point. Returns two new neurons.
+    """ Split neuron at given point and returns two new neurons.
+
+    Note
+    ----
+    Split is performed between cut node and its parent node. However, cut node
+    will still be present in both resulting neurons.
 
     Parameters
     ----------
@@ -970,23 +975,22 @@ def _cut_igraph(x, cut_node, ret):
     g = x.igraph.copy()
 
     # Get vertex index
-    cut_node = g.vs.find(node_id=cut_node).index
+    cut_ix = g.vs.find(node_id=cut_node).index
 
     # Get edge to parent
-    e = g.es.find(_source=cut_node)
+    e = g.es.find(_source=cut_ix)
 
     # Remove edge
     g.delete_edges(e)
 
     # Make graph undirected -> otherwise .decompose() throws an error
     # This issue is fixed in the up-to-date branch of igraph-python
-    # (which is not on PYPI...)
+    # (which is not on PyPI O_o )
     g.to_undirected(combine_edges='first')
 
-    # Get subgraph
+    # Get subgraph -> fastest way to get sets of nodes for subsetting
     a, b = g.decompose(mode='WEAK')
-
-    # Important: a,b are now UNDIRECTED graphs -> we must not keep using them.
+    # IMPORTANT: a,b are now UNDIRECTED graphs -> we must not keep using them!
 
     if x.root[0] in a.vs['node_id']:
         dist_graph, prox_graph = b, a
@@ -1004,7 +1008,7 @@ def _cut_igraph(x, cut_node, ret):
         dist._clear_temp_attr(exclude=['igraph', 'type', 'classify_nodes'])
 
     if ret == 'proximal' or ret == 'both':
-        prox = subset_neuron(x, prox_graph.vs['node_id'], clear_temp=False)
+        prox = subset_neuron(x, prox_graph.vs['node_id'] + [cut_node], clear_temp=False)
 
         # Change new root for dist
         prox.nodes.loc[prox.nodes.treenode_id == cut_node, 'type'] = 'end'
@@ -1104,6 +1108,8 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
             Cut neuron at specific point.
 
     """
+    if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
+        x = x[0]
 
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Can only process data of type "CatmaidNeuron", not\

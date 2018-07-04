@@ -280,6 +280,20 @@ class CatmaidNeuron:
                 except BaseException:
                     pass
 
+    def __dir__(self):
+        """ Custom __dir__ to add some parameters that we want to make
+        searchable.
+        """
+        add_attributes = ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
+                          'cable_length', 'root', 'neuron_name',
+                          'nodes', 'annotations', 'partners', 'review_status',
+                          'connectors', 'presynapses', 'postsynapses',
+                          'gap_junctions', 'soma', 'root', 'tags',
+                          'n_presynapses', 'n_postsynapses', 'n_connectors',
+                          'bbox']
+
+        return list(set(super().__dir__() + add_attributes))
+
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
         if 'nodes' in self.__dict__ and \
@@ -335,6 +349,8 @@ class CatmaidNeuron:
         elif key == 'tags':
             self.get_skeleton()
             return self.tags
+        elif key == 'sampling_resolution':
+            return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
             if 'nodes' in self.__dict__:
                 closed = self.tags.get('ends', []) \
@@ -344,36 +360,43 @@ class CatmaidNeuron:
                     + self.tags.get('soma', [])
                 return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed])
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_branch_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'branch'].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_end_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'end'].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes.shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_connectors':
             if 'connectors' in self.__dict__:
                 return self.connectors.shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_presynapses':
             if 'connectors' in self.__dict__:
                 return self.connectors[self.connectors.relation == 0].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'n_postsynapses':
             if 'connectors' in self.__dict__:
                 return self.connectors[self.connectors.relation == 1].shape[0]
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
@@ -384,6 +407,13 @@ class CatmaidNeuron:
                     w = nx.get_edge_attributes(self.graph, 'weight').values()
                 return sum(w) / 1000
             else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                return 'NA'
+        elif key == 'bbox':
+            if 'nodes' in self.__dict__:
+                return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
+            else:
+                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
                 return 'NA'
         else:
             raise AttributeError('Attribute "%s" not found' % key)
@@ -470,7 +500,9 @@ class CatmaidNeuron:
         for a in [at for at in temp_att if at not in exclude]:
             try:
                 delattr(self, a)
+                logger.debug('Neuron {}: {} cleared'.format(self.skeleton_id, a))
             except BaseException:
+                logger.debug('Neuron {}: Unable to clear temporary attribute "{}"'.format(self.skeleton_id, a))
                 pass
 
         temp_node_cols = ['flow_centrality', 'strahler_index']
@@ -844,10 +876,11 @@ class CatmaidNeuron:
 
         for n in node:
             prox = graph_utils.cut_neuron(x, n, ret='proximal')
+            # Reinitialise with proximal data
             x.__init__(prox, x._remote_instance, x.meta_data)
-
-        # Clear temporary attributes is done by cut_neuron
-        # x._clear_temp_attr()
+            # Remove potential "left over" attributes (happens if we use a copy)
+            x._clear_temp_attr(exclude=['graph', 'igraph', 'type',
+                                        'classify_nodes'])
 
         if not inplace:
             return x
@@ -879,7 +912,11 @@ class CatmaidNeuron:
 
         for n in node:
             dist = graph_utils.cut_neuron(x, n, ret='distal')
+            # Reinitialise with distal data
             x.__init__(dist, x._remote_instance, x.meta_data)
+            # Remove potential "left over" attributes (happens if we use a copy)
+            x._clear_temp_attr(exclude=['graph', 'igraph', 'type',
+                                        'classify_nodes'])
 
         # Clear temporary attributes is done by cut_neuron
         # x._clear_temp_attr()
@@ -1431,13 +1468,28 @@ class CatmaidNeuronList:
         """Use skeleton ID here, otherwise this is terribly slow."""
         return len(self.skeleton_id)
 
+    def __dir__(self):
+        """ Custom __dir__ to add some parameters that we want to make
+        searchable.
+        """
+        add_attributes = ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
+                          'cable_length', 'root', 'neuron_name',
+                          'nodes', 'annotations', 'partners', 'review_status',
+                          'connectors', 'presynapses', 'postsynapses',
+                          'gap_junctions', 'soma', 'root', 'tags',
+                          'n_presynapses', 'n_postsynapses', 'n_connectors',
+                          'skeleton_id', 'empty', 'shape', 'bbox']
+
+        return list(set(super().__dir__() + add_attributes))
+
     def __getattr__(self, key):
         if key == 'shape':
             return (self.__len__(),)
         elif key in ['n_nodes', 'n_connectors', 'n_presynapses',
                      'n_postsynapses', 'n_open_ends', 'n_end_nodes',
                      'cable_length', 'tags', 'igraph', 'soma', 'root',
-                     'segments', 'graph', 'n_branch_nodes', 'dps']:
+                     'segments', 'graph', 'n_branch_nodes', 'dps',
+                     'sampling_resolution']:
             self.get_skeletons(skip_existing=True)
             return np.array([getattr(n, key) for n in self.neurons])
         elif key == 'neuron_name':
@@ -1455,6 +1507,8 @@ class CatmaidNeuronList:
                 this_n['skeleton_id'] = n.skeleton_id
                 data.append(this_n)
             return pd.concat(data, axis=0, ignore_index=True)
+        elif key == 'bbox':
+            return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]
