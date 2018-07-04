@@ -21,6 +21,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
+import mpl_toolkits
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.mplot3d import proj3d
 from matplotlib.collections import LineCollection
@@ -255,8 +256,8 @@ def plot2d(x, method='2d', **kwargs):
       neurons by skeleton ID.
 
     ``depth_coloring`` (bool, default = False)
-      If True, will color encode depth (Z). Overrides ``color``. Only works
-      with ``method = '2d'``.
+      If True, will color encode depth (Z). Overrides ``color``. Does not work
+      with ``method = '3d_complex'``.
 
     ``cn_mesh_colors`` (bool, default = False)
       If True, will use the neuron's color for its connectors too.
@@ -382,9 +383,9 @@ def plot2d(x, method='2d', **kwargs):
             raise TypeError('Axis must be 2d.')
 
     # Prepare some stuff for depth coloring
-    if depth_coloring and method != '2d':
+    if depth_coloring and method == '3d_complex':
         raise logger.warning('Depth coloring unavailable for method "{}"'.format(method))
-    elif depth_coloring:
+    elif depth_coloring and method == '2d':
         all_co = skdata.nodes[['x', 'y', 'z']]
         norm = plt.Normalize(vmin=all_co.z.min(), vmax=all_co.z.max())
 
@@ -420,6 +421,8 @@ def plot2d(x, method='2d', **kwargs):
                 lim.append(verts.min(axis=0))
 
     # Create lines from segments
+    line3D_collections = []
+    surf3D_collections = []
     for i, neuron in enumerate(config.tqdm(skdata.itertuples(), desc='Plot neurons',
                                     total=skdata.shape[0], leave=False,
                                     disable=config.pbar_hide)):
@@ -444,12 +447,11 @@ def plot2d(x, method='2d', **kwargs):
                                               alpha=alpha, color=this_color,
                                               label='{} - #{}'.format(neuron.neuron_name,
                                                                       neuron.skeleton_id))
-
                     ax.add_line(this_line)
                 else:
                     coords = _tn_pairs_to_coords(neuron, modifier=(1, -1, 1))
                     lc = LineCollection(coords[:, :, [0, 1]],
-                                        cmap='viridis',
+                                        cmap='jet',
                                         norm=norm)
                     lc.set_array(neuron.nodes.loc[~neuron.nodes.parent_id.isnull(),
                                                   'z'].values)
@@ -462,7 +464,7 @@ def plot2d(x, method='2d', **kwargs):
 
                 for n in soma.itertuples():
                     if depth_coloring:
-                        this_color = mpl.cm.viridis(norm(n.z))
+                        this_color = mpl.cm.jet(norm(n.z))
 
                     s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius,
                                         alpha=alpha, fill=True, fc=this_color,
@@ -470,17 +472,26 @@ def plot2d(x, method='2d', **kwargs):
                     ax.add_patch(s)
 
             elif method in ['3d', '3d_complex']:
+                cmap = mpl.cm.jet if depth_coloring else None
+
                 # For simple scenes, add whole neurons at a time -> will speed up rendering
                 if method == '3d':
-                    lc = Line3DCollection([c[:, [0, 2, 1]] for c in coords],
+                    if depth_coloring:
+                        this_coords = _tn_pairs_to_coords(neuron, modifier=(1, -1, 1))[:, :, [0, 2, 1]]
+                    else:
+                        this_coords = [c[:, [0, 2, 1]] for c in coords]
+
+                    lc = Line3DCollection(this_coords,
                                           color=this_color,
                                           label=neuron.neuron_name,
                                           alpha=alpha,
+                                          cmap = cmap,
                                           lw=linewidth,
                                           linestyle=linestyle)
                     if group_neurons:
                         lc.set_gid(neuron.neuron_name)
                     ax.add_collection3d(lc)
+                    line3D_collections.append(lc)
 
                 # For complex scenes, add each segment as a single collection
                 # -> help preventing Z-order errors
@@ -488,7 +499,8 @@ def plot2d(x, method='2d', **kwargs):
                     for c in coords:
                         lc = Line3DCollection([c[:, [0, 2, 1]]],
                                               color=this_color,
-                                              lw=linewidth, alpha=alpha,
+                                              lw=linewidth,
+                                              alpha=alpha,
                                               linestyle=linestyle)
                         if group_neurons:
                             lc.set_gid(neuron.neuron_name)
@@ -498,6 +510,7 @@ def plot2d(x, method='2d', **kwargs):
                 lim.append(coords.max(axis=0))
                 lim.append(coords.min(axis=0))
 
+                surf3D_collections.append([])
                 for n in soma.itertuples():
                     resolution = 20
                     u = np.linspace(0, 2 * np.pi, resolution)
@@ -510,6 +523,8 @@ def plot2d(x, method='2d', **kwargs):
                         x, z, y, color=this_color, shade=False, alpha=alpha)
                     if group_neurons:
                         surf.set_gid(neuron.neuron_name)
+
+                    surf3D_collections[-1].append(surf)
 
         if connectors or connectors_only:
             if not cn_mesh_colors:
@@ -735,8 +750,54 @@ def plot2d(x, method='2d', **kwargs):
             sbar_z.set_gid('{0}_um'.format(scalebar))
             """
 
-    if depth_coloring and method == '2d':
-        fig.colorbar(line, ax=ax, fraction=.075, shrink=.5, label='Z')
+    def set_depth():
+        """Sets depth information for neurons according to camera position."""
+
+        # Get camera normal vector
+        alpha= ax.azim*np.pi/180.
+        beta= ax.elev*np.pi/180.
+        n = np.array([np.cos(alpha)*np.sin(beta),
+                      np.sin(alpha)*np.cos(beta),
+                      np.sin(beta)])
+
+        # Modifier for coordinates
+        modifier = np.array([1, 1, -1])
+
+        # Calculate min and max z from this position
+        ns = -np.dot(n, (skdata.nodes[['x','z','y']].values * modifier).T)
+        z_min, z_max = min(ns), max(ns)
+
+        # Go over all neurons and update Z information
+        for neuron, lc, surf in zip(skdata, line3D_collections, surf3D_collections):
+            # Can't use root node -> this is not part of the line collection
+            nodes = neuron.nodes[~neuron.nodes.parent_id.isnull()]
+
+            # Get all coordinates and get relative Z position
+            ns = -np.dot(n, (nodes[['x','z','y']].values * modifier).T)
+            # Use zalpha to map to
+            color = [1,0,0,1]
+            #cs = np.array(mpl_toolkits.mplot3d.art3d.zalpha(color, ns))[:,3] * -1 + 1
+            cs = (ns - z_min) / (z_max - z_min)
+            lc.set_array(cs)
+
+            # Get depth of soma(s)
+            soma_co = neuron.nodes[neuron.nodes.radius > 1][['x','z','y']].values
+            soma_ns = -np.dot(n, (soma_co * modifier).T)
+            soma_cs = (soma_ns - z_min) / (z_max - z_min)
+
+            # Set
+            for cs, s in zip(soma_cs, surf):
+                s.set_color(cmap(cs))
+
+    def Update(event):
+        set_depth()
+
+    if depth_coloring:
+        if method == '2d':
+            fig.colorbar(line, ax=ax, fraction=.075, shrink=.5, label='Depth')
+        elif method == '3d':
+            fig.canvas.mpl_connect('draw_event', Update)
+            set_depth()
 
     plt.axis('off')
 
