@@ -1287,7 +1287,7 @@ class CatmaidNeuronList:
 
     """
 
-    def __init__(self, x, remote_instance=None, make_copy=True,
+    def __init__(self, x, remote_instance=None, make_copy=False,
                  _use_parallel=False):
         """ Initialize CatmaidNeuronList.
 
