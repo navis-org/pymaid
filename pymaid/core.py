@@ -207,9 +207,10 @@ class CatmaidNeuron:
                             Data to construct neuron from.
         remote_instance :   CatmaidInstance, optional
                             Storing this makes it more convenient to retrieve
-                            e.g. neuron annotations, review status, etc.
+                            e.g. neuron annotations, review status, etc. If
+                            not provided, will try using global CatmaidInstance.
         meta_data :         dict, optional
-                            any additional data
+                            Any additional data to attach to neuron.
         """
         if isinstance(x, (pd.DataFrame, CatmaidNeuronList)):
             if x.shape[0] == 1:
@@ -1254,7 +1255,7 @@ class CatmaidNeuronList:
                         Number of cores to use. Default ``os.cpu_count()-1``.
     _use_threading :    bool (default=True)
                         If True, will use parallel threads. Should be slightly
-                        up to a lot faster depending of the numbers of cores.
+                        up to a lot faster depending on the numbers of cores.
                         Switch off if you experience performance issues.
 
     Examples
@@ -1293,21 +1294,18 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        x
-                            Data to construct neuron from. Can be either:
+        x :                 int | list | array | CatmaidNeuron/List
+                            Data to construct neuronlist from. Can be either:
 
                             1. skeleton ID(s)
-                            2. CatmaidNeuronList (will create a deep copy)
-                            3. pandas DataFrame
+                            2. CatmaidNeuron(s)
+                            3. CatmaidNeuronList(s)
         remote_instance :   CatmaidInstance, optional
-                            Storing this makes it more convenient to retrieve
-                            e.g. neuron annotations, review status, etc.
-        meta_data :         dict, optional
-                            Any additional data
+                            If not provided, will try extracting from input
+                            or from global CatmaidInstance.
         make_copy :         boolean, optional
-                            If true, DataFrames are copied [.copy()] before
-                            being assigned to the neuron object to prevent
-                            backpropagation of subsequent changes to the data.
+                            If True, CatmaidNeurons are deepcopied before
+                            being assigned to the neuronlist.
         """
 
         # Set number of cores
@@ -2256,7 +2254,7 @@ class CatmaidNeuronList:
         Returns
         -------
         :class:`pymaid.CatmaidNeuronList`
-                        Neurons that have given annotation(s).
+                          Neurons that have given annotation(s).
 
         Examples
         --------
@@ -2266,7 +2264,7 @@ class CatmaidNeuronList:
         >>> nl.has_annotation(['test1','test2'])
         >>> # Get neurons that have BOTH "test1" and "test2"
         >>> nl.has_annotation(['test1','test2'], intersect=True)
-        >>> # Get neurons that have "test1" but not "test2"
+        >>> # Get neurons that have "test1" but NOT "test2"
         >>> nl.has_annotation(['test1','~test2'])
 
         """
@@ -2482,7 +2480,7 @@ class Dotprops(pd.DataFrame):
     See Also
     --------
     :func:`pymaid.rmaid.dotprops2py`
-        Converts R dotprops to core.Dotprops
+        Converts R dotprops to :class:`~pymaid.Dotprops`.
 
     Notes
     -----
@@ -2543,7 +2541,7 @@ class Volume:
 
         Returns
         -------
-        volume
+        :class:`~pymaid.Volume`
         """
 
         if isinstance(x, Volume):
@@ -2648,10 +2646,10 @@ class Volume:
 
         Returns
         -------
-        None
-                    If ``inplace=False``.
         :class:`pymaid.Volume`
                     Resized copy of original volume. Only if ``inplace=True``.
+        Nothing
+                    If ``inplace=False``.
         """
         if not inplace:
             x = self.copy()
@@ -2690,7 +2688,7 @@ class Volume:
         Examples
         --------
         >>> vol = pymaid.get_volume('v13.LH_R')
-        >>> vol.plot3d( color = (255,0,0) )
+        >>> vol.plot3d(color = (255, 0, 0))
         """
 
         from pymaid import plotting
@@ -2729,7 +2727,7 @@ class Volume:
         -------
         list
                     Coordinates of 2d circumference.
-                    e.g. [(x1,y1,z1),(x2,y2,z2),(x3,y3,z3),...]
+                    e.g. [(x1, y1, z1), (x2, y2, z2), (x3, y3, z3), ...]
                     Third dimension is averaged
         """
 
