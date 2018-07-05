@@ -898,20 +898,25 @@ def cut_neuron(x, cut_node, ret='both'):
     ----------
     x :        CatmaidNeuron | CatmaidNeuronList
                Must be a single neuron.
-    cut_node : int | str
-               Node ID or a tag of the node to cut.
+    cut_node : int | str | list
+               Node ID(s) or a tag(s) of the node(s) to cut. Multiple cuts are
+               performed in the order of ``cut_node``.
     ret :      'proximal' | 'distal' | 'both', optional
                Define which parts of the neuron to return. Use this to speed
-               up processing.
+               up processing when making only a single cut!
 
     Returns
     -------
-    (distal, proximal)
-                Distal and proximal part of the neuron. Only if ``ret='both'``.
-    distal
-                Distal part of the neuron. Only if ``ret='distal'``.
-    proximal
-                Proximal part of the neuron. Only if ``ret='proximal'``.
+    distal, proximal :      CatmaidNeuronList
+                            Distal and proximal part of the neuron. Only if
+                            ``ret='both'``. The order is only guaranteed in
+                            case of single cuts.
+    distal :                CatmaidNeuronList
+                            Distal part of the neuron. Only if
+                            ``ret='distal'``.
+    proximal :              CatmaidNeuronList
+                            Proximal part of the neuron. Only if
+                            ``ret='proximal'``.
 
     Examples
     --------
@@ -949,25 +954,51 @@ def cut_neuron(x, cut_node, ret='both'):
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
-    # If cut_node is a tag (rather than an ID), try finding that node
-    if isinstance(cut_node, str):
-        if cut_node not in x.tags:
-            raise ValueError(
-                '#%s: Found no treenode with tag %s - please double check!' % (str(x.skeleton_id), str(cut_node)))
+    # Turn cut node into iterable
+    if not utils._is_iterable(cut_node):
+        cut_node = [cut_node]
 
-        elif len(x.tags[cut_node]) > 1:
-            raise ValueError(
-                '#%s: Found multiple treenode with tag %s - please double check!' % (str(x.skeleton_id), str(cut_node)))
+    # Process cut nodes (i.e. if tag)
+    cn_ids = []
+    for cn in cut_node:
+        # If cut_node is a tag (rather than an ID), try finding that node
+        if isinstance(cn, str):
+            if cn not in x.tags:
+                raise ValueError(
+                    '#{}: Found no treenode with tag {} - please double check!'.format(x.skeleton_id, cn))
+            cn_ids += x.tags[cn]
+        elif cn not in x.nodes.treenode_id.values:
+            raise ValueError('No treenode with ID "{}" found.'.format(cn))
         else:
-            cut_node = x.tags[cut_node][0]
-    elif cut_node not in x.nodes.treenode_id.values:
-        raise ValueError('No treenode with ID "{}" found.'.format(cut_node))
+            cn_ids.append(cn)
 
-    if x.igraph and config.use_igraph:
-        return _cut_igraph(x, cut_node, ret)
-    else:
-        return _cut_networkx(x, cut_node, ret)
+    # Remove duplicates while retaining order - set() would mess that up
+    seen = set()
+    cn_ids = [x for x in cn_ids if not (x in seen or seen.add(x))]
 
+    # Warn if not all returned
+    if len(cn_ids) > 1 and ret != 'both':
+        logger.warning('Multiple cuts should use `ret = True`.')
+
+    # Go over all cut_nodes -> order matters!
+    res = core.CatmaidNeuronList(x)
+    for cn in cn_ids:
+        # First, find out in which neuron the cut node is
+        to_cut = [n for n in res if cn in n.nodes.treenode_id.values][0]
+
+        # Remove this neuron from results (will be cut into two)
+        res -= to_cut
+
+        # Cut neuron
+        if x.igraph and config.use_igraph:
+            cut =  _cut_igraph(x, cn, ret)
+        else:
+            cut = _cut_networkx(x, cn, ret)
+
+        # Add result back to results
+        res += cut
+
+    return res
 
 def _cut_igraph(x, cut_node, ret):
     """Uses iGraph to cut a neuron."""
