@@ -1586,7 +1586,7 @@ class CatmaidNeuronList:
                                      make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_add):
             if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
-                return CatmaidNeuronList(self.neurons + to_add,
+                return CatmaidNeuronList(self.neurons + list(to_add),
                                          make_copy=self.copy_on_subset)
             else:
                 return CatmaidNeuronList(self.neurons
