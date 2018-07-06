@@ -900,17 +900,19 @@ def cut_neuron(x, cut_node, ret='both'):
                Must be a single neuron.
     cut_node : int | str | list
                Node ID(s) or a tag(s) of the node(s) to cut. Multiple cuts are
-               performed in the order of ``cut_node``.
+               performed in the order of ``cut_node``. Fragments are ordered
+               distal -> proximal.
     ret :      'proximal' | 'distal' | 'both', optional
                Define which parts of the neuron to return. Use this to speed
                up processing when making only a single cut!
 
     Returns
     -------
-    distal, proximal :      CatmaidNeuronList
+    distal -> proximal :    CatmaidNeuronList
                             Distal and proximal part of the neuron. Only if
-                            ``ret='both'``. The distal->proximal order is only
-                            guaranteed in case of single cuts.
+                            ``ret='both'``. The distal->proximal order of
+                            fragments is tried to be maintained for multiple
+                            cuts but is not guaranteed.
     distal :                CatmaidNeuronList
                             Distal part of the neuron. Only if
                             ``ret='distal'``.
@@ -998,24 +1000,27 @@ def cut_neuron(x, cut_node, ret='both'):
         logger.warning('Multiple cuts should use `ret = True`.')
 
     # Go over all cut_nodes -> order matters!
-    res = core.CatmaidNeuronList(x)
+    res = [x]
     for cn in cn_ids:
         # First, find out in which neuron the cut node is
         to_cut = [n for n in res if cn in n.nodes.treenode_id.values][0]
+        to_cut_ix = res.index(to_cut)
 
         # Remove this neuron from results (will be cut into two)
-        res -= to_cut
+        res.remove(to_cut)
 
         # Cut neuron
         if x.igraph and config.use_igraph:
-            cut =  _cut_igraph(x, cn, ret)
+            dist, prox = _cut_igraph(to_cut, cn, ret)
         else:
-            cut = _cut_networkx(x, cn, ret)
+            dist, prox = _cut_networkx(to_cut, cn, ret)
 
-        # Add result back to results
-        res += cut
+        # Add results back to results at same index
+        res.insert(to_cut_ix, prox)
+        res.insert(to_cut_ix, dist)
 
-    return res
+    return core.CatmaidNeuronList(res)
+
 
 def _cut_igraph(x, cut_node, ret):
     """Uses iGraph to cut a neuron."""
