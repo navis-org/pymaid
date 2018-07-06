@@ -283,7 +283,7 @@ def _eval_remote_instance(remote_instance, raise_error=True):
     return remote_instance
 
 
-def eval_skids(x, remote_instance=None):
+def eval_skids(x, remote_instance=None, warn_duplicates=True):
     """ Evaluate skeleton IDs. Will turn annotations and neuron names into
     skeleton IDs.
 
@@ -300,8 +300,11 @@ def eval_skids(x, remote_instance=None):
                         - else will be assumed to be neuron names
                     3. For CatmaidNeuron/List or pandas.DataFrames/Series:
                         - will look for ``skeleton_id`` attribute
-    remote_instance : CatmaidInstance, optional
-                      If not passed directly, will try using global.
+    remote_instance :  CatmaidInstance, optional
+                       If not passed directly, will try using global.
+    warn_duplicates :  bool, optional
+                       If True, will warn if duplicate skeleton IDs are found.
+                       Only applies to CatmaidNeuronLists.
 
     Returns
     -------
@@ -345,8 +348,15 @@ def eval_skids(x, remote_instance=None):
     elif isinstance(x, core.CatmaidNeuron):
         return [x.skeleton_id]
     elif isinstance(x, core.CatmaidNeuronList):
+        if len(x.skeleton_id) != len(set(x.skeleton_id)) and warn_duplicates:
+            logger.warning('Duplicate skeleton IDs found in neuronlist. ' +
+                           'The function you are using might not respect ' +
+                           'fragments of the same neuron. For explanation see ' +
+                           'http://pymaid.readthedocs.io/en/latest/source/connectivity_analysis.html.')
         return list(x.skeleton_id)
     elif isinstance(x, pd.DataFrame):
+        if 'skeleton_id' not in x.columns:
+            raise ValueError('Expect "skeleton_id" column in pandas DataFrames')
         return x.skeleton_id.tolist()
     elif isinstance(x, pd.Series):
         if x.name == 'skeleton_id':
