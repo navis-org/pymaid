@@ -638,9 +638,9 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
     Parameters
     ----------
-    source,target : CatmaidNeuron | CatmaidNeuronList
+    source,target : skeleton IDs | CatmaidNeuron | CatmaidNeuronList
                     Neuron(s) for which to generate adjacency matrix.
-                    If ``target==None``, will use ``targets=sources``.
+                    If ``target==None``, will use ``target=source``.
 
     Returns
     -------
@@ -680,12 +680,15 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
+    if not isinstance(source, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        skids = utils.eval_skids(source)
+        source = fetch.get_neuron(skids, remote_instance=remote_instance)
+
     if isinstance(target, type(None)):
         target = source
-
-    for _ in [source, target]:
-        if not isinstance(_, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            raise TypeError('Need CatmaidNeuron/List, got "{}"'.format(type(_)))
+    elif not isinstance(target, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        skids = utils.eval_skids(target)
+        target = fetch.get_neuron(skids, remote_instance=remote_instance)
 
     if isinstance(source, core.CatmaidNeuron):
         source = core.CatmaidNeuronList(source)
@@ -698,7 +701,7 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
     # Get connector details for all neurons
     all_cn = list(set(np.append(source.connectors.connector_id.values,
-                           target.connectors.connector_id.values)))
+                                target.connectors.connector_id.values)))
     cn_details = fetch.get_connector_details(all_cn)
 
     # Now go over all source neurons and process connections
@@ -721,7 +724,7 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
             # Now figure out how many links are between this connector and
             # the target
             n_links = sum([len(t_tn & set(r.postsynaptic_to_node))
-                                    for r in this_t.itertuples()])
+                           for r in this_t.itertuples()])
 
             adj[i][k] = n_links
 
