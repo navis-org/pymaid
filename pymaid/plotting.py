@@ -526,7 +526,7 @@ def plot2d(x, method='2d', **kwargs):
 
                     surf3D_collections[-1].append(surf)
 
-        if connectors or connectors_only:
+        if (connectors or connectors_only) and not neuron.connectors.empty:
             if not cn_mesh_colors:
                 cn_types = {0: 'red', 1: 'blue', 2: 'green', 3: 'magenta'}
             else:
