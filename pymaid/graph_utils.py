@@ -909,8 +909,8 @@ def cut_neuron(x, cut_node, ret='both'):
     -------
     distal, proximal :      CatmaidNeuronList
                             Distal and proximal part of the neuron. Only if
-                            ``ret='both'``. The order is only guaranteed in
-                            case of single cuts.
+                            ``ret='both'``. The distal->proximal order is only
+                            guaranteed in case of single cuts.
     distal :                CatmaidNeuronList
                             Distal part of the neuron. Only if
                             ``ret='distal'``.
@@ -920,14 +920,31 @@ def cut_neuron(x, cut_node, ret='both'):
 
     Examples
     --------
-    >>> # Example for multiple cuts
+    First example: single cut at node tag
+
     >>> import pymaid
     >>> rm = pymaid.CatmaidInstance(url, http_user, http_pw, token)
-    >>> n = pymaid.get_neuron(skeleton_id)
-    >>> # First cut
-    >>> nA, nB = cut_neuron2( n, cut_node1 )
-    >>> # Second cut
-    >>> nD, nE = cut_neuron2( nA, cut_node2 )
+    >>> n = pymaid.get_neuron(16)
+    >>> # Cut neuron
+    >>> nl = cut_neuron(n, 'SCHLEGEL_LH')
+    >>> nl
+    <class 'pymaid.core.CatmaidNeuronList'> of 2 neurons
+                     neuron_name skeleton_id  n_nodes  n_connectors  \
+    0  PN glomerulus VA6 017 DB          16     3603          1295
+    1  PN glomerulus VA6 017 DB          16     9142           741
+
+       n_branch_nodes  n_end_nodes  open_ends  cable_length review_status   soma
+    0             303          323          3    960.118516            NA  False
+    1             471          501        278   1905.986926            NA   True
+
+    Second example: multiple cuts at low confidence edges
+
+    >>> # Get neuron
+    >>> n = pymaid.get_neuron(27295)
+    >>> # Get IDs of low confidence treenodes
+    >>> lc = n.nodes[n.nodes.confidence < 5].treenode_id.values
+    >>> # Cut neuron
+    >>> nl = pymaid.cut_neuron(n, lc)
 
     See Also
     --------
