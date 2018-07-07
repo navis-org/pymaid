@@ -1157,7 +1157,7 @@ def get_names(x, remote_instance=None):
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         Either pass directly to function or define
                         globally as ``remote_instance``.
 
@@ -1414,7 +1414,7 @@ def get_edges(x, remote_instance=None):
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -1684,7 +1684,7 @@ def get_connector_details(x, remote_instance=None):
     x :                 list of connector IDs | CatmaidNeuron | CatmaidNeuronList
                         Connector ID(s) to retrieve details for. If
                         CatmaidNeuron/List, will use their connectors.
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -2054,7 +2054,6 @@ def get_user_annotations(x, remote_instance=None):
 
                         1. single or list of user IDs
                         2. single or list of user login names
-
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
@@ -2359,7 +2358,7 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     Returns
     -------
     dict
-                        ``{ 'skid1' : True, 'skid2' : False, ...}``
+                        ``{'skid1': True, 'skid2': False, ...}``
 
     Note
     ----
@@ -2410,7 +2409,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                         Name(s) to search for.
     allow_partial :     bool, optional
                         If True, partial matches are returned too.
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -2424,6 +2423,12 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
         1
         2
 
+    See Also
+    --------
+    :func:`pymaid.find_neurons`
+                            Use to retrieve neurons by combining various
+                            search criteria. For example names, reviewers,
+                            annotations, etc.
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -2472,6 +2477,12 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     list
                             ``[skid1, skid2, skid3 ]``
 
+    See Also
+    --------
+    :func:`pymaid.find_neurons`
+                            Use to retrieve neurons by combining various
+                            search criteria. For example names, reviewers,
+                            annotations, etc.
     """
 
     """
@@ -2584,7 +2595,7 @@ def get_treenode_info(x, remote_instance=None):
     x                   CatmaidNeuron | CatmaidNeuronList | list of treenode IDs
                         Single or list of treenode IDs. If CatmaidNeuron/List,
                         details for all it's treenodes are requested.
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -2624,7 +2635,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     node_type :         'TREENODE' | 'CONNECTOR'
                         Set which node type of IDs you have provided as they
                         use different API endpoints!
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -2665,13 +2676,14 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
 
 def delete_neuron(x, no_prompt=False, remote_instance=None):
     """ Completely delete neurons. Use this with EXTREME caution
-    as this is not reversible!
+    as this is irreversible!
 
     Important
     ---------
     Deletes a neuron if (and only if!) two things are the case:
-    1. You own all treenodes of the skeleton making up the neuron in question
-    2. The neuron is not annotated by other users
+
+     1. You own all treenodes of the skeleton making up the neuron in question
+     2. The neuron is not annotated by other users
 
     Parameters
     ----------
@@ -2738,7 +2750,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     node_type :         'TREENODE' | 'CONNECTOR'
                         Set which node type of IDs you have provided as they
                         use different API endpoints!
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -2753,19 +2765,19 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
     Examples
     --------
-    Use this to clean up end-related tags from non-end treenodes
+    Remove end-related tags from non-end treenodes
 
     >>> import pymaid
     >>> # Load neuron
     >>> n = pymaid.get_neuron( 16 )
     >>> # Get non-end nodes
-    >>> non_leaf_nodes = n.nodes[ n.nodes.type != 'end' ]
+    >>> non_leaf_nodes = n.nodes[n.nodes.type != 'end']
     >>> # Define which tags to remove
-    >>> tags_to_remove = ['ends','uncertain end','uncertain continuation','TODO']
+    >>> tags_to_remove = ['ends', 'uncertain end', 'uncertain continuation', 'TODO']
     >>> # Remove tags
-    >>> resp = pymaid.delete_tags(  non_leaf_nodes.treenode_id.tolist(),
-    ...                             tags_to_remove,
-    ...                             'TREENODE')
+    >>> resp = pymaid.delete_tags( non_leaf_nodes.treenode_id.tolist(),
+    ...                            tags_to_remove,
+    ...                            'TREENODE')
     2017-08-09 14:08:36,102 - pymaid.pymaid - WARNING - Skipping 8527 nodes without tags
     >>> # Above warning means that most nodes did not have ANY tags
 
@@ -2823,17 +2835,17 @@ def add_tags(node_list, tags, node_type, remote_instance=None,
                         Treenode or connector IDs to edit.
     tags :              str | list | dict
                         Tags(s) to add to provided treenode/connector ids. If
-                        a dictionary is provided `{node_id1: [tag1,tag2], ...}`
+                        a dictionary is provided `{node_id: [tag1, tag2], ...}`
                         each node gets individual tags. If string or list
                         are provided, all nodes will get the same tags.
     node_type :         'TREENODE' | 'CONNECTOR'
                         Set which node type of IDs you have provided as they
                         use different API endpoints!
-    override_existing : bool, default=False
+    override_existing : bool, default = False
                         This needs to be set to True if you want to delete a
                         tag. Otherwise, your tags (even if empty) will not
                         override existing tags.
-    remote_instance :   CATMAID instance
+    remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -2903,6 +2915,12 @@ def get_segments(x, remote_instance=None):
                 List of treenode IDs, ordered by length. If multiple neurons
                 are requested, returns a dict { skid : [], ... }
 
+    See Also
+    --------
+    ``CatmaidNeuron.segments``
+    ``CatmaidNeuron.short_segments``
+                Use these :class:`pymaid.CatmaidNeuron` attributes to access
+                segments generated by pymaid (faster).
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -3121,7 +3139,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     separate :          bool, optional
-                        If true, stats are given per neuron
+                        If true, stats are given per neuron.
     max_threads :       int, optional
                         Maximum parallel data requests. Overrides
                         ``CatmaidInstance.max_threads``.
@@ -3277,8 +3295,8 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
     end_date :          datetime | list of integers, optional
                         If list: ``[year, month, day]``
                         Only consider neurons created before.
-    reviewed_by :       int | str, optional
-                        User ID (int) or login name (str) of reviewer.
+    reviewed_by :       int | str | list, optional
+                        User ID(s) (int) or login name(s) (str) of reviewer.
 
     Returns
     -------
@@ -3353,8 +3371,8 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
         if utils._is_iterable(reviewed_by):
             skid_list = list()
             for u in config.tqdm(reviewed_by, desc='Get revs',
-                          disable=config.pbar_hide,
-                          leave=config.pbar_leave):
+                                 disable=config.pbar_hide,
+                                 leave=config.pbar_leave):
                 skid_list += get_neuron_list(remote_instance=remote_instance,
                                              user=user,
                                              node_count=node_count,
@@ -3443,10 +3461,10 @@ def get_history(remote_instance=None,
     --------
     >>> import matplotlib.pyplot as plt
     >>> import pymaid
-    >>> rm = pymaid.CatmaidInstance(    'server_url',
-    ...                                 'http_user',
-    ...                                 'http_pw',
-    ...                                 'token')
+    >>> rm = pymaid.CatmaidInstance( 'server_url',
+    ...                              'http_user',
+    ...                              'http_pw',
+    ...                              'token')
     >>> # Get last week's history (using the default start/end dates)
     >>> hist = pymaid.get_history( remote_instance = rm )
     >>> # Plot cable created by all users over time
@@ -3986,13 +4004,17 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     Returns
     -------
     list
-                            ``[ skeleton_id, skeleton_id, ... ]``
+                            ``[skeleton_id, skeleton_id, ...]``
 
     See Also
     --------
     :func:`~pymaid.get_partners_in_volume`
                             Get only partners that make connections within a
-                            given volume
+                            given volume.
+    :func:`pymaid.find_neurons`
+                            Use to retrieve neurons by combining various
+                            search criteria. For example names, reviewers,
+                            annotations, etc.
 
     Examples
     --------
@@ -4008,12 +4030,6 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     >>> # Filter neurons with more than 100um of cable in the volume
     >>> n = lh_neurons[ lh_pruned.cable_length > 100  ]
 
-    """
-
-    """
-    logger.warning(
-            "Deprecationwarning: get_neurons_in_volume() is deprecated, use find_neurons() instead."
-        )
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -4069,8 +4085,8 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
     bbox :                  np.ndarray | list, dict
                             Coordinates of the bounding box. Can be either:
 
-                              (1) list/np.ndarray: [[left,right],[top,bottom],[z1,z2]]
-                              (2) dictionary with above entries
+                              1. List/np.array: ``[[left, right], [top, bottom], [z1, z2]]``
+                              2. Dictionary with above entries.
     unit :                  'NM' | 'PIXEL'
                             Unit of your coordinates. Attention:
                             'PIXEL' will also assume that Z1/Z2 is in slices.
@@ -4311,7 +4327,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
 
     networkx.DiGraph
                 Only if ``return_graph=True``. Graph contains all neurons that
-                connect sources and targets. **Important** Does only contain
+                connect sources and targets. **Important**: Does only contain
                 edges that connect sources and targets via max ``n_hops``!
                 Other edges have been removed.
 
@@ -4554,7 +4570,6 @@ def get_annotation_list(remote_instance=None):
               annotation_id   annotation   users
             0
             1
-
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -4600,11 +4615,12 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     --------
     >>> # Get URL for a single coordinate
     >>> url = pymaid.url_to_coordinates([1000,1000,1000], stack_id=5)
-    >>> # Get URLs for all presynapses of a neuron
-    >>> n = pymaid.get_neuron(16)
-    >>> urls = pymaid.url_to_coordinates( n.presynapses[['x','y','z']],
-                                          stack_id = 5,
-                                          active_node_id = n.presynapses.connector_id.values)
+    >>> # Get URLs for all low-confidence nodes of a neuron
+    >>> n = pymaid.get_neuron(27295)
+    >>> low_c = n.nodes.loc[n.nodes.confidence < 5]
+    >>> urls = pymaid.url_to_coordinates(low_c[['x','y','z']].values,
+                                         stack_id = 5,
+                                         active_node_id = low_c.treenode_id.values)
     """
 
     def gen_url(c, stid, nid, sid):
@@ -4679,6 +4695,17 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
                         renaming neuron(s). Set this to True to skip that step.
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
+
+    Examples
+    --------
+    Add your initials to a set of neurons
+
+    >>> # Get their current names
+    >>> names = pymaid.get_names('annotation:Philipps neurons')
+    >>> # Add initials to names
+    >>> new_names = {skid : name + ' PS' for skid, name in names.items()}
+    >>> # Rename neurons
+    >>> pymaid.rename_neurons(list(names.keys()), new_names)
 
     Returns
     -------

@@ -934,7 +934,6 @@ def cut_neuron(x, cut_node, ret='both'):
                      neuron_name skeleton_id  n_nodes  n_connectors  \
     0  PN glomerulus VA6 017 DB          16     3603          1295
     1  PN glomerulus VA6 017 DB          16     9142           741
-
        n_branch_nodes  n_end_nodes  open_ends  cable_length review_status   soma
     0             303          323          3    960.118516            NA  False
     1             471          501        278   1905.986926            NA   True
@@ -950,10 +949,10 @@ def cut_neuron(x, cut_node, ret='both'):
 
     See Also
     --------
-    :func:`~pymaid.CatmaidNeuron.prune_distal_to`
-    :func:`~pymaid.CatmaidNeuron.prune_proximal_to`
+    :func:`pymaid.CatmaidNeuron.prune_distal_to`
+    :func:`pymaid.CatmaidNeuron.prune_proximal_to`
             ``CatmaidNeuron/List`` shorthands to this function.
-    :func:`~pymaid.subset_neuron`
+    :func:`pymaid.subset_neuron`
             Returns a neuron consisting of a subset of its treenodes.
 
     """
@@ -993,7 +992,7 @@ def cut_neuron(x, cut_node, ret='both'):
 
     # Remove duplicates while retaining order - set() would mess that up
     seen = set()
-    cn_ids = [x for x in cn_ids if not (x in seen or seen.add(x))]
+    cn_ids = [cn for cn in cn_ids if not (cn in seen or seen.add(cn))]
 
     # Warn if not all returned
     if len(cn_ids) > 1 and ret != 'both':
@@ -1155,10 +1154,24 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
     -------
     CatmaidNeuron
 
+    Examples
+    --------
+    Subset neuron to presynapse-bearing branches
+
+    >>> # Get neuron
+    >>> n = pymaid.get_neuron(16)
+    >>> # Go over each segment and find those with synapses
+    >>> cn_nodes = set(n.presynapses.treenode_id.values)
+    >>> syn_segs = [s for s in n.small_segments if set(s) & set(cn_nodes)]
+    >>> # Flatten segments into list of nodes
+    >>> syn_branches = [n for s in syn_segs for n in s]
+    >>> # Subset neuron
+    >>> axon = pymaid.subset_neuron(n, syn_branches)
+
     See Also
     --------
     :func:`~pymaid.cut_neuron`
-            Cut neuron at specific point.
+            Cut neuron at specific points.
 
     """
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
