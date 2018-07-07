@@ -1010,13 +1010,17 @@ def cut_neuron(x, cut_node, ret='both'):
 
         # Cut neuron
         if x.igraph and config.use_igraph:
-            dist, prox = _cut_igraph(to_cut, cn, ret)
+            cut = _cut_igraph(to_cut, cn, ret)
         else:
-            dist, prox = _cut_networkx(to_cut, cn, ret)
+            cut = _cut_networkx(to_cut, cn, ret)
 
-        # Add results back to results at same index
-        res.insert(to_cut_ix, prox)
-        res.insert(to_cut_ix, dist)
+        # If ret != 'both', we will get only a single neuron
+        if not utils._is_iterable:
+            cut = [cut]
+
+        # Add results back to results at same index, proximal first
+        for c in cut[::-1]:
+            res.insert(to_cut_ix, c)
 
     return core.CatmaidNeuronList(res)
 
