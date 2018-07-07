@@ -1899,7 +1899,7 @@ def _neuron2vispy(x, **kwargs):
     ----------
     x :               CatmaidNeuron | CatmaidNeuronList
                       Neuron(s) to plot.
-    color :           list | tuple | array
+    color :           list | tuple | array | str
                       Color to use for plotting.
     colormap :        tuple | dict | array
                       Color to use for plotting. Dictionaries should be mapped
@@ -1977,6 +1977,10 @@ def _neuron2vispy(x, **kwargs):
             neuron_color = colormap[str(neuron.skeleton_id)]
         except:
             neuron_color = kwargs.get('color', (0, 0, 0))
+
+        # Convert color from str to RGB
+        if isinstance(neuron_color, str):
+            neuron_color = mcl.to_rgb(neuron_color)
 
         # Convert color 0-1
         if max(neuron_color) > 1:
