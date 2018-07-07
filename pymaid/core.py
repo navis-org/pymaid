@@ -2419,8 +2419,9 @@ class CatmaidNeuronList:
         else:
             x = self.copy(deepcopy=False)
 
+        temp = x.neurons
         x.neurons = []
-        for n in self.neurons:
+        for n in temp:
             if not set([n.skeleton_id]) & set(x.skeleton_id):
                 x.neurons.append(n)
 
