@@ -1274,20 +1274,20 @@ def plot3d(x, **kwargs):
         # Now add neuropils:
         for v in volumes_data:
             # Skip empty data
-            if isinstance(volumes_data[v].vertices, np.ndarray):
-                if not volumes_data[v].vertices.any():
+            if isinstance(volumes_data[v]['verts'], np.ndarray):
+                if not volumes_data[v]['verts'].any():
                     continue
-            elif not volumes_data[v].vertices:
+            elif not volumes_data[v]['verts']:
                 continue
             trace_data.append(go.Mesh3d(
-                x=[-v[0] for v in volumes_data[v].vertices],
+                x=[-v[0] for v in volumes_data[v]['verts']],
                 # y and z are switched
-                y=[-v[2] for v in volumes_data[v].vertices],
-                z=[-v[1] for v in volumes_data[v].vertices],
+                y=[-v[2] for v in volumes_data[v]['verts']],
+                z=[-v[1] for v in volumes_data[v]['verts']],
 
-                i=[f[0] for f in volumes_data[v].faces],
-                j=[f[1] for f in volumes_data[v].faces],
-                k=[f[2] for f in volumes_data[v].faces],
+                i=[f[0] for f in volumes_data[v]['faces']],
+                j=[f[1] for f in volumes_data[v]['faces']],
+                k=[f[2] for f in volumes_data[v]['faces']],
 
                 opacity=.5,
                 color='rgb' + str(volumes_data[v]['color']),
@@ -1484,7 +1484,8 @@ def plot3d(x, **kwargs):
                 v = fetch.get_volume(v, remote_instance)
 
         volumes_data[v.name] = {'verts': v.vertices,
-                                   'faces': v.faces, 'color': v.color}
+                                'faces': v.faces,
+                                'color': v.color}
 
     logger.debug('Preparing neurons for plotting...')
     # First downsample neurons
