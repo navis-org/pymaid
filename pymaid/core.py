@@ -2551,8 +2551,8 @@ class Volume:
         if isinstance(x, dict):
             x = list(x.values())
 
-        if not isinstance(x, utils._is_iterable):
-            raise TypeError('Input must be list of volumes')
+        if not utils._is_iterable(x):
+            x = [x]
 
         if False in [isinstance(v, Volume) for v in x]:
             raise TypeError('Input must be list of volumes')
