@@ -1284,7 +1284,8 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
     Returns
     -------
     dict
-            ``{ treenode_ID : skeleton_ID, .... }``
+            ``{ treenode_ID : skeleton_ID, .... }``. If treenode does not
+            exists, ``skeleton_ID`` will be ``None``.
 
     """
 
