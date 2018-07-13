@@ -2529,16 +2529,16 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(120, 120, 120, .6)):
+    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
         """ Merges multiple volumes into a single object.
 
         Parameters
         ----------
-        x :     list or dict of volumes
+        x :     list or dict of Volumes
         name :  str, optional
-                Name of the combined volume
+                Name of the combined volume.
         color : tuple, optional
-                Color of the combined volume
+                Color of the combined volume.
 
         Returns
         -------
@@ -2557,13 +2557,13 @@ class Volume:
         if False in [isinstance(v, Volume) for v in x]:
             raise TypeError('Input must be list of volumes')
 
-        vertices = []
+        vertices = np.empty((0, 3))
         faces = []
 
         # Reindex faces
         for vol in x:
             offs = len(vertices)
-            vertices += vol.vertices
+            vertices = np.append(vertices, vol.vertices, axis=0)
             faces += [[f[0] + offs, f[1] + offs, f[2] + offs]
                       for f in vol.faces]
 
