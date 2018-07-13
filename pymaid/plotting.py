@@ -371,11 +371,12 @@ def plot2d(x, method='2d', **kwargs):
             # This sets front view
             ax.azim = -90
             ax.elev = 0
+            ax.dist = 7
         ax.set_aspect('equal')
     else:
         if not isinstance(ax, mpl.axes.Axes):
             raise TypeError(
-                'Ax must be of type <mpl.axes.Axes>, not <{}>'.format(type(ax)))
+                'Ax must be of type "mpl.axes.Axes", not "{}"'.format(type(ax)))
         fig = ax.get_figure()
         if method in ['3d', '3d_complex'] and ax.name != '3d':
             raise TypeError('Axis must be 3d.')
@@ -477,7 +478,8 @@ def plot2d(x, method='2d', **kwargs):
                 # For simple scenes, add whole neurons at a time -> will speed up rendering
                 if method == '3d':
                     if depth_coloring:
-                        this_coords = _tn_pairs_to_coords(neuron, modifier=(1, -1, 1))[:, :, [0, 2, 1]]
+                        this_coords = _tn_pairs_to_coords(neuron,
+                                                          modifier=(1, -1, 1))[:, :, [0, 2, 1]]
                     else:
                         this_coords = [c[:, [0, 2, 1]] for c in coords]
 
@@ -485,7 +487,7 @@ def plot2d(x, method='2d', **kwargs):
                                           color=this_color,
                                           label=neuron.neuron_name,
                                           alpha=alpha,
-                                          cmap = cmap,
+                                          cmap=cmap,
                                           lw=linewidth,
                                           linestyle=linestyle)
                     if group_neurons:
@@ -556,8 +558,8 @@ def plot2d(x, method='2d', **kwargs):
             lim.append(coords.min(axis=0))
 
     for neuron in config.tqdm(dotprops.itertuples(), desc='Plt dotprops',
-                       total=dotprops.shape[0], leave=False,
-                       disable=config.pbar_hide):
+                              total=dotprops.shape[0], leave=False,
+                              disable=config.pbar_hide):
         # Prepare lines - this is based on nat:::plot3d.dotprops
         halfvect = neuron.points[
             ['x_vec', 'y_vec', 'z_vec']] / 2
@@ -753,39 +755,47 @@ def plot2d(x, method='2d', **kwargs):
     def set_depth():
         """Sets depth information for neurons according to camera position."""
 
-        # Get camera normal vector
-        alpha= ax.azim*np.pi/180.
-        beta= ax.elev*np.pi/180.
-        n = np.array([np.cos(alpha)*np.sin(beta),
-                      np.sin(alpha)*np.cos(beta),
-                      np.sin(beta)])
-
-        # Modifier for coordinates
+        # Modifier for soma coordinates
         modifier = np.array([1, 1, -1])
 
-        # Calculate min and max z from this position
-        ns = -np.dot(n, (skdata.nodes[['x','z','y']].values * modifier).T)
-        z_min, z_max = min(ns), max(ns)
+        # Get all coordinates
+        all_co = np.concatenate([lc._segments3d[:, 0, :] for lc in line3D_collections],
+                                 axis=0)
+
+        # Get projected coordinates
+        proj_co = mpl_toolkits.mplot3d.proj3d.proj_points(all_co, ax.get_proj())
+
+        # Get min and max of z coordinates
+        z_min, z_max = min(proj_co[:, 2]), max(proj_co[:, 2])
+
+        # Generate a new normaliser
+        norm = plt.Normalize(vmin=z_min, vmax=z_max)
 
         # Go over all neurons and update Z information
         for neuron, lc, surf in zip(skdata, line3D_collections, surf3D_collections):
-            # Can't use root node -> this is not part of the line collection
-            nodes = neuron.nodes[~neuron.nodes.parent_id.isnull()]
+            # Get this neurons coordinates
+            this_co = lc._segments3d[:, 0, :]
 
-            # Get all coordinates and get relative Z position
-            ns = -np.dot(n, (nodes[['x','z','y']].values * modifier).T)
-            # Use zalpha to map to
-            color = [1,0,0,1]
-            #cs = np.array(mpl_toolkits.mplot3d.art3d.zalpha(color, ns))[:,3] * -1 + 1
-            cs = (ns - z_min) / (z_max - z_min)
-            lc.set_array(cs)
+            # Get projected coordinates
+            this_proj = mpl_toolkits.mplot3d.proj3d.proj_points(this_co,
+                                                                ax.get_proj())
+
+            # Normalise z coordinates
+            ns = norm(this_proj[:, 2]).data
+
+            # Set array
+            lc.set_array(ns)
+
+            # No need for normaliser - already happened
+            lc.set_norm(None)
 
             # Get depth of soma(s)
-            soma_co = neuron.nodes[neuron.nodes.radius > 1][['x','z','y']].values
-            soma_ns = -np.dot(n, (soma_co * modifier).T)
-            soma_cs = (soma_ns - z_min) / (z_max - z_min)
+            soma_co = neuron.nodes[neuron.nodes.radius > 1][['x', 'z', 'y']].values
+            soma_proj = mpl_toolkits.mplot3d.proj3d.proj_points(soma_co * modifier,
+                                                                ax.get_proj())
+            soma_cs = norm(soma_proj[:, 2]).data
 
-            # Set
+            # Set soma color
             for cs, s in zip(soma_cs, surf):
                 s.set_color(cmap(cs))
 
