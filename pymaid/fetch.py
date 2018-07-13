@@ -1300,7 +1300,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
 
     data = remote_instance.fetch(urls, desc='Fetch skids')
 
-    return {treenode_ids[i]: d['skeleton_id'] for i, d in enumerate(data)}
+    return {treenode_ids[i]: d.get('skeleton_id', None) for i, d in enumerate(data)}
 
 
 def get_treenode_table(x, include_details=True, remote_instance=None):
