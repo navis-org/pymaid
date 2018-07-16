@@ -2455,7 +2455,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                         n in res['entities'] if n['type'] == 'neuron'],
                       columns=['name', 'skeleton_id'])
 
-    return df.sort_values(['name']).reset_index(drop=True)
+    return df.sort_values(['name']).drop_duplicates().reset_index(drop=True)
 
 
 def get_skids_by_annotation(annotations, remote_instance=None,
@@ -2476,7 +2476,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     Returns
     -------
     list
-                            ``[skid1, skid2, skid3 ]``
+                            ``[skid1, skid2, skid3]``
 
     See Also
     --------
@@ -2541,10 +2541,12 @@ def get_skids_by_annotation(annotations, remote_instance=None,
             if entry['type'] == 'neuron':
                 annotated_skids.append(str(entry['skeleton_ids'][0]))
 
+    annotated_skids = list(set(annotated_skids))
+
     logger.info(
         'Found %i skeletons with matching annotation(s)' % len(annotated_skids))
 
-    return(annotated_skids)
+    return annotated_skids
 
 
 def neuron_exists(x, remote_instance=None):
