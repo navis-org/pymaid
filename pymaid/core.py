@@ -1599,12 +1599,12 @@ class CatmaidNeuronList:
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
-            if to_sub.skeleton_id in self.neurons and to_sub not in self.neurons:
+            if to_sub.skeleton_id in self and to_sub not in self.neurons:
                 logger.warning('Skeleton ID in neuronlist but neuron not identical: not substracted! Try using .skeleton_id instead.')
             return CatmaidNeuronList([n for n in self.neurons if n != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
-            if [n.skeleton_id in self.neurons and n not in self.neurons for n in to_sub]:
+            if [n.skeleton_id in self and n not in self.neurons for n in to_sub]:
                 logger.warning('Skeleton ID(s) in neuronlist but neuron(s) not identical: not substracted! Try using .skeleton_id instead.')
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub],
                                      make_copy=self.copy_on_subset)
