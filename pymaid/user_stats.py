@@ -792,17 +792,17 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
     creation_timestamps = node_details[['user', 'creation_time']]
-    creation_timestamps.loc[:, 'action'] = 'creation'
+    creation_timestamps['action'] = 'creation'
     creation_timestamps.columns = ['user', 'timestamp', 'action']
 
     # Dataframe for edition times
     edition_timestamps = node_details[['editor', 'edition_time']]
-    edition_timestamps.loc[:, 'action'] = 'edition'
+    edition_timestamps['action'] = 'edition'
     edition_timestamps.columns = ['user', 'timestamp', 'action']
 
     # DataFrame for linking
-    linking_timestamps =  link_details[['creator_id','creation_time']]
-    linking_timestamps.loc[:, 'action'] = 'linking'
+    linking_timestamps = link_details[['creator_id','creation_time']]
+    linking_timestamps['action'] = 'linking'
     linking_timestamps.columns = ['user', 'timestamp', 'action']
 
     # Generate dataframe for reviews
