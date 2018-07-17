@@ -1580,7 +1580,9 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
     Parameters
     ----------
     x :                 int | CatmaidNeuron | CatmaidNeuronList
-                        Neurons/Skeleton IDs to retrieve link details for.
+                        Neurons/Skeleton IDs to retrieve link details for. If
+                        CatmaidNeuron/List will respect changes made to 
+                        original neurons (e.g. pruning)!
     with_tags :         bool, optional
                         If True will also return dictionary of connector tags.
     chunk_size :        int, optional
@@ -1620,7 +1622,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = utils.eval_skids(x, remote_instance=remote_instance)
+    skids = utils.eval_skids(x, warn_duplicates=False, remote_instance=remote_instance)
 
     df_collection = []
     tags = {}
@@ -1664,6 +1666,10 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
     # Merge DataFrames
     df = pd.concat(df_collection, axis=0)
+
+    # Cater for cases in which the original neurons have been edited
+    if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        df = df[df.connector_id.isin(x.connectors)]
 
     # Convert to timestamps
     df['creation_time'] = [datetime.datetime.strptime(
