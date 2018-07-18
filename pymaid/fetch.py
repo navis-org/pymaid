@@ -1198,8 +1198,8 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     Parameters
     ----------
     x :                 list | CatmaidNeuron | CatmaidNeuronList
-                        List of treenode ids (can also be connector ids!).
-                        If CatmaidNeuron/List will get both treenodes and
+                        List of node ids: can be treenode or connector ids!
+                        If CatmaidNeuron/List will get both, treenodes and
                         connectors!
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
@@ -1214,7 +1214,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
         DataFrame in which each row represents a treenode:
 
         >>> df
-        ...   treenode_id  creation_time  user  edition_time
+        ...   node_id  creation_time  user  edition_time
         ... 0
         ... 1
         ...   editor  reviewers  review_times
@@ -1257,7 +1257,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     df = pd.DataFrame(
         [[e] + [d[k] for k in data_columns] for e, d in data.items()],
-        columns=['treenode_id'] + data_columns,
+        columns=['node_id'] + data_columns,
         dtype=object
     )
 
