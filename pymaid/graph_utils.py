@@ -293,11 +293,11 @@ def distal_to(x, a=None, b=None):
     Returns
     -------
     bool
-            If a and b are single treenode IDs respectively.
+            If *a* and *b* are single treenode IDs respectively.
     pd.DataFrame
-            If a and/or b are lists of treenode IDs. Columns and rows (index)
-            represent treenode IDs. Neurons *a* are rows, neurons *b* are
-            columns.
+            If *a* and/or *b* are lists of treenode IDs. Columns and rows
+            (index) represent treenode IDs. Neurons *a* are rows, neurons *b*
+            are columns.
 
     Examples
     --------
@@ -336,6 +336,8 @@ def distal_to(x, a=None, b=None):
         # Map treenodeID to index
         id2ix = {n: v for v, n in zip(x.igraph.vs.indices,
                                       x.igraph.vs['node_id'])}
+
+        # Convert treenode IDs to indices
         if isinstance(a, type(None)):
             a = x.igraph.vs.indices
         else:
@@ -345,11 +347,18 @@ def distal_to(x, a=None, b=None):
         else:
             b = [id2ix[n] for n in b]
 
-        df = pd.DataFrame(x.igraph.shortest_paths(a, b, mode='OUT'),
+        # Get path lengths
+        le = x.igraph.shortest_paths(a, b, mode='OUT')
+
+        # Converting to numpy array first is ~2X as fast
+        le = np.asarray(le)
+
+        # Convert to True/False
+        le = le != float('inf')
+
+        df = pd.DataFrame(le,
                           index=x.igraph.vs[a]['node_id'],
                           columns=x.igraph.vs[b]['node_id'])
-
-        df = df != float('inf')
     else:
         # Generate empty DataFrame
         df = pd.DataFrame(np.zeros((len(a), len(b)), dtype=bool),
@@ -496,7 +505,7 @@ def dist_between(x, a, b):
         _ = int(a)
         _ = int(b)
     except:
-        raise ValueError('a, b need to be treenode IDs')
+        raise ValueError('a, b need to be treenode IDs!')
 
     # If we're working with network X DiGraph
     if isinstance(g, nx.DiGraph):
@@ -509,7 +518,6 @@ def dist_between(x, a, b):
                                 g.vs.find(node_id=b),
                                 weights='weight',
                                 mode='ALL')[0][0]
-
 
 
 def find_main_branchpoint(x, reroot_to_soma=False):
@@ -1203,7 +1211,7 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
     x.nodes = pd.concat([x.nodes.drop('parent_id', axis=1),
                          x.nodes[['parent_id']].where(x.nodes.parent_id.isin(x.nodes.treenode_id.values),
                                                       None, inplace=False)],
-                         axis=1)
+                        axis=1)
 
     # Filter connectors
     if remove_disconnected:
