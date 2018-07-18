@@ -1290,9 +1290,14 @@ def node_label_sorting(x):
     term = x.nodes[x.nodes.type == 'end'].treenode_id.values
 
     # Get distance from all branch_points
-    dist_mat = geodesic_matrix(x, tn_ids=term, directed=True)
+    geo = geodesic_matrix(x, tn_ids=term, directed=True)
     # Set distance between unreachable points to None
-    dist_mat[dist_mat == float('inf')] = None
+    #dist_mat[geo == float('inf')] = None
+    dist_mat = pd.SparseDataFrame(np.where(geo == float('inf'),
+                                           np.nan,
+                                           geo),
+                                  columns=geo.columns,
+                                  index=geo.index)
 
     # Get starting points and sort by longest path to a terminal
     curr_points = sorted(list(x.simple.graph.predecessors(x.root[0])),
