@@ -1154,6 +1154,22 @@ class CatmaidNeuron:
                                 'review_status', 'soma']
                          )
 
+    def to_dataframe(self):
+        """ Turn this Catmaidneuron into a pandas DataFrame containing
+        only the original Catmaid data.
+
+        Returns
+        -------
+        pandas DataFrame
+                neuron_name  skeleton_id  nodes  connectors  tags
+            0
+        """
+
+        return pd.DataFrame([[self.neuron_name, self.skeleton_id,
+                              self.nodes, self.connectors, self.tags]],
+                              columns=['neuron_name', 'skeleton_id', 'nodes',
+                                       'connectors', 'tags'])
+
     def to_swc(self, filename=None):
         """ Generate SWC file from this neuron. This converts CATMAID
         nanometer coordinates into microns.
@@ -2354,6 +2370,23 @@ class CatmaidNeuronList:
             json.dump(data, outfile)
 
         logger.info('Selection saved as {}.'.format(fname))
+
+    def to_dataframe(self):
+        """ Turn this CatmaidneuronList into a pandas DataFrame containing
+        only original Catmaid data.
+
+        Returns
+        -------
+        pandas DataFrame
+                neuron_name  skeleton_id  nodes  connectors  tags
+            0
+            1
+        """
+
+        return pd.DataFrame([[n.neuron_name, n.skeleton_id, n.nodes,
+                              n.connectors, n.tags] for n in self.neurons],
+                              columns=['neuron_name', 'skeleton_id', 'nodes',
+                                       'connectors', 'tags'])
 
     def to_swc(self, filenames=None):
         """ Generate SWC file from this neuron. This converts CATMAID
