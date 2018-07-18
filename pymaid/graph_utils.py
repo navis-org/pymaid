@@ -597,7 +597,7 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
     >>> # Cut into two fragments
     >>> cut1 = pymaid.split_into_fragments(x, n=2)
     >>> # Cut into fragments of >10 um size
-    >>> cut2 = pymaid.split_into_fragments(x, n=1000000000, min_size=10)
+    >>> cut2 = pymaid.split_into_fragments(x, n=float('inf'), min_size=10)
 
     """
 
@@ -622,7 +622,8 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
     # Collect treenodes of the n longest neurites
     tn_to_preserve = []
     fragments = []
-    for i in range(n):
+    i = 0
+    while i < n:
         if tn_to_preserve:
             # Generate fresh graph
             g = graph.neuron2nx(x)
@@ -644,6 +645,8 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
 
         tn_to_preserve += longest_path
         fragments.append(longest_path)
+
+        i += 1
 
     # Next, make some virtual cuts and get the complement of treenodes for each fragment
     graphs = [x.graph.copy()]
