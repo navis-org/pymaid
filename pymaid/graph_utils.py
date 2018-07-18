@@ -393,7 +393,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
 
     Returns
     -------
-    pd.DataFrame
+    pd.SparseDataFrame
                 Geodesic distance matrix. Distances in nanometres.
 
     See Also
@@ -438,7 +438,8 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
     dmat = csgraph.dijkstra(m,
                             directed=directed, indices=tn_indices)
 
-    return pd.DataFrame(dmat, columns=nodeList, index=ix)
+    return pd.SparseDataFrame(dmat, columns=nodeList, index=ix,
+                              default_fill_value=float('inf'))
 
 
 def dist_between(x, a, b):
