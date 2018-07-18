@@ -306,6 +306,11 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'connectors/', **GET)
 
     def _get_connector_types_url(self, **GET):
+        """ Use to retrieve list of connectors - POST request
+        """
+        return self.make_url(self.project_id, 'connectors/types/', **GET)
+
+    def _get_connector_types_url(self, **GET):
         """ Use to retrieve dictionary of connector types in the project
         """
         return self.make_url(self.project_id, 'connectors', 'types', **GET)
@@ -1480,11 +1485,11 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
         DataFrame in which each row represents a connector:
 
         >>> df
-        ...   connector_id  x  y  z  confidence  creator_id,
+        ...   connector_id  x  y  z  confidence  creator,
         ... 0
         ... 1
         ...
-        ... editor_id  creation_time  edition_time
+        ...   editor  creation_time  edition_time
         ... 0
         ... 1
 
@@ -1532,29 +1537,39 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     data = remote_instance.fetch(remote_get_connectors_url, post=postdata)
 
     df = pd.DataFrame(data=data['connectors'],
-                      columns=['connector_id', 'x', 'y', 'z', 'confidence', 'creator_id', 'editor_id', 'creation_time', 'edition_time'])
+                      columns=['connector_id', 'x', 'y', 'z', 'confidence',
+                               'creator', 'editor', 'creation_time',
+                               'edition_time'])
 
     # Add tags
-    df['tags'] = [data['tags'].get(str(cn_id), None)
-                  for cn_id in df.connector_id.tolist()]
+    df['tags'] = df.connector_id.map(data['tags'])
 
-    # Hard-wired relation IDs
+    # Hard-wired connector types. Use this to check for what's on the server:
+    # types = remote_instance.fetch(remote_instance._get_connector_types_url())
     rel_ids = {8: {'relation': 'postsynaptic_to', 'type': 'synaptic'},
                14: {'relation': 'presynaptic_to', 'type': 'synaptic'},
                54650: {'relation': 'abutting', 'type': 'abutting'},
                686364: {'relation': 'gapjunction_with', 'type': 'gap_junction'},
-               # ATTENTION: apparently "attachment" can be part of any connector type
+               # ATTENTION: "attachment" can be part of any connector type
                5989640: {'relation': 'attached_to', 'type': 'attachment'},
-               'unknown': {'relation': 'unknown', 'type': 'unknown'}
+               6216812: {'relation': 'close_to', 'type': 'close_to'}
                }
 
-    df['type'] = [rel_ids[data['partners'].get(str(cn_id), [['unknown', 0]])[
-        0][-2]]['type'] for cn_id in df.connector_id.tolist()]
+    # Get connector type IDs
+    cn_ids = {k: v[0][-2] for k, v in data['partners'].items()}
+
+    # Map type ID to relation (also note conversion of connector ID to integer)
+    cn_type = {int(k): rel_ids.get(v, {'type': 'unknown'})['type']
+               for k, v in cn_ids.items()}
+
+    df['type'] = df.connector_id.map(cn_type)
 
     # Add creator login instead of id
-    userlist = get_user_list(remote_instance=remote_instance).set_index('id')
-    df['creator'] = [userlist.loc[u, 'login'] for u in df.creator_id.values]
-    df.drop('creator_id', inplace=True, axis=1)
+    user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
+    df['creator'] = df.creator_id.map(user_dict)
+    df['editor'] = df.editor_id.map(user_dict)
+    df.drop(['creator_id', 'editor_id'], inplace=True, axis=1)
 
     # Convert timestamps to datetimes
     df['creation_time'] = df['creation_time'].apply(
@@ -1581,7 +1596,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
     ----------
     x :                 int | CatmaidNeuron | CatmaidNeuronList
                         Neurons/Skeleton IDs to retrieve link details for. If
-                        CatmaidNeuron/List will respect changes made to 
+                        CatmaidNeuron/List will respect changes made to
                         original neurons (e.g. pruning)!
     with_tags :         bool, optional
                         If True will also return dictionary of connector tags.
