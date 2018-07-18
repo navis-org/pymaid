@@ -26,12 +26,6 @@ from scipy.sparse import csgraph, csr_matrix
 
 from pymaid import graph, core, utils, config
 
-from tqdm import tqdm, trange
-if utils.is_jupyter():
-    from tqdm import tqdm_notebook, tnrange
-    tqdm = tqdm_notebook
-    trange = tnrange
-
 # Set up logging
 logger = config.logger
 
@@ -244,7 +238,7 @@ def classify_nodes(x, inplace=True):
 
     # If more than one neuron
     if isinstance(x, (pd.DataFrame, core.CatmaidNeuronList)):
-        for i in trange(x.shape[0], desc='Classifying'):
+        for i in config.trange(x.shape[0], desc='Classifying'):
             classify_nodes(x.ix[i], inplace=True)
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
         # Make sure there are nodes to classify
@@ -362,7 +356,7 @@ def distal_to(x, a=None, b=None):
                           columns=b, index=a)
 
         # Iterate over all targets
-        for nB in tqdm(b, desc='Querying paths',
+        for nB in config.tqdm(b, desc='Querying paths',
                        disable=(len(b) < 1000) | config.pbar_hide,
                        leave=config.pbar_leave):
             # Get all paths TO this target. This function returns a dictionary:
