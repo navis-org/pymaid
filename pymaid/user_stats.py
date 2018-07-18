@@ -20,12 +20,12 @@ neurons.
 Examples
 --------
 >>> import pymaid
->>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' ,
-...                                      'HTTP_USER' ,
-...                                      'HTTP_PASSWORD',
-...                                      'TOKEN' )
+>>> myInstance = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
+...                                     'HTTP_USER' ,
+...                                     'HTTP_PASSWORD',
+...                                     'TOKEN')
 >>> skeleton_ids = pymaid.get_skids_by_annotation('Hugin')
->>> cont = pymaid.get_user_contributions( skeleton_ids )
+>>> cont = pymaid.get_user_contributions(skeleton_ids)
 >>> cont
              user  nodes  presynapses  postsynapses
 0        Schlegel  47221          470          1408
@@ -34,8 +34,8 @@ Examples
 3              Li   1244            5            45
 ...
 >>> # Get the time that each user has invested
->>> time_inv = pymaid.get_time_invested(  skeleton_ids,
-...                                       remote_instance = myInstance )
+>>> time_inv = pymaid.get_time_invested(skeleton_ids,
+...                                     remote_instance = myInstance)
 >>> time_inv
             user  total  creation  edition  review
 0       Schlegel   4649      3224     2151    1204
@@ -45,9 +45,9 @@ Examples
 ...
 >>> # Plot contributions as pie chart
 >>> import plotly
->>> fig = { "data" : [ { "values" : time_inv.total.tolist(),
-...         "labels" : time_inv.user.tolist(),
-...         "type" : "pie" } ] }
+>>> fig = {"data": [{"values": time_inv.total.tolist(),
+...        "labels": time_inv.user.tolist(),
+...        "type": "pie"}]}
 >>> plotly.offline.plot(fig)
 
 """
@@ -109,7 +109,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
                         use e.g. ``'user1': None`` for no date restrictions
                         on that user.
 
-    neuron              skeleton ID(s) | CatmaidNeuron/List, optional
+    neurons             skeleton ID(s) | CatmaidNeuron/List, optional
                         Restrict check to given set of neurons. If
                         CatmaidNeuron/List, will use this neurons nodes/
                         connectors. Use to subset contributions e.g. to a given
@@ -224,7 +224,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
         cn_ids = n.connectors.connector_id.values.astype(str)
 
         current_status = config.pbar_hide
-        config.pbar_hide=True
+        config.pbar_hide = True
         node_details = fetch.get_node_details(np.append(tn_ids, cn_ids),
                                               remote_instance=remote_instance)
         config.pbar_hide = current_status
@@ -310,7 +310,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
 
     Notes
     -----
-    This is essentially a wrapper for :func:`~pymaid.get_contributor_statistics`
+    This is essentially a wrapper for :func:`pymaid.get_contributor_statistics`
     - if you are also interested in e.g. construction time, review time, etc.
     you may want to consider using :func:`~pymaid.get_contributor_statistics`
     instead.
@@ -516,29 +516,32 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     assumes that you have already imported and set up pymaid.
 
     >>> import plotly
-    >>> stats = pymaid.get_time_invested( skids, remote_instance )
+    >>> stats = pymaid.get_time_invested(skids, remote_instance)
     >>> # Use plotly to generate pie chart
-    >>> fig = { "data" : [ { "values" : stats.total.tolist(),
-    ...         "labels" : stats.user.tolist(), "type" : "pie" } ] }
+    >>> fig = {"data": [{"values": stats.total.tolist(),
+    ...        "labels": stats.user.tolist(), "type" : "pie" }]}
     >>> plotly.offline.plot(fig)
 
     Plot reconstruction efforts over time:
 
-    >>> stats = pymaid.get_time_invested( skids, mode='OVER_TIME' )
+    >>> stats = pymaid.get_time_invested(skids, mode='OVER_TIME')
     >>> # Plot time invested over time
     >>> stats.T.plot()
     >>> # Plot cumulative time invested over time
     >>> stats.T.cumsum(axis=0).plot()
     >>> # Filter for major contributors
-    >>> stats[ stats.sum(axis=1) > 20 ].T.cumsum(axis=0).plot()
+    >>> stats[stats.sum(axis=1) > 20].T.cumsum(axis=0).plot()
 
     """
 
     def _extract_timestamps(ts, desc='Calc'):
+        grouped = ts.set_index('timestamp',
+                               drop=False).groupby(['user',
+                                                    pd.Grouper(freq=bin_width)]).count() >= minimum_actions
         temp_stats = {}
-        for u in config.tqdm( set(ts.user.unique()) & set(relevant_users), desc=desc, disable=config.pbar_hide, leave=False):
-            temp_stats[u] = sum(ts[ts.user == u].timestamp.to_frame().set_index(
-                'timestamp', drop=False).groupby(pd.Grouper(freq=bin_width)).count().values >= minimum_actions)[0] * interval
+        for u in config.tqdm(set(ts.user.unique()) & set(relevant_users),
+                             desc=desc, disable=config.pbar_hide, leave=False):
+            temp_stats[u] = sum(grouped.loc[u].values)[0] * interval
         return temp_stats
 
     if mode not in ['SUM', 'OVER_TIME', 'ACTIONS']:
@@ -605,18 +608,18 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
             end_date)]
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = np.append(node_details[['user','creation_time']].values,
-                                    link_details[['creator_id','creation_time']].values,
+    creation_timestamps = np.append(node_details[['user', 'creation_time']].values,
+                                    link_details[['creator_id', 'creation_time']].values,
                                     axis=0)
     creation_timestamps = pd.DataFrame(creation_timestamps,
                                        columns=['user', 'timestamp'])
 
     # Dataframe for edition times
-    edition_timestamps = np.append(node_details[['user','edition_time']].values,
-                                    link_details[['creator_id','edition_time']].values,
-                                    axis=0)
+    edition_timestamps = np.append(node_details[['user', 'edition_time']].values,
+                                   link_details[['creator_id', 'edition_time']].values,
+                                   axis=0)
     edition_timestamps = pd.DataFrame(edition_timestamps,
-                                       columns=['user', 'timestamp'])
+                                      columns=['user', 'timestamp'])
 
     # Generate dataframe for reviews
     reviewers = [u for l in node_details.reviewers.tolist() for u in l]
@@ -631,7 +634,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     all_timestamps.sort_values('timestamp', inplace=True)
 
     relevant_users = all_timestamps.groupby('user').count()
-    relevant_users = relevant_users[ relevant_users.timestamp >= minimum_actions ].index.values
+    relevant_users = relevant_users[relevant_users.timestamp >= minimum_actions].index.values
 
     if mode == 'SUM':
         stats = {
@@ -640,10 +643,14 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
             'edition': {u: 0 for u in relevant_users},
             'review': {u: 0 for u in relevant_users}
         }
-        stats['total'].update(_extract_timestamps(all_timestamps, desc='Calc total'))
-        stats['creation'].update(_extract_timestamps(creation_timestamps, desc='Calc creation'))
-        stats['edition'].update(_extract_timestamps(edition_timestamps, desc='Calc edition'))
-        stats['review'].update(_extract_timestamps(review_timestamps, desc='Calc review'))
+        stats['total'].update(_extract_timestamps(all_timestamps,
+                                                  desc='Calc total'))
+        stats['creation'].update(_extract_timestamps(creation_timestamps,
+                                                     desc='Calc creation'))
+        stats['edition'].update(_extract_timestamps(edition_timestamps,
+                                                    desc='Calc edition'))
+        stats['review'].update(_extract_timestamps(review_timestamps,
+                                                   desc='Calc review'))
 
         return pd.DataFrame([[user_list.loc[u, 'login'],
                               stats['total'][u],
@@ -671,7 +678,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         # First count all minutes with minimum number of actions
         minutes_counting = (all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(
             pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions)
-        # Then remove the minutes that have less
+        # Then remove the minutes that have less than minimum actions
         minutes_counting = minutes_counting[minutes_counting.timestamp == True]
         # Now group by hour
         all_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
@@ -737,9 +744,10 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
     >>> # Get all actions for a single user
-    >>> actions = pymaid.get_user_actions(users='schlegelp', start_date=(2017,11,1))
+    >>> actions = pymaid.get_user_actions(users='schlegelp',
+    ....                                  start_date=(2017, 11, 1))
     >>> # Group by hour and see what time of the day user is usually active
-    >>> actions.set_index(pd.DatetimeIndex(actions.timestamp), inplace=True )
+    >>> actions.set_index(pd.DatetimeIndex(actions.timestamp), inplace=True)
     >>> hours = actions.groupby(actions.index.hour).count()
     >>> ax = hours.action.plot()
     >>> plt.show()
@@ -801,7 +809,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     edition_timestamps.columns = ['user', 'timestamp', 'action']
 
     # DataFrame for linking
-    linking_timestamps = link_details[['creator_id','creation_time']]
+    linking_timestamps = link_details[['creator_id', 'creation_time']]
     linking_timestamps['action'] = 'linking'
     linking_timestamps.columns = ['user', 'timestamp', 'action']
 
@@ -816,7 +824,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
                                 edition_timestamps,
                                 review_timestamps,
                                 linking_timestamps],
-                                axis=0).reset_index(drop=True)
+                               axis=0).reset_index(drop=True)
 
     # Map login onto user ID
     all_timestamps.user = [user_dict[u] for u in all_timestamps.user.values]
