@@ -189,7 +189,9 @@ def neuron2json(x, **kwargs):
             this_data['connectors'] = n.connectors.to_json(**kwargs)
 
         for k in n.__dict__:
-            if k in ['nodes', 'connectors', 'graph', 'igraph', '_remote_instance']:
+            if k in ['nodes', 'connectors', 'graph', 'igraph', '_remote_instance',
+                     'segments', 'small_segments', 'nodes_geodesic_distance_matrix',
+                     'dps', 'simple']:
                 continue
             try:
                 this_data[k] = n.__dict__[k]

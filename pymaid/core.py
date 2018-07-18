@@ -1599,9 +1599,13 @@ class CatmaidNeuronList:
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
+            if to_sub.skeleton_id in self and to_sub not in self.neurons:
+                logger.warning('Skeleton ID in neuronlist but neuron not identical: not substracted! Try using .skeleton_id instead.')
             return CatmaidNeuronList([n for n in self.neurons if n != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
+            if [n.skeleton_id in self and n not in self.neurons for n in to_sub]:
+                logger.warning('Skeleton ID(s) in neuronlist but neuron(s) not identical: not substracted! Try using .skeleton_id instead.')
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub],
                                      make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_sub):
@@ -2529,16 +2533,16 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(120, 120, 120, .6)):
+    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
         """ Merges multiple volumes into a single object.
 
         Parameters
         ----------
-        x :     list or dict of volumes
+        x :     list or dict of Volumes
         name :  str, optional
-                Name of the combined volume
+                Name of the combined volume.
         color : tuple, optional
-                Color of the combined volume
+                Color of the combined volume.
 
         Returns
         -------
@@ -2551,19 +2555,19 @@ class Volume:
         if isinstance(x, dict):
             x = list(x.values())
 
-        if not isinstance(x, utils._is_iterable):
-            raise TypeError('Input must be list of volumes')
+        if not utils._is_iterable(x):
+            x = [x]
 
         if False in [isinstance(v, Volume) for v in x]:
             raise TypeError('Input must be list of volumes')
 
-        vertices = []
+        vertices = np.empty((0, 3))
         faces = []
 
         # Reindex faces
         for vol in x:
             offs = len(vertices)
-            vertices += vol.vertices
+            vertices = np.append(vertices, vol.vertices, axis=0)
             faces += [[f[0] + offs, f[1] + offs, f[2] + offs]
                       for f in vol.faces]
 

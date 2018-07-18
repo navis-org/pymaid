@@ -1284,7 +1284,8 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
     Returns
     -------
     dict
-            ``{ treenode_ID : skeleton_ID, .... }``
+            ``{ treenode_ID : skeleton_ID, .... }``. If treenode does not
+            exists, ``skeleton_ID`` will be ``None``.
 
     """
 
@@ -1300,7 +1301,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
 
     data = remote_instance.fetch(urls, desc='Fetch skids')
 
-    return {treenode_ids[i]: d['skeleton_id'] for i, d in enumerate(data)}
+    return {treenode_ids[i]: d.get('skeleton_id', None) for i, d in enumerate(data)}
 
 
 def get_treenode_table(x, include_details=True, remote_instance=None):
@@ -1579,7 +1580,9 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
     Parameters
     ----------
     x :                 int | CatmaidNeuron | CatmaidNeuronList
-                        Neurons/Skeleton IDs to retrieve link details for.
+                        Neurons/Skeleton IDs to retrieve link details for. If
+                        CatmaidNeuron/List will respect changes made to 
+                        original neurons (e.g. pruning)!
     with_tags :         bool, optional
                         If True will also return dictionary of connector tags.
     chunk_size :        int, optional
@@ -1619,7 +1622,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = utils.eval_skids(x, remote_instance=remote_instance)
+    skids = utils.eval_skids(x, warn_duplicates=False, remote_instance=remote_instance)
 
     df_collection = []
     tags = {}
@@ -1663,6 +1666,10 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
     # Merge DataFrames
     df = pd.concat(df_collection, axis=0)
+
+    # Cater for cases in which the original neurons have been edited
+    if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        df = df[df.connector_id.isin(x.connectors)]
 
     # Convert to timestamps
     df['creation_time'] = [datetime.datetime.strptime(
@@ -2454,7 +2461,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                         n in res['entities'] if n['type'] == 'neuron'],
                       columns=['name', 'skeleton_id'])
 
-    return df.sort_values(['name']).reset_index(drop=True)
+    return df.sort_values(['name']).drop_duplicates().reset_index(drop=True)
 
 
 def get_skids_by_annotation(annotations, remote_instance=None,
@@ -2475,7 +2482,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     Returns
     -------
     list
-                            ``[skid1, skid2, skid3 ]``
+                            ``[skid1, skid2, skid3]``
 
     See Also
     --------
@@ -2540,10 +2547,12 @@ def get_skids_by_annotation(annotations, remote_instance=None,
             if entry['type'] == 'neuron':
                 annotated_skids.append(str(entry['skeleton_ids'][0]))
 
+    annotated_skids = list(set(annotated_skids))
+
     logger.info(
         'Found %i skeletons with matching annotation(s)' % len(annotated_skids))
 
-    return(annotated_skids)
+    return annotated_skids
 
 
 def neuron_exists(x, remote_instance=None):
