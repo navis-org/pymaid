@@ -1052,7 +1052,7 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
     return
 
 
-def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
+def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     """ Stitch multiple neurons together.
 
     Notes
@@ -1065,19 +1065,21 @@ def stitch_neurons(*x, tn_to_stitch=None, method='ALL'):
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
                         Neurons to stitch.
-    tn_to_stitch :      List of treenode IDs, optional
-                        If provided, these treenodes will be preferentially
-                        used to stitch neurons together. If there are more
-                        than two possible treenodes for a single stitching
-                        operation, the two closest are used.
     method :            'LEAFS' | 'ALL' | 'NONE', optional
                         Set stitching method:
-                            (1) 'LEAFS': only leaf (including root) nodes will
-                                be considered for stitching
-                            (2) 'ALL': all treenodes are considered
-                            (3) 'NONE': node and connector tables will simply
-                                be combined. Use this if your neurons consists
-                                of fragments with multiple roots.
+                            (1) 'LEAFS': Only leaf (including root) nodes will
+                                be considered for stitching.
+                            (2) 'ALL': All treenodes are considered.
+                            (3) 'NONE': Node and connector tables will simply
+                                be combined. Use this if your neurons consist
+                                of fragments with multiple roots. Overrides
+                                ``tn_to_stitch``.
+    tn_to_stitch :      List of treenode IDs, optional
+                        If provided, these treenodes will be preferentially
+                        used to stitch neurons together. Overrides methods
+                        ``'ALL'`` or ``'LEAFS'``. If there are more
+                        than two possible treenodes for a single stitching
+                        operation, the two closest are used.
 
     Returns
     -------
