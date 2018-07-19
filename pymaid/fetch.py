@@ -1169,7 +1169,7 @@ def get_names(x, remote_instance=None):
     Returns
     -------
     dict
-                    ``{ skid1 : 'neuron_name', skid2 : 'neuron_name',  .. }``
+                    ``{skid1: 'neuron_name', skid2: 'neuron_name', ...}``
 
     """
 
@@ -1219,7 +1219,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
         DataFrame in which each row represents a treenode:
 
         >>> df
-        ...   node_id  creation_time  user  edition_time
+        ...   node_id  creation_time  creator  edition_time
         ... 0
         ... 1
         ...   editor  reviewers  review_times
@@ -1265,6 +1265,9 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
         columns=['node_id'] + data_columns,
         dtype=object
     )
+
+    # Rename column 'user' to 'creator'
+    df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
     df['creation_time'] = [datetime.datetime.strptime(
         d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].tolist()]
@@ -1536,9 +1539,10 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 
     data = remote_instance.fetch(remote_get_connectors_url, post=postdata)
 
+    # creator_id and editor_id will be replaced with logins later
     df = pd.DataFrame(data=data['connectors'],
                       columns=['connector_id', 'x', 'y', 'z', 'confidence',
-                               'creator', 'editor', 'creation_time',
+                               'creator_id', 'editor_id', 'creation_time',
                                'edition_time'])
 
     # Add tags
@@ -1562,6 +1566,7 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     cn_type = {int(k): rel_ids.get(v, {'type': 'unknown'})['type']
                for k, v in cn_ids.items()}
 
+    # Map connector ID to connector type
     df['type'] = df.connector_id.map(cn_type)
 
     # Add creator login instead of id
@@ -1632,12 +1637,12 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
         If you just need the connector table (ID, x, y, z, creator, etc).
     :func:`~pymaid.get_connector_details`
         Get the same data but by connector, not by link.
-
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = utils.eval_skids(x, warn_duplicates=False, remote_instance=remote_instance)
+    skids = utils.eval_skids(x, warn_duplicates=False,
+                             remote_instance=remote_instance)
 
     df_collection = []
     tags = {}
@@ -3997,7 +4002,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
                           only_soma=False, remote_instance=None):
     """ Retrieves neurons with processes within CATMAID volumes. This function
-    uses the *BOUNDING BOX* around the volume as proxy and queries for neurons
+    uses the **BOUNDING BOX** around volume as proxy and queries for neurons
     that are within that volume. See examples on how to work around this.
 
     Warning

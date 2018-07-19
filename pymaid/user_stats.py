@@ -608,22 +608,19 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
             end_date)]
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = np.append(node_details[['user', 'creation_time']].values,
+    creation_timestamps = np.append(node_details[['creator', 'creation_time']].values,
                                     link_details[['creator_id', 'creation_time']].values,
                                     axis=0)
     creation_timestamps = pd.DataFrame(creation_timestamps,
                                        columns=['user', 'timestamp'])
 
-    # Dataframe for edition times
-    edition_timestamps = np.append(node_details[['user', 'edition_time']].values,
-                                   link_details[['creator_id', 'edition_time']].values,
-                                   axis=0)
-    edition_timestamps = pd.DataFrame(edition_timestamps,
-                                      columns=['user', 'timestamp'])
+    # Dataframe for edition times - can't use links as there is no editor 
+    edition_timestamps = node_details[['editor', 'edition_time']]
+    edition_timestamps.columns = ['user', 'timestamp']
 
     # Generate dataframe for reviews
-    reviewers = [u for l in node_details.reviewers.tolist() for u in l]
-    timestamps = [ts for l in node_details.review_times.tolist() for ts in l]
+    reviewers = [u for l in node_details.reviewers.values for u in l]
+    timestamps = [ts for l in node_details.review_times.values for ts in l]
     review_timestamps = pd.DataFrame([[u, ts] for u, ts in zip(
         reviewers, timestamps)], columns=['user', 'timestamp'])
 
@@ -768,9 +765,8 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
         users = [users]
 
     # Get user dictionary (needed later)
-    user_list = fetch.get_user_list(
-        remote_instance=remote_instance).set_index('id')
-    user_dict = user_list.login.to_dict()
+    user_list = fetch.get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
 
     if isinstance(neurons, type(None)):
         neurons = fetch.find_neurons(users=users,
@@ -799,7 +795,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     link_details = fetch.get_connector_links(neurons)
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = node_details[['user', 'creation_time']]
+    creation_timestamps = node_details[['creator', 'creation_time']]
     creation_timestamps['action'] = 'creation'
     creation_timestamps.columns = ['user', 'timestamp', 'action']
 
