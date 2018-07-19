@@ -244,6 +244,12 @@ class TestFetch(unittest.TestCase):
             cn.connector_id.tolist(), remote_instance=self.rm), pd.DataFrame)
 
     @try_conditions
+    def test_get_connector_links(self):
+        cn = pymaid.get_connector_links(config_test.test_skids,
+                                        remote_instance=self.rm)
+        self.assertIsInstance(cn, pd.DataFrame)
+
+    @try_conditions
     def test_get_partners_in_volume(self):
         self.assertIsInstance(pymaid.get_partners_in_volume(config_test.test_skids[0],
                                                             config_test.test_volume),
