@@ -1520,7 +1520,7 @@ class CatmaidNeuronList:
                 this_n = getattr(n, key)
                 this_n['skeleton_id'] = n.skeleton_id
                 data.append(this_n)
-            return pd.concat(data, axis=0, ignore_index=True)
+            return pd.concat(data, axis=0, ignore_index=True, sort=True)
         elif key == 'bbox':
             return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
         elif key == '_remote_instance':
