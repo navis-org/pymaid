@@ -73,8 +73,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
     Notes
     -----
      1. Time calculation uses defaults from :func:`pymaid.get_time_invested`.
-     2. Time does not take edits into account.
-     3. ``total_reviews`` > ``total_nodes`` is possible if nodes have been
+     2. ``total_reviews`` > ``total_nodes`` is possible if nodes have been
         reviewed multiple times by different users. Similarly,
         ``total_reviews`` = ``total_nodes`` does not imply that the neuron
         is fully reviewed!
@@ -213,6 +212,17 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
         if u not in user_list.index:
             raise ValueError('User "{}" not found in user list'.format(u))
 
+    # Get all node details
+    all_node_details = fetch.get_node_details(neurons,
+                                              remote_instance=remote_instance)
+
+    # Get connector links
+    link_details = fetch.get_connector_links(neurons)
+
+    # link_details contains all links. We have to subset this to existing
+    # connectors in case the input neurons have been pruned
+    link_details = link_details[link_details.connector_id.isin(neurons.connectors.connector_id.values)]
+
     interval = 3
     bin_width = '%iMin' % interval
     minimum_actions = 10 * interval
@@ -225,29 +235,39 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
         current_status = config.pbar_hide
         config.pbar_hide = True
-        node_details = fetch.get_node_details(np.append(tn_ids, cn_ids),
-                                              remote_instance=remote_instance)
+        node_details = all_node_details[all_node_details.node_id.isin(np.append(tn_ids, cn_ids))]
         config.pbar_hide = current_status
 
         # Extract node creation
-        node_creation = node_details.loc[node_details.treenode_id.isin(tn_ids),
-                                         ['user', 'creation_time']].values
+        node_creation = node_details.loc[node_details.node_id.isin(tn_ids),
+                                         ['creator', 'creation_time']].values
         node_creation = np.c_[node_creation, ['node_creation'] * node_creation.shape[0]]
 
         # Extract connector creation
-        cn_creation = node_details.loc[node_details.treenode_id.isin(cn_ids),
-                                         ['user', 'creation_time']].values
+        cn_creation = node_details.loc[node_details.node_id.isin(cn_ids),
+                                         ['creator', 'creation_time']].values
         cn_creation = np.c_[cn_creation, ['cn_creation'] * cn_creation.shape[0]]
 
+        # Extract edition times (treenodes + connectors)
+        node_edits = node_details.loc[:, ['editor', 'edition_time']].values
+        node_edits = np.c_[node_edits, ['editor'] * node_edits.shape[0]]
+
+        # Link creation
+        link_creation = link_details.loc[link_details.connector_id.isin(cn_ids),
+                                         ['creator_id', 'creation_time']].values
+        link_creation = np.c_[link_creation, ['link_creation'] * link_details.shape[0]]
+
         # Extract review times
-        reviewers = [u for l in node_details.reviewers.tolist() for u in l]
-        timestamps = [ts for l in node_details.review_times.tolist() for ts in l]
+        reviewers = [u for l in node_details.reviewers.values for u in l]
+        timestamps = [ts for l in node_details.review_times.values for ts in l]
         node_review = np.c_[reviewers, timestamps, ['review'] * len(reviewers)]
 
         # Merge all timestamps (ignore edits for now) to get time_invested
         all_ts = pd.DataFrame(np.vstack([node_creation,
                                          node_review,
-                                         cn_creation]),
+                                         cn_creation,
+                                         link_creation,
+                                         node_edits]),
                               columns=['user', 'timestamp', 'type'])
 
         # Add column with just the date and make it the index
@@ -614,7 +634,7 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     creation_timestamps = pd.DataFrame(creation_timestamps,
                                        columns=['user', 'timestamp'])
 
-    # Dataframe for edition times - can't use links as there is no editor 
+    # Dataframe for edition times - can't use links as there is no editor
     edition_timestamps = node_details[['editor', 'edition_time']]
     edition_timestamps.columns = ['user', 'timestamp']
 
