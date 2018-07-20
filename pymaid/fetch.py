@@ -884,7 +884,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
 
     # Get details for connectors in volume
     cn_details = get_connector_details(
-        cn_in_volume.connector_id.unique().tolist(),
+        cn_in_volume.connector_id.unique(),
         remote_instance=remote_instance)
 
     # Filter those connectors that don't have a presynaptic node
@@ -904,7 +904,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
     if not mismatch.empty:
         logger.info(
             'Retrieving additional details for {0} connectors'.format(mismatch.shape[0]))
-        tn_to_skid = get_skid_from_treenode([tn for l in mismatch.postsynaptic_to_node.tolist() for tn in l],
+        tn_to_skid = get_skid_from_treenode([tn for l in mismatch.postsynaptic_to_node.values for tn in l],
                                             remote_instance=remote_instance)
     else:
         tn_to_skid = []
@@ -959,9 +959,9 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
                         remote_instance=remote_instance).set_index('skeleton_id')
 
     df['neuron_name'] = [review.loc[str(s), 'neuron_name']
-                         for s in df.skeleton_id.tolist()]
+                         for s in df.skeleton_id.values]
     df['num_nodes'] = [review.loc[str(s), 'total_node_count']
-                       for s in df.skeleton_id.tolist()]
+                       for s in df.skeleton_id.values]
     df['total'] = df[x].sum(axis=1)
 
     # Filter for min size
@@ -1227,6 +1227,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
         ... 1
 
     """
+
     if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         node_ids = np.append(x.nodes.treenode_id.values,
                              x.connectors.connector_id.values)
@@ -1269,11 +1270,11 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
     df['creation_time'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].tolist()]
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
     df['edition_time'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].tolist()]
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
     df['review_times'] = [[datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in lst] for lst in df['review_times'].tolist()]
+        d[:16], '%Y-%m-%dT%H:%M') for d in lst] for lst in df['review_times'].values]
 
     return df
 
@@ -1665,8 +1666,9 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
             # Generate separate DataFrames
             data = [pd.DataFrame(r['links'],
-                                 columns=['skeleton_id', 'connector_id', 'x', 'y', 'z',
-                                          'confidence', 'creator_id', 'treenode_id',
+                                 columns=['skeleton_id', 'connector_id',
+                                          'x', 'y', 'z', 'confidence',
+                                          'creator_id', 'treenode_id',
                                           'creation_time', 'edition_time']
                                 ) for r in responses]
 
@@ -1866,8 +1868,8 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
 
     # Get user list and replace IDs with logins
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
-    df['creator1'] = [user_list.loc[u, 'login'] for u in df.creator1.tolist()]
-    df['creator2'] = [user_list.loc[u, 'login'] for u in df.creator2.tolist()]
+    df['creator1'] = [user_list.loc[u, 'login'] for u in df.creator1.values]
+    df['creator2'] = [user_list.loc[u, 'login'] for u in df.creator2.values]
 
     return df
 
@@ -2235,7 +2237,7 @@ def get_annotation_details(x, remote_instance=None):
     df.drop('times_used', inplace=True, axis=1)
 
     df['time_annotated'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['time_annotated'].tolist()]
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['time_annotated'].values]
 
     return df.sort_values('annotation').reset_index(drop=True)
 
@@ -2414,9 +2416,9 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
             else:
                 tn_with_tag = []
         else:
-            tn_with_tag = s.nodes.treenode_id.tolist()
+            tn_with_tag = s.nodes.treenode_id.values
 
-        tn_with_rad = s.nodes[s.nodes.radius > min_rad].treenode_id.tolist()
+        tn_with_rad = s.nodes[s.nodes.radius > min_rad].treenode_id.values
 
         if set(tn_with_tag) & set(tn_with_rad):
             d[s.skeleton_id] = True
@@ -2803,7 +2805,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     >>> # Define which tags to remove
     >>> tags_to_remove = ['ends', 'uncertain end', 'uncertain continuation', 'TODO']
     >>> # Remove tags
-    >>> resp = pymaid.delete_tags( non_leaf_nodes.treenode_id.tolist(),
+    >>> resp = pymaid.delete_tags( non_leaf_nodes.treenode_id.values,
     ...                            tags_to_remove,
     ...                            'TREENODE')
     2017-08-09 14:08:36,102 - pymaid.pymaid - WARNING - Skipping 8527 nodes without tags
@@ -3033,7 +3035,7 @@ def get_review_details(x, remote_instance=None):
 
     df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(np.nan)
     df.columns = [user_list.loc[u, 'login'] for u in df.columns]
-    df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.tolist()]
+    df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.values]
     df.index.name = 'treenode_id'
     df = df.reset_index(drop=False)
 
@@ -3145,7 +3147,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
                       )
 
     df['timestamp'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['timestamp'].tolist()]
+        d[:16], '%Y-%m-%dT%H:%M') for d in df['timestamp'].values]
 
     return df
 
