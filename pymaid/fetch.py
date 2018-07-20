@@ -1244,22 +1244,21 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
 
     data = dict()
 
-    with config.tqdm(total=len(node_ids), disable=config.pbar_hide,
-              desc='Nodes', leave=False) as pbar:
-        for ix in range(0, len(node_ids), chunk_size):
-            get_node_details_postdata = dict()
+    urls = []
+    post = []
 
-            for k, tn in enumerate(node_ids[ix:ix + chunk_size]):
-                key = 'node_ids[%i]' % k
-                get_node_details_postdata[key] = tn
+    for ix in range(0, len(node_ids), chunk_size):
+        urls.append(remote_instance._get_node_info_url())
+        post.append({'node_ids[{}]'.format(k): tn for k, tn in  enumerate(node_ids[ix:ix + chunk_size])})
 
-            data.update(remote_instance.fetch(remote_nodes_details_url,
-                                              get_node_details_postdata))
-            pbar.update(chunk_size)
+    # Get responses
+    resp = remote_instance.fetch(urls, post, desc='Chunks')
+    # Merge into a single dictionary
+    data = {k: d[k] for d in resp for k in d}
 
+    # Generate dataframe
     data_columns = ['creation_time', 'user', 'edition_time',
                     'editor', 'reviewers', 'review_times']
-
     df = pd.DataFrame(
         [[e] + [d[k] for k in data_columns] for e, d in data.items()],
         columns=['node_id'] + data_columns,
