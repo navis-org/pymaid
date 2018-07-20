@@ -70,6 +70,9 @@ from rpy2.robjects import pandas2ri
 cl = robjects.r('class')
 names = robjects.r('names')
 
+# Set up logging
+logger = config.logger
+
 try:
     nat = importr('nat')
     r_nblast = importr('nat.nblast')
@@ -77,7 +80,7 @@ try:
     nat_flybrains = importr('nat.flybrains')
     # even if not used, these packages are important!
     flycircuit = importr('flycircuit')
-    elmr = importr('elmr')  # even if not used, these packages are important!
+    elmr = importr('elmr')
 except:
     logger.error(
         'R library "nat" not found! Please install from within R.')
@@ -85,8 +88,6 @@ except:
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
                   'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
 
-# Set up logging
-logger = config.logger
 
 def init_rcatmaid(**kwargs):
     """ This function initializes the R catmaid package from Jefferis
