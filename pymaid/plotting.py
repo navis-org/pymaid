@@ -243,6 +243,9 @@ def plot2d(x, method='2d', **kwargs):
     ``linestyle`` (str, default = '-')
       Line style of neurites.
 
+    ``autoscale`` (bool, default=True)
+       If True, will scale the axes to fit the data.
+
     ``scalebar`` (int | float, default=False)
        Adds scale bar. Provide integer/float to set size of scalebar in um.
        For methods '3d' and '3d_complex', this will create an axis object.
@@ -284,7 +287,8 @@ def plot2d(x, method='2d', **kwargs):
     _ACCEPTED_KWARGS = ['remote_instance', 'connectors', 'connectors_only',
                         'ax', 'color', 'view', 'scalebar', 'cn_mesh_colors',
                         'linewidth', 'cn_size', 'group_neurons', 'scatter_kws',
-                        'figsize', 'linestyle', 'alpha', 'depth_coloring']
+                        'figsize', 'linestyle', 'alpha', 'depth_coloring',
+                        'autoscale']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
@@ -319,6 +323,7 @@ def plot2d(x, method='2d', **kwargs):
     linewidth = kwargs.get('linewidth', .5)
     cn_size = kwargs.get('cn_size', 1)
     linestyle = kwargs.get('linestyle', '-')
+    autoscale = kwargs.get('autoscale', True)
 
     remote_instance = utils._eval_remote_instance(
         remote_instance, raise_error=False)
@@ -682,26 +687,27 @@ def plot2d(x, method='2d', **kwargs):
             lim.append(coords.max(axis=0))
             lim.append(coords.min(axis=0))
 
-    if method == '2d':
-        ax.autoscale()
-    elif method in ['3d', '3d_complex']:
-        lim = np.vstack(lim)
-        lim_min = lim.min(axis=0)
-        lim_max = lim.max(axis=0)
+    if autoscale:
+        if method == '2d':
+            ax.autoscale()
+        elif method in ['3d', '3d_complex']:
+            lim = np.vstack(lim)
+            lim_min = lim.min(axis=0)
+            lim_max = lim.max(axis=0)
 
-        center = lim_min + (lim_max - lim_min) / 2
-        max_dim = (lim_max - lim_min).max()
+            center = lim_min + (lim_max - lim_min) / 2
+            max_dim = (lim_max - lim_min).max()
 
-        new_min = center - max_dim / 2
-        new_max = center + max_dim / 2
+            new_min = center - max_dim / 2
+            new_max = center + max_dim / 2
 
-        ax.set_xlim(new_min[0], new_max[0])
-        ax.set_ylim(new_min[2], new_max[2])
-        ax.set_zlim(new_max[1], new_min[1])
+            ax.set_xlim(new_min[0], new_max[0])
+            ax.set_ylim(new_min[2], new_max[2])
+            ax.set_zlim(new_min[1], new_max[1])
 
-        ax.set_xlim(lim_min[0], lim_min[0] + max_dim)
-        ax.set_ylim(lim_min[2], lim_min[2] + max_dim)
-        ax.set_zlim(lim_max[1] - max_dim, lim_max[1])
+            #ax.set_xlim(lim_min[0], lim_min[0] + max_dim)
+            #ax.set_ylim(lim_min[2], lim_min[2] + max_dim)
+            #ax.set_zlim(lim_max[1] - max_dim, lim_max[1])
 
     if scalebar is not None:
         # Convert sc size to nm
