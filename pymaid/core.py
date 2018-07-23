@@ -1635,6 +1635,30 @@ class CatmaidNeuronList:
             raise TypeError(
                 'Unable to substract data of type {0}'.format(type(to_sub)))
 
+    def __and__(self, other):
+        """Implements bitwise and using the & operator. """
+        if isinstance(other, (str, int)):
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id == other or n.neuron_name == other],
+                                     make_copy=self.copy_on_subset)
+        elif isinstance(other, CatmaidNeuron):
+            if other.skeleton_id in self and other not in self.neurons:
+                logger.warning('Skeleton IDs overlap but neuron not identical! Bitwise cancelled! Try using .skeleton_id instead.')
+                return
+            return CatmaidNeuronList([n for n in self.neurons if n == other],
+                                     make_copy=self.copy_on_subset)
+        elif isinstance(other, CatmaidNeuronList):
+            if len(set(self.neurons) & set(other.neurons)) != len(set(self.skeleton_id) & set(other.skeleton_id)):
+                logger.warning('Skeleton IDs overlap but neuron(s) not identical! Bitwise cancelled! Try using .skeleton_id instead.')
+                return
+            return CatmaidNeuronList([n for n in self.neurons if n in other],
+                                     make_copy=self.copy_on_subset)
+        elif utils._is_iterable(other):
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id in other or n.neuron_name in other],
+                                     make_copy=self.copy_on_subset)
+        else:
+            raise TypeError(
+                'Unable to substract data of type {0}'.format(type(other)))
+
     def sum(self):
         """Returns sum numeric and boolean values over all neurons. """
         return self.summary().sum(numeric_only=True)
