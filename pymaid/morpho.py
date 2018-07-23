@@ -1285,7 +1285,7 @@ def average_neurons(x, limit=10, base_neuron=None):
     mean_z = np.mean(base_z, axis=1)
 
     # If any of the base coords has NO nearest neighbour within limit whatsoever,
-    # the average of that row will be "nan" -> in this case we will fall back to
+    # the average of that row will be "NaN" -> in this case we will fall back to
     # the base coordinate
     mean_x[np.isnan(mean_x)] = base_nodes[np.isnan(mean_x), 0]
     mean_y[np.isnan(mean_y)] = base_nodes[np.isnan(mean_y), 1]
@@ -1564,25 +1564,27 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         return
 
 
-def despike_neuron(x, sigma=5, inplace=False):
+def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False):
     """ Removes spikes in neuron traces (e.g. from jumps in image data).
 
     Notes
     -----
-    For each treenode A, the (euclidean) distance to its immediate parent
-    B and to that node's parent C is computed.
+    For each treenode A, the euclidean distance to its next successor (parent)
+    B and the second next successor is computed.
     If ``dist(A->B)/dist(A->C) > sigma``, node B is considered a spike and
     realigned between A and C.
 
     Parameters
     ----------
-    x :         CatmaidNeuron | CatmaidNeuronList
-                Neuron(s) to be processed.
-    sigma :     float | int, optional
-                Threshold for spike detection. Smaller sigma = more
-                promiscuous spike detection. See notes.
-    inplace :   bool, optional
-                If False, a copy of the neuron is returned.
+    x :                 CatmaidNeuron | CatmaidNeuronList
+                        Neuron(s) to be processed.
+    sigma :             float | int, optional
+                        Threshold for spike detection. Smaller sigma = more
+                        aggressive spike detection. See notes.
+    max_spike_length :  int, optional
+                        Determines how long (# of nodes) a spike can be.
+    inplace :           bool, optional
+                        If False, a copy of the neuron is returned.
 
     Returns
     -------
@@ -1617,31 +1619,34 @@ def despike_neuron(x, sigma=5, inplace=False):
     # Index treenodes table by treenode ID
     this_treenodes = x.nodes.set_index('treenode_id')
 
-    # Go over all segments
-    for seg in x.segments:
-        # Get nodes A, B and C of this segment
-        this_A = this_treenodes.loc[seg[:-2]]
-        this_B = this_treenodes.loc[seg[1:-1]]
-        this_C = this_treenodes.loc[seg[2:]]
+    # For each spike length do -> do this in reverse to correct the long
+    # spikes first
+    for l in list(range(1, max_spike_length+1))[::-1]:
+        # Go over all segments
+        for seg in x.segments:
+            # Get nodes A, B and C of this segment
+            this_A = this_treenodes.loc[seg[:-l-1]]
+            this_B = this_treenodes.loc[seg[l:-1]]
+            this_C = this_treenodes.loc[seg[l+1:]]
 
-        # Get coordinates
-        A = this_A[['x', 'y', 'z']].values
-        B = this_B[['x', 'y', 'z']].values
-        C = this_C[['x', 'y', 'z']].values
+            # Get coordinates
+            A = this_A[['x', 'y', 'z']].values
+            B = this_B[['x', 'y', 'z']].values
+            C = this_C[['x', 'y', 'z']].values
 
-        # Calculate euclidian distances A->B and A->C
-        dist_AB = np.linalg.norm(A - B, axis=1)
-        dist_AC = np.linalg.norm(A - C, axis=1)
+            # Calculate euclidian distances A->B and A->C
+            dist_AB = np.linalg.norm(A - B, axis=1)
+            dist_AC = np.linalg.norm(A - C, axis=1)
 
-        # Get the spikes
-        spikes_ix = np.where((dist_AB / dist_AC) > sigma)[0]
-        spikes = this_B.iloc[spikes_ix]
+            # Get the spikes
+            spikes_ix = np.where((dist_AB / dist_AC) > sigma)[0]
+            spikes = this_B.iloc[spikes_ix]
 
-        if not spikes.empty:
-            # Interpolate new position(s) between A and C
-            new_positions = A[spikes_ix] + (C[spikes_ix] - A[spikes_ix]) / 2
+            if not spikes.empty:
+                # Interpolate new position(s) between A and C
+                new_positions = A[spikes_ix] + (C[spikes_ix] - A[spikes_ix]) / 2
 
-            this_treenodes.loc[spikes.index, ['x', 'y', 'z']] = new_positions
+                this_treenodes.loc[spikes.index, ['x', 'y', 'z']] = new_positions
 
     # Reassign treenode table
     x.nodes = this_treenodes.reset_index(drop=False)
