@@ -302,9 +302,6 @@ def plot2d(x, method='2d', **kwargs):
     # Set axis to plot for method '2d'
     axis1, axis2 = 'x', 'y'
 
-    # Keep track of limits if necessary
-    lim = []
-
     skids, skdata, dotprops, volumes, points, visuals = utils._parse_objects(x)
 
     remote_instance = kwargs.get('remote_instance', None)
@@ -327,6 +324,9 @@ def plot2d(x, method='2d', **kwargs):
 
     remote_instance = utils._eval_remote_instance(
         remote_instance, raise_error=False)
+
+    # Keep track of limits if necessary
+    lim = []
 
     if skids:
         skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
@@ -351,9 +351,9 @@ def plot2d(x, method='2d', **kwargs):
             colormap.update({str(n): cm[i + skdata.shape[0]]
                              for i, n in enumerate(dotprops.gene_name.tolist())})
     elif isinstance(color, dict):
-        colormap = {n: tuple(color[n]) for n in color}
+        colormap = {n: mcl.to_rgb(color[n]) for n in color}
     elif isinstance(color, (list, tuple)):
-        colormap = {n: tuple(color) for n in all_identifiers}
+        colormap = {n: mcl.to_rgb(color) for n in all_identifiers}
     elif isinstance(color, str):
         color = tuple([c for c in mcl.to_rgb(color)])
         colormap = {n: color for n in all_identifiers}
@@ -383,10 +383,18 @@ def plot2d(x, method='2d', **kwargs):
             raise TypeError(
                 'Ax must be of type "mpl.axes.Axes", not "{}"'.format(type(ax)))
         fig = ax.get_figure()
-        if method in ['3d', '3d_complex'] and ax.name != '3d':
-            raise TypeError('Axis must be 3d.')
-        elif method == '2d' and ax.name == '3d':
-            raise TypeError('Axis must be 2d.')
+        if method in ['3d', '3d_complex']:
+            if ax.name != '3d':
+                raise TypeError('Axis must be 3d.')
+
+            # Add existing limits to ax
+            lim += np.array((ax.get_xlim3d(),
+                             ax.get_zlim3d(),
+                             ax.get_ylim3d())
+                            ).T.tolist()
+        elif method == '2d':
+            if ax.name == '3d':
+                raise TypeError('Axis must be 2d.')
 
     # Prepare some stuff for depth coloring
     if depth_coloring and method == '3d_complex':
