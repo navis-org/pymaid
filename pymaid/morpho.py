@@ -1564,7 +1564,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         return
 
 
-def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False):
+def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False):
     """ Removes spikes in neuron traces (e.g. from jumps in image data).
 
     Notes
@@ -1585,6 +1585,10 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False):
                         Determines how long (# of nodes) a spike can be.
     inplace :           bool, optional
                         If False, a copy of the neuron is returned.
+    reverse :           bool, optional
+                        If True, will **also** walk the segments from proximal
+                        to distal. Use this to catch spikes on e.g. terminal
+                        nodes.
 
     Returns
     -------
@@ -1618,6 +1622,11 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False):
 
     # Index treenodes table by treenode ID
     this_treenodes = x.nodes.set_index('treenode_id')
+
+    segs_to_walk = x.segments
+
+    if reverse:
+        segs_to_walk += x.segments[::-1]
 
     # For each spike length do -> do this in reverse to correct the long
     # spikes first
