@@ -260,7 +260,8 @@ class LoadTiles:
 
         # Get fastest img mirror
         self.img_mirror = sorted(
-            info['mirrors'], key=lambda x: test_response_time(x['image_base'], calls=2))[0]
+            info['mirrors'], key=lambda x: test_response_time(x['image_base'],
+                                                              calls=2))[0]
         self.tile_width = self.img_mirror['tile_width']
         self.mirror_url = self.img_mirror['image_base']
         self.file_ext = self.img_mirror['file_extension']
@@ -809,7 +810,7 @@ def test_response_time(url, calls=5):
     for i in range(calls):
         start = time.time()
         try:
-            _ = urllib.request.urlopen(url)
+            _ = urllib.request.urlopen(url, timeout=3)
             resp_times.append(time.time() - start)
         except urllib.error.HTTPError as err:
             if err.code == 404:
