@@ -260,8 +260,26 @@ class CatmaidInstance:
             return response
 
     def make_url(self, *args, **GET):
-        """ Generates URL from *args. **GET are assumed to be arguments
-        for GET requests and will be added.
+        """ Generates URL.
+
+        Parameters
+        ----------
+        *args
+                    Will be turned into the URL. For example::
+
+                        >>> remote_instance.make_url('skeleton', 'list')
+                        'http://my-server.com/skeleton/list'
+
+        **GET
+                    Keyword arguments are assumed to be GET request queries
+                    and will be encoded in the url. For example::
+
+                        >>> remote_instance.make_url('skeleton', node_gt: 100)
+                        'http://my-server.com/skeleton?node_gt=100'
+
+        Returns
+        -------
+        url :       str
         """
         # Generate the URL
         url = self.server
