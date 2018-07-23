@@ -141,3 +141,5 @@ Filtering/Subsetting
     :toctree: generated/
 
 	~pymaid.filter_connectivity
+    ~pymaid.cn_table_from_connectors
+    ~pymaid.adjacency_from_connectors

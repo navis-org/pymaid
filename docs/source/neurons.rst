@@ -11,7 +11,7 @@ Single neurons and lists of neurons are represented in ``pymaid`` by:
  	~pymaid.CatmaidNeuron
  	~pymaid.CatmaidNeuronList
 
-They can be minimally initialized with just skeleton IDs. So you can do 
+They can be minimally initialized with just skeleton IDs. So you can do
 something like this::
 
 	>>> n = pymaid.CatmaidNeuron(16)
@@ -46,24 +46,24 @@ functions like :func:`~pymaid.get_neuron` that already contain some data::
 	n_open_ends                                       280
 	cable_length                                  2866.11
 	review_status                                      NA
-	soma                                          2941309	
+	soma                                          2941309
 
 :func:`pymaid.get_neuron` returned a :class:`~pymaid.CatmaidNeuron` with name,
 nodes, connectors and tags::
 
 	>>> n.nodes
 	   treenode_id parent_id  creator_id       x       y       z  radius  \
-	0     17909304  26337791         123  355710  153742  152440      -1   
-	1     26337791  26337787         117  355738  153802  152400      -1   
-	2     26337787   3148134         117  355790  153922  152320      -1   
-	3      6532788  25728462          94  349025  160905  154160      -1   
-	4     25728462   6532787         117  349059  160783  154360      -1   
+	0     17909304  26337791         123  355710  153742  152440      -1
+	1     26337791  26337787         117  355738  153802  152400      -1
+	2     26337787   3148134         117  355790  153922  152320      -1
+	3      6532788  25728462          94  349025  160905  154160      -1
+	4     25728462   6532787         117  349059  160783  154360      -1
 
-	   confidence  type  
-	0           5   end  
-	1           5  slab  
-	2           5  slab  
-	3           5  slab  
+	   confidence  type
+	0           5   end
+	1           5  slab
+	2           5  slab
+	3           5  slab
 	4           5  slab
 
 
@@ -89,21 +89,21 @@ data from the server::
  	 'glomerulus DA1 right excitatory']
 
 
-Function such as :func:`~pymaid.get_neuron` return multiple neurons as
+Functions such as :func:`~pymaid.get_neuron` return multiple neurons as
 :class:`~pymaid.CatmaidNeuronList`::
 
 	>>> nl = pymaid.get_neuron([16, 27295])
 	>>> nl
-	<class 'pymaid.core.CatmaidNeuronList'> of 2 neurons 
+	<class 'pymaid.core.CatmaidNeuronList'> of 2 neurons
                  	  neuron_name skeleton_id  n_nodes  n_connectors  \
-	0    PN glomerulus VA6 017 DB          16    12743          2028   
-	1  PN glomerulus DA1 27296 BH       27295     9973           469   
+	0    PN glomerulus VA6 017 DB          16    12743          2028
+	1  PN glomerulus DA1 27296 BH       27295     9973           469
 
-	   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma  
-	0             774          823        280   2866.105439            NA  True  
-	1             212          219         58   1591.519821            NA  True  
+	   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma
+	0             774          823        280   2866.105439            NA  True
+	1             212          219         58   1591.519821            NA  True
 
-:class:`~pymaid.CatmaidNeuronList` work similar to normal lists with a few
+A :class:`~pymaid.CatmaidNeuronList` works similar to normal lists with a few
 additional perks::
 
 	>>> nl[0]
@@ -133,13 +133,13 @@ additional perks::
 	soma                                          2941309
 
 	>>> nl.has_annotations('glomerulus VA6')
-	<class 'pymaid.core.CatmaidNeuronList'> of 1 neurons 
+	<class 'pymaid.core.CatmaidNeuronList'> of 1 neurons
                  	  neuron_name skeleton_id  n_nodes  n_connectors  \
-	0    PN glomerulus VA6 017 DB          16    12743          2028   	
+	0    PN glomerulus VA6 017 DB          16    12743          2028
 
-	   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma  
-	0             774          823        280   2866.105439            NA  True  
-	
+	   n_branch_nodes  n_end_nodes  open_ends  cable_length review_status  soma
+	0             774          823        280   2866.105439            NA  True
+
 
 They allow easy and fast access to data across all neurons::
 
@@ -150,7 +150,7 @@ They allow easy and fast access to data across all neurons::
 	array([2866.10543944, 1591.51982146])
 
 
-In addition to these **attributes**, both :class:`~pymaid.CatmaidNeuron` and 
+In addition to these **attributes**, both :class:`~pymaid.CatmaidNeuron` and
 :class:`~pymaid.CatmaidNeuronList` have shortcuts (called **methods**) to
 other pymaid functions. These lines of code are equivalent::
 
@@ -168,87 +168,43 @@ in the excellent pandas library. If ``inplace=True`` operations are performed
 on the original. Ff ``inplace=False`` operations are performed on a copy of the
 original which is then returned::
 
-	>>> n = pymaid.get_neuron(16)	
+	>>> n = pymaid.get_neuron(16)
 	>>> n_lh = n.prune_by_volume('LH_R', inplace=False)
 	>>> n.n_nodes, n_lh.n_nodes
 	(12743, 3564)
 
-Please see other sections and the docstrings of 
+Please see other sections and the docstrings of
 :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` for
 more examples.
 
 Neuron attributes
 -----------------
 
-This is a *selection* of :class:`~pymaid.CatmaidNeuron` and 
+This is a *selection* of :class:`~pymaid.CatmaidNeuron` and
 :class:`~pymaid.CatmaidNeuronList` class attributes:
 
 - ``skeleton_id``: neurons' skeleton ID(s)
 - ``neuron_name``: neurons' name(s)
 - ``nodes``: treenode table
 - ``connectors``: connector table
+- ``presynapses``: connector table for presynapses only
+- ``postsynapses``: connector table for postsynapses only
+- ``gap_junctions``: connector table for gap junctions only
 - ``partners``: connectivity table
 - ``tags``: node tags (dict)
 - ``annotations``: list of neurons' annotations
 - ``cable_length``: cable length(s) in nm
 - ``review_status``: review status of neuron(s)
 - ``soma``: treenode ID of soma (if applicable)
+- ``root``: root treenode ID
 - ``segments``: list of linear segments
 - ``graph``: NetworkX graph representation of the neuron
 - ``igraph``: iGraph representation of the neuron (if library available)
 - ``dps``: Dotproduct representation of the neuron
 
+All attributes are accessible through auto-completion.
 
-Neuron methods
---------------
+Reference
+---------
 
-See :class:`~pymaid.CatmaidNeuron` or ``help(pymaid.CatmaidNeuron)`` for complete list.
-
-CatmaidNeuron/List methods
-++++++++++++++++++++++++++
-.. autosummary::
-	:toctree: generated/
-
-	pymaid.CatmaidNeuron.plot3d
-	pymaid.CatmaidNeuron.plot2d
-	pymaid.CatmaidNeuron.prune_by_strahler
-	pymaid.CatmaidNeuron.prune_by_volume
-	pymaid.CatmaidNeuron.prune_distal_to
-	pymaid.CatmaidNeuron.prune_proximal_to
-	pymaid.CatmaidNeuron.prune_by_longest_neurite
-	pymaid.CatmaidNeuron.reroot
-	pymaid.CatmaidNeuron.reload
-	pymaid.CatmaidNeuron.summary
-	pymaid.CatmaidNeuron.resample
-	pymaid.CatmaidNeuron.downsample
-	pymaid.CatmaidNeuron.copy
-	pymaid.CatmaidNeuron.to_swc	
-
-
-CatmaidNeuron-specific
-++++++++++++++++++++++
-.. autosummary::
-	:toctree: generated/
-
-	pymaid.CatmaidNeuron.from_swc
-	pymaid.CatmaidNeuron.plot_dendrogram	
-
-
-CatmaidNeuronList-specific
-+++++++++++++++++++++++++++
-.. autosummary::
-	:toctree: generated/
-
-	pymaid.CatmaidNeuronList.to_selection
-	pymaid.CatmaidNeuronList.from_selection
-	pymaid.CatmaidNeuronList.has_annotation
-	pymaid.CatmaidNeuronList.summary
-	pymaid.CatmaidNeuronList.head
-	pymaid.CatmaidNeuronList.sort_values
-	pymaid.CatmaidNeuronList.sample
-	pymaid.CatmaidNeuronList.remove_duplicates
-	pymaid.CatmaidNeuronList.sum
-	pymaid.CatmaidNeuronList.mean
-	pymaid.CatmaidNeuronList.itertuples
-
-
+See :class:`~pymaid.CatmaidNeuron` or :ref:`API <api_neurons>`.

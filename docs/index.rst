@@ -1,46 +1,41 @@
-PyMaid
-======
+pymaid: neuron analysis toolbox
+===============================
 
-:Release: |version|
-:Date: |today|
+.. raw:: html
 
-PyMaid is a Python 3 package for working with neurons generated with CATMAID.
-It allows you to fetch, analyse and plot data from a CATMAID server.
-The package is (sort of) stable for now but I recommend watching its 
+   <div class="container-fluid">
+      <div class="row">
+         <div class="col-md-6">
+
+Pymaid is a Python library for visualisation and analysis of neuron data generated
+with `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_. It allows you to
+fetch, analyse and plot neuron morpholgy and connectivity from a CATMAID server.
+
+The package is stable for but I recommend watching its
 `Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
-Make sure that your ``pymaid.__version__`` is up-to-date (see
-**Release** above).
+Make sure that your ``pymaid.__version__`` is up-to-date.
 
-Features
---------
+For a brief introduction to the library, you can read the
+:ref:`tutorial <tutorial>`. Visit the
+:ref:`installation page <installing>` page to see how to download the
+package. You can browse the :ref:`example gallery <example_gallery>` and
+:ref:`API reference <api>`  to see what you can do with pymaid.
 
-* wrappers for CATMAID's API to fetch data
-* custom neuron objects that perform on-demand data fetching
-* 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
-* virtual neuron surgery (cutting, stitching, pruning, rerooting)
-* R bindings (e.g. for libraries nat, nat.nblast and elmr)
-* interface with Blender 3D
-* import/export from/to SWC
-* and oh so much more...
-
-Contribute
-----------
-
-Source Code: https://github.com/schlegelp/PyMaid
-
-Issue Tracker: https://github.com/schlegelp/PyMaid/issues
-
-Support
--------
-
+Pymaid is licensed under the GNU GPL v3+ license. The Source code is hosted
+at `Github <https://github.com/schlegelp/PyMaid>`_. This is also where
+`issues <https://github.com/schlegelp/PyMaid/issues>`_ are being tracked.
 If you have any questions, please don't hesitate: pms70@cam.ac.uk
 
-License
----------
-PyMaid is licensed under the GNU GPL v3+ license
 
-Table of Contents
------------------
+.. raw:: html
+
+         </div>
+         <div class="col-md-3">
+            <div class="panel panel-default">
+               <div class="panel-heading">
+                  <h3 class="panel-title">Contents</h3>
+               </div>
+               <div class="panel-body">
 
 .. toctree::
    :maxdepth: 1
@@ -60,10 +55,33 @@ Table of Contents
    source/troubleshooting
    examples/examples_index
 
-Indices and tables
-==================
+.. raw:: html
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+               </div>
+            </div>
+         </div>
+         <div class="col-md-3">
+            <div class="panel panel-default">
+               <div class="panel-heading">
+                  <h3 class="panel-title">Features</h3>
+               </div>
+               <div class="panel-body">
+
+* fetch data from CATMAID server
+* custom neuron objects w/ on-demand data fetching
+* 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
+* virtual neuron surgery (cutting, stitching, pruning, rerooting)
+* R bindings (e.g. for libraries nat, nat.nblast and elmr)
+* interface with Blender 3D
+* import/export from/to SWC
+* load EM data
+* and oh so much more...
+
+.. raw:: html
+
+               </div>
+            </div>
+         </div>
+      </div>
+   </div>
 

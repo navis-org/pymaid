@@ -1,179 +1,9 @@
+.. _api:
+
 API Reference
 =============
 
-.. _neuron-reference:
-
-CatmaidNeuron/List
-++++++++++++++++++
-
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.CatmaidNeuron
-    ~pymaid.CatmaidNeuronList
-
-CatmaidNeuron/List methods
---------------------------
-
-.. autosummary::
-    :toctree: generated/
-
-    pymaid.CatmaidNeuron.plot3d
-    pymaid.CatmaidNeuron.plot2d
-    pymaid.CatmaidNeuron.plot_dendrogram
-    pymaid.CatmaidNeuron.prune_by_strahler
-    pymaid.CatmaidNeuron.prune_by_volume
-    pymaid.CatmaidNeuron.prune_distal_to
-    pymaid.CatmaidNeuron.prune_proximal_to
-    pymaid.CatmaidNeuron.prune_by_longest_neurite
-    pymaid.CatmaidNeuron.reroot
-    pymaid.CatmaidNeuron.reload
-    pymaid.CatmaidNeuron.summary
-    pymaid.CatmaidNeuron.resample
-    pymaid.CatmaidNeuron.downsample
-    pymaid.CatmaidNeuron.copy
-
-CatmaidNeuronList-specific
---------------------------
-.. autosummary::
-    :toctree: generated/
-
-    pymaid.CatmaidNeuronList.to_selection
-    pymaid.CatmaidNeuronList.from_selection
-    pymaid.CatmaidNeuronList.has_annotation
-
-
-Neuron Morphology
-+++++++++++++++++
-
-Manipulation
-------------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.cut_neuron
-    ~pymaid.reroot_neuron
-    ~pymaid.stitch_neurons
-    ~pymaid.split_axon_dendrite
-    ~pymaid.split_into_fragments
-    ~pymaid.longest_neurite
-    ~pymaid.prune_by_strahler
-    ~pymaid.subset_neuron
-    ~pymaid.average_neurons
-    ~pymaid.remove_tagged_branches
-    ~pymaid.despike_neuron
-    ~pymaid.guess_radius
-
-Resampling
-----------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.resample_neuron
-    ~pymaid.downsample_neuron
-
-Analysis
---------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.arbor_confidence
-    ~pymaid.bending_flow
-    ~pymaid.calc_cable
-    ~pymaid.classify_nodes
-    ~pymaid.find_main_branchpoint
-    ~pymaid.flow_centrality
-    ~pymaid.segregation_index
-    ~pymaid.strahler_index
-
-Distances
----------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.cable_overlap
-    ~pymaid.geodesic_matrix
-    ~pymaid.distal_to
-    ~pymaid.dist_between
-
-Intersection
-------------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.in_volume
-
-
-Connectivity
-++++++++++++
-
-Graphs
-------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.neuron2nx
-    ~pymaid.neuron2igraph
-    ~pymaid.neuron2KDTree
-    ~pymaid.network2nx
-    ~pymaid.network2igraph
-
-Predicting connectivity
------------------------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.predict_connectivity
-
-Adjacency matrices
-------------------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.adjacency_matrix
-    ~pymaid.group_matrix
-
-Connectivity clustering
------------------------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.cluster_by_connectivity
-    ~pymaid.cluster_by_synapse_placement
-    ~pymaid.ClustResults
-
-Plotting network
-----------------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.plot_network
-
-Filtering
----------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.filter_connectivity
-
-
-Plotting
-++++++++
-
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.plot3d
-    ~pymaid.plot2d
-    ~pymaid.plot1d
-    ~pymaid.plot_network
-    ~pymaid.clear3d
-    ~pymaid.close3d
-    ~pymaid.get_viewer
-    ~pymaid.screenshot
-    ~pymaid.Volume
-    ~pymaid.Viewer
-
+.. _api_fetch:
 
 Fetching data
 +++++++++++++
@@ -262,6 +92,8 @@ Volumes
 
     ~pymaid.get_volume
 
+.. _api_misc:
+
 Misc
 ----
 .. autosummary::
@@ -272,6 +104,194 @@ Misc
     ~pymaid.get_review
     ~pymaid.get_review_details
 
+.. _api_neurons:
+
+CatmaidNeuron/List
+++++++++++++++++++
+
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.CatmaidNeuron
+    ~pymaid.CatmaidNeuronList
+
+CatmaidNeuron/List methods
+--------------------------
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.CatmaidNeuron.plot3d
+    pymaid.CatmaidNeuron.plot2d
+    pymaid.CatmaidNeuron.plot_dendrogram
+    pymaid.CatmaidNeuron.prune_by_strahler
+    pymaid.CatmaidNeuron.prune_by_volume
+    pymaid.CatmaidNeuron.prune_distal_to
+    pymaid.CatmaidNeuron.prune_proximal_to
+    pymaid.CatmaidNeuron.prune_by_longest_neurite
+    pymaid.CatmaidNeuron.reroot
+    pymaid.CatmaidNeuron.reload
+    pymaid.CatmaidNeuron.summary
+    pymaid.CatmaidNeuron.resample
+    pymaid.CatmaidNeuron.downsample
+    pymaid.CatmaidNeuron.copy
+    pymaid.CatmaidNeuron.from_swc
+    pymaid.CatmaidNeuron.to_swc
+
+CatmaidNeuronList-specific
+--------------------------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.CatmaidNeuronList.to_selection
+    pymaid.CatmaidNeuronList.from_selection
+    pymaid.CatmaidNeuronList.has_annotation
+    pymaid.CatmaidNeuronList.sample
+    pymaid.CatmaidNeuronList.remove_duplicates
+    pymaid.CatmaidNeuronList.head
+    pymaid.CatmaidNeuronList.tail
+    pymaid.CatmaidNeuronList.itertuples
+    pymaid.CatmaidNeuronList.summary
+    pymaid.CatmaidNeuronList.mean
+    pymaid.CatmaidNeuronList.sum
+    pymaid.CatmaidNeuronList.sort_values
+
+
+.. _api_plot:
+
+Plotting
+++++++++
+
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.plot3d
+    ~pymaid.plot2d
+    ~pymaid.plot1d
+    ~pymaid.plot_network
+    ~pymaid.clear3d
+    ~pymaid.close3d
+    ~pymaid.get_viewer
+    ~pymaid.screenshot
+    ~pymaid.Volume
+    ~pymaid.Viewer
+
+
+.. _api_morph:
+
+Neuron Morphology
++++++++++++++++++
+
+Manipulation
+------------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.cut_neuron
+    ~pymaid.reroot_neuron
+    ~pymaid.stitch_neurons
+    ~pymaid.split_axon_dendrite
+    ~pymaid.split_into_fragments
+    ~pymaid.longest_neurite
+    ~pymaid.prune_by_strahler
+    ~pymaid.subset_neuron
+    ~pymaid.average_neurons
+    ~pymaid.remove_tagged_branches
+    ~pymaid.despike_neuron
+    ~pymaid.guess_radius
+
+Resampling
+----------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.resample_neuron
+    ~pymaid.downsample_neuron
+
+Analysis
+--------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.arbor_confidence
+    ~pymaid.bending_flow
+    ~pymaid.calc_cable
+    ~pymaid.classify_nodes
+    ~pymaid.find_main_branchpoint
+    ~pymaid.flow_centrality
+    ~pymaid.segregation_index
+    ~pymaid.strahler_index
+
+Distances
+---------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.cable_overlap
+    ~pymaid.geodesic_matrix
+    ~pymaid.distal_to
+    ~pymaid.dist_between
+
+Intersection
+------------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.in_volume
+
+.. _api_con:
+
+Connectivity
+++++++++++++
+
+Graphs
+------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.neuron2nx
+    ~pymaid.neuron2igraph
+    ~pymaid.neuron2KDTree
+    ~pymaid.network2nx
+    ~pymaid.network2igraph
+
+Predicting connectivity
+-----------------------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.predict_connectivity
+
+Adjacency matrices
+------------------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.adjacency_matrix
+    ~pymaid.group_matrix
+
+Connectivity clustering
+-----------------------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.cluster_by_connectivity
+    ~pymaid.cluster_by_synapse_placement
+    ~pymaid.ClustResults
+
+Plotting network
+----------------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.plot_network
+
+Filtering
+---------
+.. autosummary::
+    :toctree: generated/
+
+    ~pymaid.filter_connectivity
 
 Import/Export
 +++++++++++++
@@ -283,6 +303,7 @@ Import/Export
     pymaid.neuron2json
     pymaid.json2neuron
 
+.. _api_b3d:
 
 Blender API
 +++++++++++
@@ -324,15 +345,13 @@ Selections
     pymaid.b3d.object_list.use_transparency
     pymaid.b3d.object_list.alpha
     pymaid.b3d.object_list.bevel
-
     pymaid.b3d.object_list.hide
     pymaid.b3d.object_list.unhide
     pymaid.b3d.object_list.hide_others
-
     pymaid.b3d.object_list.delete
-
     pymaid.b3d.object_list.to_json
 
+.. _api_userstats:
 
 User statistics
 +++++++++++++++
