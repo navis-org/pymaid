@@ -90,7 +90,7 @@ logger = config.logger
 
 class CatmaidInstance:
     """ Class giving access to a CATMAID instance. Holds base url,
-    credentials and fetches data. You can either pass this object to
+    credentials and fetches data. You can either pass it to
     functions individually or define globally (default).
 
     Attributes
@@ -104,40 +104,72 @@ class CatmaidInstance:
     authtoken :     str
                     User token - see CATMAID documentation on how to get it.
     project_id :    int, optional
-                    ID of your project. Default = 1
-    time_out :      int | None
-                    Time in seconds after which fetching data will time-out
-                    (so as to not block the system).
+                    ID of your project. Default = 1.
     max_threads :   int | None
                     Maximum parallel threads to be used. Note that some
                     functions (e.g. :func:`pymaid.get_skid_from_treenode`)
                     override this parameter.
     set_global :    bool, optional
-                    If True, this remote instance will be set as global by
-                    adding it as module ``'remote_instance'`` to ``sys.modules``.
+                    If True, this instance will be set as global (default)
+                    CatmaidInstance. This overrides pre-existing global
+                    instances.
 
     Examples
     --------
-    Ordinarily, you would use one of the wrapper functions in
-    :mod:`pymaid.fetch` but if you want to get the raw data,
-    here is how it goes:
+    Initialise a CatmaidInstance. Note that ``HTTP_USER`` and ``HTTP_PASSWORD``
+    are only necessary if your server requires HTTP authentification.
 
-    >>> # 1.) Fetch raw skeleton data for a single neuron
-    >>> import pymaid
-    >>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org',
-    ...                                      'user',
-    ...                                      'password',
-    ...                                      'token'
-    ...                                     )
+    >>> rm = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
+    ...                             'HTTP_USER',
+    ...                             'HTTP_PASSWORD',
+    ...                             'TOKEN')
+    INFO  : Global CATMAID instance set. (pymaid.fetch)
+
+    As you instanciate CatmaidInstance, it is made the default, “global”
+    remote instance and you don’t need to worry about it anymore.
+
+    By default, a CatmaidInstance will refer to the first project on your
+    server. To illustrate, let's assume you have two projects and you want to
+    fetch data from both:
+
+    >>> p1 = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
+    ...                             'HTTP_USER',
+    ...                             'HTTP_PASSWORD',
+    ...                             'TOKEN')
+    >>> # Make copy of CatmaidInstance and change project ID
+    >>> p2 = p1.copy()
+    >>> p2.project_id = 2
+    >>> # Fetch a neuron from project 1 and another from project 2
+    >>> n1 = pymaid.get_neuron(16, remote_instance=p1)
+    >>> n2 = pymaid.get_neuron(233007, remote_instance=p2)
+
+    Manually make one CatmaidInstance the global one
+
+    >>> p2.make_global()
+
+    Ordinarily, you would use one of the wrapper functions to fetch data
+    from the server (e.g. :func:`pymaid.get_neuron`). If however you want
+    to get the **raw data**, here is how:
+
+    >>> # 1. Fetch raw skeleton data for a single neuron
+    >>> rm = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
+    ...                             'HTTP_USER',
+    ...                             'HTTP_PASSWORD',
+    ...                             'TOKEN')
     >>> skeleton_id = 12345
-    >>> 3d_skeleton_url = myInstance._get_compact_skeleton_url( skeleton_id )
-    >>> raw_data = myInstance.fetch( 3d_skeleton_url )
-    >>> # 2.) Alternatively, use wrapper which returns CatmaidNeuron objects
-    >>> neuron_list = pymaid.get_neuron ( skeleton_id , myInstance )
-    >>> # Print summary
-    >>> print(neuron_list)
-
+    >>> url = rm._get_compact_skeleton_url(skeleton_id)
+    >>> raw_data = rm.fetch(url)
+    >>> # 2. Query for neurons matching given criteria using GET request
+    >>> GET = {'nodecount_gt': 1000, # min node size
+                    'created_by': 16}    # user ID
+    >>> url = rm._get_list_skeletons_url(**GET)
+    >>> raw_data = rm.fetch(url)
+    >>> # 3. Fetch contributions using POST request
+    >>> url = rm._get_contributions_url()
+    >>> POST = {'skids[0]': 16, 'skids[1]': 2333007}
+    >>> raw_data = rm.fetch(url, POST)
     """
+
     def __init__(self, server, authname, authpassword, authtoken,
                  project_id=1, max_threads=100, make_global=True):
         # Catch too many backslashes
