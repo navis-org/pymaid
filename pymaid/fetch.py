@@ -292,6 +292,20 @@ class CatmaidInstance:
             url += '?{}'.format(urllib.parse.urlencode(GET))
         return url
 
+    def __copy__(self):
+        return self.copy()
+
+    def __deepcopy__(self):
+        return self.copy()
+
+    def copy(self):
+        """Returns a copy of this CatmaidInstance.
+        """
+        return CatmaidInstance(self.server, self.authname,
+                               self.authpassword, self.authtoken,
+                               self.project_id, self.max_threads,
+                               make_global=False)
+
     def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
         return self.make_url('version', **GET)
