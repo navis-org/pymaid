@@ -659,12 +659,12 @@ class CatmaidNeuron:
         ----------
         **kwargs
                 Will be passed to :func:`pymaid.plot2d`.
-                See ``help(pymaid.plot3d)`` for a list of keywords
+                See ``help(pymaid.plot2d)`` for a list of keywords.
 
         See Also
         --------
         :func:`pymaid.plot2d`
-                    Function called to generate 2d plot
+                    Function called to generate 2d plot.
 
         """
 
@@ -754,7 +754,7 @@ class CatmaidNeuron:
         return self.neuron_name
 
     def resample(self, resample_to, inplace=True):
-        """Resample the neuron to given resolution.
+        """Resample the neuron to given resolution [nm].
 
         Parameters
         ----------
@@ -1117,6 +1117,7 @@ class CatmaidNeuron:
         return output.getvalue()
 
     def __add__(self, to_add):
+        """Implements addition. """
         if isinstance(to_add, list):
             if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
                 return CatmaidNeuronList([self] + [to_add], make_copy=False)
@@ -1596,6 +1597,7 @@ class CatmaidNeuronList:
         raise AttributeError('No neuron matching the search critera.')
 
     def __add__(self, to_add):
+        """Implements addition. """
         if isinstance(to_add, CatmaidNeuron):
             return CatmaidNeuronList(self.neurons + [to_add],
                                      make_copy=self.copy_on_subset)
@@ -1615,17 +1617,20 @@ class CatmaidNeuronList:
                 'Unable to add data of type {0}'.format(type(to_add)))
 
     def __sub__(self, to_sub):
+        """Implements substraction. """
         if isinstance(to_sub, (str, int)):
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
             if to_sub.skeleton_id in self and to_sub not in self.neurons:
-                logger.warning('Skeleton ID in neuronlist but neuron not identical: not substracted! Try using .skeleton_id instead.')
+                logger.warning('Skeleton ID in neuronlist but neuron not identical! Substraction cancelled! Try using .skeleton_id instead.')
+                return
             return CatmaidNeuronList([n for n in self.neurons if n != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
-            if [n.skeleton_id in self and n not in self.neurons for n in to_sub]:
-                logger.warning('Skeleton ID(s) in neuronlist but neuron(s) not identical: not substracted! Try using .skeleton_id instead.')
+            if len(set(self.neurons) & set(to_sub.neurons)) != len(set(self.skeleton_id) & set(to_sub.skeleton_id)):
+                logger.warning('Skeleton ID(s) in neuronlist but neuron(s) not identical! Substraction cancelled! Try using .skeleton_id instead.')
+                return
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub],
                                      make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_sub):
