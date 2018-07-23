@@ -46,14 +46,15 @@ import json
 import os
 import time
 
+logger = config.logger
+
 try:
     import bpy
     import bmesh
 except ImportError:
-    raise ImportError(
-        'Unable to load Blender API - this module only works from within Blender!')
 
-logger = config.logger
+    logger.error(
+        'Unable to load Blender API - this module only works from within Blender!')
 
 
 class handler:
