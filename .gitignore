@@ -28,6 +28,7 @@ Thumbs.db
 .Python
 env/
 build/
+generated/
 develop-eggs/
 #dist/
 downloads/
