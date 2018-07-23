@@ -2477,6 +2477,10 @@ class CatmaidNeuronList:
         """Return summary for top N neurons."""
         return self.summary(n=n)
 
+    def tail(self, n=5):
+        """Return summary for bottom N neurons."""
+        return self.summary(n=slice(-n, len(self)))
+
     def remove_duplicates(self, inplace=False):
         """Removes duplicate neurons from list. Based on skeleton IDs."""
         if inplace:
