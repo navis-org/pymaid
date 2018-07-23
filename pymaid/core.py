@@ -1413,8 +1413,8 @@ class CatmaidNeuronList:
 
         Parameters
         ----------
-        n :         int, optional
-                    Get only first N entries
+        n :         int | slice, optional
+                    If int, get only first N entries.
         add_cols :  list, optional
                     Additional columns for the summary. If attribute not
                     available will return 'NA'.
@@ -1425,7 +1425,11 @@ class CatmaidNeuronList:
 
         """
         d = []
-        for n in self.neurons[:n]:
+
+        if not isinstance(n, slice):
+            n = slice(n)
+
+        for n in self.neurons[n]:
             neuron_name = n.__dict__.get('neuron_name', 'NA')
             review_status = n.__dict__.get('review_status', 'NA')
 
