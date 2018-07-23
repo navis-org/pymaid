@@ -14,7 +14,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-import imageio
 import urllib.request
 
 import gc
@@ -35,6 +34,11 @@ import threading
 
 # Set up logging
 logger = config.logger
+
+try:
+    import imageio
+except ImportError:
+    logger.error('Unable to import imageio. Please make sure library is installed!')
 
 __all__ = sorted(['crop_neuron', 'LoadTiles'])
 
