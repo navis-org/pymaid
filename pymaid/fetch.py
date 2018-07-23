@@ -195,9 +195,6 @@ class CatmaidInstance:
 
         if make_global:
             self.make_global()
-        else:
-            logger.info(
-                'CATMAID instance created. See help(pymaid.CatmaidInstance) to learn how to define globally.')
 
     @property
     def max_threads(self):
