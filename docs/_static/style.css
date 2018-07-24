@@ -1,3 +1,6 @@
+/* This style sheet is from the excellent seaborn library: */
+/* https://seaborn.pydata.org (https://github.com/mwaskom/seaborn) */
+
 body { color: #444444 !important; }
 
 h1 { font-size: 40px !important; }
@@ -86,7 +89,7 @@ thead {
 }
 
 tr, th, td {
-    text-align: right;
+    text-align: left;
     vertical-align: middle;
     padding: 0.5em 0.5em;
     line-height: normal;
