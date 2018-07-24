@@ -68,13 +68,12 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
                <div class="panel-body">
 
 * fetch data from CATMAID server
-* custom neuron objects w/ on-demand data fetching
 * 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
 * virtual neuron surgery (cutting, stitching, pruning, rerooting)
 * R bindings (e.g. for libraries nat, nat.nblast and elmr)
 * interface with Blender 3D
 * import/export from/to SWC
-* load EM data
+* process EM image data
 * and oh so much more...
 
 .. raw:: html

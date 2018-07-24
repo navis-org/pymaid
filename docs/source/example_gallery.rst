@@ -23,7 +23,7 @@ find out details about a given function.
    Overview <neurons>
    Indexing NeuronLists <indexing_neuronlists>
    NeuronList math <neuronlist_math>
-   Parsing skeleton IDs <parsing_skids>
+   Parsing skeleton IDs <parsing_skids>   
 
 .. raw:: html
 
@@ -101,6 +101,7 @@ find out details about a given function.
    EM image data <tiles.ipynb>
    Troubleshooting <troubleshooting>
    Pymaid & R <rmaid_doc>
+   URLs & random sampling <generate_urls>
 
 .. raw:: html
 
