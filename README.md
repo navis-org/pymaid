@@ -1,7 +1,7 @@
 [![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Build Status](https://travis-ci.org/schlegelp/pyMaid.svg?branch=master)](https://travis-ci.org/schlegelp/pyMaid) [![Coverage Status](https://coveralls.io/repos/github/schlegelp/pyMaid/badge.svg?branch=master)](https://coveralls.io/github/schlegelp/pyMaid?branch=master) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=tree)
 
-pymaid
-======
+<img src="https://github.com/schlegelp/pyMaid/raw/master/docs/_static/favicon.png" height="24"> pymaid
+======================================================================================================
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
 Tested with CATMAID release version 2018.04.15 - if you are working with older versions you may experience incompatibilities due to API changes.
 
