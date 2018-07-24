@@ -7,8 +7,8 @@ pymaid: neuron analysis toolbox
       <div class="row">
          <div class="col-md-6">
 
-Pymaid is a Python library for visualisation and analysis of neuron data generated
-with `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_. It allows you to
+Pymaid is a Python library for **visualisation** and **analysis** of **neuron data**
+generated with `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_. It allows you to
 fetch, analyse and plot neuron morpholgy and connectivity from a CATMAID server.
 
 The package is stable for but I recommend watching its
