@@ -102,6 +102,7 @@ find out details about a given function.
    Troubleshooting <troubleshooting>
    Pymaid & R <rmaid_doc>
    URLs & random sampling <generate_urls>
+   User contributions <user_contributions>
 
 .. raw:: html
 

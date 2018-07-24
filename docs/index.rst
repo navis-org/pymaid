@@ -11,7 +11,7 @@ Pymaid is a Python library for **visualisation** and **analysis** of **neuron da
 generated with `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_. It allows you to
 fetch, analyse and plot neuron morpholgy and connectivity from a CATMAID server.
 
-The package is stable for but I recommend watching its
+The package is stable but I recommend watching its
 `Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
 Make sure that your ``pymaid.__version__`` is up-to-date.
 
