@@ -50,7 +50,7 @@ dt:target, span.highlighted {
 }
 
 ul {
-    padding-left: 20px !important;  
+    padding-left: 20px !important;
 }
 
 ul.dropdown-menu {
@@ -64,12 +64,12 @@ ul.dropdown-menu {
 }
 
 /* From https://github.com/twbs/bootstrap/issues/1768 */
-*[id]:before { 
-  display: block; 
-  content: " "; 
-  margin-top: -75px; 
-  height: 75px; 
-  visibility: hidden; 
+*[id]:before {
+  display: block;
+  content: " ";
+  margin-top: -75px;
+  height: 75px;
+  visibility: hidden;
 }
 
 table {
@@ -80,7 +80,7 @@ table {
     border-collapse: collapse;
     border-spacing: 0;
     font-size: 12px;
-    table-layout: fixed;
+    /*table-layout: fixed;*/
 }
 
 thead {
