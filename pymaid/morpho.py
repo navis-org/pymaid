@@ -1764,11 +1764,18 @@ def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
     if isinstance(smooth, bool) and smooth:
         smooth = 5
 
+    # We will be using the index as distance to interpolate. For this we have
+    # to change method 'linear' to 'index'
+    method = 'index' if method == 'linear' else method
+
     # Collect connectors and calc distances
     cn = x.connectors.copy()
 
-    # For each connector (pre and post), get the X/Y distance to its treenode
+    # Prepare nodes (add parent_dist for later, set index)
+    _parent_dist(x, root_dist=0)
     nodes = x.nodes.set_index('treenode_id')
+
+    # For each connector (pre and post), get the X/Y distance to its treenode
     cn_locs = cn[['x', 'y']].values
     tn_locs = nodes.loc[cn.treenode_id.values,
                         ['x', 'y']].values
@@ -1787,7 +1794,15 @@ def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
     # Go over each segment and interpolate radii
     for s in config.tqdm(x.segments, desc='Interp.', disable=config.pbar_hide,
                   leave=config.pbar_leave):
-        this_radii = nodes.loc[s, 'radius']
+
+        # Get this segments radii and parent dist
+        this_radii = nodes.loc[s, ['radius', 'parent_dist']]
+        this_radii['parent_dist_cum'] = this_radii.parent_dist.cumsum()
+
+        # Set cumulative distance as index and drop parent_dist
+        this_radii = this_radii.set_index('parent_dist_cum', drop=True).drop('parent_dist', axis=1)
+
+        # Interpolate missing radii
         interp = this_radii.interpolate(method=method, limit_direction='both',
                                         limit=limit)
 
@@ -1795,7 +1810,7 @@ def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
             interp = interp.rolling(smooth,
                                     min_periods=1).max()
 
-        nodes.loc[s, 'radius'] = interp
+        nodes.loc[s, 'radius'] = interp.values
 
     # Set non-interpolated radii back to -1
     nodes.loc[nodes.radius.isnull(), 'radius'] = -1
