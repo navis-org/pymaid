@@ -33,9 +33,9 @@ __all__ = sorted(['downsample_neuron', 'resample_neuron'])
 def resample_neuron(x, resample_to, method='linear', inplace=False,
                     skip_errors=True):
     """ Resamples neuron(s) to given NM resolution. Preserves root, leafs,
-    branchpoints. Tags, connectors and radii > 0 are mapped onto the closest
+    branchpoints. Tags and connectors are mapped onto the closest
     new treenode. Columns "confidence" and "creator" of the treenode table
-    are currently discarded.
+    are discarded.
 
     Important
     ---------
@@ -51,7 +51,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     resample_to :       int
                         New resolution in NANOMETERS.
     method :            str, optional
-                        See `scipy.interpolate.interp1d` for possible options.
+                        See ``scipy.interpolate.interp1d`` for possible options.
                         By default, we're using linear interpolation.
     inplace :           bool, optional
                         If True, will modify original neuron. If False, a
@@ -59,6 +59,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     skip_errors :       bool, optional
                         If True, will skip errors during interpolation and
                         only print summary.
+
 
     Returns
     -------
@@ -69,15 +70,15 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     --------
     :func:`pymaid.downsample_neuron`
                         This function reduces the number of nodes instead of
-                        resample to certain resolution. Usefull if you are
+                        resample to certain resolution. Useful if you are
                         just after some simplification e.g. for speeding up
-                        your calculations or you want to preserve more of a
-                        neuron's structure.
-
+                        your calculations or you want to preserve treenode IDs.
     """
 
     if isinstance(x, core.CatmaidNeuronList):
-        results = [resample_neuron(x.loc[i], resample_to, inplace=inplace)
+        results = [resample_neuron(x[i], resample_to,
+                                  method='method', inplace=inplace,
+                                  skip_errors=skip_errors)
                    for i in config.trange(x.shape[0],
                                           desc='Resampl. neurons',
                                           disable=config.pbar_hide,
@@ -91,8 +92,10 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     if not inplace:
         x = x.copy()
 
+    # Collect some information for later
     nodes = x.nodes.set_index('treenode_id')
     locs = nodes[['x', 'y', 'z']]
+    radii = nodes['radius'].to_dict()
 
     new_nodes = []
     max_tn_id = x.nodes.treenode_id.max() + 1
@@ -102,9 +105,12 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     # Iterate over segments
     for i, seg in enumerate(config.tqdm(x.small_segments, desc='Proc. segments',
                                         disable=config.pbar_hide, leave=False)):
+        # Get coordinates
         coords = locs.loc[seg].values.astype(float)
+        # Get radii
+        rad = [radii[tn] for tn in seg]
 
-        # vecs between subsequently measured points
+        # Vecs between subsequently measured points
         vecs = np.diff(coords.T)
 
         # path: cum distance along points (norm from first to ith point)
@@ -114,7 +120,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         # If path is too short, just keep the first and last treenode
         if path[-1] < resample_to or (method == 'cubic' and len(seg) <= 3):
             new_nodes += [[seg[0], seg[-1], None, coords[0]
-                           [0], coords[0][1], coords[0][2], -1, 5]]
+                           [0], coords[0][1], coords[0][2], radii[seg[0]], 5]]
             continue
 
         # Coords of interpolation
@@ -127,6 +133,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
             sampleY = scipy.interpolate.interp1d(path, coords[:, 1],
                                                  kind=method)
             sampleZ = scipy.interpolate.interp1d(path, coords[:, 2],
+                                                 kind=method)
+            sampleR = scipy.interpolate.interp1d(path, rad,
                                                  kind=method)
         except ValueError as e:
             if skip_errors:
@@ -143,6 +151,7 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         xnew = sampleX(interp_coords)
         ynew = sampleY(interp_coords)
         znew = sampleZ(interp_coords)
+        rnew = sampleR(interp_coords).round(1)
 
         # Generate new coordinates
         new_coords = np.array([xnew, ynew, znew]).T.round()
@@ -152,8 +161,11 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
                              i for i in range(len(new_coords) - 2)] + seg[-1:]
 
         # Keep track of new nodes
-        new_nodes += [[tn, pn, None, co[0], co[1], co[2], -1, 5, ]
-                      for tn, pn, co in zip(new_ids[:-1], new_ids[1:], new_coords)]
+        new_nodes += [[tn, pn, None, co[0], co[1], co[2], -1, 5]
+                      for tn, pn, co, r in zip(new_ids[:-1],
+                                               new_ids[1:],
+                                               new_coords,
+                                               rnew)]
 
         # Increase max index
         max_tn_id += len(new_ids)
@@ -216,17 +228,6 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         new_tags = {t: [new_tag_tn[tn] for tn in x.tags[t]] for t in x.tags}
         x.tags = new_tags
 
-    # Map nodes with radius > 0 back
-    # 1. Get position of old synapse-bearing treenodes
-    old_tn_position = x.nodes.loc[x.nodes.radius > 0, ['x', 'y', 'z']].values
-    # 2. Get closest neighbours
-    distances = scipy.spatial.distance.cdist(
-        old_tn_position, new_nodes[['x', 'y', 'z']].values)
-    min_ix = np.argmin(distances, axis=1)
-    # 3. Map radii onto
-    new_nodes.loc[min_ix,
-                  'radius'] = x.nodes.loc[x.nodes.radius > 0, 'radius'].values
-
     # Set nodes
     x.nodes = new_nodes
 
@@ -272,7 +273,7 @@ def downsample_neuron(x, resampling_factor, preserve_cn_treenodes=True,
     --------
     :func:`pymaid.resample_neuron`
                              This function resamples a neuron to given
-                             resolution.
+                             resolution. This will not preserve treenode IDs!
 
     """
     if isinstance(x, core.CatmaidNeuronList):
