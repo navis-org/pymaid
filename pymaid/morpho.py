@@ -111,6 +111,46 @@ def _calc_dist(v1, v2):
     return math.sqrt(sum(((a - b)**2 for a, b in zip(v1, v2))))
 
 
+def _parent_dist(x, root_dist=None):
+    """ Adds ``parent_dist`` [nm] column to the treenode table.
+
+    Parameters
+    ----------
+    x :         CatmaidNeuron | treenode table
+    root_dist : int | None
+                ``parent_dist`` for the root's row. Set to ``None``, to leave
+                at ``NaN`` or e.g. to ``0`` to set to 0.
+
+    Returns
+    -------
+    Nothing
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        nodes = x.nodes
+    elif isinstance(x, pd.DataFrame):
+        nodes = x
+    else:
+        raise TypeError('Need CatmaidNeuron or DataFrame, got "{}"'.format(type(x)))
+
+    # Calculate distance to parent for each node
+    wo_root = nodes[~nodes.parent_id.isnull()]
+    tn_coords = wo_root[['x', 'y', 'z']].values
+
+    # Ready treenode table to be indexes by treenode_id
+    this_tn = nodes.set_index('treenode_id')
+    parent_coords = this_tn.loc[wo_root.parent_id.values,
+                                ['x', 'y', 'z']].values
+
+    # Calculate distances between nodes and their parents
+    w = np.sqrt(np.sum((tn_coords - parent_coords) ** 2, axis=1))
+
+    nodes['parent_dist'] = root_dist
+    nodes.loc[~nodes.parent_id.isnull(), 'parent_dist'] = w
+
+    return
+
+
 def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
     """ Calculates cable length in micrometer (um).
 
