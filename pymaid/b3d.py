@@ -45,6 +45,8 @@ import colorsys
 import json
 import os
 import time
+import math
+import mathutils
 
 logger = config.logger
 
@@ -150,13 +152,13 @@ class handler:
             raise AttributeError('Unknown attribute ' + key)
 
     def add(self, x, neurites=True, soma=True, connectors=True, redraw=True,
-            use_radii=False, skip_existing=False):
+            use_radii=False, skip_existing=False, **kwargs):
         """ Add neuron(s) to scene.
 
         Parameters
         ----------
         x :             CatmaidNeuron | CatmaidNeuronList | core.Volume
-                        Objects to import into Blender
+                        Objects to import into Blender.
         neurites :      bool, optional
                         Plot neurites. Default = True
         soma :          bool, optional
@@ -194,6 +196,8 @@ class handler:
             wm.progress_end()
         elif isinstance(x, core.Volume):
             self._create_mesh(x)
+        elif isinstance(x, np.ndarray):
+            self._create_scatter(x, **kwargs)
         else:
             logger.error(
                 'Unable to interpret data type ' + str(type(x)))
@@ -207,9 +211,49 @@ class handler:
         """ Clear all neurons """
         self.all.delete()
 
+    def _create_scatter(self, x, **kwargs):
+        """ Create scatter. """
+
+        if x.ndim != 2 or x.shape[1] != 3:
+            raise ValueError('Array must be of shape N,3')
+
+        # Get & scale coordinates and invert y
+        coords = x.astype(float)[:,[0, 2, 1]]
+        coords *= float(self.conversion)
+        coords *= [1, 1, -1]
+
+        base_verts, base_faces = CalcSphere(kwargs.get('size', 0.02),
+                                            kwargs.get('sp_res', 7),
+                                            kwargs.get('sp_res', 7))
+
+        n_verts = base_verts.shape[0]
+        sp_verts = []
+        sp_faces = []
+        for i, co in enumerate(coords):
+            this_verts = base_verts.copy()
+            # Offset spatially
+            this_verts += co
+            # Offset face indices
+            this_faces = [[ix + i * n_verts for ix in f] for f in base_faces]
+
+            sp_verts.append(this_verts)
+            sp_faces += this_faces
+
+        verts = np.concatenate(sp_verts, axis=0)
+
+        mesh = bpy.data.meshes.new(kwargs.get('name', 'scatter'))
+        mesh.from_pydata(verts, [], sp_faces)
+        obj = bpy.data.objects.new(kwargs.get('name', 'scatter'), mesh)
+        bpy.context.scene.objects.link(obj)
+        bpy.ops.object.shade_smooth()
+        obj.location = (0, 0, 0)
+        obj.show_name = False
+
+        return
+
     def _create_neuron(self, x, neurites=True, soma=True, connectors=True,
                        use_radii=False):
-        """Create neuron object """
+        """ Create neuron object """
 
         mat_name = ('M#' + x.neuron_name)[:59]
 
@@ -259,7 +303,7 @@ class handler:
         edges = np.vstack(edges)
 
         # Swap z and y and invert y coords
-        verts = verts[:,[0,2,1]] * np.array([1,1,-1])
+        verts = verts[:,[0, 2, 1]] * np.array([1, 1, -1])
 
         # Add all data at once
         mesh.from_pydata(verts, edges.astype(int), [])
@@ -307,6 +351,9 @@ class handler:
 
         #DO NOT touch this: lookup via dict is >10X faster!
         tn_coords = {r.treenode_id: (r.x * self.conversion, r.z * self.conversion, r.y * -self.conversion) for r in x.nodes.itertuples()}
+        if use_radii:
+            tn_radii = {r.treenode_id: r.radius * self.conversion for r in x.nodes.itertuples()}
+
 
         for s in x.segments:
             sp = cu.splines.new('POLY')
@@ -317,15 +364,15 @@ class handler:
             sp.points.add(len(coords) - 1)
 
             # Add this weird fourth coordinate
-            coords = np.c_[coords, [0]*coords.shape[0]]
+            coords = np.c_[coords, [0] * coords.shape[0]]
 
             # Set point coordinates
             sp.points.foreach_set('co', coords.ravel())
             sp.points.foreach_set('weight', s)
 
             if use_radii:
-                sp.points.foreach_set('radius',
-                                       nodes.loc[s,'radius'].values * self.conversion)
+                r = [tn_radii[tn] for tn in s]
+                sp.points.foreach_set('radius', r)
 
         ob.active_material = mat
 
@@ -336,7 +383,7 @@ class handler:
     def _create_soma(self, x, mat):
         """ Create soma """
         s = x.nodes.set_index('treenode_id').ix[x.soma]
-        loc = s[['x', 'z', 'y']].values * self.conversion * [1,1,-1]
+        loc = s[['x', 'z', 'y']].values * self.conversion * [1 ,1 ,-1]
         rad = s.radius * self.conversion
 
         mesh = bpy.data.meshes.new('Soma of #{0} - mesh'.format(x.skeleton_id))
@@ -787,3 +834,57 @@ class object_list:
 
         logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
         print('Selection saved as {0} in {1}'.format(fname, os.getcwd()))
+
+
+def CalcSphere(radius, nrPolar, nrAzimuthal):
+    """ Calculates vertices and faces for a sphere. """
+    dPolar = math.pi / (nrPolar - 1)
+    dAzimuthal = 2.0 * math.pi / (nrAzimuthal)
+
+
+    # 1/2: vertices
+    verts = []
+    currV = mathutils.Vector((0.0, 0.0, radius))        # top vertex
+    verts.append(currV)
+    for iPolar in range(1, nrPolar - 1):                # regular vertices
+        currPolar = dPolar * float(iPolar)
+
+        currCosP = math.cos(currPolar)
+        currSinP = math.sin(currPolar)
+
+        for iAzimuthal in range(nrAzimuthal):
+            currAzimuthal = dAzimuthal * float(iAzimuthal)
+
+            currCosA = math.cos(currAzimuthal)
+            currSinA = math.sin(currAzimuthal)
+
+            currV = mathutils.Vector((currSinP * currCosA, currSinP * currSinA, currCosP)) * radius
+            verts.append(currV)
+    currV = mathutils.Vector((0.0, 0.0, - radius))        # bottom vertex
+    verts.append(currV)
+
+
+    # 2/2: faces
+    faces = []
+    for iAzimuthal in range(nrAzimuthal):                # top faces
+        iNextAzimuthal = iAzimuthal + 1
+        if iNextAzimuthal >= nrAzimuthal: iNextAzimuthal -= nrAzimuthal
+        faces.append([0, iAzimuthal + 1, iNextAzimuthal + 1])
+
+    for iPolar in range(nrPolar - 3):                    # regular faces
+        iAzimuthalStart = iPolar * nrAzimuthal + 1
+
+        for iAzimuthal in range(nrAzimuthal):
+            iNextAzimuthal = iAzimuthal + 1
+            if iNextAzimuthal >= nrAzimuthal: iNextAzimuthal -= nrAzimuthal
+            faces.append([iAzimuthalStart + iAzimuthal, iAzimuthalStart + iAzimuthal + nrAzimuthal, iAzimuthalStart + iNextAzimuthal + nrAzimuthal, iAzimuthalStart + iNextAzimuthal])
+
+    iLast = len(verts) - 1
+    iAzimuthalStart = iLast - nrAzimuthal
+    for iAzimuthal in range(nrAzimuthal):                # bottom faces
+        iNextAzimuthal = iAzimuthal + 1
+        if iNextAzimuthal >= nrAzimuthal: iNextAzimuthal -= nrAzimuthal
+        faces.append([iAzimuthalStart + iAzimuthal, iLast, iAzimuthalStart + iNextAzimuthal])
+
+
+    return np.vstack(verts), faces
