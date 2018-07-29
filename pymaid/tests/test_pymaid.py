@@ -612,6 +612,12 @@ class TestMorpho(unittest.TestCase):
                                                     inplace=False),
                               pymaid.CatmaidNeuron)
 
+    @try_conditions
+    def test_guess_radius(self):
+        self.assertIsInstance(pymaid.guess_radius(self.nl[0],
+                                                  inplace=False),
+                              pymaid.CatmaidNeuron)
+
 
 class TestGraphs(unittest.TestCase):
     """Test pymaid.graph and pymaid.graph_utils """
