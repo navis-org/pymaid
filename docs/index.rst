@@ -22,8 +22,9 @@ package. You can browse the :ref:`example gallery <example_gallery>` and
 :ref:`API reference <api>`  to see what you can do with pymaid.
 
 Pymaid is licensed under the GNU GPL v3+ license. The Source code is hosted
-at `Github <https://github.com/schlegelp/PyMaid>`_. This is also where
-`issues <https://github.com/schlegelp/PyMaid/issues>`_ are being tracked.
+at `Github <https://github.com/schlegelp/PyMaid>`_. Feedback, feature requests
+and bug reports are very welcome and best placed in
+`issues <https://github.com/schlegelp/PyMaid/issues>`_.
 If you have any questions, please don't hesitate: pms70@cam.ac.uk
 
 
@@ -42,18 +43,10 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
 
    source/install
    source/intro.ipynb
-   source/neurons
-   source/fetching_data
-   source/plotting.ipynb
-   source/morph_analysis.ipynb
-   source/connectivity_analysis
-   source/blender
-   source/rmaid_doc
-   source/tiles.ipynb
-   source/user_stats
-   source/api
-   source/troubleshooting
    examples/examples_index
+   source/troubleshooting
+   source/api   
+   
 
 .. raw:: html
 
@@ -67,14 +60,14 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
                </div>
                <div class="panel-body">
 
-* fetch data from CATMAID server
-* 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
+* data fetching directly from CATMAID server
+* 2D (matplotlib) and 3D (vispy or plotly) plotting
 * virtual neuron surgery (cutting, stitching, pruning, rerooting)
 * R bindings (e.g. for libraries nat, nat.nblast and elmr)
-* interface with Blender 3D
+* interface with Blender 3D and Cytoscape
 * import/export from/to SWC
-* process EM image data
-* and oh so much more...
+* EM image data processing
+* data snapshots
 
 .. raw:: html
 

@@ -23,7 +23,7 @@ find out details about a given function.
    Overview <neurons>
    Indexing NeuronLists <indexing_neuronlists>
    NeuronList math <neuronlist_math>
-   Parsing skeleton IDs <parsing_skids>   
+   Parsing skeleton IDs <parsing_skids>
 
 .. raw:: html
 
@@ -64,7 +64,9 @@ find out details about a given function.
    Cutting <cutting_neurons>
    Resampling <resample_neurons>
    Despiking <despike_neurons>
-   
+   Smoothing <smooth_neurons>
+   Pruning <prune_neurons>
+
 
 .. raw:: html
 
@@ -80,7 +82,8 @@ find out details about a given function.
 .. toctree::
    :maxdepth: 1
 
-   Basics <connectivity_analysis>
+   Basics <connectivity_basics>
+   Compartmentalizing <connectivity_analysis>
 
 .. raw:: html
 
@@ -103,6 +106,7 @@ find out details about a given function.
    Pymaid & R <rmaid_doc>
    URLs & random sampling <generate_urls>
    User contributions <user_contributions>
+   Data caching <data_caching>
 
 .. raw:: html
 

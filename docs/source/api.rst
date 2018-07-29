@@ -198,6 +198,7 @@ Manipulation
     ~pymaid.average_neurons
     ~pymaid.remove_tagged_branches
     ~pymaid.despike_neuron
+    ~pymaid.smooth_neuron
     ~pymaid.guess_radius
 
 Resampling
@@ -393,3 +394,13 @@ R interface (rMAID)
     pymaid.rmaid.dotprops2py
     pymaid.rmaid.neuron2r
     pymaid.rmaid.NBLASTresults
+
+Utility
++++++++
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.set_pbars
+    pymaid.set_loggers
+    pymaid.eval_skids
+

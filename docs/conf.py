@@ -31,8 +31,6 @@ import sys
 sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../..'))
-#sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid/pymaid')
-#sys.path.insert(0, '/Users/philipps/OneDrive/Cloudbox/Python/PyMaid')
 
 #This needs to be removed in order to built locally
 import mock
@@ -388,7 +386,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'pymaid', 'pymaid Documentation',
-     author, 'pymaid', 'One line description of project.',
+     author, 'pymaid', 'Neuron analysis toolbox for CATMAID data.',
      'Miscellaneous'),
 ]
 
