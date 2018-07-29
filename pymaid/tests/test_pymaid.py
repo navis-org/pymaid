@@ -802,6 +802,20 @@ class TestConnectivity(unittest.TestCase):
                                                           remote_instance=self.rm),
                               pd.DataFrame)
 
+    @try_conditions
+    def test_cn_table_from_connectors(self):
+        self.assertIsInstance(pymaid.cn_table_from_connectors(self.n,
+                                                              remote_instance=self.rm),
+                              pd.DataFrame)
+
+    @try_conditions
+    def test_adjacency_from_connectors(self):
+        nl = pymaid.get_neurons(
+            self.cn_table[self.cn_table.relation == 'upstream'].iloc[:10].skeleton_id.values)
+        self.assertIsInstance(pymaid.adjacency_from_connectors(nl,
+                                                               remote_instance=self.rm),
+                              pd.DataFrame)
+
 
 class TestCluster(unittest.TestCase):
     """Test pymaid.cluster """
@@ -969,6 +983,15 @@ class TestUserStats(unittest.TestCase):
         self.assertIsInstance(pymaid.get_time_invested(ds,
                                                        mode='OVER_TIME',
                                                        remote_instance=self.rm),
+                              pd.DataFrame)
+
+    def test_team_contributions(self):
+        ds = self.n.downsample(20, inplace=False)
+        ul = pymaid.get_user_list().set_index('id')
+        teams = {'test_team' : [ul.loc[u, 'login'] for u in ds.nodes.creator.unique()]}
+        self.assertIsInstance(pymaid.get_team_contributions(teams,
+                                                            neurons=ds,
+                                                            remote_instance=self.rm),
                               pd.DataFrame)
 
     def test_user_contributions(self):
