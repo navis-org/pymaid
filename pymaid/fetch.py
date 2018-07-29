@@ -49,6 +49,7 @@ import urllib
 import json
 import time
 import base64
+import sys
 
 import requests
 from requests_futures.sessions import FuturesSession
@@ -59,6 +60,11 @@ import pandas as pd
 import numpy as np
 import sys
 import networkx as nx
+
+import pickle
+
+from collections import OrderedDict, deque
+from itertools import chain
 
 from pymaid import core, graph, utils, config
 from pymaid.intersect import in_volume
@@ -113,6 +119,10 @@ class CatmaidInstance:
                     If True, this instance will be set as global (default)
                     CatmaidInstance. This overrides pre-existing global
                     instances.
+    caching :       bool, optional
+                    If True, will cache server responses for this session.
+                    Use :func:`CatmaidInstance.setup_cache` to set size or
+                    time limit.
 
     Examples
     --------
@@ -170,8 +180,8 @@ class CatmaidInstance:
     >>> raw_data = rm.fetch(url, POST)
     """
 
-    def __init__(self, server, authname, authpassword, authtoken,
-                 project_id=1, max_threads=100, make_global=True):
+    def __init__(self, server, authname, authpassword, authtoken, project_id=1,
+                 max_threads=100, make_global=True, caching=True):
         # Catch too many backslashes
         if server.endswith('/'):
             server = server[:-1]
@@ -182,6 +192,9 @@ class CatmaidInstance:
         self.authpassword = authpassword
         self.authtoken = authtoken
         self.__max_threads = max_threads
+
+        self.caching = caching
+        self._cache = Cache(size_limit=128)
 
         self._session = requests.Session()
         self._future_session = FuturesSession(session=self._session,
@@ -195,6 +208,47 @@ class CatmaidInstance:
 
         if make_global:
             self.make_global()
+
+    def setup_cache(self, size_limit=128, time_limit=None):
+        """ Setup a cache for responses from the CATMAID server.
+
+        Parameters
+        ----------
+        size_limit :    int | None, optional
+                        Max amount memory used to cache responses in mb.
+                        Set to ``None`` to for no limit.
+        time_limit :    int, optional
+                        Maximal time in seconds before cached responses are
+                        discarded. Set to ``None`` to for no limit.
+        """
+
+        self.caching = True
+        self._cache.size_limit = size_limit
+        self._cache.time_limit = time_limit
+
+    def clear_cache(self):
+        """ Clear cache. """
+        self._cache = Cache(size_limit=self._cache.size_limit,
+                            time_limit=self._cache.time_limit)
+
+    def load_cache(self, filename):
+        """ Load cache from file. """
+        self._cache = Cache.load(filename)
+
+        # Deactivate time limit - otherwise might not use data
+        self._cache.time_limit = False
+
+        if not self.caching:
+            logger.info('Cache loaded but caching is disable. Will use but not update cache.')
+
+    def save_cache(self, filename='cache.pickle'):
+        """ Save cache to file. """
+        self._cache.save(filename)
+
+    @property
+    def cache_size(self):
+        """ Size of cache in mb."""
+        return self._cache.size
 
     @property
     def max_threads(self):
@@ -216,48 +270,68 @@ class CatmaidInstance:
         sys.modules['remote_instance'] = self
         logger.info('Global CATMAID instance set.')
 
-    def fetch(self, url, post=None, method=None, desc='Fetching', raw=False,
+    def fetch(self, url, post=None, desc='Fetching', raw=False,
               callback=None, disable_pbar=False, leave_pbar=True):
         """ Requires the url to connect to and the variables for POST,
         if any, in a dictionary.
         """
-        if utils._is_iterable(url):
-            # Prepare futures
-            if post or method == 'POST':
-                if not utils._is_iterable(post):
-                    raise ValueError('POST needs to be provided for each url.')
-                futures = [self._future_session.post(u,
-                                                     data=p,
-                                                     background_callback=callback) for u, p in zip(url, post)]
-            else:
-                futures = [self._future_session.get(u,
-                                                    params=None,
-                                                    background_callback=callback) for u in url]
 
-            # Get the responses
-            response = [f.result() for f in config.tqdm(futures,
-                                                        desc=desc,
-                                                        disable=disable_pbar | config.pbar_hide,
-                                                        leave=leave_pbar & config.pbar_leave)]
-
-            # Make sure all responses returned data
-            for r in response:
-                r.raise_for_status()
-
-            if not raw:
-                return [r.json() for r in response]
-            else:
-                return response
-
-        if post or method == 'POST':
-            response = self._session.post(url, data=post)
+        # Keep track of if a single response is expected
+        if not utils._is_iterable(url):
+            was_single = True
+            url = utils._make_iterable(url)
+            if not isinstance(post, (type(None), list)):
+                post = [post]
         else:
-            response = self._session.get(url, params=None)
+            was_single = False
 
+        # Prepare futures
+        if not isinstance(post, type(None)):
+            if len(url) != len(post):
+                raise ValueError('POST needs to be provided for each url.')
+            if self.caching:
+                futures = [self._cache.get_cached_response(u, self._future_session,
+                                                           post=p) for u, p in zip(url, post)]
+            else:
+                futures = [self._future_session.post(u, data=p) for u, p in zip(url, post)]
+        else:
+            if self.caching:
+                futures = [self._cache.get_cached_response(u, self._future_session,
+                                                           post=None) for u in url]
+            else:
+                futures = [self._future_session.get(u, params=None) for u in url]
+
+        # Get the responses
+        resp = [f.result() for f in config.tqdm(futures,
+                                                desc=desc,
+                                                disable=disable_pbar | config.pbar_hide,
+                                                leave=leave_pbar & config.pbar_leave)]
+
+        # Make sure all responses returned data
+        for r in resp:
+            r.raise_for_status()
+
+        # Add new responses to cache
+        if self.caching:
+            self._cache.update_responses(url, post, resp)
+
+            # Flag if any data is from cache
+            if True in [getattr(r, 'is_cached', False) for r in resp]:
+                if False not in [getattr(r, 'is_cached', False) for r in resp]:
+                    logger.info('Cached data used.')
+                else:
+                    logger.info('Some cached data used.')
+
+        # Convert to json if applicable
         if not raw:
-            return response.json()
+            resp = [r.json() for r in resp]
         else:
-            return response
+            resp = [r.content for r in resp]
+
+        if was_single:
+            return resp[0]
+        else:
+            return resp
 
     def make_url(self, *args, **GET):
         """ Generates URL.
@@ -305,6 +379,18 @@ class CatmaidInstance:
                                self.authpassword, self.authtoken,
                                self.project_id, self.max_threads,
                                make_global=False)
+
+    def __repr__(self):
+        s = 'CatmaidInstance at {}.\nServer: {}\nProject: {}\nCaching {}'.format(id(self),
+                                                                      self.server,
+                                                                      self.project_id,
+                                                                      self.caching)
+        if self.caching:
+            s += ' (size limit {}; time limit {})\n'.format(self._cache.size_limit,
+                                                           self._cache.time_limit)
+            s += 'Cache size: {}'.format(self.cache_size)
+
+        return s
 
     def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
@@ -564,6 +650,116 @@ class CatmaidInstance:
     def _get_label_list_url(self, **GET):
         """ Use to rename a single neuron. Does need postdata."""
         return self.make_url(self.project_id, 'labels', 'stats', **GET)
+
+
+class Cache(OrderedDict):
+    """ Custom dictionary for handling the caching of request.responses.
+    Implements a maximum size [mb] and a time limit [s].
+    """
+    def __init__(self, *args, **kwargs):
+        self.size_limit = kwargs.pop("size_limit", None)
+        self.time_limit = kwargs.pop("time_limit", None)
+        OrderedDict.__init__(self, *args, **kwargs)
+        self._check_size_limit()
+
+    def __setitem__(self, key, value):
+        # Add timestamp to value if not present
+        if not isinstance(value, list):
+            value = [value, datetime.datetime.now()]
+        elif len(value) != 2 or not isinstance(value[1], datetime.datetime):
+            value = [value, datetime.datetime.now()]
+
+        OrderedDict.__setitem__(self, key, value)
+        self._check_size_limit()
+
+    def __getitem__(self, key):
+        value = OrderedDict.__getitem__(self, key)
+
+        if self.time_limit:
+            if (datetime.datetime.now() - value[1]).seconds > self.time_limit:
+                # Pop response and raise - for this we have to temporarily
+                # deactivate the time restrictions. Otherwise we enter a
+                # infinite loop because .pop calls __getitem__
+                temp = self.time_limit
+                self.time_limit = False
+                _ = self.pop(key)
+                self.time_limit = temp
+                raise KeyError('{} exists but is outdated.'.format(key))
+
+        # Exctract response and flag as cached
+        resp = value[0]
+        resp.is_cached = True
+
+        return resp
+
+    def get_cached_response(self, url, future, post=None):
+        """ Looks for cached response. If not cached, will return
+        request futures for fetching the data from server.
+        """
+        try:
+            # If response is cached, return a mock future object
+            return _mock_future(self.__getitem__((url, str(post))))
+        except KeyError:
+            if post:
+                return future.post(url, data=post)
+            else:
+                return future.get(url, params=None)
+
+    def get(self, key, fallback=None):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            return fallback
+
+    def _check_size_limit(self):
+        """ Check size limit. Pop items if size limit reached."""
+        if self.size_limit is not None:
+            while self.size > self.size_limit and len(self) > 0:
+                self.popitem(last=False)
+
+    def update_responses(self, urls, posts, responses):
+        """ Update cached responses. Only overwrites reponses not alread
+        cached.
+        """
+        if isinstance(posts, type(None)):
+            posts = [posts] * len(urls)
+
+        for u, p, r in zip(urls, posts, responses):
+            # Update only if not already cached
+            if not self.get(u):
+                self[(u, str(p))] = r
+
+    def __repr__(self):
+        return 'Cache at {} (size limit: {}; time limit[s]: {}). {} items ({}mb).'.format(id(self),
+                                                                                          self.size_limit,
+                                                                                          self.time_limit,
+                                                                                          len(self),
+                                                                                          self.size)
+
+    @property
+    def size(self):
+        """ Return size [mb] of cached responses."""
+        return round(sum([sys.getsizeof(r[0].content) for r in OrderedDict.values(self)]) / 1000 ** 2, 1)
+
+    def save(self, filename='cache.pickle'):
+        """ Save cache to file. """
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    @classmethod
+    def load(self, filename):
+        """ Load cache from file. """
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
+
+
+class _mock_future:
+    """ Class to emulate futures."""
+    def __init__(self, response):
+        self.response = response
+
+    def result(self):
+        return self.response
 
 
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
