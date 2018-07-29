@@ -36,7 +36,8 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'stitch_neurons', 'arbor_confidence', 'split_axon_dendrite',
                   'bending_flow', 'flow_centrality', 'segregation_index',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
-                  'remove_tagged_branches', 'despike_neuron', 'guess_radius'])
+                  'remove_tagged_branches', 'despike_neuron', 'guess_radius',
+                  'smooth_neuron'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
@@ -151,7 +152,7 @@ def _parent_dist(x, root_dist=None):
     return
 
 
-def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
+def calc_cable(skdata, remote_instance=None, return_skdata=False):
     """ Calculates cable length in micrometer (um).
 
     Parameters
@@ -159,9 +160,6 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
     skdata :            int | str | CatmaidNeuron | CatmaidNeuronList
                         If skeleton ID (str or in), 3D skeleton data will be
                         pulled from CATMAID server.
-    smoothing :         int, optional
-                        Use to smooth neuron by downsampling.
-                        Default = 1 (no smoothing) .
     remote_instance :   CATMAID instance, optional
                         Pass if skdata is a skeleton ID.
     return_skdata :     bool, optional
@@ -181,6 +179,9 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
     ``pymaid.CatmaidNeuron.cable_length``
                 Use this attribute to get the cable length of given neuron.
                 Also works with ``CatmaidNeuronList``.
+    ``pymaid.smooth_neuron``
+                Use this function to smooth the neuron before calculating
+                cable.
 
     """
 
@@ -210,9 +211,6 @@ def calc_cable(skdata, smoothing=1, remote_instance=None, return_skdata=False):
             return df
         else:
             return 0
-
-    if smoothing > 1:
-        df = downsample_neuron(df, smoothing)
 
     # Calculate distance to parent for each node
     nodes = df.nodes[~df.nodes.parent_id.isnull()]
@@ -514,11 +512,10 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
                           reconnected to the closest still existing treenode.
                           Works only in child->parent direction.
 
-
     Returns
     -------
-    pymaid.CatmaidNeuron/List
-                    Pruned neuron.
+    CatmaidNeuron/List
+                    Pruned neuron(s).
 
     """
 
@@ -622,7 +619,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     Returns
     -------
     CatmaidNeuronList
-        Contains Axon, Dendrite and primary neurite
+                        Axon, dendrite and primary neurite.
 
     Examples
     --------
@@ -757,7 +754,7 @@ def segregation_index(x, centrality_method='centrifugal'):
     Returns
     -------
     H :                 float
-                        Segregation Index (SI)
+                        Segregation Index (SI).
 
     """
 
@@ -1124,6 +1121,7 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     Returns
     -------
     core.CatmaidNeuron
+                        Stitched neuron.
 
     """
 
@@ -1354,15 +1352,15 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
     seg_length :        int | float | list, optional
-                        Target Segment length(s) L in microns [um]. Will try
+                        Target segment length(s) L in microns [um]. Will try
                         resampling neuron to this resolution. Please note that
                         the final segment length is restricted by the neuron's
                         original resolution.
     skip_remainder :    bool, optional
                         Segments can turn out to be smaller than desired if a
                         branch point or end point is hit before `seg_length`
-                        is reached. If `skip_remainder` is True, these will be
-                        ignored.
+                        is reached. If ``skip_remainder`` is True, these will
+                        be ignored.
 
     Returns
     -------
@@ -1446,8 +1444,8 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
                           Treeode tag to use.
     how :                 'segment' | 'distal' | 'proximal', optional
                           Method of removal:
-                            1. `'segment'` removes entire segment
-                            2. `'distal'`/`'proximal'` removes everything
+                            1. ``segment`` removes entire segment
+                            2. ``distal``/``proximal`` removes everything
                                distal/proximal to tagged node(s), including
                                that node.
     preserve_connectors : bool, optional
@@ -1470,14 +1468,14 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
     >>> x_prun = pymaid.remove_tagged_branches(x,
     ...                                        'not a branch',
     ...                                        how='segment',
-    ...                                        preserve_connectors=True )
+    ...                                        preserve_connectors=True)
 
     2. Prune neuron to microtubule-containing backbone
 
     >>> x_prun = pymaid.remove_tagged_branches(x,
     ...                                        'microtubule ends',
     ...                                        how='distal',
-    ...                                        preserve_connectors=False )
+    ...                                        preserve_connectors=False)
 
 
     """
@@ -1707,7 +1705,7 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False)
         return x
 
 
-def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
+def guess_radius(x, method='linear', limit=None, smooth=True, inplace=False):
     """ Tries guessing radii for all treenodes. Uses distance between
     connectors and treenodes and interpolate for all treenodes. Fills in
     ``radius`` column in treenode table.
@@ -1727,18 +1725,20 @@ def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
                     rolling window. If ``int``, will use to define size of
                     window.
     inplace :       bool, optional
-                    If True, will use and return copy of original neuron(s).
+                    If False, will use and return copy of original neuron(s).
 
     Returns
     -------
     CatmaidNeuron/List
                     If ``inplace=False``.
 
-    TODO
-    ----
-    - teach other functions (e.g. resample) to preserve radii
-
     """
+
+
+    # TODOs:
+    # - teach other functions (e.g. resample) to preserve radii
+    # - take distances into account by switching to scipy.interpolate
+    #   - alternatively use method 'index' and set cumulative distance to index
 
     if isinstance(x, core.CatmaidNeuronList):
         if not inplace:
@@ -1817,6 +1817,72 @@ def guess_radius(x, method='linear', limit=50, smooth=True, inplace=False):
 
     # Reassign nodes
     x.nodes = nodes.reset_index(drop=False)
+
+    if not inplace:
+        return x
+
+
+def smooth_neuron(x, window=5, inplace=False):
+    """ Smooth neuron using rolling windows.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron | CatmaidNeuronList
+                    Neuron(s) to be processed.
+    window :        int, optional
+                    Size of the rolling window in number of nodes.
+    inplace :       bool, optional
+                    If False, will use and return copy of original neuron(s).
+
+    Returns
+    -------
+    CatmaidNeuron/List
+                    Smoothed neuron(s). If ``inplace=False``.
+
+    """
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if not inplace:
+            x = x.copy()
+
+        for n in config.tqdm(x, desc='Smoothing', disable=config.pbar_hide,
+                             leave=config.pbar_leave):
+            smooth_neuron(n, window=window, inplace=True)
+
+        if not inplace:
+            return x
+        return
+
+    elif not isinstance(x, core.CatmaidNeuron):
+        raise TypeError(
+            'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
+
+    if not inplace:
+        x = x.copy()
+
+    # Prepare nodes (add parent_dist for later, set index)
+    _parent_dist(x, root_dist=0)
+    nodes = x.nodes.set_index('treenode_id')
+
+    # Go over each segment and interpolate radii
+    for s in config.tqdm(x.segments, desc='Smoothing', disable=config.pbar_hide,
+                         leave=config.pbar_leave):
+
+        # Get this segments radii and parent dist
+        this_co = nodes.loc[s, ['x', 'y', 'z', 'parent_dist']]
+        this_co['parent_dist_cum'] = this_co.parent_dist.cumsum()
+
+        # Set cumulative distance as index and drop parent_dist
+        this_co = this_co.set_index('parent_dist_cum', drop=True).drop('parent_dist', axis=1)
+
+        interp = this_co.rolling(window, min_periods=1).mean()
+
+        nodes.loc[s, ['x', 'y', 'z']] = interp.values
+
+    # Reassign nodes
+    x.nodes = nodes.reset_index(drop=False)
+
+    x._clear_temp_attr()
 
     if not inplace:
         return x
