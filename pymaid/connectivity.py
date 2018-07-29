@@ -878,10 +878,10 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     neuronsA = utils.eval_skids(s, remote_instance=remote_instance)
     neuronsB = utils.eval_skids(t, remote_instance=remote_instance)
 
-    # Make sure neurons are strings, not integers
-    neurons = list(set([str(n) for n in (neuronsA + neuronsB)]))
-    neuronsA = [str(n) for n in neuronsA]
-    neuronsB = [str(n) for n in neuronsB]
+    # Make sure neurons are  integers
+    neurons = list(set([int(n) for n in (neuronsA + neuronsB)]))
+    neuronsA = [int(n) for n in neuronsA]
+    neuronsB = [int(n) for n in neuronsB]
 
     # Make sure neurons are unique
     neuronsA = sorted(set(neuronsA), key=neuronsA.index)
@@ -896,29 +896,19 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     else:
         edges = fetch.get_edges(neurons, remote_instance=remote_instance)
 
-    edge_dict = {n: {} for n in neuronsA}
-    for e in edges.itertuples():
-        if str(e.source_skid) in neuronsA:
-            edge_dict[str(e.source_skid)][str(e.target_skid)] = e.weight
+    # Turn into a adjacency matrix
+    matrix = edges.pivot(values='weight',
+                         columns='target_skid',
+                         index='source_skid').fillna(0)
 
-    matrix = pd.DataFrame(
-        np.zeros((len(neuronsA), len(neuronsB))), index=neuronsA, columns=neuronsB)
+    # Filter to actual sources and targets
+    matrix = matrix.reindex(neuronsA, columns=neuronsB, fill_value=0)
 
-    for nA in neuronsA:
-        for nB in neuronsB:
-            try:
-                e = edge_dict[nA][nB]
-            except:
-                e = 0
+    # Apply cutoff and threshold
+    matrix = matrix.clip(upper=syn_cutoff)
 
-            if syn_cutoff:
-                e = min(e, syn_cutoff)
-
-            if syn_threshold:
-                if e < syn_threshold:
-                    e = 0
-
-            matrix.loc[nA, nB] = e
+    if syn_threshold:
+        matrix[matrix < syn_threshold] = 0
 
     matrix.datatype = 'adjacency_matrix'
 
