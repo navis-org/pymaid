@@ -707,49 +707,61 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
     names = get_names(x, remote_instance)
 
     if not get_history:
-        df = pd.DataFrame([[
-            names[str(x[i])],
-            str(x[i]),
-            pd.DataFrame(n[0],
-                         columns=['treenode_id', 'parent_id',
-                                  'creator_id', 'x', 'y', 'z',
-                                  'radius', 'confidence'],
-                         dtype=object),
-            pd.DataFrame(n[1],
-                         columns=['treenode_id', 'connector_id',
-                                  'relation', 'x', 'y', 'z'],
-                         dtype=object),
-            n[2]]
-            for i, n in enumerate(skdata)
-        ],
-            columns=['neuron_name', 'skeleton_id',
-                     'nodes', 'connectors', 'tags'],
-            dtype=object
-        )
+        try:
+            df = pd.DataFrame([[
+                names[str(x[i])],
+                str(x[i]),
+                pd.DataFrame(n[0],
+                             columns=['treenode_id', 'parent_id',
+                                      'creator_id', 'x', 'y', 'z',
+                                      'radius', 'confidence'],
+                             dtype=object),
+                pd.DataFrame(n[1],
+                             columns=['treenode_id', 'connector_id',
+                                      'relation', 'x', 'y', 'z'],
+                             dtype=object),
+                n[2]]
+                for i, n in enumerate(skdata)
+            ],
+                columns=['neuron_name', 'skeleton_id',
+                         'nodes', 'connectors', 'tags'],
+                dtype=object
+            )
+        except KeyError as e:
+            cause = e.args[0]
+            raise Exception('Skeleton ID {} not found.'.format(cause))
+        except:
+            raise
     else:
-        df = pd.DataFrame([[
-            names[str(x[i])],
-            str(x[i]),
-            pd.DataFrame(n[0],
-                         columns=['treenode_id', 'parent_id',
-                                  'creator_id', 'x', 'y', 'z',
-                                  'radius', 'confidence',
-                                  'last_modified',
-                                  'creation_date'],
-                         dtype=object),
-            pd.DataFrame(n[1],
-                         columns=['treenode_id', 'connector_id',
-                                  'relation', 'x', 'y', 'z',
-                                  'last_modified',
-                                  'creation_date'],
-                         dtype=object),
-            n[2]]
-            for i, n in enumerate(skdata)
-        ],
-            columns=['neuron_name', 'skeleton_id',
-                     'nodes', 'connectors', 'tags'],
-            dtype=object
-        )
+        try:
+            df = pd.DataFrame([[
+                names[str(x[i])],
+                str(x[i]),
+                pd.DataFrame(n[0],
+                             columns=['treenode_id', 'parent_id',
+                                      'creator_id', 'x', 'y', 'z',
+                                      'radius', 'confidence',
+                                      'last_modified',
+                                      'creation_date'],
+                             dtype=object),
+                pd.DataFrame(n[1],
+                             columns=['treenode_id', 'connector_id',
+                                      'relation', 'x', 'y', 'z',
+                                      'last_modified',
+                                      'creation_date'],
+                             dtype=object),
+                n[2]]
+                for i, n in enumerate(skdata)
+            ],
+                columns=['neuron_name', 'skeleton_id',
+                         'nodes', 'connectors', 'tags'],
+                dtype=object
+            )
+        except KeyError as e:
+            cause = e.args[0]
+            raise Exception('Skeleton ID {} not found.'.format(cause))
+        except:
+            raise
 
     # Convert data to respective dtypes
     dtypes = {'treenode_id': int, 'parent_id': object,
