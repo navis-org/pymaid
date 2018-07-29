@@ -101,6 +101,7 @@ find out details about a given function.
    :maxdepth: 1
 
    Pymaid & Blender3D <blender>
+   Pymaid & Cytoscape <python2cytoscape>
    EM image data <tiles.ipynb>
    Troubleshooting <troubleshooting>
    Pymaid & R <rmaid_doc>

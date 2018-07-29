@@ -352,6 +352,15 @@ Selections
     pymaid.b3d.object_list.delete
     pymaid.b3d.object_list.to_json
 
+
+Cytoscape API
++++++++++++++
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.cytoscape.generate_network
+    pymaid.cytoscape.get_client
+
 .. _api_userstats:
 
 User statistics

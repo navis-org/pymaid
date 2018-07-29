@@ -47,14 +47,17 @@ MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'bpy', 'bmesh',
                 'mpl_toolkits.mplot3d','mpl_toolkits.mplot3d.proj3d','matplotlib.colors', 'mpl_toolkits.mplot3d.art3d',
                 'mpl_toolkits.mplot3d.art3d.Line3DCollection', 'proj3d', 'pylab',
                 'mlines','mpatches','mcollections', 'mcl','Line3DCollection',
+                'mathutils',
                 'networkx', 'nx', 'requests', 'requests-futures', 'requests.exceptions',
-                'imageio', 'py2cytoscape',
+                'imageio', 'py2cytoscape', 'py2cytoscape.data.cyrest_client', 'CyRestClient',
                 'requests_futures.sessions', 'requests_futures.sessions.FuturesSession',
                 'vispy','seaborn','vispy.geometry', 'vispy.gloo.util', 'vispy.gloo.util._screenshot']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
 import pymaid
+from pymaid import cytoscape
+from pymaid import b3d
 
 # -- General configuration ------------------------------------------------
 

@@ -21,7 +21,7 @@ For a brief introduction to the library, you can read the
 package. You can browse the :ref:`example gallery <example_gallery>` and
 :ref:`API reference <api>`  to see what you can do with pymaid.
 
-Pymaid is licensed under the GNU GPL v3+ license. The Source code is hosted
+Pymaid is licensed under the GNU GPL v3+ license. The source code is hosted
 at `Github <https://github.com/schlegelp/PyMaid>`_. Feedback, feature requests
 and bug reports are very welcome and best placed in
 `issues <https://github.com/schlegelp/PyMaid/issues>`_.
