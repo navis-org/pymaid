@@ -988,7 +988,7 @@ class TestUserStats(unittest.TestCase):
     def test_team_contributions(self):
         ds = self.n.downsample(20, inplace=False)
         ul = pymaid.get_user_list().set_index('id')
-        teams = {'test_team' : [ul.loc[u, 'login'] for u in ds.nodes.creator.unique()]}
+        teams = {'test_team' : [ul.loc[u, 'login'] for u in ds.nodes.creator_id.unique()]}
         self.assertIsInstance(pymaid.get_team_contributions(teams,
                                                             neurons=ds,
                                                             remote_instance=self.rm),
