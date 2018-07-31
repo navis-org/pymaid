@@ -500,7 +500,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
                             - 2: gap junctions
                             - 3: abutting connectors
                         If None, will use all connectors. Use either single
-                        integer or list. E.g. ``restrict_cn=[0,1]`` to use
+                        integer or list. E.g. ``restrict_cn=[0, 1]`` to use
                         only pre- and postsynapses.
     remote_instance :   CatmaidInstance, optional
                         Need to provide if neurons are only skids or

@@ -13,7 +13,8 @@ fetch, analyse and plot neuron morpholgy and connectivity from a CATMAID server.
 
 The package is stable but I recommend watching its
 `Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
-Make sure that your ``pymaid.__version__`` is up-to-date.
+Make sure that your ``pymaid.__version__`` is up-to-date and check out the
+:ref:`release notes <whats_new>`.
 
 For a brief introduction to the library, you can read the
 :ref:`tutorial <tutorial>`. Visit the
@@ -41,12 +42,13 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
 .. toctree::
    :maxdepth: 1
 
+   source/whats_new
    source/install
    source/intro.ipynb
    examples/examples_index
    source/troubleshooting
-   source/api   
-   
+   source/api
+
 
 .. raw:: html
 

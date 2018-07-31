@@ -98,11 +98,27 @@ Misc
 ----
 .. autosummary::
     :toctree: generated/
-
-    ~pymaid.CatmaidInstance
+    
     ~pymaid.url_to_coordinates
     ~pymaid.get_review
     ~pymaid.get_review_details
+
+
+CatmaidInstance
++++++++++++++++
+
+.. autosummary::
+    :toctree: generated/
+    
+    pymaid.CatmaidInstance
+    pymaid.CatmaidInstance.fetch
+    pymaid.CatmaidInstance.make_url
+    pymaid.CatmaidInstance.setup_cache
+    pymaid.CatmaidInstance.clear_cache
+    pymaid.CatmaidInstance.load_cache
+    pymaid.CatmaidInstance.save_cache
+    pymaid.CatmaidInstance.copy
+    pymaid.CatmaidInstance.make_url
 
 .. _api_neurons:
 

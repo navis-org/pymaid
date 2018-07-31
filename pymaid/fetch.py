@@ -2772,7 +2772,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     Returns
     -------
     list
-                            ``[skid1, skid2, skid3]``
+                            ``[skid1, skid2, skid3, ...]``
 
     See Also
     --------
