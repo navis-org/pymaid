@@ -2463,11 +2463,10 @@ class CatmaidNeuronList:
         return self.neurons
 
     def sort_values(self, key, ascending=False):
-        """Sort neurons by given value. See .summary() for valid keys."""
-        summary = self.summary().sort_values(key).reset_index(drop=True)
-        new_order = {s: i for i, s in enumerate(summary.skeleton_id.tolist())}
+        """Sort neurons by given key. Needs to be an attribute of all neurons:
+        for example ``n_presynapse``. Also works with custom attributes."""
         self.neurons = sorted(self.neurons,
-                              key=lambda x: new_order[x.skeleton_id],
+                              key=lambda x: getattr(x, key),
                               reverse=ascending is False)
 
     def __copy__(self):
