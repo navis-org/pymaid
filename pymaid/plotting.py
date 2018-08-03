@@ -281,14 +281,11 @@ def plot2d(x, method='2d', **kwargs):
 
     """
 
-    # TODO:
-    # - depth-code option
-
     _ACCEPTED_KWARGS = ['remote_instance', 'connectors', 'connectors_only',
                         'ax', 'color', 'view', 'scalebar', 'cn_mesh_colors',
                         'linewidth', 'cn_size', 'group_neurons', 'scatter_kws',
                         'figsize', 'linestyle', 'alpha', 'depth_coloring',
-                        'autoscale']
+                        'autoscale', 'depth_scale']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
@@ -314,6 +311,7 @@ def plot2d(x, method='2d', **kwargs):
     group_neurons = kwargs.get('group_neurons', False)
     alpha = kwargs.get('alpha', .9)
     depth_coloring = kwargs.get('depth_coloring', False)
+    depth_scale = kwargs.get('depth_scale', True)
 
     scatter_kws = kwargs.get('scatter_kws', {})
 
@@ -817,7 +815,7 @@ def plot2d(x, method='2d', **kwargs):
         set_depth()
 
     if depth_coloring:
-        if method == '2d':
+        if method == '2d' and depth_scale:
             fig.colorbar(line, ax=ax, fraction=.075, shrink=.5, label='Depth')
         elif method == '3d':
             fig.canvas.mpl_connect('draw_event', Update)
