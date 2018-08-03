@@ -1135,6 +1135,11 @@ class CatmaidNeuron:
     def summary(self):
         """Get a summary of this neuron."""
 
+        # Set logger to warning only - otherwise you miht get tons of
+        # "skeleton data not available" messages
+        l = logger.level
+        logger.setLevel('WARNING')
+
         # Look up these values without requesting them
         neuron_name = self.__dict__.get('neuron_name', 'NA')
         review_status = self.__dict__.get('review_status', 'NA')
@@ -1144,7 +1149,7 @@ class CatmaidNeuron:
         else:
             soma_temp = 'NA'
 
-        return pd.Series([type(self), neuron_name, self.skeleton_id,
+        s = pd.Series([type(self), neuron_name, self.skeleton_id,
                           self.n_nodes, self.n_connectors,
                           self.n_branch_nodes, self.n_end_nodes,
                           self.n_open_ends, self.cable_length,
@@ -1154,6 +1159,9 @@ class CatmaidNeuron:
                                 'n_end_nodes', 'n_open_ends', 'cable_length',
                                 'review_status', 'soma']
                          )
+
+        logger.setLevel(l)
+        return s
 
     def to_dataframe(self):
         """ Turn this Catmaidneuron into a pandas DataFrame containing
@@ -1427,6 +1435,10 @@ class CatmaidNeuronList:
         """
         d = []
 
+        # Set level to warning to avoid spam of "skeleton data not available"
+        l = logger.level
+        logger.setLevel('WARNING')
+
         if not isinstance(n, slice):
             n = slice(n)
 
@@ -1445,6 +1457,8 @@ class CatmaidNeuronList:
             this_n += [getattr(n, a, 'NA') for a in add_cols]
 
             d.append(this_n)
+
+        logger.setLevel(l)
 
         return pd.DataFrame(data=d,
                             columns=['neuron_name', 'skeleton_id', 'n_nodes',
