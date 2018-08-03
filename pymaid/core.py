@@ -2740,24 +2740,24 @@ class Volume:
                     If ``inplace=False``.
         """
         if not inplace:
-            x = self.copy()
+            v = self.copy()
         else:
-            x = self
+            v = self
 
         # Get the center
-        cn = np.mean(x.vertices, axis=0)
+        cn = np.mean(v.vertices, axis=0)
 
         # Get vector from center to each vertex
-        vec = x.vertices - cn
+        vec = v.vertices - cn
 
         # Multiply vector by resize factor
         vec *= x
 
         # Recalculate vertex positions
-        x.vertices = vec + cn
+        v.vertices = vec + cn
 
         if not inplace:
-            return x
+            return v
 
     def plot3d(self, **kwargs):
         """Plot neuron using :func:`pymaid.plot3d`.
