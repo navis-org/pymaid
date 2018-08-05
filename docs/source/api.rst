@@ -190,7 +190,22 @@ Plotting
     ~pymaid.get_viewer
     ~pymaid.screenshot
     ~pymaid.Volume
+
+Vispy 3D viewer
+
+.. autosummary::
+    :toctree: generated/
+
     ~pymaid.Viewer
+    ~pymaid.Viewer.add
+    ~pymaid.Viewer.clear
+    ~pymaid.Viewer.close
+    ~pymaid.Viewer.colorize
+    ~pymaid.Viewer.set_colors
+    ~pymaid.Viewer.hide_neurons
+    ~pymaid.Viewer.unhide_neurons
+    ~pymaid.Viewer.screenshot
+    ~pymaid.Viewer.show
 
 
 .. _api_morph:
