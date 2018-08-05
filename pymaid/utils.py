@@ -29,7 +29,19 @@ from pymaid import core, fetch, config
 logger = config.logger
 
 __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
-           'set_loggers', 'set_pbars', 'eval_skids']
+           'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache']
+
+
+def clear_cache():
+    """ Clear cache of global CatmaidInstance. """
+    if 'remote_instance' in sys.modules:
+        rm = sys.modules['remote_instance']
+    elif 'remote_instance' in globals():
+        rm = globals()['remote_instance']
+    else:
+        raise ValueError('No global CatmaidInstance found.')
+
+    rm.clear_cache()
 
 
 def _type_of_script():
@@ -265,8 +277,6 @@ def _eval_remote_instance(remote_instance, raise_error=True):
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
             return sys.modules['remote_instance']
-        elif 'remote_instance' in sys.modules:
-            return sys.modules['remote_instance']
         elif 'remote_instance' in globals():
             return globals()['remote_instance']
         else:
@@ -325,7 +335,7 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
             return [str(x)]
         except BaseException:
             if x.startswith('annotation:') or x.startswith('annotations:'):
-                an = x[x.index(':') + 1 : ]
+                an = x[x.index(':') + 1:]
                 return fetch.get_skids_by_annotation(an,
                                                      remote_instance=remote_instance)
             elif x.startswith('name:'):
