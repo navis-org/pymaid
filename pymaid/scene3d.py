@@ -56,7 +56,7 @@ logger = config.logger
 
 class Viewer:
     """
-    Experimental 3D viewer for CatmaidNeurons.
+    Vispy 3D viewer.
 
     Parameters
     ----------
@@ -80,6 +80,22 @@ class Viewer:
     legend_font_size : int
                     Font size for legend.
 
+    Examples
+    --------
+    This viewer is what :func:`pymaid.plot3d` uses when ``backend='vispy'``.
+    Instead of :func:`pymaid.plot3d` we can interact with the viewer directly:
+
+    >>> # Open a 3D viewer
+    >>> v = pymaid.Viewer()
+    >>> # Get and add neurons
+    >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
+    >>> v.add(nl)
+    >>> # Colorize
+    >>> v.colorize()
+    >>> # Assign specific colors
+    >>> v.set_colors({nl[0].skeleton_id: (1, 0, 0)})
+    >>> # Clear the canvas
+    >>> v.clear()    
 
     """
     def __init__(self, picking=False, **kwargs):
@@ -427,7 +443,8 @@ class Viewer:
         if volumes:
             visuals += plotting._volume2vispy(volumes, **kwargs)
         if points:
-            visuals += plotting._points2vispy(points, **kwargs.get('scatter_kws', {}))
+            visuals += plotting._points2vispy(points,
+                                              **kwargs.get('scatter_kws', {}))
 
         if not visuals:
             raise ValueError('No visuals generated.')
