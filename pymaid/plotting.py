@@ -988,24 +988,24 @@ def plot3d(x, **kwargs):
     Parameters
     ----------
 
-    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | pymaid.Dotprops | pymaid.Volume | numpy.array
-                      Objects to plot::
-
-                        - int is interpreted as skeleton ID(s)
-                        - str is interpreted as volume name(s)
-                        - numpy.array (N,3) is plotted as scatter plot
+    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | pymaid.Dotprops | pymaid.Volume | numpy.array                      
+                        - ``int`` is interpreted as skeleton ID(s)
+                        - ``str`` is interpreted as volume name(s)
+                        - ``numpy.array (N,3)`` is plotted as scatter plot
                         - multiple objects can be passed as list (see examples)
-
-    backend :         'vispy' | 'plotly', default='vispy'
-       | ``vispy`` uses OpenGL to generate high-performance 3D plots.
-       | ``plotly`` generates 3D plots in html format.
-
+    backend :         'auto' | 'vispy' | 'plotly', default='auto'
+                        - ``auto`` selects backend based on context: ``vispy``
+                          for terminal and ``plotly`` for jupyter notebooks.
+                        - ``vispy`` uses OpenGL to generate high-performance
+                          3D plots. Works in terminal.
+                        - ``plotly`` generates 3D plots using WebGL. Works in
+                          Jupyter notebooks.
     connectors :      bool, default=False
                       Plot synapses and gap junctions.
     by_strahler :     bool, default=False
                       Will shade neuron(s) by strahler index.
     by_confidence :   bool, default=False
-                      Will shade neuron(s) by arbor confidence
+                      Will shade neuron(s) by arbor confidence.
     cn_mesh_colors :  bool, default=False
                       Plot connectors using mesh colors.
     downsampling :    int, default=None
@@ -1014,23 +1014,23 @@ def plot3d(x, **kwargs):
                       If True, canvas is cleared before plotting (only for
                       vispy).
     color :           tuple | dict, default=random
-                      Use single tuple (r,g,b) to give all neurons the same
+                      Use single tuple ``(r, g, b)`` to give all neurons the same
                       color. Use ``dict`` to give individual colors to neurons:
-                      ``{skid: (r, g, b), ... }``. RGB must be 0-255
+                      ``{skid: (r, g, b), ...}``. RGB must be 0-255.
     use_neuron_color : bool, default=False
                       If True, will try using the ``.color`` attribute of
                       CatmaidNeurons.
-    width,height :    int, default=600
+    width/height :    int, default=600
                       Use to define figure/window size.
     title :           str, default=None
-                      Plot title (for plotly only!)
+                      For plotly only! Change plot title.
     fig_autosize :    bool, default=False
                       For plotly only! Autoscale figure size.
                       Attention: autoscale overrides width and height
     scatter_kws :     dict, optional
-                      Use to modify scatter plots. Accepted parameters are:
-                        - ``'size'`` to adjust size of dots
-                        - ``'color'`` to adjust color
+                      Use to modify scatter plots. Accepted parameters are
+                        - ``size`` to adjust size of dots
+                        - ``color`` to adjust color
     remote_instance : CATMAID Instance, optional
                       Will try using globally defined CatmaidInstance if not
                       provided.
@@ -1048,19 +1048,41 @@ def plot3d(x, **kwargs):
             Use ``plotly.offline.plot(fig, filename='3d_plot.html')``
             to generate html file and open it webbrowser
 
+
+    See Also
+    --------
+    :class:`pymaid.Viewer`
+        Interactive vispy 3D viewer. Makes it easy to add/remove/select objects.
+
+
     Examples
     --------
-    This assumes that you have alread initialised a remote instance as ``rm``
+    In a Jupyter notebook using plotly as backend.
+
+    >>> import plotly.offline
+    >>> plotly.offline.init_notebook_mode()
+    >>> nl = pymaid.get_neuron(16)
+    >>> # Backend is automatically chosen but we can set it explicitly
+    >>> fig = nl.plot3d(backend='plotly')
+    >>> # Plot inline
+    >>> plotly.offline.iplot(fig)
+    >>> # Generate html in new window
+    >>> plotly.offline.plot(fig)
+
+    In a terminal using vispy as backend.
 
     >>> # Plot single neuron
     >>> nl = pymaid.get_neuron(16)
-    >>> v = pymaid.plot3d(nl)
+    >>> v = pymaid.plot3d(nl, backend='vispy')
     >>> # Clear canvas
     >>> pymaid.clear3d()
-    >>> # Plot3D can deal with combinations of objects
+
+    Some more advanced examples (using vispy here but also works with plotly).
+
+    >>> # plot3d() can deal with combinations of objects
     >>> nl2 = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> vol = pymaid.get_volume('v13.LH_R')
-    >>> vol['color'] = (255,0,0,.5)
+    >>> vol['color'] = (255, 0, 0, .5)
     >>> # This plots two neuronlists, two volumes and a single neuron
     >>> pymaid.plot3d([nl1, nl2, vol, 'v13.AL_R', 233007])
     >>> # Pass kwargs
@@ -1381,7 +1403,16 @@ def plot3d(x, **kwargs):
     skids, skdata, dotprops, volumes, points, visual = utils._parse_objects(x)
 
     # Backend
-    backend = kwargs.get('backend', 'vispy')
+    backend = kwargs.get('backend', 'auto')
+    if backend == 'auto':
+        if utils.is_jupyter():
+            backend = 'plotly'
+        else:
+            backend = 'vispy'
+    elif backend not in ['plotly', 'vispy']:
+        logger.error(
+            'Unknown backend: {}. See help(plot.plot3d).'.format(backend))
+        return
 
     # CatmaidInstance
     remote_instance = kwargs.get('remote_instance', None)
@@ -1396,24 +1427,17 @@ def plot3d(x, **kwargs):
     linewidth = kwargs.get('linewidth', 2)
     connectors_only = kwargs.get('connectors_only', False)
     use_neuron_color = kwargs.get('use_neuron_color', False)
-
     scatter_kws = kwargs.get('scatter_kws', {})
     syn_lay_new = kwargs.get('synapse_layout', {})
     syn_lay = {
-        0: {
-            'name': 'Presynapses',
-                    'color': (255, 0, 0)
-        },
-        1: {
-            'name': 'Postsynapses',
-                    'color': (0, 0, 255)
-        },
-        2: {
-            'name': 'Gap junctions',
-                    'color': (0, 255, 0)
-        },
+        0: {'name': 'Presynapses',
+            'color': (255, 0, 0)},
+        1: {'name': 'Postsynapses',
+            'color': (0, 0, 255)},
+        2: {'name': 'Gap junctions',
+            'color': (0, 255, 0)},
         'display': 'lines'  # 'circles'
-    }
+               }
     syn_lay.update(syn_lay_new)
 
     # Parameters for dotprops
@@ -1425,12 +1449,7 @@ def plot3d(x, **kwargs):
     height = kwargs.get('height', 600)
     fig_autosize = kwargs.get('fig_autosize', False)
     auto_limits = kwargs.get('auto_limits', True)
-    auto_limits = kwargs.get('autolimits', auto_limits)
-
-    if backend not in ['plotly', 'vispy']:
-        logger.error(
-            'Unknown backend: %s. See help(plot.plot3d).' % str(backend))
-        return
+    auto_limits = kwargs.get('autolimits', auto_limits)    
 
     if not remote_instance and isinstance(skdata, core.CatmaidNeuronList):
         try:
