@@ -61,6 +61,8 @@ import numpy as np
 import sys
 import networkx as nx
 
+from functools import wraps
+
 import pickle
 
 from collections import OrderedDict, deque
@@ -209,11 +211,15 @@ class CatmaidInstance:
         if make_global:
             self.make_global()
 
-    def setup_cache(self, size_limit=128, time_limit=None):
+    def setup_cache(self, caching=True, size_limit=128, time_limit=None):
         """ Setup a cache for responses from the CATMAID server.
 
         Parameters
         ----------
+        caching :       bool, optional
+                        Use to activate/deactivate caching. Deactivating does
+                        not clear the existing cache, it's just not used
+                        anymore.
         size_limit :    int | None, optional
                         Max amount memory used to cache responses in mb.
                         Set to ``None`` to for no limit.
@@ -222,7 +228,7 @@ class CatmaidInstance:
                         discarded. Set to ``None`` to for no limit.
         """
 
-        self.caching = True
+        self.caching = caching
         self._cache.size_limit = size_limit
         self._cache.time_limit = time_limit
 
@@ -230,6 +236,7 @@ class CatmaidInstance:
         """ Clear cache. """
         self._cache = Cache(size_limit=self._cache.size_limit,
                             time_limit=self._cache.time_limit)
+        logger.info('Cached cleared.')
 
     def load_cache(self, filename):
         """ Load cache from file. """
@@ -239,7 +246,7 @@ class CatmaidInstance:
         self._cache.time_limit = False
 
         if not self.caching:
-            logger.info('Cache loaded but caching is disable. Will use but not update cache.')
+            logger.info('Cache loaded but caching is disabled.')
 
     def save_cache(self, filename='cache.pickle'):
         """ Save cache to file. """
@@ -247,7 +254,7 @@ class CatmaidInstance:
 
     @property
     def cache_size(self):
-        """ Size of cache in mb."""
+        """ Size of cache in mb. """
         return self._cache.size
 
     @property
@@ -290,13 +297,13 @@ class CatmaidInstance:
             if len(url) != len(post):
                 raise ValueError('POST needs to be provided for each url.')
             if self.caching:
-                futures = [self._cache.get_cached_response(u, self._future_session,
+                futures = [self._cache.get_cached_url(u, self._future_session,
                                                            post=p) for u, p in zip(url, post)]
             else:
                 futures = [self._future_session.post(u, data=p) for u, p in zip(url, post)]
         else:
             if self.caching:
-                futures = [self._cache.get_cached_response(u, self._future_session,
+                futures = [self._cache.get_cached_url(u, self._future_session,
                                                            post=None) for u in url]
             else:
                 futures = [self._future_session.get(u, params=None) for u in url]
@@ -317,10 +324,7 @@ class CatmaidInstance:
 
             # Flag if any data is from cache
             if True in [getattr(r, 'is_cached', False) for r in resp]:
-                if False not in [getattr(r, 'is_cached', False) for r in resp]:
-                    logger.info('Cached data used.')
-                else:
-                    logger.info('Some cached data used.')
+                logger.info('Cached data used. Use `pymaid.clear_cache()` to clear.')
 
         # Convert to json if applicable
         if not raw:
@@ -652,6 +656,117 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'labels', 'stats', **GET)
 
 
+def no_caching(function):
+    """ Decorator to prevent caching of results. """
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        # Get remote instance either from kwargs or global
+        rm = utils._eval_remote_instance(kwargs.get('remote_instance', None))
+        # Keep track of old caching settings
+        old_value = rm.caching
+        # Set caching to False
+        rm.caching = False
+        # Execute function
+        res = function(*args, **kwargs)
+        # Set caching to old value
+        rm.caching = old_value
+        # Return result
+        return res
+    return wrapper
+
+
+def retry_clear_cache(*to_clear):
+    """ Decorator that clears given URL(s) from the cache and retries if a
+    function fails on the first run (only if caching is enabled).
+
+    Parameters
+    ----------
+    *to_clear
+                Variable length list of strings. Must be a CatmaidInstance
+                URL function (e.g. `._get_annotation_list`). Upon failure,
+                these URLs are cleared from the cache.
+    """
+    def decorator(function):
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            # Get remote instance either from kwargs or global
+            rm = utils._eval_remote_instance(kwargs.get('remote_instance', None))
+            try:
+                # Execute function
+                res = function(*args, **kwargs)
+            except:
+                # If caching is on, try the function without caching
+                if rm.caching:
+                    logger.info('Failed using cached data. Clearing relevant entries and retrying...')
+                    for f in to_clear:
+                        url = getattr(rm, f)()
+                        rm._cache.clear_cached_url(url)
+                    try:
+                        res = function(*args, **kwargs)
+                    except:
+                        raise
+                # If caching is off, raise right away
+                else:
+                    raise
+            # Return result
+            return res
+        return wrapper
+    return decorator
+
+
+def retry_no_caching():
+    """ Decorator that disables caching and retries if a function fails
+    on the first run (only if caching is enabled).
+    """
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        # Get remote instance either from kwargs or global
+        rm = utils._eval_remote_instance(kwargs.get('remote_instance', None))
+        try:
+            # Execute function
+            res = function(*args, **kwargs)
+        except:
+            # If caching is on, try the function without caching
+            if rm.caching:
+                logger.info('Failed using cached data. Retrying without caching...')
+                rm.caching = False
+                try:
+                    res = function(*args, **kwargs)
+                except:
+                    raise
+                finally:
+                    # Make sure to re-enable caching
+                    rm.caching = True
+            # If caching is off, raise right away
+            else:
+                raise
+        # Return result
+        return res
+    return wrapper
+
+
+def no_cache_on_error(function):
+    """ Decorator to catch exceptions and prevent caching of erroneous data."""
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        # Get remote instance either from kwargs or global
+        rm = utils._eval_remote_instance(kwargs.get('remote_instance', None))
+        # Keep existing entries
+        old = rm._cache.keys()
+        try:
+            # Execute function
+            res = function(*args, **kwargs)
+        except BaseException:
+            # If error was raised, remove new entries from cache
+            new_entries = [k for k in rm._cache.keys() if k not in old]
+            # Remove new entries from cache
+            for k in new_entries:
+                _ = rm.pop(k)
+            raise
+        return res
+    return wrapper
+
+
 class Cache(OrderedDict):
     """ Custom dictionary for handling the caching of request.responses.
     Implements a maximum size [mb] and a time limit [s].
@@ -692,8 +807,8 @@ class Cache(OrderedDict):
 
         return resp
 
-    def get_cached_response(self, url, future, post=None):
-        """ Looks for cached response. If not cached, will return
+    def get_cached_url(self, url, future, post=None):
+        """ Looks for cached url. If not cached, will return
         request futures for fetching the data from server.
         """
         try:
@@ -704,6 +819,15 @@ class Cache(OrderedDict):
                 return future.post(url, data=post)
             else:
                 return future.get(url, params=None)
+
+    def clear_cached_url(self, url, post=None):
+        """ Clears cached url for given url. """
+        try:
+            _ = self.pop((url, str(post)))
+        except KeyError:
+            pass
+        except BaseException:
+            raise
 
     def get(self, key, fallback=None):
         try:
@@ -718,7 +842,7 @@ class Cache(OrderedDict):
                 self.popitem(last=False)
 
     def update_responses(self, urls, posts, responses):
-        """ Update cached responses. Only overwrites reponses not alread
+        """ Update cached responses. Only overwrites reponses not already
         cached.
         """
         if isinstance(posts, type(None)):
@@ -762,6 +886,7 @@ class _mock_future:
         return self.response
 
 
+@no_cache_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
                get_history=False, get_merge_history=False, get_abutting=False,
                return_df=False, kwargs={}):
@@ -984,6 +1109,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
 get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
 
 
+@no_cache_on_error
 def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
               tag_flag=1):
     """ Retrieve skeleton data for a list of skeleton ids.
@@ -1074,6 +1200,7 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
     return df
 
 
+@no_cache_on_error
 def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
                            min_size=2):
     """ Retrieve the synaptic/gap junction partners of neurons
@@ -1244,6 +1371,7 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
     return df.reset_index(drop=True)
 
 
+@no_cache_on_error
 def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                  min_confidence=1, directions=['incoming', 'outgoing',
                  'gapjunctions', 'attachments']):
@@ -1419,6 +1547,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
     return df
 
 
+@no_cache_on_error
 def get_names(x, remote_instance=None):
     """ Retrieve neurons names for a list of skeleton ids.
 
@@ -1465,6 +1594,7 @@ def get_names(x, remote_instance=None):
     return(names)
 
 
+@no_cache_on_error
 def get_node_details(x, remote_instance=None, chunk_size=10000):
     """ Retrieve detailed treenode info for a list of treenodes and/or
     connectors.
@@ -1548,6 +1678,7 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     return df
 
 
+@no_cache_on_error
 def get_skid_from_treenode(treenode_ids, remote_instance=None):
     """ Retrieve skeleton IDs from a list of nodes.
 
@@ -1581,6 +1712,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
     return {treenode_ids[i]: d.get('skeleton_id', None) for i, d in enumerate(data)}
 
 
+@no_cache_on_error
 def get_treenode_table(x, include_details=True, remote_instance=None):
     """ Retrieve treenode table(s) for a list of neurons.
 
@@ -1680,6 +1812,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
     return tn_table
 
 
+@no_cache_on_error
 def get_edges(x, remote_instance=None):
     """ Retrieve edges (synaptic connections only!) between sets of neurons.
 
@@ -1730,6 +1863,7 @@ def get_edges(x, remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     """ Retrieve connectors based on a set of filters.
 
@@ -1856,6 +1990,7 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None):
     """ Retrieve connectors links for a set of neurons.
 
@@ -1973,6 +2108,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
     return df
 
 
+@no_cache_on_error
 def get_connector_details(x, remote_instance=None):
     """ Retrieve details on sets of connectors.
 
@@ -2049,6 +2185,7 @@ def get_connector_details(x, remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_connectors_between(a, b, directional=True, remote_instance=None):
     """ Retrieve connectors between sets of neurons.
 
@@ -2143,6 +2280,7 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_review(x, remote_instance=None):
     """ Retrieve review status for a set of neurons.
 
@@ -2217,6 +2355,7 @@ def get_review(x, remote_instance=None):
     return df
 
 
+@no_caching
 def remove_annotations(x, annotations, remote_instance=None):
     """ Remove annotation(s) from a list of neuron(s).
 
@@ -2294,6 +2433,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     return
 
 
+@no_caching
 def add_annotations(x, annotations, remote_instance=None):
     """ Add annotation(s) to a list of neuron(s)
 
@@ -2341,6 +2481,7 @@ def add_annotations(x, annotations, remote_instance=None):
     return
 
 
+@no_cache_on_error
 def get_user_annotations(x, remote_instance=None):
     """ Retrieve annotations used by given user(s).
 
@@ -2416,6 +2557,7 @@ def get_user_annotations(x, remote_instance=None):
     return df.sort_values('times_used').reset_index(drop=True)
 
 
+@no_cache_on_error
 def get_annotation_details(x, remote_instance=None):
     """ Retrieve annotations for a set of neuron. Returns more
     details than :func:`~pymaid.get_annotations` but is slower.
@@ -2511,6 +2653,7 @@ def get_annotation_details(x, remote_instance=None):
     return df.sort_values('annotation').reset_index(drop=True)
 
 
+@no_cache_on_error
 def get_annotations(x, remote_instance=None):
     """ Retrieve annotations for a list of skeleton ids.
     If a neuron has no annotations, it will not show up in returned dict!
@@ -2574,13 +2717,12 @@ def get_annotations(x, remote_instance=None):
 
         return(annotation_list)
     except BaseException:
-        logger.error(
-            'No annotations retrieved. Make sure that the skeleton IDs exist.')
         raise Exception(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
 
 
-def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
+@retry_clear_cache("_get_annotation_list")
+def get_annotation_id(annotations, remote_instance=None, allow_partial=False,):
     """ Retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
@@ -2595,7 +2737,7 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
     Returns
     -------
     dict
-                        ``{'annotation_name' : 'annotation_id', ....}``
+                        ``{'annotation_name': 'annotation_id', ...}``
 
     """
 
@@ -2612,6 +2754,7 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
     annotations = utils._make_iterable(annotations)
     annotation_ids = {}
     for an in annotations:
+        an = an.strip()
         # '/' indicates regex
         if an.startswith('/'):
             re_str = an[1:]
@@ -2628,9 +2771,13 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
             logger.warning('No annotation found for "{}"'.format(an))
         annotation_ids.update(res)
 
+    if not annotation_ids:
+        raise Exception('No matching annotation(s) found!')
+
     return annotation_ids
 
 
+@no_cache_on_error
 def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     """ Check if a neuron/a list of neurons have somas.
 
@@ -2697,6 +2844,7 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
     return d
 
 
+@no_cache_on_error
 def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     """ Retrieve the all neurons with matching name.
 
@@ -2751,9 +2899,13 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                         n in res['entities'] if n['type'] == 'neuron'],
                       columns=['name', 'skeleton_id'])
 
+    if df.empty:
+        raise Exception('No matching name(s) found.')
+
     return df.sort_values(['name']).drop_duplicates().reset_index(drop=True)
 
 
+@no_cache_on_error
 def get_skids_by_annotation(annotations, remote_instance=None,
                             allow_partial=False, intersect=False):
     """ Retrieve the all neurons annotated with given annotation(s).
@@ -2810,8 +2962,6 @@ def get_skids_by_annotation(annotations, remote_instance=None,
         annotations, remote_instance, allow_partial=allow_partial)
 
     if not annotation_ids:
-        logger.error(
-            'No matching annotation found! Returning None')
         raise Exception('No matching annotation found!')
 
     if allow_partial is True:
@@ -2845,6 +2995,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     return annotated_skids
 
 
+@no_cache_on_error
 def neuron_exists(x, remote_instance=None):
     """ Check if neurons exist in CATMAID.
 
@@ -2886,6 +3037,7 @@ def neuron_exists(x, remote_instance=None):
         return True
 
 
+@no_cache_on_error
 def get_treenode_info(x, remote_instance=None):
     """ Retrieve info for a set of treenodes.
 
@@ -2924,6 +3076,7 @@ def get_treenode_info(x, remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_node_tags(node_ids, node_type, remote_instance=None):
     """ Retrieve tags for a set of treenodes.
 
@@ -2973,6 +3126,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     return remote_instance.fetch(url, post=POST)
 
 
+@no_caching
 def delete_neuron(x, no_prompt=False, remote_instance=None):
     """ Completely delete neurons. Use this with EXTREME caution
     as this is irreversible!
@@ -3033,6 +3187,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     return remote_instance.fetch(url)
 
 
+@no_caching
 def delete_tags(node_list, tags, node_type, remote_instance=None):
     """ Remove tag(s) for a list of treenode(s) or connector(s).
     Works by getting existing tags, removing given tag(s) and then using
@@ -3124,6 +3279,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
                     remote_instance=remote_instance, override_existing=True)
 
 
+@no_caching
 def add_tags(node_list, tags, node_type, remote_instance=None,
              override_existing=False):
     """ Add or edit tag(s) for a list of treenode(s) or connector(s).
@@ -3193,6 +3349,7 @@ def add_tags(node_list, tags, node_type, remote_instance=None,
                                  desc='Modifying tags')
 
 
+@no_cache_on_error
 def get_segments(x, remote_instance=None):
     """ Retrieve list of segments for a neuron just like the review widget.
 
@@ -3212,7 +3369,7 @@ def get_segments(x, remote_instance=None):
     -------
     list
                 List of treenode IDs, ordered by length. If multiple neurons
-                are requested, returns a dict { skid : [], ... }
+                are requested, returns a dict ``{skid: [], ... }``.
 
     See Also
     --------
@@ -3243,6 +3400,7 @@ def get_segments(x, remote_instance=None):
         return [[tn['id'] for tn in arb['sequence']] for arb in rdata[0]]
 
 
+@no_cache_on_error
 def get_review_details(x, remote_instance=None):
     """ Retrieve review status (reviewer + timestamp) for each node
     of a given skeleton. Uses the review API.
@@ -3314,6 +3472,7 @@ def get_review_details(x, remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
              search=""):
     """ Retrieve logs (same data as in log widget).
@@ -3421,6 +3580,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
     return df
 
 
+@no_cache_on_error
 def get_contributor_statistics(x, remote_instance=None, separate=False,
                                max_threads=500):
     """ Retrieve contributor statistics for given skeleton ids.
@@ -3567,6 +3727,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
     return df
 
 
+@no_cache_on_error
 def get_neuron_list(remote_instance=None, user=None, node_count=1,
                     start_date=[], end_date=[], reviewed_by=None,
                     minimum_cont=None):
@@ -3713,6 +3874,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
     return list(set(skid_list))
 
 
+@no_cache_on_error
 def get_history(remote_instance=None,
                 start_date=(datetime.date.today() - datetime.timedelta(days=7)).isoformat(),
                 end_date=datetime.date.today().isoformat(), split=True):
@@ -3889,6 +4051,7 @@ def get_history(remote_instance=None,
     return df
 
 
+@no_cache_on_error
 def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
                         coord_format='NM', resolution=(4, 4, 50)):
     """ Retrieve treenodes in given bounding box.
@@ -3985,6 +4148,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
     return data
 
 
+@no_cache_on_error
 def find_neurons(names=None, annotations=None, volumes=None, users=None,
                  from_date=None, to_date=None, reviewed_by=None, skids=None,
                  intersect=False, partial_match=False, only_soma=False,
@@ -4021,10 +4185,11 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                         Can be a list of skids or pandas object with
                         "skeleton_id" columns.
     intersect :         bool, optional
-                        If multiple search parameters are provided, this
-                        parameter determines if neurons have to meet all of
-                        them or just a single one in order to be returned. This
-                        applies between AND within search parameters!
+                        If multiple search critera are provided, neurons have
+                        to meet all of them in order to be returned. This
+                        is first applied WITHIN search criteria (works for
+                        multiple ``annotations``, ``volumes``, ``users`` and
+                        ``reviewed_by``) and then ACROSS critera!
     partial_match :     bool, optional
                         If True, partial *names* AND *annotations* matches are
                         returned.
@@ -4135,8 +4300,6 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
             annotations, remote_instance, allow_partial=partial_match)
 
         if not annotation_ids:
-            logger.error(
-                'No matching annotation(s) found! Returning None')
             raise Exception('No matching annotation(s) found!')
 
         if partial_match is True:
@@ -4146,16 +4309,20 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
             logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
                 str(annotation_ids), len(annotations) - len(annotation_ids)))
 
-        logger.debug(
-            'Retrieving skids for annotationed neurons')
-
         urls = [remote_instance._get_annotated_url() for an in annotation_ids]
         post_data = [{'annotated_with0': str(an), 'with_annotations': 'false'}
                      for an in annotation_ids.values()]
         results = remote_instance.fetch(urls,
                                         post=post_data,
                                         desc='Get annot')
-        sets_of_skids.append(set([e['skeleton_ids'][0] for res in results for e in res['entities'] if e['type'] == 'neuron']))
+
+        annotated = [set([e['skeleton_ids'][0] for e in res['entities'] if e['type'] == 'neuron']) for res in results]
+
+        # Intersect within search criteria if applicable
+        if intersect:
+           sets_of_skids.append(set.intersection(*annotated))
+        else:
+           sets_of_skids.append(set.union(*annotated))
 
     # Get skids by user
     if users:
@@ -4171,7 +4338,11 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         results = remote_instance.fetch(urls, desc='Get users')
 
-        sets_of_skids.append(set([s for res in results for s in res]))
+        # Intersect within search criteria if applicable
+        if intersect:
+           sets_of_skids.append(set.intersection(*[set(res) for res in results]))
+        else:
+           sets_of_skids.append(set.union(*[set(res) for res in results]))
 
     # Get skids by reviewer
     if reviewed_by:
@@ -4187,10 +4358,15 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         results = remote_instance.fetch(urls, desc='Get reviewers')
 
-        sets_of_skids.append(set([s for res in results for s in res]))
+        # Intersect within search criteria if applicable
+        if intersect:
+           sets_of_skids.append(set.intersection(*[set(res) for res in results]))
+        else:
+           sets_of_skids.append(set.union(*[set(res) for res in results]))
 
     # Get by volume
     if volumes:
+        temp = []
         for v in config.tqdm(volumes, desc='Get by vols', disable=config.pbar_hide,
                       leave=config.pbar_leave):
             if not isinstance(v, core.Volume):
@@ -4198,10 +4374,15 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
             else:
                 vol = v
 
-            temp = get_neurons_in_bbox(
-                vol.bbox, remote_instance=remote_instance)
+            temp.append(set(get_neurons_in_bbox(vol.bbox,
+                                                remote_instance=remote_instance)))
 
-            sets_of_skids.append(set(temp))
+        # Intersect within search criteria if applicable
+        if intersect:
+           sets_of_skids.append(set.intersection(*temp))
+        else:
+           sets_of_skids.append(set.union(*temp))
+
 
     # Get neurons by size if only min_size and no other no parameters were provided
     if False not in [isinstance(param, type(None)) for param in [names, annotations, volumes, users, reviewed_by, skids]]:
@@ -4226,7 +4407,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         sets_of_skids.append(these_neurons)
 
-    # Now merge the different neurons that we have
+    # Now intersect/merge ACROSS search criteria
     if intersect:
         logger.info('Intersecting by search parameters')
         skids = list(set.intersection(*sets_of_skids))
@@ -4269,6 +4450,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     return nl
 
 
+@no_cache_on_error
 def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
                           only_soma=False, remote_instance=None):
     """ Retrieves neurons with processes within CATMAID volumes. This function
@@ -4371,6 +4553,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     return neurons
 
 
+@no_cache_on_error
 def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
                         **kwargs):
     """ Retrieves neurons with processes within a defined box volume. Because the
@@ -4526,6 +4709,7 @@ def _subset_volume(bbox, max_vol=None):
     return new_boxes
 
 
+@no_cache_on_error
 def get_user_list(remote_instance=None):
     """ Get list of users for given CATMAID server (not project specific).
 
@@ -4580,6 +4764,7 @@ def get_user_list(remote_instance=None):
     return df
 
 
+@no_cache_on_error
 def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
               return_graph=False, remove_isolated=False):
     """ Retrieves paths between two sets of neurons.
@@ -4708,6 +4893,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
     return all_paths, g
 
 
+@no_cache_on_error
 def get_volume(volume_name=None, remote_instance=None,
                color=(120, 120, 120, .6), combine_vols=False):
     """ Retrieves volume (mesh) from Catmaid server and converts to set of
@@ -4852,6 +5038,7 @@ def get_volume(volume_name=None, remote_instance=None,
     return volumes
 
 
+@no_cache_on_error
 def get_annotation_list(remote_instance=None):
     """ Get a list of all annotations in the project.
 
@@ -4972,6 +5159,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
         return gen_url(coords, stack_id, active_node_id, active_skeleton_id)
 
 
+@no_caching
 def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
     """ Rename neuron(s).
 
@@ -5066,6 +5254,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
     return
 
 
+@no_cache_on_error
 def get_label_list(remote_instance=None):
     """ Retrieves all labels (TREENODE tags only) in a project.
 
@@ -5104,6 +5293,7 @@ def get_label_list(remote_instance=None):
                                          'treenode_id'])
 
 
+@no_cache_on_error
 def get_transactions(range_start=None, range_length=25, remote_instance=None):
     """ Retrieve individual transactions with server. **This API endpoint is
     extremely slow!**
