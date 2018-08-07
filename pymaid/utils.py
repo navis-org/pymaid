@@ -17,6 +17,7 @@
 import collections
 import six
 import sys
+import os
 import numpy as np
 import json
 import pandas as pd
@@ -590,7 +591,7 @@ def _parse_objects(x, remote_instance=None):
     return skids, skdata, dotprops, volumes, points, visuals
 
 
-def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
+def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
              post_label=None):
     """ Generate neuron object from SWC file. This import is following
     format specified here: http://research.mssm.edu/cnic/swc.html
@@ -602,8 +603,9 @@ def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
 
     Parameters
     ----------
-    filename :          str
-                        SWC filename.
+    f :                 str
+                        SWC filename or folder. If folder, will import all
+                        ``.swc`` files.
     neuronname :        str, optional
                         Name to use for the neuron. If not provided, will use
                         filename.
@@ -616,7 +618,7 @@ def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
 
     Returns
     -------
-    CatmaidNeuron
+    CatmaidNeuron/List
 
     See Also
     --------
@@ -624,14 +626,25 @@ def from_swc(filename, neuron_name=None, neuron_id=None, pre_label=None,
                         Export neurons as SWC files.
 
     """
+    if os.path.isdir(f):
+        swc = [os.path.join(f, x) for x in os.listdir(f) if os.path.isfile(os.path.join(f, x)) and x.endswith('.swc')]
+        return core.CatmaidNeuronList([from_swc(x,
+                                                neuron_name=neuron_name,
+                                                neuron_id=neuron_id,
+                                                pre_label=pre_label,
+                                                post_label=post_label)
+                                       for x in config.tqdm(swc, desc='Importing',
+                                                            disable=config.pbar_hide,
+                                                            leave=config.pbar_leave)])
+
     if not neuron_id:
         neuron_id = uuid.uuid4().int
 
     if not neuron_name:
-        neuron_name = filename
+        neuron_name = os.path.basename(f)
 
     data = []
-    with open(filename) as file:
+    with open(f) as file:
         reader = csv.reader(file, delimiter=' ')
         for row in reader:
             # skip empty rows
