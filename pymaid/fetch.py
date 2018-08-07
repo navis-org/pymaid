@@ -2754,7 +2754,14 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False,):
     annotations = utils._make_iterable(annotations)
     annotation_ids = {}
     for an in annotations:
+        # Strip whitespaces
         an = an.strip()
+
+        # Strip tilde -> consider that people might use e.g. "~/VA6" for NOT
+        # VA6
+        if an.startswith('~'):
+            an = an[1:]
+
         # '/' indicates regex
         if an.startswith('/'):
             re_str = an[1:]
@@ -2851,7 +2858,9 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     Parameters
     ----------
     names :             str | list of str
-                        Name(s) to search for.
+                        Name(s) to search for. Like CATMAID's search widget,
+                        you can use regex to search for names by starting
+                        the query with a leading ``/``.
     allow_partial :     bool, optional
                         If True, partial matches are returned too.
     remote_instance :   CATMAID instance, optional
@@ -2881,15 +2890,12 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     # Prepare names for regex search on the backend
     re_str = []
     for n in utils._make_iterable(names, force_type=str):
-        # '/' indicates regex - not necessary for the backend, so remove
-        if n.startswith('/'):
-            re_str.append(n[1:])
-        # If allow partial just use the raw string
-        elif allow_partial:
+        # '/' indicates regex - will be processed on the backend
+        if allow_partial or n.startswith('/'):
             re_str.append(n)
         # If exact match, encode this in regex
         else:
-            re_str.append('^{}$'.format(n))
+            re_str.append('/^{}$'.format(n))
 
     urls = [remote_instance._get_annotated_url() for n in re_str]
     POST = [{'name': n, 'with_annotations': False} for n in re_str]
@@ -2908,12 +2914,13 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 @no_cache_on_error
 def get_skids_by_annotation(annotations, remote_instance=None,
                             allow_partial=False, intersect=False):
-    """ Retrieve the all neurons annotated with given annotation(s).
+    """ Retrieve the neurons annotated with given annotation(s).
 
     Parameters
     ----------
     annotations :           str | list
                             Single annotation or list of multiple annotations.
+                            Using a tilde (~) as prefix is interpreted as NOT.
     remote_instance :       CATMAID instance, optional
                             If not passed directly, will try using global.
     allow_partial :         bool, optional
@@ -2934,63 +2941,51 @@ def get_skids_by_annotation(annotations, remote_instance=None,
                             annotations, etc.
     """
 
-    """
-    logger.warning(
-            "Deprecationwarning: get_skids_by_annotation() is deprecated, use find_neurons() instead."
-        )
-    """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    logger.debug(
-        'Looking for annotation(s): ' + str(annotations))
+    annotations = utils._make_iterable(annotations)
+    pos_an = [an for an in annotations if not an.startswith('~')]
+    neg_an = [an[1:] for an in annotations if an.startswith('~')]
 
-    if intersect and utils._is_iterable(annotations):
-        current_level = logger.level
-        logger.setLevel('WARNING')
-        skids = set.intersection(*[set(get_skids_by_annotation(a,
-                                                               remote_instance=remote_instance,
-                                                               allow_partial=allow_partial,
-                                                               intersect=False))
-                                   for a in annotations])
-        logger.setLevel(current_level)
-        logger.info(
-            'Found %i skeletons with matching annotation(s)' % len(skids))
-        return list(skids)
+    # Placeholders in case we don't even ask for pos or neg
+    pos_ids = {}
+    neg_ids = {}
 
-    annotation_ids = get_annotation_id(
-        annotations, remote_instance, allow_partial=allow_partial)
+    if pos_an:
+        pos_ids = get_annotation_id(
+                        pos_an, remote_instance, allow_partial=allow_partial)
+        if not pos_ids:
+            raise Exception('No matching annotation found!')
 
-    if not annotation_ids:
-        raise Exception('No matching annotation found!')
+    if neg_an:
+        neg_ids = get_annotation_id(
+                        neg_an, remote_instance, allow_partial=allow_partial)
+        if not neg_ids:
+            raise Exception('No matching annotation found!')
 
-    if allow_partial is True:
-        logger.debug(
-            'Found id(s): %s (partial matches included)' % len(annotation_ids))
-    elif utils._is_iterable(annotations):
-        logger.debug('Found id(s): %s | Unable to retrieve: %i' % (
-            str(annotation_ids), len(annotations) - len(annotation_ids)))
-    elif isinstance(annotations, str):
-        logger.debug('Found id: %s | Unable to retrieve: %i' % (
-            list(annotation_ids.keys())[0], 1 - len(annotation_ids)))
+    # Collapse for intersection...
+    if intersect:
+        annotation_post = [{'annotated_with[{}]'.format(i): v for i, v in enumerate(list(pos_ids.values()))}]
+        annotation_post[0].update({'not_annotated_with[{}]'.format(i): v for i, v in enumerate(list(neg_ids.values()))})
+    # ... or keep separate for no intersection
+    else:
+        annotation_post = [{'annotated_with': an} for an in pos_ids.values()]
+        annotation_post += [{'not_annotated_with': an} for an in neg_ids.values()]
+        # Need to clear empties
+        annotation_post = [p for p in annotation_post if p]
 
-    annotated_skids = []
-    logger.debug(
-        'Retrieving skids for annotationed neurons...')
-    for an_id in annotation_ids.values():
-        #annotation_post = {'neuron_query_by_annotation': annotation_id, 'display_start': 0, 'display_length':500}
-        annotation_post = {'annotated_with0': an_id, 'with_annotations': False}
-        remote_annotated_url = remote_instance._get_annotated_url()
-        neuron_list = remote_instance.fetch(
-            remote_annotated_url, annotation_post)
-        for entry in neuron_list['entities']:
-            if entry['type'] == 'neuron':
-                annotated_skids.append(str(entry['skeleton_ids'][0]))
+    # Query server
+    remote_annotated_url = [remote_instance._get_annotated_url() for _ in annotation_post]
+    resp = remote_instance.fetch(remote_annotated_url, annotation_post)
 
+    # Extract skids from responses
+    annotated_skids = [e['skeleton_ids'][0] for r in resp for e in r['entities'] if e['type'] == 'neuron']
+
+    # Remove duplicates
     annotated_skids = list(set(annotated_skids))
 
     logger.info(
-        'Found %i skeletons with matching annotation(s)' % len(annotated_skids))
+        'Found %i neurons with matching annotation(s)' % len(annotated_skids))
 
     return annotated_skids
 
