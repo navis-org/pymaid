@@ -1,13 +1,13 @@
 decorator>=4.1.0
 matplotlib==2.2.2
 Shapely==1.6.4.post2
-tqdm==4.23.4
+tqdm==4.24.0
 numpy==1.15.0
 six==1.11.0
 setuptools==40.0.0
 imageio==2.3.0
 vispy==0.5.3
-pandas==0.23.3
+pandas==0.23.4
 seaborn==0.9.0
 requests==2.19.1
 requests_futures==0.9.7
