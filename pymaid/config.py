@@ -28,7 +28,7 @@ if len(logger.handlers) == 0:
 
 # Default settings for progress bars
 pbar_hide = False
-pbar_leave = True
+pbar_leave = False
 
 # Default setting for igraph:
 #   If True, will use iGraph if possible
