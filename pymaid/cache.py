@@ -192,7 +192,7 @@ def wipe_and_retry(function):
 
             # Execute function the first time (make sure no new data is added
             # if exception is raised)
-            res = no_cache_on_error(function)(*args, **kwargs)
+            res = undo_on_error(function)(*args, **kwargs)
         except:
             # If caching is on, try the function without caching
             if rm.caching:
