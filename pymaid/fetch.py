@@ -1230,6 +1230,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
+    x = np.array(x).astype(str)
 
     remote_connectivity_url = remote_instance._get_connectivity_url()
 
@@ -1255,7 +1256,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                       d]] + list(x), remote_instance)
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
-                               'num_nodes', 'relation'] + [str(s) for s in x])
+                               'num_nodes', 'relation'] + list(x))
 
     relations = {
         'incoming': 'upstream',
@@ -1273,7 +1274,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
             str(n),
             int(connectivity_data[d][n]['num_nodes']),
             relations[d]]
-            + [sum(connectivity_data[d][n]['skids'].get(str(s),
+            + [sum(connectivity_data[d][n]['skids'].get(s,
                                                         [0, 0, 0, 0, 0])[min_confidence - 1:]) for s in x]
             for i, n in enumerate(connectivity_data[d])
         ],
