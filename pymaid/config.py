@@ -36,7 +36,6 @@ pbar_leave = False
 # Primarily used for debugging
 use_igraph = True
 
-
 def _type_of_script():
     """ Returns context in which pymaid is run. """
     try:
