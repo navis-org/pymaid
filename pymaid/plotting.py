@@ -1844,7 +1844,7 @@ def plot1d(x, ax=None, color=None, **kwargs):
         # Order this neuron's segments by topology
         breaks = [topology[0]] + \
             [n for i, n in enumerate(topology) if n in bp or n in term]
-        segs = [([s for s in n.segments if s[0] == end][0][-1], end)
+        segs = [([s for s in n.small_segments if s[0] == end][0][-1], end)
                 for end in breaks[1:]]
 
         # Now get distances for each segment
