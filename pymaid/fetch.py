@@ -415,7 +415,7 @@ class CatmaidInstance:
 
     def _get_skeleton_nodes_url(self, skid, **GET):
         """ Use to parse url for retrieving skeleton nodes (no info on parents or synapses, does need post data). """
-        return self.make_url(self.project_id, 'treenode', 'table', skid, 'content', **GET)
+        return self.make_url(self.project_id, 'skeletons', skid, 'node-overview', **GET)
 
     def _get_skeleton_for_3d_viewer_url(self, skid, **GET):
         """ ATTENTION: this url doesn't work properly anymore as of 07/07/14

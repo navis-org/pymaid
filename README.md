@@ -3,10 +3,10 @@
 <img src="https://github.com/schlegelp/pyMaid/raw/master/docs/_static/favicon.png" height="30"> pymaid
 ======================================================================================================
 Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
-Tested with CATMAID release version 2018.04.15 - if you are working with older versions you may experience incompatibilities due to API changes.
+Tested with CATMAID release version 2018.07.19 - if you are working with older versions you may run into issues due to API changes.
 
 ## Documentation
-PyMaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs").
+Pymaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "pymaid ReadTheDocs").
 
 ## Features
 
@@ -33,7 +33,7 @@ Alternatively click on the *launch binder* badge above to try out pymaid hosted 
 This code is under GNU GPL V3
 
 ## References:
-PyMaid implements algorithms described in:
+Pymaid implements algorithms described in:
 
 1. **Comparison of neurons based on morphology**: Cell. 2016 doi: 10.1016/j.neuron.2016.06.012
 *NBLAST: Rapid, Sensitive Comparison of Neuronal Structure and Construction of Neuron Family Databases.*
