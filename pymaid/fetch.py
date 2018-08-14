@@ -227,7 +227,7 @@ class CatmaidInstance:
 
     def clear_cache(self):
         """ Clear cache. """
-        self._cache = Cache(size_limit=self._cache.size_limit,
+        self._cache = cache.Cache(size_limit=self._cache.size_limit,
                             time_limit=self._cache.time_limit)
         logger.info('Cached cleared.')
 
