@@ -392,6 +392,7 @@ Cytoscape API
 
     pymaid.cytoscape.generate_network
     pymaid.cytoscape.get_client
+    pymaid.cytoscape.watch_network
 
 .. _api_userstats:
 

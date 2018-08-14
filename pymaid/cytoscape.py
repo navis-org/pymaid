@@ -25,6 +25,11 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 
+from pymaid import utils, fetch, graph
+
+import time
+import datetime
+
 from py2cytoscape.data.cyrest_client import CyRestClient
 
 # Set up logging
@@ -150,3 +155,166 @@ def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
         cy.style.apply(s, n)
 
     return n
+
+
+def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
+                  remote_instance=None, verbose=True):
+    """ Loads and **updated** a network into Cytoscape. Use CTRL-C to stop.
+
+    Parameters
+    ----------
+    x :                 skeleton IDs | CatmaidNeuron/List
+                        Seed neurons to keep track of.
+    sleep :             int | None, optional
+                        Time in seconds to sleep after each update.
+    n_circles :         int, optional
+                        Number of circles around seed neurons to include in
+                        the network. See also :func:`pymaid.get_nth_partners`.
+                        Set to ``None | 0 | False`` to only update
+                        seed nodes.
+    min_pre/min_post :  int, optional
+                        Synapse threshold to apply to ``n_circles``.
+                        Set to -1 to not get any pre-/post synaptic partners.
+                        Please note: as long as there is a single
+                        above-threshold connection, a neuron will be included.
+                        This does not remove other, sub-threshold connections.
+    layout :            str | None, optional
+                        Name of a Cytoscape layout. If provided, will update
+                        the network's layout on every change.
+    remote_instance :   CatmaidInstance, optional
+    verbose :           bool, optional
+                        If True, will log changes made to the network.
+
+    Returns
+    -------
+    Nothing
+
+    Examples
+    --------
+    >>> import pymaid
+    >>> import pymaid.cytoscape as cytomaid
+    >>> rm = pymaid.CatmaidInstance('server_url', 'http_user',
+    ...                             'http_pw', 'auth_token')
+    >>> # Don't forget to start Cytoscape!
+    >>> cytomaid.watch_network('annotation:glomerulus DA1', min_pre=5,
+    ...                         min_post=-1, sleep=5)
+    """
+
+    cy = get_client()
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    sleep = 0 if not sleep else sleep
+
+    x = utils.eval_skids(x, remote_instance=remote_instance)
+
+    # Generate the initial network
+    if n_circles:
+        to_add = fetch.get_nth_partners(x, n_circles=n_circles,
+                                                min_pre=min_pre, min_post=min_post,
+                                                remote_instance=remote_instance).skeleton_id
+    else:
+        to_add = []
+    g = graph.network2nx(np.concatenate([x, to_add]).astype(int),
+                         remote_instance=remote_instance)
+    network = generate_network(g, clear_session=True, apply_style=False,
+                               layout=layout)
+
+    if layout:
+        cy.layout.apply(name=layout, network=network)
+
+    logger.info('Watching network. Use CTRL-C to stop.')
+    if remote_instance.caching:
+        logger.warning('Caching disabled.')
+        remote_instance.caching = False
+    utils.set_loggers('WARNING')
+    while True:
+        if n_circles:
+            to_add = fetch.get_nth_partners(x, n_circles=n_circles,
+                                            min_pre=min_pre, min_post=min_post,
+                                            remote_instance=remote_instance).skeleton_id
+        else:
+            to_add = []
+
+        g = graph.network2nx(np.concatenate([x, to_add]).astype(int),
+                             remote_instance=remote_instance)
+
+        # Add nodes that came in new
+        ntable = network.get_node_table()
+        nodes_to_add = [s for s in g.nodes if s not in ntable.id.values]
+        if nodes_to_add:
+            network.add_nodes(nodes_to_add)
+
+        # Update neuron names
+        ntable = network.get_node_table()
+        names = ntable.set_index('name').neuron_name.to_dict()
+        names.update({s: g.nodes[s]['neuron_name'] for s in g.nodes})
+        ntable['id'] = ntable.name
+        ntable['neuron_name'] = ntable.name.map(names)
+        network.update_node_table(ntable, data_key_col='name',
+                                          network_key_col='name')
+
+        # Remove nodes that do not exist anymore
+        ntable = network.get_node_table()
+        nodes_to_remove = ntable[~ntable['id'].isin(g.nodes)]
+        if not nodes_to_remove.empty:
+            for v in nodes_to_remove.SUID.values:
+                network.delete_node(v)
+
+        # Remove edges
+        etable = network.get_edge_table()
+        edges_removed = 0
+        for e in etable.itertuples():
+            if (e.source, e.target) not in g.edges:
+                edges_removed += 1
+                network.delete_edge(e.SUID)
+
+        # Add edges
+        etable = network.get_edge_table()
+        edges = [(s, t) for s, t in zip(etable.source.values, etable.target.values)]
+        skid_to_SUID = ntable.set_index('name').SUID.to_dict()
+        edges_to_add = []
+        for e in set(g.edges) - set(edges):
+            edges_to_add.append({'source': skid_to_SUID[e[0]],
+                                 'target': skid_to_SUID[e[1]],
+                                 'interaction': None,
+                                 'directed': True})
+        if edges_to_add:
+            network.add_edges(edges_to_add)
+
+        # Fix table and modify weights if applicable
+        etable = network.get_edge_table()
+        if not etable.loc[etable.source.isnull()].empty:
+            etable.loc[etable.source.isnull(), 'source'] = etable.loc[etable.source.isnull(), 'name'].map(lambda x : x[:x.index('(')-1])
+            etable.loc[etable.target.isnull(), 'target'] = etable.loc[etable.target.isnull(), 'name'].map(lambda x : x[x.index(')')+2:])
+        new_weights = [g.edges[e]['weight'] for e in etable[['source','target']].values]
+        weights_modified = [new_w for new_w, old_w in zip(new_weights, etable.weight.values) if new_w != old_w]
+        etable['weight'] = new_weights
+        # For some reason, there os no official wrapper for this, so we have to cheat a bit
+        network._CyNetwork__update_table('edge', etable,
+                                         network_key_col='SUID',
+                                         data_key_col='SUID')
+
+        if nodes_to_add or not nodes_to_remove.empty or edges_to_add or edges_removed or weights_modified:
+            if verbose:
+                logger.info('{} - nodes added/removed: {}/{}; edges added/removed/modified {}/{}/{}'.format(datetime.datetime.now(),
+                                                           len(nodes_to_add),
+                                                           len(nodes_to_remove),
+                                                           len(edges_to_add),
+                                                           edges_removed,
+                                                           len(weights_modified),
+                                                           )
+                            )
+
+            if layout:
+                cy.layout.apply(name=layout, network=network)
+
+        # ZzzZzzzZ
+        time.sleep(sleep)
+
+
+
+
+
+
+
