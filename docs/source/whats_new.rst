@@ -10,6 +10,17 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.89
+     - 14/09/18
+     - - new function: :func:`~pymaid.cytoscape.watch_network` constantly pushes updates Cytoscape
+       - new function: :func:`~pymaid.get_nth_partners` returns neurons connected via n hops
+       - by default, :func:`~pymaid.plot3d` now chooses the backend automatically: vispy for terminal sessions, plotly for Jupyter notebook/lab
+       - :func:`~pymaid.get_skids_by_annotation` now accepts negative search criteria
+       - :func:`~pymaid.from_swc` now imports multiple SWCs at a time
+       - major improvements to caching system
+       - by default, progress bars will now vanish after completion
+       - followed changes in CATMAID API regarding treenode tables
+       - various bugfixes
    * - 0.88
      - 29/07/18
      - - data caching for faster queries, see :doc:`caching demo <data_caching>`
@@ -17,14 +28,14 @@ What's new?
        - :func:`~pymaid.resample_neuron` now resamples radius too
        - :func:`~pymaid.guess_radius` interpolation now takes distance along spines into account
        - :func:`~pymaid.despike_neuron` is now able to catch spikes that consist of multiple nodes
-       - :func:`~pymaid.cable_length` is now deprecated
+       - :func:`~pymaid.calc_cable` is now deprecated
        - general improvements to docstrings
    * - 0.87
      - 20/07/18
      - - :func:`~pymaid.get_team_contributions` now takes link creation into account
        - :func:`~pymaid.get_time_invested` should be way faster now
        - :func:`~pymaid.geodesic_matrix` now returns a SparseDataFrame to save memory
-       - addded :func:`pymaid.CatmaidNeuron.to_dataframe` method
+       - added :func:`pymaid.CatmaidNeuron.to_dataframe` method
        - general improvements and docstrings
    * - 0.86
      - 16/07/18
