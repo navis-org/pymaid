@@ -102,12 +102,12 @@ find out details about a given function.
 
    Pymaid & Blender3D <blender>
    Pymaid & Cytoscape <python2cytoscape>
-   EM image data <tiles.ipynb>
-   Troubleshooting <troubleshooting>
    Pymaid & R <rmaid_doc>
+   EM image data <tiles.ipynb>      
    URLs & random sampling <generate_urls>
    User contributions <user_contributions>
    Data caching <data_caching>
+   Troubleshooting <troubleshooting>
 
 .. raw:: html
 
