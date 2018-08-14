@@ -86,16 +86,21 @@ def get_pymaid_style():
     return s
 
 
-def generate_network(x, clear_session=True):
+def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
+                    clear_session=True):
     """ Loads a CATMAID network into Cytoscape.
 
     Parameters
     ----------
-    x :             {networkx.Graph, pandas.DataFrame}
+    x :             networkX Graph | pandas.DataFrame
                     Network to export to Cytoscape. Can be:
                       1. NetworkX Graph e.g. from pymaid.networkx (preferred!)
                       2. Pandas DataFrame. Mandatory columns:
                          'source','target','interaction'
+    layout :        str | None, optional
+                    Layout to apply. Set to ``None`` to not apply any.
+    apply_style :   bool, optional
+                    If True will apply a "pymaid" style to the network.
     clear_session : bool, optional
                     If True, will clear session before adding network.
 
@@ -106,6 +111,9 @@ def generate_network(x, clear_session=True):
 
     # Initialise connection with Cytoscape
     cy = get_client()
+
+    if layout not in cy.layout.get_all() + [None]:
+        raise ValueError('Unknown layout. Available options: ' + ', '.join(cy.layout.get_all()))
 
     # Clear session
     if clear_session:
@@ -121,22 +129,24 @@ def generate_network(x, clear_session=True):
         raise TypeError(
             'Unable to generate network from data of type "{0}"'.format(type(x)))
 
-    # Apply basic layout
-    cy.layout.apply(name='degree-circle', network=n)
+    if layout:
+        # Apply basic layout
+        cy.layout.apply(name=layout, network=n)
 
-    # Get our default style
-    s = get_pymaid_style()
+    if apply_style:
+        # Get our default style
+        s = get_pymaid_style()
 
-    # Add some passthough mappings to the style
-    s.create_passthrough_mapping(
-        column='neuron_name', vp='NODE_LABEL', col_type='String')
-    max_edge_weight = n.get_edge_column('weight').max()
-    s.create_continuous_mapping(column='weight', vp='EDGE_WIDTH', col_type='Double',
-                                points=[{'equal': '1.0', 'greater': '1.0', 'lesser': '1.0', 'value': 1.0},
-                                        {'equal': max_edge_weight / 3, 'greater': 1.0, 'lesser': max_edge_weight / 3, 'value': max_edge_weight}]
-                                )
+        # Add some passthough mappings to the style
+        s.create_passthrough_mapping(
+            column='neuron_name', vp='NODE_LABEL', col_type='String')
+        max_edge_weight = n.get_edge_column('weight').max()
+        s.create_continuous_mapping(column='weight', vp='EDGE_WIDTH', col_type='Double',
+                                    points=[{'equal': '1.0', 'greater': '1.0', 'lesser': '1.0', 'value': 1.0},
+                                            {'equal': max_edge_weight / 3, 'greater': 1.0, 'lesser': max_edge_weight / 3, 'value': max_edge_weight}]
+                                    )
 
-    # Apply style
-    cy.style.apply(s, n)
+        # Apply style
+        cy.style.apply(s, n)
 
     return n
