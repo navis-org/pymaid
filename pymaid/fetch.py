@@ -83,7 +83,8 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_connectors_between', 'url_to_coordinates',
                   'rename_neurons', 'get_label_list', 'find_neurons',
                   'get_skid_from_treenode', 'get_transactions',
-                  'remove_annotations', 'get_connector_links'])
+                  'remove_annotations', 'get_connector_links',
+                  'get_nth_partners'])
 
 # Set up logging
 logger = config.logger
@@ -645,8 +646,12 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'neurons', neuron_id, 'rename', **GET)
 
     def _get_label_list_url(self, **GET):
-        """ Use to rename a single neuron. Does need postdata."""
+        """ Use to get a list of all labels. Does not need postdata."""
         return self.make_url(self.project_id, 'labels', 'stats', **GET)
+
+    def _get_circles_of_hell_url(self, **GET):
+        """ Use to get n-th order partners for a set of neurons. Does need postdata."""
+        return self.make_url(self.project_id, 'graph', 'circlesofhell', **GET)
 
 
 @cache.undo_on_error
@@ -1133,6 +1138,58 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
 
     return df.reset_index(drop=True)
 
+
+@cache.undo_on_error
+def get_nth_partners(x, n_circles=1, min_pre=2, min_post=2,
+                     remote_instance=None):
+    """ Retrieve partners that are directly (``n_circles=1``) or via n "hops"
+    (``n_circles>1``) connected to a set of seed neurons.
+
+    Parameters
+    ----------
+    x
+                        Seed neurons for which to retrieve partners. Can be either:
+
+                        1. list of skeleton ID(s) (int or str)
+                        2. list of neuron name(s) (str, exact match)
+                        3. an annotation: e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    n_circles :         int, optional
+                        Number of circles around your seed neurons.
+    min_pre/min_post :  int, optional
+                        Synapse threshold. Set to -1 to not get any pre-/post
+                        synaptic partners.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame each row represents a partner:
+
+        >>> df
+           neuron_name   skeleton_id
+        0   name1           123
+        1   name2           456
+        2   ...             ...
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+    x = utils.eval_skids(x, remote_instance=remote_instance)
+
+    url = remote_instance._get_circles_of_hell_url()
+    post = {'n_circles': n_circles, 'min_pre': min_pre, 'min_post': min_post}
+    post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(x)})
+
+    # Returns list of skids [0] and names dict [1]
+    resp = remote_instance.fetch(url, post=post)
+
+    # Generate DataFrame
+    df = pd.DataFrame.from_dict(resp[1], orient='index').reset_index()
+    df.columns = ['skeleton_id', 'neuron_name']
+
+    return df
 
 @cache.undo_on_error
 def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],

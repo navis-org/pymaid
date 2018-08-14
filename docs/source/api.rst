@@ -67,6 +67,7 @@ Connectivity
     ~pymaid.get_edges
     ~pymaid.get_partners
     ~pymaid.get_partners_in_volume
+    ~pymaid.get_nth_partners
     ~pymaid.get_paths
     ~pymaid.adjacency_from_connectors
     ~pymaid.cn_table_from_connectors
@@ -98,7 +99,7 @@ Misc
 ----
 .. autosummary::
     :toctree: generated/
-    
+
     ~pymaid.url_to_coordinates
     ~pymaid.get_review
     ~pymaid.get_review_details
@@ -109,7 +110,7 @@ CatmaidInstance
 
 .. autosummary::
     :toctree: generated/
-    
+
     pymaid.CatmaidInstance
     pymaid.CatmaidInstance.fetch
     pymaid.CatmaidInstance.make_url
