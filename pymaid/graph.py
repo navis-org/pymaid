@@ -37,7 +37,7 @@ __all__ = sorted(['network2nx', 'network2igraph', 'neuron2igraph',
                   'neuron2nx', 'neuron2KDTree'])
 
 
-def network2nx(x, remote_instance=None, threshold=1):
+def network2nx(x, remote_instance=None, threshold=1, group_by=None):
     """ Generates NetworkX graph for neuron connectivity.
 
     Parameters
@@ -52,9 +52,12 @@ def network2nx(x, remote_instance=None, threshold=1):
                             columns=targets)
     remote_instance :   CATMAID instance, optional
                         Either pass directly to function or define globally
-                        as 'remote_instance'.
+                        as ``remote_instance``.
     threshold :         int, optional
                         Connections weaker than this will be excluded.
+    group_by :          None | dict, optional
+                        Provide a dictionary ``{group_name: [skid1, skid2, ...]}``
+                        to collapse sets of nodes into groups.
 
     Returns
     -------
@@ -118,6 +121,16 @@ def network2nx(x, remote_instance=None, threshold=1):
     g = nx.DiGraph()
     g.add_nodes_from(nodes)
     g.add_edges_from(edges)
+
+    # Group nodes
+    if group_by:
+        for n, skids in group_by.items():
+            # First collapse all nodes into the first of each group
+            for s in skids[1:]:
+                g = nx.contracted_nodes(g, str(skids[0]), str(s))
+            # Now relabel the first node
+            g = nx.relabel_nodes(g, {str(skids[0]): str(n)})
+            g.nodes[str(n)]['neuron_name'] = str(n)
 
     return g
 
