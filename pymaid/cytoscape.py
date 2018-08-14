@@ -158,8 +158,9 @@ def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
 
 
 def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
-                  remote_instance=None, verbose=True):
-    """ Loads and **updated** a network into Cytoscape. Use CTRL-C to stop.
+                  remote_instance=None, verbose=True, group_by=None):
+    """ Loads and **continuously updates** a network into Cytoscape. Use
+    CTRL-C to stop.
 
     Parameters
     ----------
@@ -184,6 +185,9 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
     remote_instance :   CatmaidInstance, optional
     verbose :           bool, optional
                         If True, will log changes made to the network.
+    group_by :          None | dict, optional
+                        Provide a dictionary ``{group_name: [skid1, skid2, ...]}``
+                        to collapse sets of nodes into groups.
 
     Returns
     -------
@@ -198,6 +202,7 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
     >>> # Don't forget to start Cytoscape!
     >>> cytomaid.watch_network('annotation:glomerulus DA1', min_pre=5,
     ...                         min_post=-1, sleep=5)
+    >>> # Use CTRL-C to stop the loop
     """
 
     cy = get_client()
@@ -216,6 +221,7 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
     else:
         to_add = []
     g = graph.network2nx(np.concatenate([x, to_add]).astype(int),
+                         group_by=group_by,
                          remote_instance=remote_instance)
     network = generate_network(g, clear_session=True, apply_style=False,
                                layout=layout)
@@ -237,6 +243,7 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
             to_add = []
 
         g = graph.network2nx(np.concatenate([x, to_add]).astype(int),
+                             group_by=group_by,
                              remote_instance=remote_instance)
 
         # Add nodes that came in new
@@ -290,11 +297,12 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
         new_weights = [g.edges[e]['weight'] for e in etable[['source','target']].values]
         weights_modified = [new_w for new_w, old_w in zip(new_weights, etable.weight.values) if new_w != old_w]
         etable['weight'] = new_weights
-        # For some reason, there os no official wrapper for this, so we have to cheat a bit
+        # For some reason, there os no official wrapper for this, so we have to get our hands dirty
         network._CyNetwork__update_table('edge', etable,
                                          network_key_col='SUID',
                                          data_key_col='SUID')
 
+        # If changes were made, give some feedback and/or change layout
         if nodes_to_add or not nodes_to_remove.empty or edges_to_add or edges_removed or weights_modified:
             if verbose:
                 logger.info('{} - nodes added/removed: {}/{}; edges added/removed/modified {}/{}/{}'.format(datetime.datetime.now(),
@@ -311,10 +319,4 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
 
         # ZzzZzzzZ
         time.sleep(sleep)
-
-
-
-
-
-
 
