@@ -78,13 +78,22 @@ Step-by-step instructions
           </ol>
       </li>
       <li>
-        <strong>Get the Python package manager <a href="https://pip.pypa.io">PIP</a></strong><br>
+        <strong>Get the Python package manager <a href="https://pip.pypa.io">PIP</a>.</strong><br>
         Try running this in a terminal:
         <pre>pip3 install --upgrade pip</pre>
         If you already have PIP, this should update it to the most recent version.
         If you get: <pre>pip3: command not found</pre> follow this
         <a href="https://pip.pypa.io/en/stable/installing/">link</a> to download
         and install PIP.
+      </li>
+      <li>
+        <strong>Make sure <a href="https://git-scm.com/">git</a> is installed.</strong><br>
+        In 99% of the cases you should be fine but just to make sure, try running
+        this in a terminal:
+        <pre>git --version</pre>
+        If you get: <pre>git: command not found</pre> follow this
+        <a href="https://git-scm.com/">link</a> for instructions how to install
+        git on your OS.
       </li>
       <li>
         <strong>Install pymaid and its dependencies</strong>.<br>
