@@ -173,12 +173,16 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
                         the network. See also :func:`pymaid.get_nth_partners`.
                         Set to ``None | 0 | False`` to only update
                         seed nodes.
-    min_pre/min_post :  int, optional
+    min_pre/min_post :  int | dict, optional
                         Synapse threshold to apply to ``n_circles``.
                         Set to -1 to not get any pre-/post synaptic partners.
                         Please note: as long as there is a single
                         above-threshold connection, a neuron will be included.
                         This does not remove other, sub-threshold connections.
+                        Use dictionary to assign individual thresholds to
+                        neurons: e.g. ``min_pre={16: 5, 2333007: 10}``. Neurons
+                        in ``x`` that are not in the dictionary will be given
+                        a threshold of ``-1`` (no partners).
     layout :            str | None, optional
                         Name of a Cytoscape layout. If provided, will update
                         the network's layout on every change.
@@ -195,6 +199,8 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
 
     Examples
     --------
+    A basic example:
+
     >>> import pymaid
     >>> import pymaid.cytoscape as cytomaid
     >>> rm = pymaid.CatmaidInstance('server_url', 'http_user',
@@ -203,6 +209,16 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
     >>> cytomaid.watch_network('annotation:glomerulus DA1', min_pre=5,
     ...                         min_post=-1, sleep=5)
     >>> # Use CTRL-C to stop the loop
+
+    More advanced: individual thresholds
+
+    >>> # Get seed neurons
+    >>> seeds = pymaid.get_skids_by_annotation('glomerulus DA1')
+    >>> # Set individual downstream thresholds
+    >>> min_pre = {2863104: 5, 2319457: 10, 57323: 10, 57311: 20}
+    >>> # Neurons not mapped in min_pre will default to -1 (no partners)
+    >>> cytomaid.watch_network(seeds, min_pre=min_pre,
+    ...                        min_post=-1, sleep=5)
     """
 
     cy = get_client()
@@ -213,14 +229,37 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
+    # Prepare individual thresholds:
+    if not isinstance(min_pre, dict):
+        min_pre = {s: min_pre for s in x}
+    if not isinstance(min_post, dict):
+        min_post = {s: min_post for s in x}
+
+    # Make sure everything is integer
+    min_pre = {int(s): int(v) for s, v in min_pre.items()}
+    min_post = {int(s): int(v) for s, v in min_post.items()}
+
+    # Add missing neurons with threshold -1
+    min_pre.update({int(s): min_pre.get(int(s), -1) for s in x})
+    min_post.update({int(s): min_post.get(int(s), -1) for s in x})
+
+    # Group thresholds to minimize number of queries
+    by_neuron = {int(s) : (min_pre[int(s)], min_post[int(s)]) for s in x}
+    by_threshold = {v : [s for s, t in by_neuron.items() if v == t] for v in by_neuron.values()}
+
     # Generate the initial network
+    to_add = np.array(x)
     if n_circles:
-        to_add = fetch.get_nth_partners(x, n_circles=n_circles,
-                                                min_pre=min_pre, min_post=min_post,
-                                                remote_instance=remote_instance).skeleton_id
-    else:
-        to_add = []
-    g = graph.network2nx(np.concatenate([x, to_add]).astype(int),
+        for (t_pre, t_post), skids in by_threshold.items():
+            # Don't attempt to fetch neither pre nor post
+            if t_pre == -1 and t_post == -1:
+                continue
+            temp = fetch.get_nth_partners(skids, n_circles=n_circles,
+                                          min_pre=t_pre, min_post=t_post,
+                                          remote_instance=remote_instance).skeleton_id
+            to_add = np.concatenate([to_add, temp])
+
+    g = graph.network2nx(to_add.astype(int),
                          group_by=group_by,
                          remote_instance=remote_instance)
     network = generate_network(g, clear_session=True, apply_style=False,
@@ -235,14 +274,19 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
         remote_instance.caching = False
     utils.set_loggers('WARNING')
     while True:
+        # Pull new set of partners
+        to_add = x
         if n_circles:
-            to_add = fetch.get_nth_partners(x, n_circles=n_circles,
-                                            min_pre=min_pre, min_post=min_post,
-                                            remote_instance=remote_instance).skeleton_id
-        else:
-            to_add = []
+            for (t_pre, t_post), skids in by_threshold.items():
+                # Don't attempt to fetch neither pre nor post
+                if t_pre == -1 and t_post == -1:
+                    continue
+                temp = fetch.get_nth_partners(skids, n_circles=n_circles,
+                                              min_pre=t_pre, min_post=t_post,
+                                              remote_instance=remote_instance).skeleton_id
+                to_add = np.concatenate([to_add, temp])
 
-        g = graph.network2nx(np.concatenate([x, to_add]).astype(int),
+        g = graph.network2nx(to_add.astype(int),
                              group_by=group_by,
                              remote_instance=remote_instance)
 
