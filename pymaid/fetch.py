@@ -1185,9 +1185,13 @@ def get_nth_partners(x, n_circles=1, min_pre=2, min_post=2,
     # Returns list of skids [0] and names dict [1]
     resp = remote_instance.fetch(url, post=post)
 
-    # Generate DataFrame
-    df = pd.DataFrame.from_dict(resp[1], orient='index').reset_index()
-    df.columns = ['skeleton_id', 'neuron_name']
+    # If no neurons returned, return empty DataFrame
+    if resp[1]:
+        # Generate DataFrame
+        df = pd.DataFrame.from_dict(resp[1], orient='index').reset_index()
+        df.columns = ['skeleton_id', 'neuron_name']
+    else:
+        df = pd.DataFrame([], columns=['skeleton_id', 'neuron_name'])
 
     return df
 
