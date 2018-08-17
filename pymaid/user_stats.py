@@ -255,7 +255,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
         # Link creation
         link_creation = link_details.loc[link_details.connector_id.isin(cn_ids),
                                          ['creator_id', 'creation_time']].values
-        link_creation = np.c_[link_creation, ['link_creation'] * link_details.shape[0]]
+        link_creation = np.c_[link_creation, ['link_creation'] * link_creation.shape[0]]
 
         # Extract review times
         reviewers = [u for l in node_details.reviewers.values for u in l]
@@ -363,7 +363,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
         >>> df
         ...   user  nodes  presynapses  postsynapses  nodes_reviewed
         ... 0
-        ... 1d
+        ... 1
 
     Examples
     --------
