@@ -27,7 +27,7 @@ import scipy
 import networkx as nx
 import itertools
 
-from pymaid import fetch, core, graph_utils, graph, utils, config
+from pymaid import fetch, core, graph_utils, graph, utils, config, resample
 
 # Set up logging
 logger = config.logger
@@ -586,13 +586,11 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
         return
 
 
-def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_soma=True, return_point=False):
+def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=True, return_point=False):
     """ This function tries to split a neuron into axon, dendrite and primary
-    neurite. The result is highly depending on the method and on your
+    neurite. The result is highly dependent on the method and on your
     neuron's morphology and works best for "typical" neurons, i.e. those where
     the primary neurite branches into axon and dendrites.
-    See :func:`~pymaid.flow_centrality` for details on the flow
-    centrality algorithm.
 
     Parameters
     ----------
@@ -609,6 +607,7 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     primary_neurite :   bool, optional
                         If True and the split point is at a branch point, will
                         try splittig into axon, dendrite and primary neurite.
+                        Works only with ``method=bending``!
     reroot_soma :       bool, optional
                         If True, will make sure neuron is rooted to soma if at
                         all possible.
@@ -631,9 +630,9 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     0  neuron 123457_primary_neurite          16      148             0
     1             neuron 123457_axon          16     9682          1766
     2         neuron 123457_dendrite          16     2892           113
-    >>> # Plot in their respective colors
-    >>> for n in split:
-    >>>   n.plot3d(color=self.color)
+    >>> # For convenience, split_axon_dendrite assigns colors to the resulting
+    >>> # fragments: axon = red, dendrites = blue, primary neurite = green
+    >>> split.plot3d(color=split.color)
 
     """
 
@@ -651,10 +650,13 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
         return core.CatmaidNeuronList([n for l in nl for n in l])
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Can only process a single CatmaidNeuron')
+        raise TypeError('Can only process CatmaidNeuron, got "{}"'.format(type(x)))
 
     if method not in ['centrifugal', 'centripetal', 'sum', 'bending']:
-        raise ValueError('Unknown parameter for mode: {0}'.format(mode))
+        raise ValueError('Unknown parameter for mode: {0}'.format(method))
+
+    if primary_neurite and method != 'bending':
+        logger.warning('Primary neurite splits only works well with method "bending"')
 
     if x.soma and x.soma not in x.root and reroot_soma:
         x.reroot(x.soma)
@@ -668,33 +670,58 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     if last_method != method:
         if method == 'bending':
             _ = bending_flow(x)
-        else:
+        elif method in ['centripetal', 'centrifugal', 'sum']:
             _ = flow_centrality(x, mode=method)
+        else:
+            raise ValueError('Unknown method "{}"'.format(method))
 
     # Make copy, so that we don't screw things up
     x = x.copy()
 
-    logger.debug(
-        'Splitting neuron #{0} by flow centrality'.format(x.skeleton_id))
-
     # Now get the node point with the highest flow centrality.
-    cut = x.nodes[(x.nodes.flow_centrality ==
-                   x.nodes.flow_centrality.max())].treenode_id.tolist()
+    cut = x.nodes[x.nodes.flow_centrality ==
+                   x.nodes.flow_centrality.max()].treenode_id.values
 
     # If there is more than one point we need to get one closest to the soma (root)
-    cut = sorted(cut, key=lambda y: graph_utils.dist_between(
-        x.graph, y, x.root[0]))[0]
+    if len(cut) > 1:
+        cut = sorted(cut, key=lambda y: graph_utils.dist_between(
+            x.graph, y, x.root[0]))[0]
+    else:
+        cut = cut[0]
 
     if return_point:
         return cut
 
     # If cut node is a branch point, we will try cutting off main neurite
     if x.graph.degree(cut) > 2 and primary_neurite:
-        rest, primary_neurite = graph_utils.cut_neuron(
-            x, next(x.graph.successors(cut)))
+        # First make sure that there are no other branch points with flow between this one and the soma
+        path_to_root = nx.shortest_path(x.graph, cut, x.root[0])
+
+        # Get flow centrality along the path
+        flows = x.nodes.set_index('treenode_id').loc[path_to_root]
+
+        # Subset to those that are branches (exclude mere synapses)
+        flows = flows[flows.type=='branch']
+
+        # Find the first branch point from the soma with no flow (fillna is important!)
+        last_with_flow = np.where(flows.flow_centrality.fillna(0).values > 0)[0][-1]
+
+        if method != 'bending':
+            last_with_flow += 1
+
+        to_cut = flows.iloc[last_with_flow].name
+
+        # Cut off primary neurite
+        rest, primary_neurite = graph_utils.cut_neuron(x, to_cut)
+
+        if method == 'bending':
+            # The new cut node has to be a child of the original cut node
+            cut = next(x.graph.predecessors(cut))
+
         # Change name and color
         primary_neurite.neuron_name = x.neuron_name + '_primary_neurite'
         primary_neurite.color = (0, 255, 0)
+        primary_neurite.type = 'primary_neurite'
     else:
         rest = x
         primary_neurite = None
@@ -702,14 +729,19 @@ def split_axon_dendrite(x, method='centrifugal', primary_neurite=False, reroot_s
     # Next, cut the rest into axon and dendrite
     a, b = graph_utils.cut_neuron(rest, cut)
 
-    # Figure out which one is which by comparing number of presynapses
-    if a.n_presynapses < b.n_presynapses:
+    # Figure out which one is which by comparing fraction of in- to outputs
+    a_inout = a.n_postsynapses/a.n_presynapses if a.n_presynapses else float('inf')
+    b_inout = b.n_postsynapses/b.n_presynapses if b.n_presynapses else float('inf')
+    if a_inout > b_inout:
         dendrite, axon = a, b
     else:
         dendrite, axon = b, a
 
     axon.neuron_name = x.neuron_name + '_axon'
     dendrite.neuron_name = x.neuron_name + '_dendrite'
+
+    axon.type = 'axon'
+    dendrite.type = 'dendrite'
 
     # Change colors
     axon.color = (255, 0, 0)
@@ -731,10 +763,12 @@ def segregation_index(x, centrality_method='centrifugal'):
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
                         Neuron to calculate segregation index (SI). If a
-                        NeuronList is provided, will assume that this is a
-                        split.
+                        NeuronList is provided, will assume that it contains
+                        fragments (e.g. from axon/ dendrite splits) of a
+                        single neuron.
     centrality_method : 'centrifugal' | 'centripetal' | 'sum' | 'bending'
-                        Type of flow centrality to use to split the neuron.
+                        Type of flow centrality to use to split into axon +
+                        dendrite of ``x`` is only a single neuron.
                         There are four flavors:
                             - for the first three, see
                               :func:`~pymaid.flow_centrality`
@@ -761,6 +795,9 @@ def segregation_index(x, centrality_method='centrifugal'):
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         raise ValueError(
             'Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
+
+    if isinstance(x, core.CatmaidNeuronList) and x.shape[0] == 1:
+        x = x[0]
 
     if not isinstance(x, core.CatmaidNeuronList):
         # Get the branch point with highest flow centrality
@@ -845,9 +882,6 @@ def bending_flow(x, polypre=False):
     Adds a new column ``'flow_centrality'`` to ``x.nodes``. Branch points only!
 
     """
-    logger.info(
-        'Calculating bending flow centrality for neuron #{0}'.format(x.skeleton_id))
-
     start_time = time.time()
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
@@ -980,15 +1014,10 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 
     Returns
     -------
-    Adds a new column 'flow_centrality' to ``x.nodes``. Ignores non-synapse
-    holding segment nodes!
+    Adds a new column 'flow_centrality' to ``x.nodes``. Only processes
+    branch- and synapse-holding nodes.
 
     """
-
-    logger.debug(
-        'Calculating flow centrality for neuron #{0}'.format(x.skeleton_id))
-
-    start_time = time.time()
 
     if mode not in ['centrifugal', 'centripetal', 'sum']:
         raise ValueError('Unknown parameter for mode: {0}'.format(mode))
@@ -998,7 +1027,7 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
             'Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
-        return [flow_centrality(n, mode=mode, polypre=polypre, ) for n in x]
+        return [flow_centrality(n, mode=mode, polypre=polypre) for n in x]
 
     if x.soma and x.soma not in x.root:
         logger.warning(
@@ -1010,8 +1039,8 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
     current_state = config.pbar_hide
     logger.setLevel('ERROR')
     config.pbar_hide = True
-    y = x.copy()
-    y.downsample(1000000)
+    y = resample.downsample_neuron(x, float('inf'),
+                                   inplace=False, preserve_cn_treenodes=True)
     logger.setLevel(current_level)
     config.pbar_hide = current_state
 
@@ -1060,31 +1089,17 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
         centripetal = {
             n: distal_post[n] * (total_post - distal_pre[n]) for n in calc_node_ids}
 
-    # Set flow centrality to None for all nodes
-    x.nodes['flow_centrality'] = None
-
-    # Change index to treenode_id
-    x.nodes.set_index('treenode_id', inplace=True)
-
     # Now map this onto our neuron
     if mode == 'centrifugal':
-        res = list(centrifugal.values())
+        x.nodes['flow_centrality'] = x.nodes.treenode_id.map(centrifugal)
     elif mode == 'centripetal':
-        res = list(centripetal.values())
+        x.nodes['flow_centrality'] = x.nodes.treenode_id.map(centripetal)
     elif mode == 'sum':
-        res = np.array(list(centrifugal.values())) + \
-            np.array(list(centripetal.values()))
+        combined = {n : centrifugal[n] + centripetal[n] for n in centrifugal}
+        x.nodes['flow_centrality'] = x.nodes.treenode_id.map(combined)
 
-    # Add results
-    x.nodes.loc[list(centrifugal.keys()), 'flow_centrality'] = res
-
-    # Add little info on method/mode used for flow centrality
+    # Add info on method/mode used for flow centrality
     x.centrality_method = mode
-
-    x.nodes.reset_index(inplace=True)
-
-    logger.debug('Total time for SFC calculation: {0}s'.format(
-        round(time.time() - start_time)))
 
     return
 
