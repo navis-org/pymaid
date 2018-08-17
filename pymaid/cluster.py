@@ -35,12 +35,62 @@ __all__ = sorted(['cluster_by_connectivity', 'cluster_by_synapse_placement',
                   'cluster_xyz', 'ClustResults'])
 
 
-def cluster_by_connectivity(x, remote_instance=None, upstream=True,
-                            downstream=True, threshold=1, include_skids=None,
+def cluster_by_connectivity(x, similarity='vertex_normalized',
+                            upstream=True, downstream=True,
+                            threshold=1, include_skids=None,
                             exclude_skids=None, min_nodes=2,
-                            similarity='vertex_normalized',
-                            connectivity_table=None, cluster_kws={}):
+                            connectivity_table=None, cluster_kws={},
+                            remote_instance=None):
     """ Calculate connectivity similarity.
+
+    Notes
+    -----
+
+    This functions offers a selection of metrics to compare connectivity:
+
+    .. list-table::
+       :widths: 15 75
+       :header-rows: 1
+
+       * - Metric
+         - Explanation
+       * - matching_index
+         - Number of shared partners divided by total number of partners.
+       * - matching_index_synapses
+         - Number of shared synapses (i.e. number of connections from/onto the
+           same partners) divided by total number of synapses. Attention: this
+           metric is tricky when there is a disparity of total number of
+           connections between neuron A and B. For example, consider 100/200
+           and 1/50 shared/total synapse: 101/250 results in a fairly high
+           matching index of 0.404.
+       * - matching_index_weighted_synapses
+         - Similar to *matching_index_synapses* but slightly less prone to
+           above mentioned error as it uses the percentage of shared synapses:
+
+           .. math::
+
+               S = \\frac{\\text{NeuronA}_{\\text{ shared synapses}}}{\\text{NeuronA}_{\\text{ total synapses}}} \\times \\frac{\\text{NeuronB}_{\\text{ shared synapses}}}{\\text{NeuronB}_{\\text{ total synapses}}}
+
+       * - vertex
+         - Matching index that rewards shared and punishes non-shared partners.
+           Based on
+           `Jarrell et al., 2012 <http://science.sciencemag.org/content/337/6093/437>`_:
+
+           .. math::
+
+               f(x,y) = min(x,y) - C1 \\times max(x,y) \\times \\exp(-C2 * min(x,y))
+
+           Final score is the sum of :math:`f(x,y)` over all edges x, y between
+           neurons A+B and their partners. C1 determines how negatively a case
+           where one edge is much stronger than another is punished. C2
+           determines the point where the similarity switches from negative to
+           positive. C1 and C2 default to 0.5 and 1, respectively, but can be
+           changed by passing them in a dictionary as `cluster_kws`.
+       * - vertex_normalized
+         - This is *vertex* similarity normalized by the lowest (total
+           dissimilarity) and highest (all edge weights the same) achievable
+           score.
+
 
     Parameters
     ----------
@@ -51,23 +101,20 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                          2. neuron name (str, exact match)
                          3. annotation: e.g. 'annotation:PN right'
                          4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :    CATMAID instance, optional
+    similarity :        'matching_index' | 'matching_index_synapses' | 'matching_index_weighted_synapses' | 'vertex' | vertex_normalized', optional
+                         Metric used to compare connectivity. See notes for
+                         detailed explanation.
     upstream :           bool, optional
                          If True, upstream partners will be considered.
-                         Default = True
     downstream :         bool, optional
                          If True, downstream partners will be considered.
-                         Default = True
     threshold :          int, optional
-                         Only partners with >= this synapses are considered.
-                         Default = 1. Attention: this might impair proper
-                         comparison: e.g. neuron A and neuron B connect to
-                         neuron C with 1 and 3 synapses, respectively. If
-                         ``threshold=2``, connection from A to C will be
-                         ignored!
+                         Only partners with more this synapses are used for
+                         comparison. This threshold applies to the *total*
+                         number of connections from/to all neurons in ``x``.
     min_nodes :          int, optional
                          Minimum number of nodes for a partners to be
-                         considered. Default = 2
+                         considered.
     include_skids :      see ``x``, optional
                          If filter_skids is not empty, only neurons whose skids
                          are in filter_skids will be considered when
@@ -80,10 +127,11 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
                          :func:`~pymaid.get_partners`. If provided, will use
                          this instead of querying CATMAID server. Filters
                          still apply!
+    remote_instance :    CATMAID instance, optional
 
     Returns
     -------
-    :func:`pymaid.ClustResults`
+    :class:`pymaid.ClustResults`
                          Custom cluster results class holding the distance
                          matrix and contains wrappers e.g. to plot dendograms.
 
@@ -92,9 +140,11 @@ def cluster_by_connectivity(x, remote_instance=None, upstream=True,
     >>> import pymaid
     >>> import matplotlib.pyplot as plt
     >>> # Initialise CatmaidInstance
-    >>> rm = pymaid.CatmaidInstance( 'url','user','pw','token' )
+    >>> rm = pymaid.CatmaidInstance('url', 'user', 'pw', 'token' )
     >>> # Cluster a set of neurons by their inputs (ignore small fragments)
-    >>> res = pymaid.cluster_by_connectivity('annotation:PBG6 P-EN right', upstream=True, downstream=False, threshold=1, min_nodes=500)
+    >>> res = pymaid.cluster_by_connectivity('annotation:PBG6 P-EN right',
+    ...                                      upstream=True, downstream=False,
+    ...                                      threshold=1, min_nodes=500)
     >>> # Get the adjacency matrix
     >>> print(res.mat)
     >>> # Plot a dendrogram
@@ -473,7 +523,24 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
     and (2) comparing the synapse density around synapse A and B.
     This is type-sensitive: presynapses will only be matched with presynapses,
     post with post, etc. The formula is described in
-    Schlegel et al., eLife (2017).
+    `Schlegel et al., eLife (2017) <https://elifesciences.org/articles/16799>`_:
+
+    .. math::
+
+        f(i_{s},j_{k}) = \\exp(\\frac{-d^{2}_{sk}}{2\\sigma^{2}}) \\exp(\\frac{|n(i_{s})-n(j_{k})|}{n(i_{s})+n(j_{k})})
+
+    The synapse similarity score for neurons i and j being the average
+    of :math:`f(i_{s},j_{k})` over all synapses s of i. Synapse k is the
+    closest synapse of the same sign (pre/post) in neuron j to synapse s.
+    :math:`d^{2}_{sk}` is the eucledian distance between these distances.
+    Variable :math:`\\sigma` (``sigma``) determines what distance between
+    s and k is considered "close". :math:`n(i_{s})` and :math:`n(j_{k})` are
+    defined as the number of synapses of neuron i/j that are within given
+    radius :math:`\\omega` (``omega``) of synapse s and j, respectively (same
+    sign only). This esnures that in cases of a strong disparity between
+    :math:`n(i_{s})` and :math:`n(j_{k})`, the synapse similarity will be
+    close to zero even if the distance between s and k is very small.
+
 
     Parameters
     ----------
