@@ -497,7 +497,8 @@ class CatmaidNeuron:
     def _clear_temp_attr(self, exclude=[]):
         """Clear temporary attributes."""
         temp_att = ['igraph', 'graph', 'segments', 'small_segments',
-                    'nodes_geodesic_distance_matrix', 'dps', 'simple']
+                    'nodes_geodesic_distance_matrix', 'dps', 'simple',
+                    'centrality_method']
         for a in [at for at in temp_att if at not in exclude]:
             try:
                 delattr(self, a)
