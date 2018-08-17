@@ -2578,6 +2578,11 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
     annotations = utils._make_iterable(annotations)
     annotation_ids = {}
     for an in annotations:
+        # This is just to catch misunderstandings with parsing skeleton IDs
+        if an.startswith('annotation:'):
+            logger.warning('Removing unexpected "annotation:" prefix.')
+            an = an[11:]
+
         # Strip whitespaces
         an = an.strip()
 
