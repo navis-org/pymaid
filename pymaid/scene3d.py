@@ -95,7 +95,7 @@ class Viewer:
     >>> # Assign specific colors
     >>> v.set_colors({nl[0].skeleton_id: (1, 0, 0)})
     >>> # Clear the canvas
-    >>> v.clear()    
+    >>> v.clear()
 
     """
     def __init__(self, picking=False, **kwargs):
@@ -432,6 +432,13 @@ class Viewer:
         """
 
         skids, skdata, dotprops, volumes, points, visuals = utils._parse_objects(x)
+
+        # Parse colors for neurons and dotprops
+        neuron_cmap, skdata_cmap = plotting._prepare_colormap(kwargs.get('color',
+                                                                         kwargs.get('colors', None)),
+                                                              skdata, dotprops,
+                                                              use_neuron_color=kwargs.get('use_neuron_color', False))
+        kwargs['color'] = neuron_cmap + skdata_cmap
 
         if skids:
             visuals += plotting._neuron2vispy(fetch.get_neurons(skids),

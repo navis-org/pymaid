@@ -38,10 +38,12 @@ import networkx as nx
 import pandas as pd
 import numpy as np
 import math
+import numbers
 
 from pymaid import morpho, graph, core, fetch, graph_utils, utils, scene3d, config
 
 import plotly.graph_objs as go
+import plotly.offline
 
 import vispy
 from vispy import scene
@@ -59,6 +61,8 @@ __all__ = ['plot3d', 'plot2d', 'plot1d', 'plot_network',
 
 logger = config.logger
 
+if utils.is_jupyter():
+    plotly.offline.init_notebook_mode(connected=True)
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active vispy 3D canvas.
@@ -437,7 +441,7 @@ def plot2d(x, method='2d', **kwargs):
     surf3D_collections = []
     for i, neuron in enumerate(config.tqdm(skdata.itertuples(), desc='Plot neurons',
                                     total=skdata.shape[0], leave=False,
-                                    disable=config.pbar_hide)):
+                                    disable=config.pbar_hide | len(dotprops) == 0)):
         this_color = colormap[neuron.skeleton_id]
 
         if not connectors_only:
@@ -570,7 +574,7 @@ def plot2d(x, method='2d', **kwargs):
 
     for neuron in config.tqdm(dotprops.itertuples(), desc='Plt dotprops',
                               total=dotprops.shape[0], leave=False,
-                              disable=config.pbar_hide):
+                              disable=config.pbar_hide | len(dotprops) == 0):
         # Prepare lines - this is based on nat:::plot3d.dotprops
         halfvect = neuron.points[
             ['x_vec', 'y_vec', 'z_vec']] / 2
@@ -905,7 +909,7 @@ def _segments_to_coords(x, segments, modifier=(1, 1, 1)):
     return coords
 
 
-def _random_colors(color_count, color_space='RGB', color_range=1):
+def _random_colors(count, color_space='RGB', color_range=1):
     """ Divides colorspace into N evenly distributed colors
 
     Returns
@@ -914,12 +918,14 @@ def _random_colors(color_count, color_space='RGB', color_range=1):
              [ (r,g,b),(r,g,b),... ]
 
     """
-    if color_count == 1:
+    if count == 1:
         return [(0, 0, 0)]
 
     # Make count_color an even number
-    if color_count % 2 != 0:
-        color_count += 1
+    if count % 2 != 0:
+        color_count = count + 1
+    else:
+        color_count = count
 
     colormap = []
     interval = 2 / color_count
@@ -953,7 +959,7 @@ def _random_colors(color_count, color_space='RGB', color_range=1):
     logger.debug('%i random colors created: %s' %
                         (color_count, str(colormap)))
 
-    return(colormap)
+    return colormap[:count]
 
 
 def _fibonacci_sphere(samples=1, randomize=True):
@@ -988,16 +994,16 @@ def plot3d(x, **kwargs):
     Parameters
     ----------
 
-    x :               skeleton IDs | CatmaidNeuron | CatmaidNeuronList | pymaid.Dotprops | pymaid.Volume | numpy.array                      
+    x :               skeleton IDs | CatmaidNeuron/List| pymaid.Dotprops | pymaid.Volume | numpy.array
                         - ``int`` is interpreted as skeleton ID(s)
                         - ``str`` is interpreted as volume name(s)
                         - ``numpy.array (N,3)`` is plotted as scatter plot
                         - multiple objects can be passed as list (see examples)
     backend :         'auto' | 'vispy' | 'plotly', default='auto'
                         - ``auto`` selects backend based on context: ``vispy``
-                          for terminal and ``plotly`` for jupyter notebooks.
+                          for terminal and ``plotly`` for Jupyter notebooks.
                         - ``vispy`` uses OpenGL to generate high-performance
-                          3D plots. Works in terminal.
+                          3D plots. Works in terminals.
                         - ``plotly`` generates 3D plots using WebGL. Works in
                           Jupyter notebooks.
     connectors :      bool, default=False
@@ -1013,9 +1019,11 @@ def plot3d(x, **kwargs):
     clear3d :         bool, default=False
                       If True, canvas is cleared before plotting (only for
                       vispy).
-    color :           tuple | dict, default=random
-                      Use single tuple ``(r, g, b)`` to give all neurons the same
-                      color. Use ``dict`` to give individual colors to neurons:
+    color :           None | str | tuple | list | dict, default=None (random)
+                      Use single str (e.g. ``'red'``) or ``(r, g, b)`` tuple
+                      to give all neurons the same color. Use ``list`` of
+                      colors to assign colors: ``['red', (1, 0, 1), ...].
+                      Use ``dict`` to map colors to neurons:
                       ``{skid: (r, g, b), ...}``. RGB must be 0-255.
     use_neuron_color : bool, default=False
                       If True, will try using the ``.color`` attribute of
@@ -1034,6 +1042,9 @@ def plot3d(x, **kwargs):
     remote_instance : CATMAID Instance, optional
                       Will try using globally defined CatmaidInstance if not
                       provided.
+    plotly_inline :   bool, default=True
+                      If True and you are in an Jupyter environment, will
+                      render plotly plots inline.
 
     Returns
     --------
@@ -1043,11 +1054,9 @@ def plot3d(x, **kwargs):
 
     If ``backend='plotly'``
 
-       ``fig`` - dictionary to generate plotly 3D figure:
-
-            Use ``plotly.offline.plot(fig, filename='3d_plot.html')``
-            to generate html file and open it webbrowser
-
+        Returns either ``None`` if you are in a Jupyter notebook (see
+        ``plotly_inline`` parameter) or a ``fig`` dictionary to generate
+        plotly 3D figure (see examples).
 
     See Also
     --------
@@ -1063,10 +1072,10 @@ def plot3d(x, **kwargs):
     >>> plotly.offline.init_notebook_mode()
     >>> nl = pymaid.get_neuron(16)
     >>> # Backend is automatically chosen but we can set it explicitly
-    >>> fig = nl.plot3d(backend='plotly')
     >>> # Plot inline
-    >>> plotly.offline.iplot(fig)
-    >>> # Generate html in new window
+    >>> nl.plot3d(backend='plotly')
+    >>> # Plot as separate html in a new window
+    >>> fig = nl.plot3d(backend='plotly', plotly_inline=False)
     >>> plotly.offline.plot(fig)
 
     In a terminal using vispy as backend.
@@ -1082,7 +1091,7 @@ def plot3d(x, **kwargs):
     >>> # plot3d() can deal with combinations of objects
     >>> nl2 = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> vol = pymaid.get_volume('v13.LH_R')
-    >>> vol['color'] = (255, 0, 0, .5)
+    >>> vol.color = (255, 0, 0, .5)
     >>> # This plots two neuronlists, two volumes and a single neuron
     >>> pymaid.plot3d([nl1, nl2, vol, 'v13.AL_R', 233007])
     >>> # Pass kwargs
@@ -1128,6 +1137,12 @@ def plot3d(x, **kwargs):
         # Generate sphere for somas
         fib_points = _fibonacci_sphere(samples=30)
 
+        # Generate the colormaps
+        neuron_cmap, dotprop_cmap = _prepare_colormap(color,
+                                                      skdata, dotprops,
+                                                      use_neuron_color=use_neuron_color,
+                                                      color_range=255)
+
         logger.debug('Generating traces...')
 
         for i, neuron in enumerate(skdata.itertuples()):
@@ -1138,8 +1153,7 @@ def plot3d(x, **kwargs):
 
             if not connectors_only:
                 if by_strahler:
-                    s_index = morpho.strahler_index(
-                        skdata.ix[i], return_dict=True)
+                    s_index = morpho.strahler_index(neuron, return_dict=True)
 
                 soma = neuron.nodes[neuron.nodes.radius > 1]
 
@@ -1151,19 +1165,19 @@ def plot3d(x, **kwargs):
                 coords = np.vstack(
                     [np.append(t, [[None] * 3], axis=0) for t in coords])
 
-                c = []
                 if by_strahler:
+                    c = []
                     for k, s in enumerate(coords):
-                        this_c = 'rgba(%i,%i,%i,%f)' % (colormap[str(skid)][0],
-                                                        colormap[str(skid)][1],
-                                                        colormap[str(skid)][2],
+                        this_c = 'rgba(%i,%i,%i,%f)' % (neuron_cmap[i][0],
+                                                        neuron_cmap[i][1],
+                                                        neuron_cmap[i][2],
                                                         s_index[s[0]] / max(s_index.values()))
                         # Slabs are separated by a <None> coordinate -> this is
                         # why we need one more color entry
                         c += [this_c] * (len(s) + 1)
                 else:
                     try:
-                        c = 'rgb{}'.format(colormap[str(skid)])
+                        c = 'rgb{}'.format(neuron_cmap[i])
                     except BaseException:
                         c = 'rgb(10,10,10)'
 
@@ -1172,23 +1186,21 @@ def plot3d(x, **kwargs):
                                                y=coords[:, 2],
                                                z=coords[:, 1],
                                                mode='lines',
-                                               line=dict(
-                                                   color=c,
-                                                   width=linewidth
-                ),
-                    name=neuron_name,
-                    legendgroup=neuron_name,
-                    showlegend=True,
-                    hoverinfo='none'
-
-                ))
+                                               line=dict(color=c,
+                                                         width=linewidth),
+                                               name=neuron_name,
+                                               legendgroup=neuron_name,
+                                               showlegend=True,
+                                               hoverinfo='none'
+                                               )
+                                 )
 
                 # Add soma(s):
                 for n in soma.itertuples():
                     try:
-                        color = 'rgb{}'.format(colormap[str(skid)])
+                        c = 'rgb{}'.format(neuron_cmap[i])
                     except BaseException:
-                        color = 'rgb(10,10,10)'
+                        c = 'rgb(10,10,10)'
                     trace_data.append(go.Mesh3d(
                         x=[(v[0] * n.radius / 2) - n.x for v in fib_points],
                         # y and z are switched
@@ -1196,7 +1208,7 @@ def plot3d(x, **kwargs):
                         z=[(v[2] * n.radius / 2) - n.y for v in fib_points],
 
                         alphahull=.5,
-                        color=color,
+                        color=c,
                         name=neuron_name,
                         legendgroup=neuron_name,
                         showlegend=False,
@@ -1206,11 +1218,11 @@ def plot3d(x, **kwargs):
                 for j in [0, 1, 2]:
                     if cn_mesh_colors:
                         try:
-                            color = colormap[str(skid)]
+                            c = neuron_cmap[i]
                         except:
-                            color = (10, 10, 10)
+                            c = (10, 10, 10)
                     else:
-                        color = syn_lay[j]['color']
+                        c = syn_lay[j]['color']
 
                     this_cn = neuron.connectors[
                         neuron.connectors.relation == j]
@@ -1222,7 +1234,7 @@ def plot3d(x, **kwargs):
                             z=this_cn.y.values * -1,
                             mode='markers',
                             marker=dict(
-                                color='rgb%s' % str(color),
+                                color='rgb%s' % str(c),
                                 size=2
                             ),
                             name=syn_lay[j]['name'] + ' of ' + neuron_name,
@@ -1243,7 +1255,7 @@ def plot3d(x, **kwargs):
                             z=y_coords,
                             mode='lines',
                             line=dict(
-                                color='rgb%s' % str(color),
+                                color='rgb%s' % str(c),
                                 width=5
                             ),
                             name=syn_lay[j]['name'] + ' of ' + neuron_name,
@@ -1251,7 +1263,7 @@ def plot3d(x, **kwargs):
                             hoverinfo='none'
                         ))
 
-        for neuron in dotprops.itertuples():
+        for i, neuron in enumerate(dotprops.itertuples()):
             # Prepare lines - this is based on nat:::plot3d.dotprops
             halfvect = neuron.points[
                 ['x_vec', 'y_vec', 'z_vec']] / 2 * scale_vect
@@ -1269,7 +1281,7 @@ def plot3d(x, **kwargs):
                 starts[:, 2] * -1, ends[:, 2] * -1, [None] * starts.shape[0]) for n in sublist]
 
             try:
-                c = 'rgb%s' % str(colormap[neuron.gene_name])
+                c = 'rgb{}'.format(dotprop_cmap[i])
             except:
                 c = 'rgb(10,10,10)'
 
@@ -1341,7 +1353,7 @@ def plot3d(x, **kwargs):
                                 marker=dict(
                                     size=scatter_kws.get('size',3),
                                     color='rgb' + str(scatter_kws.get('color',(0,0,0))),
-                                    opacity=scatter_kws.get('opacity',12))
+                                    opacity=scatter_kws.get('opacity',1))
                                           )
                              )
 
@@ -1395,10 +1407,15 @@ def plot3d(x, **kwargs):
 
         logger.debug('Done. Plotted %i nodes and %i connectors' % (sum([n.nodes.shape[0] for n in skdata.itertuples() if not connectors_only] + [
             n.points.shape[0] for n in dotprops.itertuples()]), sum([n.connectors.shape[0] for n in skdata.itertuples() if connectors or connectors_only])))
-        logger.info(
-            'Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimised for Google Chrome.')
 
-        return fig
+        if plotly_inline and utils.is_jupyter():
+            plotly.offline.iplot(fig)
+            return
+        else:
+            logger.info(
+                'Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimized for Google Chrome.')
+            return fig
+
 
     skids, skdata, dotprops, volumes, points, visual = utils._parse_objects(x)
 
@@ -1418,7 +1435,7 @@ def plot3d(x, **kwargs):
     remote_instance = kwargs.get('remote_instance', None)
 
     # Parameters for neurons
-    color = kwargs.get('color', None)
+    color = kwargs.get('color', kwargs.get('colors', None))
     downsampling = kwargs.get('downsampling', 1)
     connectors = kwargs.get('connectors', False)
     by_strahler = kwargs.get('by_strahler', False)
@@ -1430,13 +1447,13 @@ def plot3d(x, **kwargs):
     scatter_kws = kwargs.get('scatter_kws', {})
     syn_lay_new = kwargs.get('synapse_layout', {})
     syn_lay = {
-        0: {'name': 'Presynapses',
-            'color': (255, 0, 0)},
-        1: {'name': 'Postsynapses',
-            'color': (0, 0, 255)},
-        2: {'name': 'Gap junctions',
-            'color': (0, 255, 0)},
-        'display': 'lines'  # 'circles'
+                0: {'name': 'Presynapses',
+                    'color': (255, 0, 0)},
+                1: {'name': 'Postsynapses',
+                    'color': (0, 0, 255)},
+                2: {'name': 'Gap junctions',
+                    'color': (0, 255, 0)},
+                'display': 'lines'  # 'circles'
                }
     syn_lay.update(syn_lay_new)
 
@@ -1445,11 +1462,12 @@ def plot3d(x, **kwargs):
 
     # Parameters for figure
     pl_title = kwargs.get('title', None)
-    width = kwargs.get('width', 600)
+    width = kwargs.get('width', 1000)
     height = kwargs.get('height', 600)
     fig_autosize = kwargs.get('fig_autosize', False)
     auto_limits = kwargs.get('auto_limits', True)
-    auto_limits = kwargs.get('autolimits', auto_limits)    
+    auto_limits = kwargs.get('autolimits', auto_limits)
+    plotly_inline = kwargs.get('plotly_inline', True)
 
     if not remote_instance and isinstance(skdata, core.CatmaidNeuronList):
         try:
@@ -1466,42 +1484,7 @@ def plot3d(x, **kwargs):
                                    get_history=False,
                                    get_abutting=True)
     elif skids and not remote_instance:
-        logger.error(
-            'You need to provide a CATMAID remote instance.')
-
-    if not color and (skdata.shape[0] + dotprops.shape[0]) > 0:
-        cm = _random_colors(
-            skdata.shape[0] + dotprops.shape[0], color_space='RGB', color_range=255)
-        colormap = {}
-
-        if not skdata.empty:
-            colormap.update(
-                {str(n): cm[i] for i, n in enumerate(skdata.skeleton_id.tolist())})
-        if not dotprops.empty:
-            colormap.update({str(n): cm[i + skdata.shape[0]]
-                             for i, n in enumerate(dotprops.gene_name.tolist())})
-        if use_neuron_color:
-            colormap.update({n.skeleton_id: n.color for n in skdata})
-    elif isinstance(color, dict):
-        colormap = {n: tuple(color[n]) for n in color}
-    elif isinstance(color, (list, tuple)):
-        colormap = {n: tuple(color) for n in skdata.skeleton_id.tolist()}
-    elif isinstance(color, str):
-        color = tuple([int(c * 255) for c in mcl.to_rgb(color)])
-        colormap = {n: color for n in skdata.skeleton_id.tolist()}
-    else:
-        colormap = {}
-
-    # Make sure colors are 0-255
-    if colormap:
-        if max([v for n in colormap for v in colormap[n]]) <= 1:
-            logger.warning(
-                'Looks like RGB values are 0-1. Converting to 0-255.')
-            colormap = {n: tuple([int(v * 255) for v in colormap[n]])
-                        for n in colormap}
-
-    # Add colormap back to kwargs
-    kwargs['colormap'] = colormap
+        raise BaseException('You need to provide a CATMAID remote instance.')
 
     # Get and prepare volumes
     volumes_data = {}
@@ -1518,22 +1501,102 @@ def plot3d(x, **kwargs):
                                 'faces': v.faces,
                                 'color': v.color}
 
-    logger.debug('Preparing neurons for plotting...')
     # First downsample neurons
     if downsampling > 1 and not connectors_only and not skdata.empty:
-        logger.debug('Downsampling neurons...')
         morpho.logger.setLevel('ERROR')
-        skdata.downsample(downsampling)
+        skdata.downsample(downsampling, inplace=True)
         morpho.logger.setLevel('INFO')
-        logger.debug('Downsampling finished.')
-    elif skdata.shape[0] > 100:
-        logger.debug(
-            'Large dataset detected. Consider using the <downsampling> parameter if you encounter bad performance.')
 
     if backend == 'plotly':
         return _plot3d_plotly()
     else:
         return _plot3d_vispy()
+
+
+def _prepare_colormap(colors, skdata=None, dotprops=None, use_neuron_color=False,
+                      color_range=255):
+    """ Maps color(s) to neuron/dotprop colorlists.
+    """
+
+    if isinstance(skdata, type(None)):
+        skdata = np.array([])
+
+    if isinstance(dotprops, type(None)):
+        dotprops = np.array([])
+
+    # If no colors, generate random colors
+    if isinstance(colors, type(None)) and (skdata.shape[0] + dotprops.shape[0]) > 0:
+        colors = _random_colors(skdata.shape[0] + dotprops.shape[0],
+                                color_space='RGB', color_range=color_range)
+    else:
+        colors = _eval_color(colors, color_range=color_range)
+
+    # If color is a single color, convert to list
+    if all([isinstance(elem, numbers.Number) for elem in colors]):
+        colors = [colors] * (skdata.shape[0] + dotprops.shape[0])
+
+    # In order to cater for duplicate skeleton IDs in skdata (e.g. from
+    # splitting into fragments), we will not map skids to colors but instead
+    # keep colors as a list. That way users can pass a simple list of colors.
+
+    # If dictionary, map skids to dotprops gene names and neuron skeleton IDs
+    dotprop_cmap = []
+    neuron_cmap = []
+    if isinstance(colors, dict):
+        neuron_cmap = [colors.get(s, (0, 0, 0)) for s in skdata.skeleton_id]
+        dotprop_cmap = [colors.get(s, (0, 0, 0)) for s in dotprop.gene_name.values]
+    # If list of colors
+    elif isinstance(colors, (list, tuple, np.ndarray)):
+        colors_required = skdata.shape[0] + dotprops.shape[0]
+
+        if len(colors) < colors_required:
+            raise ValueError('Need colors for {} neurons/dotprops, got {}'.format(colors_required, len(colors)))
+        elif len(colors) > colors_required:
+            logger.debug('More colors than required: got {}, needed {}'.format(len(colors), colors_required))
+
+        if skdata.shape[0]:
+            neuron_cmap = [colors[i] for i in range(skdata.shape[0])]
+        if dotprops.shape[0]:
+            dotprop_cmap = [colors[i + skdata.shape[0]] for i in range(dotprops.shape[0])]
+    else:
+        raise TypeError('Got colors of type "{}"'.format(type(colors)))
+
+    # Override neuron cmap if we are supposed to use neuron colors
+    if use_neuron_color:
+        neuron_cmap = [n.getattr('color', (0, 0, 0)) for i, n in enumerate(skdata)]
+
+    return neuron_cmap, dotprop_cmap
+
+
+def _eval_color(x, color_range=255):
+    """ Helper to evaluate colors. Always returns tuples.
+    """
+
+    if color_range not in [1, 255]:
+        raise ValueError('color_range must be 1 or 255')
+
+    if isinstance(x, str):
+        c = mcl.to_rgb(x)
+    elif isinstance(x, dict):
+        return {k: _eval_color(v, color_range=color_range) for k, v in x.items()}
+    elif isinstance(x, (list, tuple, np.ndarray)):
+        # If is this is not a list of RGB values:
+        if any([not isinstance(elem, numbers.Number) for elem in x]):
+            return [_eval_color(c, color_range=color_range) for c in x]
+        # If this is a single RGB color:
+        c = x
+    elif isinstance(x, type(None)):
+        return None
+    else:
+        raise TypeError('Unable to interpret color of type "{}"'.format(type(x)))
+
+    # Check if we need to convert
+    if not any([v > 1 for v in c]) and color_range==255:
+        c = [int(v * 255) for v in c]
+    elif any([v > 1 for v in c]) and color_range==1:
+        c = [v / 255 for v in c]
+
+    return tuple(c)
 
 
 def plot_network(x, **kwargs):
@@ -1989,20 +2052,23 @@ def _neuron2vispy(x, **kwargs):
     else:
         raise TypeError('Unable to process data of type "{}"'.format(type(x)))
 
-    colormap = kwargs.get('colormap', {})
+    colormap, _ = _prepare_colormap(kwargs.get('color', kwargs.get('colors', None)),
+                                    x, None,
+                                    use_neuron_color=kwargs.get('use_neuron_color', False),
+                                    color_range=1)
 
     syn_lay = {
         0: {
             'name': 'Presynapses',
-            'color': (255, 0, 0)
+            'color': (1, 0, 0)
         },
         1: {
             'name': 'Postsynapses',
-            'color': (0, 0, 255)
+            'color': (0, 0, 1)
         },
         2: {
             'name': 'Gap junctions',
-            'color': (0, 255, 0)
+            'color': (0, 1, 0)
         },
         'display': 'lines'  # 'circle'
     }
@@ -2011,18 +2077,11 @@ def _neuron2vispy(x, **kwargs):
     # List to fill with vispy visuals
     visuals = []
 
-    for neuron in x:
+    for i, neuron in enumerate(x):
         # Generate random ID -> we need this in case we have duplicate skeleton IDs
         object_id = uuid.uuid4()
 
-        try:
-            neuron_color = colormap[str(neuron.skeleton_id)]
-        except:
-            neuron_color = kwargs.get('color', (0, 0, 0))
-
-        # Convert color from str to RGB
-        if isinstance(neuron_color, str):
-            neuron_color = mcl.to_rgb(neuron_color)
+        neuron_color = colormap[i]
 
         # Convert color 0-1
         if max(neuron_color) > 1:
@@ -2075,27 +2134,53 @@ def _neuron2vispy(x, **kwargs):
                 neuron_color = np.insert(neuron_color, 3, alpha, axis=1)
 
             if segments:
-                # Create line plot from segments.
-                t = scene.visuals.Line(pos=np.array(segments),
-                                       color=list(neuron_color),
-                                       # Can only be used with method 'agg'
-                                       width=kwargs.get('linewidth', 1),
-                                       connect='segments',
-                                       antialias=False,
-                                       method='gl')  # method can also be 'agg' -> has to use connect='strip'
-                # Make visual discoverable
-                t.interactive = True
+                if not kwargs.get('use_radius', False):
+                    # Create line plot from segments.
+                    t = scene.visuals.Line(pos=np.array(segments),
+                                           color=list(neuron_color),
+                                           # Can only be used with method 'agg'
+                                           width=kwargs.get('linewidth', 1),
+                                           connect='segments',
+                                           antialias=False,
+                                           method='gl')
+                    # method can also be 'agg' -> has to use connect='strip'
+                    # Make visual discoverable
+                    t.interactive = True
 
-                # Add custom attributes
-                t.unfreeze()
-                t._object_type = 'neuron'
-                t._neuron_part = 'neurites'
-                t._skeleton_id = neuron.skeleton_id
-                t._neuron_name = neuron.neuron_name
-                t._object_id = object_id
-                t.freeze()
+                    # Add custom attributes
+                    t.unfreeze()
+                    t._object_type = 'neuron'
+                    t._neuron_part = 'neurites'
+                    t._skeleton_id = neuron.skeleton_id
+                    t._neuron_name = neuron.neuron_name
+                    t._object_id = object_id
+                    t.freeze()
 
-                visuals.append(t)
+                    visuals.append(t)
+                else:
+                    from pymaid import tube
+                    coords = _segments_to_coords(neuron,
+                                                 neuron.segments,
+                                                 modifier=(1, 1, 1))
+                    nodes = neuron.nodes.set_index('treenode_id')
+                    for s, c in zip(neuron.segments, coords):
+                        radii = nodes.loc[s, 'radius'].values.astype(float)
+                        radii[radii <= 100] = 100
+                        t = tube.Tube(c.astype(float),
+                                      radius=radii,
+                                      color=neuron_color,
+                                      tube_points=5,)
+
+                        # Add custom attributes
+                        t.unfreeze()
+                        t._object_type = 'neuron'
+                        t._neuron_part = 'neurites'
+                        t._skeleton_id = neuron.skeleton_id
+                        t._neuron_name = neuron.neuron_name
+                        t._object_id = object_id
+                        t.freeze()
+
+                        visuals.append(t)
 
             if kwargs.get('by_strahler', False) or \
                kwargs.get('by_confidence', False):
@@ -2194,7 +2279,7 @@ def _dp2vispy(x, **kwargs):
                     Dotprop(s) to plot.
     colormap :      tuple | dict | array
                     Color to use for plotting. Dictionaries should be mapped
-                    by gene name.
+                    to gene names.
     scale_vect :    int, optional
                     Vector to scale dotprops by.
 
@@ -2209,23 +2294,18 @@ def _dp2vispy(x, **kwargs):
 
     visuals = []
 
-    colormap = kwargs.get('colormap', None)
+    # Parse colors for dotprops
+    _, colormap = _prepare_colormap(kwargs.get('color', kwargs.get('colors', None)),
+                                    None, x, use_neuron_color=False,
+                                    color_range=1)
+
     scale_vect = kwargs.get('scale_vect', 1)
 
-    for n in x.itertuples():
+    for i, n in enumerate(x.itertuples()):
         # Generate random ID -> we need this in case we have duplicate skeleton IDs
         object_id = uuid.uuid4()
 
-        if isinstance(colormap, dict):
-            try:
-                color = colormap[str(n.gene_name)]
-            except BaseException:
-                color = (10 / 255, 10 / 255, 10 / 255)
-        else:
-            color = colormap
-
-        if max(color) > 1:
-            color = np.array(color) / 255
+        color = colormap[i]
 
         # Prepare lines - this is based on nat:::plot3d.dotprops
         halfvect = n.points[
