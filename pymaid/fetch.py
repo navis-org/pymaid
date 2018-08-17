@@ -1919,7 +1919,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None)
 
     # Cater for cases in which the original neurons have been edited
     if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        df = df[df.connector_id.isin(x.connectors)]
+        df = df[df.connector_id.isin(x.connectors.connector_id)]
 
     # Convert to timestamps
     df['creation_time'] = [datetime.datetime.strptime(
