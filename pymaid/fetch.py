@@ -653,6 +653,10 @@ class CatmaidInstance:
         """ Use to get n-th order partners for a set of neurons. Does need postdata."""
         return self.make_url(self.project_id, 'graph', 'circlesofhell', **GET)
 
+    def _get_treenode_table_url(self, **GET):
+        """ Use to get treenode table. Does need postdata."""
+        return self.make_url(self.project_id, 'treenodes', 'compact-detail', **GET)
+
 
 @cache.undo_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
@@ -1465,13 +1469,8 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     logger.debug(
         'Retrieving details for %i nodes...' % len(node_ids))
 
-    remote_nodes_details_url = remote_instance._get_node_info_url()
-
-    data = dict()
-
     urls = []
     post = []
-
     for ix in range(0, len(node_ids), chunk_size):
         urls.append(remote_instance._get_node_info_url())
         post.append({'node_ids[{}]'.format(k): tn for k, tn in  enumerate(node_ids[ix:ix + chunk_size])})
@@ -2614,8 +2613,8 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
 
 
 @cache.undo_on_error
-def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
-    """ Check if a neuron/a list of neurons have somas.
+def has_soma(x, tag:str='soma', min_rad:int=500, remote_instance=None):
+    """ Check if neuron(s) has soma.
 
     Parameters
     ----------
@@ -2626,26 +2625,18 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
                         2. neuron name(s) (str)
                         3. annotation(s): e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-
-    remote_instance :   CATMAID instance, optional
-                        If not passed directly, will try using global.
     tag :               str | None, optional
                         Tag we expect the soma to have. Set to ``None`` if
                         not applicable.
     min_rad :           int, optional
                         Minimum radius of soma.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
     dict
-                        ``{'skid1': True, 'skid2': False, ...}``
-
-    Note
-    ----
-    There is no shortcut to get this information - we have to load the 3D
-    skeleton to get the soma. If you need the 3D skeletons anyway, it is more
-    efficient to use :func:`~pymaid.get_neuron` to get a neuronlist and then
-    use the :attr:`~pymaid.CatmaidNeuronList.soma` attribute.
+                        ``{skid1: True, skid2: False, ...}``
 
     """
 
@@ -2653,31 +2644,19 @@ def has_soma(x, remote_instance=None, tag='soma', min_rad=500):
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    skdata = get_neuron(x,
-                        remote_instance=remote_instance,
-                        connector_flag=0, tag_flag=1,
-                        get_history=False,
-                        return_df=True  # no need to make proper neurons
-                        )
+    url = remote_instance._get_treenode_table_url()
+    post = {'label_names[0]': tag}
+    post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(x)})
 
-    d = {}
-    for s in skdata.itertuples():
-        if tag:
-            if tag in s.tags:
-                tn_with_tag = s.tags['soma']
-            else:
-                tn_with_tag = []
-        else:
-            tn_with_tag = s.nodes.treenode_id.values
+    # Fetch  only treenodes that have the soma label
+    resp = remote_instance.fetch(url, post=post)
 
-        tn_with_rad = s.nodes[s.nodes.radius > min_rad].treenode_id.values
+    # Format is [[ID, parent ID, x, y, z, confidence, radius, skeleton_id, edition_time, user_id], ...]
+    by_skid = {int(s) : False for s in x}
+    for e in resp:
+        by_skid[e[7]] = max(by_skid[e[7]], e[6] >= min_rad)
 
-        if set(tn_with_tag) & set(tn_with_rad):
-            d[s.skeleton_id] = True
-        else:
-            d[s.skeleton_id] = False
-
-    return d
+    return by_skid
 
 
 @cache.undo_on_error
