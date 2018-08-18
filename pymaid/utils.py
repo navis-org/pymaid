@@ -771,54 +771,59 @@ def to_swc(x, filename=None, export_synapses=False):
     if not filename.endswith('.swc'):
         filename += '.swc'
 
-    # Make copy of nodes
-    this_tn = x.nodes.copy()
+    # Make copy of nodes and reorder such that the parent is always before a 
+    # treenode
+    nodes_ordered = [n for seg in x.segments for n in seg[::-1]]
+    this_tn = x.nodes.set_index('treenode_id').loc[nodes_ordered]
 
     # Add an index column (must start with "1", not "0")
-    this_tn.loc[:, 'index'] = list(range(1, this_tn.shape[0] + 1))
+    this_tn['index'] = list(range(1, this_tn.shape[0] + 1))
 
-    # Make a dictionary
-    this_tn = this_tn.set_index('treenode_id')
-    parent_index = {r.parent_id: this_tn.loc[r.parent_id, 'index']
-                    for r in x.nodes[~x.nodes.parent_id.isnull()].itertuples()}
-    parent_index[None] = -1
+    # Make a dictionary treenode_id -> index
+    tn2ix = this_tn['index'].to_dict()
+    tn2ix[None] = -1
+
+    # Make parent index column
+    this_tn['parent_ix'] = this_tn.parent_id.map(tn2ix)
+
+    # Set Label column to 0 (undefined)
+    this_tn['label'] = 0
+    # Add soma label
+    if x.soma:
+        this_tn.loc[x.soma, 'label'] = 1
+    if export_synapses:
+        # Add synapse label
+        this_tn.loc[x.presynapses.treenode_id.values, 'label'] = 7
+        this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
+    this_tn.loc[this_tn.type=='branch', 'label'] = 5
+    this_tn.loc[this_tn.type=='end', 'label'] = 6
+
+    # Make sure we don't have negative radii
+    this_tn.loc[this_tn.radius < 0, 'radius'] = 0
 
     # Generate table consisting of PointNo Label X Y Z Radius Parent
     # .copy() is to prevent pandas' chaining warnings
-    swc = this_tn[['index', 'x', 'y', 'z', 'radius']].copy()
-    # Set Label column to 0 (undefined)
-    swc['Label'] = 0
-    # Add soma label
-    if x.soma:
-        swc.loc[x.soma, 'Label'] = 1
-    if export_synapses:
-        # Add synapse label
-        swc.loc[x.presynapses.treenode_id.values, 'Label'] = 7
-        swc.loc[x.postsynapses.treenode_id.values, 'Label'] = 8
-    # Add parents
-    swc['Parent'] = [parent_index[tn] for tn in this_tn.parent_id.values]
+    swc = this_tn[['index', 'label', 'x', 'y', 'z', 'radius', 'parent_ix']].copy()
+
     # Adjust column titles
-    swc.columns = ['PointNo', 'X', 'Y', 'Z', 'Radius', 'Label', 'Parent']
-    # Reorder columns
-    swc = swc[['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']]
+    swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']
+
     # Coordinates and radius to microns
     swc.loc[:, ['X', 'Y', 'Z', 'Radius']] /= 1000
 
     with open(filename, 'w') as file:
         # Write header
         file.write('# SWC format file\n')
-        file.write(
-            '# based on specifications at http://research.mssm.edu/cnic/swc.html\n')
-        file.write(
-            '# Created by pymaid (https://github.com/schlegelp/PyMaid)\n')
+        file.write('# based on specifications at http://research.mssm.edu/cnic/swc.html\n')
+        file.write('# Created by pymaid (https://github.com/schlegelp/PyMaid)\n')
         file.write('# PointNo Label X Y Z Radius Parent\n')
         file.write('# Labels:\n')
-        for l in ['0 = undefined', '1 = soma']:
+        for l in ['0 = undefined', '1 = soma', '5 = fork point', '6 = end point']:
             file.write('# {}\n'.format(l))
         if export_synapses:
             for l in ['7 = presynapse', '8 = postsynapse']:
                 file.write('# {}\n'.format(l))
-        file.write('\n')
+        #file.write('\n')
 
         writer = csv.writer(file, delimiter=' ')
         writer.writerows(swc.astype(str).values)
