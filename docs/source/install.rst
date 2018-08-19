@@ -13,7 +13,7 @@ Installation instructions come in two flavors:
    You can try pymaid without having to install **anything**! Simply follow this
    link to `Binder <https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=tree>`_:
    they are kindly hosting a Jupyter notebook server with the most up-to-date version
-   of pymaid. Just navigate open ``examples/start_here.ipynb`` to have
+   of pymaid. Just navigate and open ``examples/start_here.ipynb`` to have
    a crack at it!
 
 

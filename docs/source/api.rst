@@ -103,6 +103,8 @@ Misc
     ~pymaid.url_to_coordinates
     ~pymaid.get_review
     ~pymaid.get_review_details
+    ~pymaid.clear_cache
+    ~pymaid.has_soma
 
 
 CatmaidInstance
@@ -232,6 +234,7 @@ Manipulation
     ~pymaid.despike_neuron
     ~pymaid.smooth_neuron
     ~pymaid.guess_radius
+    ~pymaid.time_machine
 
 Resampling
 ----------
