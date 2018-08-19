@@ -20,6 +20,7 @@
 import os
 import numpydoc
 import sphinx_bootstrap_theme
+import json
 
 import matplotlib as mpl
 mpl.use("Agg")
@@ -58,6 +59,22 @@ for mod_name in MOCK_MODULES:
 import pymaid
 from pymaid import cytoscape
 from pymaid import b3d
+
+
+# -- Remove execution numbers from Jupyter notebooks ----------------------
+source_path = os.path.dirname(os.path.abspath(__file__)) + '/source'
+all_nb = [f for f in os.listdir(source_path) if f.endswith('.ipynb')]
+
+for nb in all_nb:
+    with open(os.path.join(source_path, nb), 'r') as f:
+        data = json.load(f)
+        for c in data['cells']:
+            if c['cell_type'] == 'code':
+                c['execution_count'] = None
+                for o in c['outputs']:
+                    o['execution_count'] = None
+    with open(os.path.join(source_path, nb), 'w') as f:
+        json.dump(data, f, indent=3)
 
 # -- General configuration ------------------------------------------------
 
