@@ -74,7 +74,8 @@ extensions = [
     'sphinx.ext.autosummary',
     #'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
-    'sphinx.ext.mathjax',
+    #'sphinx.ext.mathjax', # mathjax is interactive and configurable but can also misbehave when rendering - switched to imgmath instead
+    'sphinx.ext.imgmath',
     'matplotlib.sphinxext.plot_directive',
     #'numpydoc'
 ]

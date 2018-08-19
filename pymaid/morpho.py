@@ -777,8 +777,7 @@ def segregation_index(x, centrality_method='centrifugal'):
                         Type of flow centrality to use to split into axon +
                         dendrite of ``x`` is only a single neuron.
                         There are four flavors:
-                            - for the first three, see
-                              :func:`~pymaid.flow_centrality`
+                            - for the first three, see :func:`~pymaid.flow_centrality`
                             - for `bending`, see :func:`~pymaid.bending_flow`
 
                         Will try using stored centrality, if possible.
