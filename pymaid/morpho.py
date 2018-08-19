@@ -37,7 +37,7 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'bending_flow', 'flow_centrality', 'segregation_index',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron', 'guess_radius',
-                  'smooth_neuron'])
+                  'smooth_neuron', 'time_machine'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
@@ -1901,3 +1901,193 @@ def smooth_neuron(x, window=5, inplace=False):
 
     if not inplace:
         return x
+
+
+def time_machine(x, target, inplace=False, remote_instance=None):
+    """ Reverses time and make neurons young again!
+
+    Prunes a neuron back to it's state before a given date. Here is what we
+    can reverse:
+
+    1. Creation and deletion of nodes
+    2. Creation and deletion of connectors (and links)
+    3. Movement of nodes and connectors
+    4. Cuts and merges
+    5. Addition of tags (even deleted ones)
+    6. Addition of annotations
+
+    Unfortunately time travel has not yet been perfected. We are oblivious to:
+
+    1. Removal of tags/annotations: i.e. we know when e.g. a tag was added
+       and that it was subsequently removed at some point but not when.
+
+    Parameters
+    ----------
+    x :                 skeleton ID(s) | CatmaidNeuron | CatmaidNeuronList
+                        Neuron(s) to rejuvenate.
+    target :            str| tuple | datetime | pandas.Timestamp
+                        Date or date + time to time-travel to.
+    inplace :           bool, optional
+                        If True, will perform time travel on and return a copy
+                        of original.
+    remote_instance :   CatmaidInstance, optional
+
+    Returns
+    -------
+    CatmaidNeuron/List
+                        A younger version of the neuron(s).
+
+    Examples
+    --------
+    >>> n = pymaid.get_neuron(16)
+    >>> previous_n = pymaid.time_machine(n, '2016-1-1')
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(x, core.CatmaidNeuronList):
+        return CatmaidNeuronList([time_machine(n, target,
+                                               inplace=inplace,
+                                               remote_instance=remote_instance)
+                                  for n in x])
+
+    if not isinstance(x, core.CatmaidNeuron):
+        x = fetch.get_neuron(x)
+
+    if not inplace:
+        x = x.copy()
+
+    if not isinstance(target, pd.Timestamp):
+        target = pd.Timestamp(target)
+
+    # Need to localize all timestamps
+    target = target.tz_localize('UTC')
+
+    if target > pd.Timestamp.now().tz_localize('UTC'):
+        raise ValueError("This is not Back to the Future II: for forward time travel, you'll have to trace yourself.")
+
+    # First get the entire history of the neuron
+    url = remote_instance._get_compact_details_url(x.skeleton_id,
+                                                   with_history=True,
+                                                   with_merge_history=True,
+                                                   with_connectors=True,
+                                                   with_tags=True,
+                                                   with_annotations=True)
+    data = remote_instance.fetch(url)
+
+    # Turn stuff into DataFrames for easier sifting/sorting
+    nodes = pd.DataFrame(data[0], columns=['treenode_id', 'parent_id',
+                                           'user_id', 'x', 'y', 'z', 'radius',
+                                           'confidence', 'creation_timestamp',
+                                           'modified_timestamp'])
+    nodes.parent_id = nodes.parent_id.astype(object)
+    nodes.loc[~nodes.parent_id.isnull(), 'parent_id'] = nodes.loc[~nodes.parent_id.isnull(), 'parent_id'].map(int)
+    nodes.loc[nodes.parent_id.isnull(), 'parent_id'] = None
+
+    connectors = pd.DataFrame(data[1], columns=['treenode_id', 'connector_id',
+                                                'relation', 'x', 'y', 'z',
+                                                'creation_timestamp',
+                                                'modified_timestamp'])
+    # This is a dictionary with {'tag': [[treenode_id, date_tagged], ...]}
+    tags = data[2]
+    annotations = pd.DataFrame(data[4], columns=['annotation_id', 'annotated_timestamp'])
+    an_list = fetch.get_annotation_list(remote_instance=remote_instance)
+    annotations['annotation'] = annotations.annotation_id.map(an_list.set_index('annotation_id').annotation.to_dict())
+
+    # Convert stuff to timestamps
+    for ts in ['creation_timestamp', 'modified_timestamp']:
+        nodes[ts] = nodes[ts].map(pd.Timestamp)
+        connectors[ts] = connectors[ts].map(pd.Timestamp)
+    annotations['annotated_timestamp'] = annotations['annotated_timestamp'].map(pd.Timestamp)
+    tags = {t: [[e[0], pd.Timestamp(e[1])] for e in tags[t]] for t in tags}
+
+    # General rules:
+    # 1. creation_timestamp and modified timestamp represent a validity
+    #    intervals.
+    # 2. Nodes where creation_timestamp is older than modified_timestamp,
+    #    represent the existing, most up-to-date versions.
+    # 3. Nodes with creation_timestamp younger than modified_timestamp, and
+    #    with NO future version of themselves, got cut off/deleted at
+    #    modification time.
+    # 4. Useful little detail: nodes/connectors are ordered by new -> old
+
+    # First change the modified_timestamp for nodes that still exist
+    # (see rule 2) to right now
+    nodes.loc[nodes.creation_timestamp > nodes.modified_timestamp, 'modified_timestamp'] = pd.Timestamp.now().tz_localize('UTC')
+    connectors.loc[connectors.creation_timestamp > connectors.modified_timestamp, 'modified_timestamp'] = pd.Timestamp.now().tz_localize('UTC')
+
+    # Remove nodes without a window (these seems to be temporary states)
+    nodes = nodes[nodes.creation_timestamp != nodes.modified_timestamp]
+    connectors = connectors[connectors.creation_timestamp != connectors.modified_timestamp]
+
+    # Second subset to versions of the nodes that existed at given time
+    before_nodes = nodes[(nodes.creation_timestamp <= target) & (nodes.modified_timestamp >= target)]
+    before_connectors = connectors[(connectors.creation_timestamp <= target) & (connectors.modified_timestamp >= target)]
+
+    # Now fix tags and annotations
+    before_annotations = annotations[annotations.annotated_timestamp <= target]
+    before_tags = {t: [e[0] for e in tags[t] if e[1] <= target] for t in tags}
+    before_tags = {t: before_tags[t] for t in before_tags if before_tags[t]}
+
+    x.nodes = before_nodes
+    x.connectors = before_connectors
+    x.annotations = before_annotations
+    x.tags = before_tags
+
+    # We might end up with multiple disconnected pieces - I don't yet know why
+    x.nodes.loc[~x.nodes.parent_id.isin(x.nodes.treenode_id), 'parent_id'] = None
+
+    # If there is more than one root, we have to remove the disconnected
+    # pieces and keep only the "oldest branch".
+    # The theory for doing this is: if a node shows up as "root" and the very
+    # next step is that it is a child to another node, we should consider
+    # it a not-yet connected branch that needs to be removed.
+    roots = x.nodes[x.nodes.parent_id.isnull()].treenode_id.tolist()
+    if len(roots) > 1:
+        after_nodes = nodes[nodes.modified_timestamp > target]
+        for r in roots:
+            # Find the next version of this node
+            nv = after_nodes[(after_nodes.treenode_id == r)]
+            # If this node is not a root anymore in its next iteration, it's
+            # not the "real" one
+            if not nv.empty and nv.iloc[-1].parent_id is not None:
+                roots.remove(r)
+
+        # Get disconnected components
+        g = graph.neuron2nx(x)
+        subgraphs = [l for l in nx.connected_components(nx.to_undirected(g))]
+
+        # If we have a winner root, keep the bit that it is part of
+        if len(roots) == 1:
+            keep = [l for l in subgraphs if roots[0] in l][0]
+        # If we have multiple winners (unlikely) or none (e.g. if the "real"
+        # root got rerooted too) go for the biggest branch
+        else:
+            keep = sorted(subgraphs, key=lambda x: len(x), reverse=True)[0]
+
+        x.nodes = x.nodes[x.nodes.treenode_id.isin(keep)].copy()
+
+    # Remove connectors where the treenode does not even exist yet
+    x.connectors = x.connectors[x.connectors.treenode_id.isin(x.nodes.treenode_id)]
+
+    # Take care of connectors where the treenode might exist but was not yet linked
+    links = fetch.get_connector_links(x.skeleton_id)
+    localize = lambda x: pd.Timestamp.tz_localize(x, 'UTC')
+    links.creation_time = links.creation_time.map(localize)
+    links = links[links.creation_time <= target]
+    links['connector_id'] = links.connector_id.astype(int)
+    links['treenode_id'] = links.treenode_id.astype(int)
+
+    # Get connector ID -> treenode combinations
+    l = links[['connector_id', 'treenode_id']].T.apply(tuple)
+    c = x.connectors[['connector_id', 'treenode_id']].T.apply(tuple)
+
+    # Keep only those where connector -> treenode connection is present
+    x.connectors = x.connectors[c.isin(l)]
+
+    x._clear_temp_attr()
+
+    if not inplace:
+        return x
+
+    return
