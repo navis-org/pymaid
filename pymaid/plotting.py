@@ -154,8 +154,9 @@ def _orthogonal_proj(zfront, zback):
 
 
 def plot2d(x, method='2d', **kwargs):
-    """ Generate 2D plots of neurons and neuropils. The main advantage of this
-    is that you can save plot as vector graphics.
+    """ Generate 2D plots of neurons and neuropils.
+
+    The main advantage of this is that you can save plot as vector graphics.
 
     Important
     ---------
@@ -988,8 +989,10 @@ def _fibonacci_sphere(samples=1, randomize=True):
 
 
 def plot3d(x, **kwargs):
-    """ Generates 3D plot using either vispy (default, http://vispy.org) or
-    plotly (http://plot.ly)
+    """ Generate 3D plot.
+
+    Uses either `vispy <http://vispy.org>`_ (default) or
+    `plotly <http://plot.ly>`_.
 
     Parameters
     ----------
@@ -1840,11 +1843,9 @@ def plot_network(x, **kwargs):
 def plot1d(x, ax=None, color=None, **kwargs):
     """ Plot neuron topology in 1D according to Cuntz et al. (2010).
 
-    Note
-    ----
     This function breaks a neurons into segments between branch points.
-    See Cuntz et al., PLoS Computational Biology (2010) for detailed explanation.
-    For very complex neurons, the neuron "barcode"
+    See Cuntz et al., PLoS Computational Biology (2010) for detailed
+    explanation. For very complex neurons, the neuron "barcode"
 
     Parameters
     ----------

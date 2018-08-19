@@ -298,7 +298,8 @@ class Viewer:
 
     @property
     def neurons(self):
-        """ Returns visible and invisible neuron visuals currently on the canvas.
+        """ Returns visible and invisible neuron visuals currently on the
+        canvas.
 
         Returns
         -------
@@ -491,7 +492,10 @@ class Viewer:
         self.update_legend()
 
     def unhide_neurons(self, n=None, check_alpha=False):
-        """ Unhide given neuron(s). Use ``n`` to unhide specific neurons. """
+        """ Unhide given neuron(s).
+
+        Use ``n`` to unhide specific neurons.
+        """
         if not isinstance(n, type(None)):
             skids = utils.eval_skids(n)
         else:

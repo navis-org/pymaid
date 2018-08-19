@@ -34,9 +34,10 @@ __all__ = sorted(['filter_connectivity', 'cable_overlap',
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
-    """ Filters connectivity data by volume or skeleton data. Use this e.g. to
-    restrict connectivity to edges within a given volume or to certain
-    compartments of neurons.
+    """ Filters connectivity data by volume or skeleton data.
+
+    Use this e.g. to restrict connectivity to edges within a given volume or
+    to certain compartments of neurons.
 
     Important
     ---------
@@ -238,6 +239,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
 def cable_overlap(a, b, dist=2, method='min'):
     """ Calculates the amount of cable of neuron A within distance of neuron B.
+
     Uses dotproduct representation of a neuron!
 
     Parameters
@@ -347,6 +349,7 @@ def cable_overlap(a, b, dist=2, method='min'):
 def predict_connectivity(source, target, method='possible_contacts',
                          remote_instance=None, **kwargs):
     """ Calculates potential synapses from source onto target neurons.
+
     Based on a concept by Alex Bates.
 
     Parameters
@@ -357,7 +360,7 @@ def predict_connectivity(source, target, method='possible_contacts',
     method :        'possible_contacts'
                     Method to use for calculations. See Notes.
     **kwargs
-                    1. For method = 'possible_contacts':
+                    1. For method 'possible_contacts':
                         - ``dist`` to set distance between connectors and
                           treenodes manually.
                         - ``stdev`` to set number of standard-deviations of
@@ -366,8 +369,8 @@ def predict_connectivity(source, target, method='possible_contacts',
     Notes
     -----
     Method ``possible_contacts``:
-        1. Calculating mean distance ``d`` (connector->treenode) at which connections
-           between neurons A and neurons B occur.
+        1. Calculating mean distance ``d`` (connector->treenode) at which
+           connections between neurons A and neurons B occur.
         2. For all presynapses of neurons A, check if they are within `stdev`
            (default=2) standard deviations of ``d`` of a neurons B treenode.
 
@@ -467,8 +470,6 @@ def predict_connectivity(source, target, method='possible_contacts',
 def cn_table_from_connectors(x, remote_instance=None):
     """ Generate connectivity table from neurons' connectors.
 
-    Notes
-    -----
     This function creates the connectivity table from scratch using just the
     neurons' connectors. This function is able to deal with non-unique
     skeleton IDs (most other functions won't). Use it e.g. when you
@@ -735,7 +736,9 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
 def _edges_from_connectors(a, b=None, remote_instance=None):
     """ Generates list of edges between two sets of neurons from their
-    connector data. Attention: this is UNIDIRECTIONAL (a->b)!
+    connector data.
+
+    Attention: this is UNIDIRECTIONAL (a->b)!
 
     Parameters
     ----------
@@ -775,8 +778,9 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
 def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
                      target_grp={}, syn_threshold=None, syn_cutoff=None,
                      use_connectors=False):
-    """ Generate adjacency matrix for synaptic connections between sets of
-    neurons. Directional: sources = rows, targets = columns.
+    """ Generate adjacency matrix between sets of neurons.
+
+    Directional: sources = rows, targets = columns.
 
     Parameters
     ----------

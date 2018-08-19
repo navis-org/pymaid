@@ -593,7 +593,7 @@ class handler:
         self.neurons.alpha(v)
 
     def bevel(self, r):
-        """Change bevel of ALL neurons
+        """Change bevel of ALL neurons.
 
         Parameters
         ----------
@@ -619,7 +619,7 @@ class handler:
 
 
 class object_list:
-    """ Collection of Blender objects
+    """ Collection of Blender objects.
 
     Notes
     -----

@@ -136,8 +136,9 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
 
 
 def network2igraph(x, remote_instance=None, threshold=1):
-    """ Generates iGraph graph for neuron connectivity. Requires iGraph to be
-    installed.
+    """ Generates iGraph graph for neuron connectivity.
+
+    Requires iGraph to be installed.
 
     Parameters
     ----------
@@ -261,8 +262,9 @@ def neuron2nx(x):
 
 
 def neuron2igraph(x):
-    """ Turns CatmaidNeuron(s) into an iGraph graph. Requires iGraph to be
-    installed.
+    """ Turns CatmaidNeuron(s) into an iGraph graph.
+
+    Requires iGraph to be installed.
 
     Parameters
     ----------

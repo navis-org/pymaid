@@ -216,7 +216,9 @@ def _edge_count_to_root(x):
 
 def classify_nodes(x, inplace=True):
     """ Classifies neuron's treenodes into end nodes, branches, slabs
-    or root. Adds ``'type'`` column to ``x.nodes``.
+    or root.
+
+    Adds ``'type'`` column to ``x.nodes``.
 
     Parameters
     ----------
@@ -260,12 +262,12 @@ def classify_nodes(x, inplace=True):
                 # [ n for n in g.nodes if g.degree(n) > 2 ]
                 branches = deg[deg.iloc[:, 0] > 2].index.values
 
-            x.nodes.loc[:, 'type'] = 'slab'
+            x.nodes['type'] = 'slab'
             x.nodes.loc[x.nodes.treenode_id.isin(ends), 'type'] = 'end'
             x.nodes.loc[x.nodes.treenode_id.isin(branches), 'type'] = 'branch'
             x.nodes.loc[x.nodes.parent_id.isnull(), 'type'] = 'root'
     else:
-        raise TypeError('Unknown neuron type: %s' % str(type(x)))
+        raise TypeError('Unknown neuron type "%s"' % str(type(x)))
 
     if not inplace:
         return x
@@ -398,7 +400,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
                 with ``distance = "inf"``.
     weight :    'weight' | None, optional
                 If ``weight`` distances are given as physical length.
-                if ``None`` distances is number of nodes.
+                If ``None`` distances is number of nodes.
 
     Returns
     -------
@@ -567,8 +569,6 @@ def find_main_branchpoint(x, reroot_to_soma=False):
 def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
     """ Splits neuron into fragments.
 
-    Notes
-    -----
     Cuts are based on longest neurites: the first cut is made where the second
     largest neurite merges onto the largest neurite, the second cut is made
     where the third largest neurite merges into either of the first fragments
@@ -856,8 +856,7 @@ def reroot_neuron(x, new_root, inplace=False):
             parent = next(g.successors(parent), None)
 
         # Invert path and add weights
-        new_edges = [
-                     (path[i + 1], path[i],
+        new_edges = [(path[i + 1], path[i],
                       {'weight': weights[i]}) for i in range(len(path) - 1)]
 
         # Add inverted path between old and new root
@@ -895,8 +894,6 @@ def reroot_neuron(x, new_root, inplace=False):
 def cut_neuron(x, cut_node, ret='both'):
     """ Split neuron at given point and returns two new neurons.
 
-    Note
-    ----
     Split is performed between cut node and its parent node. However, cut node
     will still be present in both resulting neurons.
 
@@ -1292,6 +1289,7 @@ def node_label_sorting(x):
     # Get distance from all branch_points
     geo = geodesic_matrix(x, tn_ids=term, directed=True)
     # Set distance between unreachable points to None
+    # Need to reinitialise SparseMatrix to replace float('inf') with NaN
     #dist_mat[geo == float('inf')] = None
     dist_mat = pd.SparseDataFrame(np.where(geo == float('inf'),
                                            np.nan,

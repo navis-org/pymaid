@@ -159,8 +159,9 @@ def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
 
 def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
                   remote_instance=None, verbose=True, group_by=None):
-    """ Loads and **continuously updates** a network into Cytoscape. Use
-    CTRL-C to stop.
+    """ Loads and **continuously updates** a network into Cytoscape.
+
+    Use CTRL-C to stop.
 
     Parameters
     ----------
@@ -220,6 +221,9 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
     >>> cytomaid.watch_network(seeds, min_pre=min_pre,
     ...                        min_post=-1, sleep=5)
     """
+
+    # TODO:
+    # - smart parsing of group_by: use eval_skids()
 
     cy = get_client()
 
@@ -363,4 +367,3 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
 
         # ZzzZzzzZ
         time.sleep(sleep)
-

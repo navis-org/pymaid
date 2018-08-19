@@ -32,10 +32,11 @@ __all__ = sorted(['downsample_neuron', 'resample_neuron'])
 
 def resample_neuron(x, resample_to, method='linear', inplace=False,
                     skip_errors=True):
-    """ Resamples neuron(s) to given NM resolution. Preserves root, leafs,
-    branchpoints. Tags and connectors are mapped onto the closest
-    new treenode. Columns "confidence" and "creator" of the treenode table
-    are discarded.
+    """ Resamples neuron(s) to given NM resolution.
+
+    Preserves root, leafs, branchpoints. Tags and connectors are mapped onto
+    the closest new treenode. Columns "confidence" and "creator" of the
+    treenode table are discarded.
 
     Important
     ---------
@@ -51,8 +52,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     resample_to :       int
                         New resolution in NANOMETERS.
     method :            str, optional
-                        See ``scipy.interpolate.interp1d`` for possible options.
-                        By default, we're using linear interpolation.
+                        See ``scipy.interpolate.interp1d`` for possible
+                        options. By default, we're using linear interpolation.
     inplace :           bool, optional
                         If True, will modify original neuron. If False, a
                         resampled copy is returned.
@@ -240,9 +241,10 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
 
 def downsample_neuron(x, resampling_factor, preserve_cn_treenodes=True,
                       preserve_tag_treenodes=False, inplace=False,):
-    """ Downsamples neuron(s) by a given factor. Preserves root, leafs,
-    branchpoints by default. Preservation of treenodes with synapses can
-    be toggled.
+    """ Downsamples neuron(s) by a given factor.
+
+    Preserves root, leafs, branchpoints by default. Preservation of treenodes
+    with synapses can be toggled.
 
     Parameters
     ----------

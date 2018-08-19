@@ -41,9 +41,11 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
-    """ Calculates confidence for each treenode by walking from root to leafs
+    """ Calculates confidence for each treenode.
+
+    Calculates confidence for each treenode by walking from root to leafs
     starting with a confidence of 1. Each time a low confidence edge is
-    encountered the downstream confidence is reduced (see value parameter).
+    encountered the downstream confidence is reduced (see ``confidences``).
 
     Parameters
     ----------
@@ -233,10 +235,11 @@ def calc_cable(skdata, remote_instance=None, return_skdata=False):
 
 
 def to_dotproduct(x):
-    """ Converts a neuron's neurites into dotproducts consisting of a point
-    and a vector. This works by (1) finding the center between child->parent
-    treenodes and (2) getting the vector between them. Also returns the length
-    of the vector.
+    """ Converts a neuron's neurites into dotproducts.
+
+    Dotproducts consist of a point and a vector. This works by (1) finding the
+    center between child->parent treenodes and (2) getting the vector between
+    them. Also returns the length of the vector.
 
     Parameters
     ----------
@@ -299,10 +302,11 @@ def to_dotproduct(x):
 
 def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
                    min_twig_size=None):
-    """ Calculates Strahler Index (SI). Starts with SI of 1 at each leaf and
-    walks to root. At forks with different incoming SIs, the highest index is
-    continued. At forks with the same incoming SI, highest index + 1 is
-    continued.
+    """ Calculates Strahler Index (SI).
+
+    Starts with SI of 1 at each leaf and walks to root. At forks with different
+    incoming SIs, the highest index is continued. At forks with the same
+    incoming SI, highest index + 1 is continued.
 
     Parameters
     ----------
@@ -587,10 +591,11 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
 
 
 def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=True, return_point=False):
-    """ This function tries to split a neuron into axon, dendrite and primary
-    neurite. The result is highly dependent on the method and on your
-    neuron's morphology and works best for "typical" neurons, i.e. those where
-    the primary neurite branches into axon and dendrites.
+    """ Split a neuron into axon, dendrite and primary neurite.
+
+    The result is highly dependent on the method and on your neuron's
+    morphology and works best for "typical" neurons, i.e. those where the
+    primary neurite branches into axon and dendrites.
 
     Parameters
     ----------
@@ -754,8 +759,10 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
 
 
 def segregation_index(x, centrality_method='centrifugal'):
-    """ Calculates segregation index (SI) from Schneider-Mizell et al. (eLife,
-    2016) as metric for how polarized a neuron is. SI of 1 indicates total
+    """ Calculates segregation index (SI).
+
+    The segregation index as established by Schneider-Mizell et al. (eLife,
+    2016) is a measure for how polarized a neuron is. SI of 1 indicates total
     segregation of inputs and outputs into dendrites and axon, respectively.
     SI of 0 indicates homogeneous distribution.
 
@@ -964,7 +971,26 @@ def bending_flow(x, polypre=False):
 
 
 def flow_centrality(x, mode='centrifugal', polypre=False):
-    """ Implementation of the algorithm for calculating flow centrality.
+    """ Calculates synapse flow centrality (SFC).
+
+    From Schneider-Mizell et al. (2016): "We use flow centrality for
+    four purposes. First, to split an arbor into axon and dendrite at the
+    maximum centrifugal SFC, which is a preliminary step for computing the
+    segregation index, for expressing all kinds of connectivity edges (e.g.
+    axo-axonic, dendro-dendritic) in the wiring diagram, or for rendering the
+    arbor in 3d with differently colored regions. Second, to quantitatively
+    estimate the cable distance between the axon terminals and dendritic arbor
+    by measuring the amount of cable with the maximum centrifugal SFC value.
+    Third, to measure the cable length of the main dendritic shafts using
+    centripetal SFC, which applies only to insect neurons with at least one
+    output syn- apse in their dendritic arbor. And fourth, to weigh the color
+    of each skeleton node in a 3d view, providing a characteristic signature of
+    the arbor that enables subjective evaluation of its identity."
+
+    Losely based on Alex Bate's implemention in `catnat
+    <https://github.com/alexanderbates/catnat>`_.
+
+    Catmaid uses the equivalent of ``mode='sum'`` and ``polypre=True``.
 
     Parameters
     ----------
@@ -980,27 +1006,6 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
                 the numbers of connections each makes. Attention: this works
                 only if all synapses have been properly annotated (i.e. all
                 postsynaptic sites).
-
-    Notes
-    -----
-    From Schneider-Mizell et al. (2016): "We use flow centrality for
-    four purposes. First, to split an arbor into axon and dendrite at the
-    maximum centrifugal SFC, which is a preliminary step for computing the
-    segregation index, for expressing all kinds of connectivity edges (e.g.
-    axo-axonic, dendro-dendritic) in the wiring diagram, or for rendering the
-    arbor in 3d with differently colored regions. Second, to quantitatively
-    estimate the cable distance between the axon terminals and dendritic arbor
-    by measuring the amount of cable with the maximum centrifugal SFC value.
-    Third, to measure the cable length of the main dendritic shafts using
-    centripetal SFC, which applies only to insect neurons with at least one
-    output syn- apse in their dendritic arbor. And fourth, to weigh the color
-    of each skeleton node in a 3d view, providing a characteristic signature of
-    the arbor that enables subjective evaluation of its identity."
-
-    Losely based on Alex Bate's implemention in
-    https://github.com/alexanderbates/catnat.
-
-    Pymaid uses the equivalent of ``mode='sum'`` and ``polypre=True``.
 
     See Also
     --------
@@ -1107,8 +1112,6 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     """ Stitch multiple neurons together.
 
-    Notes
-    -----
     The first neuron provided will be the master neuron. Unless treenode IDs
     are provided via ``tn_to_stitch``, neurons will be stitched at the
     closest point.
@@ -1248,11 +1251,8 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
 
 
 def average_neurons(x, limit=10, base_neuron=None):
-    """ Takes a list of neurons and computes the average using nearest
-    neighbours.
+    """ Computes an average from a list of neurons.
 
-    Notes
-    -----
     This is a very simple implementation which may give odd results if used
     on complex neurons. Works fine on e.g. backbones or tracts.
 
@@ -1353,10 +1353,11 @@ def average_neurons(x, limit=10, base_neuron=None):
 
 
 def tortuosity(x, seg_length=10, skip_remainder=False):
-    """ Calculates tortuosity for a neurons. See Stepanyants et al., Neuron
-    (2004) for detailed explanation. Briefly, tortuosity index T is defined
-    as the ratio of the branch segment length `L` (`seg_length`) to the
-    geometrical distance `R` between its ends.
+    """ Calculates tortuosity for a neurons.
+
+    See Stepanyants et al., Neuron (2004) for detailed explanation. Briefly,
+    tortuosity index `T` is defined as the ratio of the branch segment length
+    `L` (``seg_length``) to the eucledian distance `R` between its ends.
 
     Note
     ----
@@ -1607,10 +1608,10 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
 
             # Subset to remaining nodes
             graph_utils.subset_neuron(x,
-                                      subset = x.nodes[~x.nodes.treenode_id.isin(
+                                      subset=x.nodes[~x.nodes.treenode_id.isin(
                                           to_remove)].treenode_id.values,
-                                      remove_disconnected = preserve_connectors == False,
-                                      inplace = True)
+                                      remove_disconnected=preserve_connectors == False,
+                                      inplace=True)
 
         if not inplace:
             return x
@@ -1620,12 +1621,10 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
 def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False):
     """ Removes spikes in neuron traces (e.g. from jumps in image data).
 
-    Notes
-    -----
     For each treenode A, the euclidean distance to its next successor (parent)
-    B and the second next successor is computed.
-    If ``dist(A->B)/dist(A->C) > sigma``, node B is considered a spike and
-    realigned between A and C.
+    B and the second next successor is computed. If
+    :math:`\\frac{dist(A,B)}{dist(A,C)}>sigma`. node B is considered a spike
+    and realigned between A and C.
 
     Parameters
     ----------
@@ -1633,7 +1632,7 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False)
                         Neuron(s) to be processed.
     sigma :             float | int, optional
                         Threshold for spike detection. Smaller sigma = more
-                        aggressive spike detection. See notes.
+                        aggressive spike detection.
     max_spike_length :  int, optional
                         Determines how long (# of nodes) a spike can be.
     inplace :           bool, optional
@@ -1721,9 +1720,10 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False)
 
 
 def guess_radius(x, method='linear', limit=None, smooth=True, inplace=False):
-    """ Tries guessing radii for all treenodes. Uses distance between
-    connectors and treenodes and interpolate for all treenodes. Fills in
-    ``radius`` column in treenode table.
+    """ Tries guessing radii for all treenodes.
+
+    Uses distance between connectors and treenodes and interpolate for all
+    treenodes. Fills in ``radius`` column in treenode table.
 
     Parameters
     ----------
@@ -1913,8 +1913,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     2. Creation and deletion of connectors (and links)
     3. Movement of nodes and connectors
     4. Cuts and merges
-    5. Addition of tags (even deleted ones)
-    6. Addition of annotations
+    5. Addition of node tags & annotations (even deleted ones)
 
     Unfortunately time travel has not yet been perfected. We are oblivious to:
 

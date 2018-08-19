@@ -328,8 +328,6 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     """ Takes a list of neurons and returns nodes and synapses contributed
     by each user.
 
-    Notes
-    -----
     This is essentially a wrapper for :func:`pymaid.get_contributor_statistics`
     - if you are also interested in e.g. construction time, review time, etc.
     you may want to consider using :func:`~pymaid.get_contributor_statistics`
@@ -358,7 +356,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a user
+        DataFrame in which each row represents a user.
 
         >>> df
         ...   user  nodes  presynapses  postsynapses  nodes_reviewed
@@ -449,8 +447,8 @@ def get_user_contributions(x, teams=None, remote_instance=None):
 def get_time_invested(x, remote_instance=None, minimum_actions=10,
                       treenodes=True, connectors=True, mode='SUM',
                       max_inactive_time=3, start_date=None, end_date=None):
-    """ Takes a list of neurons and calculates the time individual users
-    have spent working on this set of neurons.
+    """ Calculates the time individual users have spent working on a set of
+    neurons.
 
     Parameters
     ----------

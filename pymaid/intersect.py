@@ -43,7 +43,7 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     Important
     ---------
     This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_
-    which is only an optional dependency of PyMaid. If pyoctree is not
+    which is only an optional dependency of pymaid. If pyoctree is not
     installed, we will fall back to using scipy ConvexHull instead of ray
     casting. This is slower and may give wrong positives for concave meshes!
 

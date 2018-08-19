@@ -59,6 +59,7 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
                          resolution. Use this to interpolate virtual nodes.
     remote_instance :    pymaid.CatmaidInstance, optional
     """
+
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
 
@@ -152,7 +153,7 @@ class LoadTiles:
     zoom_level :  int, optional
                   Zoom level
     coords :      'NM' | 'PIXEL', optional
-                  Format of t/l/w/h/z. Can be pixel or nanometers.
+                  Dimension of bbox.
     mem_lim :     int, optional
                   Memory limit in megabytes for loading tiles. This restricts
                   the number of tiles that can be simultaneously loaded into

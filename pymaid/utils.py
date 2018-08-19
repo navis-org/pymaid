@@ -68,7 +68,7 @@ def set_loggers(level='INFO'):
 
 
 def set_pbars(hide=None, leave=None, jupyter=None):
-    """ Set global progress bar behaviours.
+    """ Set global progress bar behaviors.
 
     Parameters
     ----------
@@ -154,8 +154,6 @@ def _eval_conditions(x):
 def neuron2json(x, **kwargs):
     """ Generate JSON formatted ``str`` respresentation of CatmaidNeuron/List.
 
-    Notes
-    -----
     Nodes and connectors are serialised using pandas' ``to_json()``. Most
     other items in the neuron's __dict__ are serialised using
     ``json.dumps()``. Properties not serialised: `._remote_instance`,
@@ -297,8 +295,9 @@ def _eval_remote_instance(remote_instance, raise_error=True):
 
 
 def eval_skids(x, remote_instance=None, warn_duplicates=True):
-    """ Evaluate skeleton IDs. Will turn annotations and neuron names into
-    skeleton IDs.
+    """ Evaluate skeleton IDs.
+
+    Will turn annotations and neuron names into skeleton IDs.
 
     Parameters
     ----------
@@ -388,8 +387,9 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
 
 
 def eval_user_ids(x, user_list=None, remote_instance=None):
-    """ Checks a list of users and turns them into user IDs. Always
-    returns a list! Will attempt converting in the following order:
+    """ Checks a list of users and turns them into user IDs.
+
+    Always returns a list! Will attempt converting in the following order:
 
         (1) user ID
         (2) login name
@@ -593,8 +593,9 @@ def _parse_objects(x, remote_instance=None):
 
 def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
              post_label=None):
-    """ Generate neuron object from SWC file. This import is following
-    format specified here: http://research.mssm.edu/cnic/swc.html
+    """ Generate neuron object from SWC file.
+
+    This import is following format specified `here <http://research.mssm.edu/cnic/swc.html>`_
 
     Important
     ---------
@@ -714,8 +715,9 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
 
 
 def to_swc(x, filename=None, export_synapses=False):
-    """ Generate SWC file from neuron(s). Follows the format specified here:
-    http://research.mssm.edu/cnic/swc.html
+    """ Generate SWC file from neuron(s).
+
+    Follows the format specified `here <http://research.mssm.edu/cnic/swc.html>`_.
 
     Important
     ---------

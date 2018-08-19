@@ -235,6 +235,7 @@ Manipulation
     ~pymaid.smooth_neuron
     ~pymaid.guess_radius
     ~pymaid.time_machine
+    ~pymaid.tortuosity
 
 Resampling
 ----------

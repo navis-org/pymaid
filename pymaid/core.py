@@ -93,8 +93,6 @@ class CatmaidNeuron:
     """ Catmaid neuron object holding neuron data (nodes, connectors, name,
     etc) and providing quick access to various PyMaid functions.
 
-    Notes
-    -----
     CatmaidNeuron can be minimally constructed from just a skeleton ID
     and a CatmaidInstance. Other parameters (nodes, connectors, neuron name,
     annotations, etc.) will then be retrieved from the server 'on-demand'.
@@ -523,8 +521,10 @@ class CatmaidNeuron:
             graph_utils.classify_nodes(self, inplace=True)
 
     def get_graph_nx(self):
-        """Calculates networkX representation of neuron. Once calculated stored
-        as `.graph`. Call function again to update graph.
+        """Calculates networkX representation of neuron.
+
+        Once calculated stored as ``.graph``. Call function again to update
+        graph.
 
         See Also
         --------
@@ -534,8 +534,10 @@ class CatmaidNeuron:
         return self.graph
 
     def get_igraph(self):
-        """Calculates iGraph representation of neuron. Once calculated stored
-        as `.igraph`. Call function again to update iGraph.
+        """Calculates iGraph representation of neuron.
+
+        Once calculated stored as ``.igraph``. Call function again to update
+        iGraph.
 
         Important
         ---------
@@ -549,8 +551,9 @@ class CatmaidNeuron:
         return self.igraph
 
     def get_dps(self):
-        """Calculates/updates dotproduct representation of the neuron. Once
-        calculated stored as `.dps`.
+        """Calculates/updates dotproduct representation of the neuron.
+
+        Once calculated stored as ``.dps``.
 
         See Also
         --------
@@ -573,8 +576,6 @@ class CatmaidNeuron:
     def _get_soma(self):
         """Search for soma and return treenode ID of soma.
 
-        Notes
-        -----
         Uses either a treenode tag or treenode radius or a combination of both
         to identify the soma. This is set in the class attributes
         ``soma_detection_radius`` and ``soma_detection_tag``. The default
@@ -615,7 +616,7 @@ class CatmaidNeuron:
         return roots
 
     def get_partners(self, remote_instance=None):
-        """ Get connectivity table for this neuron."""
+        """Get connectivity table for this neuron."""
         if not remote_instance and not self._remote_instance:
             logger.error(
                 'Get_partners: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
@@ -927,8 +928,9 @@ class CatmaidNeuron:
             return x
 
     def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
-        """ Prune neuron based on strahler order. Will reroot neuron to
-        soma if possible.
+        """ Prune neuron based on strahler order.
+
+        Will reroot neuron to soma if possible.
 
         Parameters
         ----------
@@ -1037,8 +1039,12 @@ class CatmaidNeuron:
             return x
 
     def reload(self, remote_instance=None):
-        """Reload neuron from server. Currently only updates name, nodes,
-        connectors and tags, not e.g. annotations."""
+        """Reload neuron from server.
+
+        Currently only updates name, nodes, connectors and tags, not e.g.
+        annotations.
+
+        """
 
         if not remote_instance and not self._remote_instance:
             logger.error(
@@ -1055,8 +1061,9 @@ class CatmaidNeuron:
 
     def set_remote_instance(self, remote_instance=None, server_url=None,
                             http_user=None, http_pw=None, auth_token=None):
-        """Assign remote_instance to neuron. Provide either existing
-        CatmaidInstance OR your credentials.
+        """Assign remote_instance to neuron.
+
+        Provide either existing CatmaidInstance OR your credentials.
 
         Parameters
         ----------
@@ -1181,8 +1188,9 @@ class CatmaidNeuron:
                                        'connectors', 'tags'])
 
     def to_swc(self, filename=None):
-        """ Generate SWC file from this neuron. This converts CATMAID
-        nanometer coordinates into microns.
+        """ Generate SWC file from this neuron.
+
+        This converts CATMAID nanometer coordinates into microns.
 
         Parameters
         ----------
@@ -1204,8 +1212,10 @@ class CatmaidNeuron:
 
     @classmethod
     def from_swc(self, filename, neuron_name=None, neuron_id=None):
-        """ Generate neuron object from SWC file. This import is following
-        format specified here: http://research.mssm.edu/cnic/swc.html
+        """ Generate neuron object from SWC file.
+
+        This import is following format specified `here
+        <http://research.mssm.edu/cnic/swc.html>`_.
 
         Parameters
         ----------
@@ -1237,8 +1247,6 @@ class CatmaidNeuronList:
     ways much like a pandas.DataFrames by, for example, supporting ``.ix[ ]``,
     ``.itertuples()``, ``.empty`` or ``.copy()``.
 
-    Notes
-    -----
     CatmaidNeuronList can be minimally constructed from just skeleton IDs.
     Other parameters (nodes, connectors, neuron name, annotations, etc.)
     will then be retrieved from the server 'on-demand'.
@@ -1901,7 +1909,9 @@ class CatmaidNeuronList:
         return x[0]
 
     def prune_proximal_to(self, tag, inplace=True):
-        """Remove nodes proximal to given node. Reroots neurons to cut node.
+        """Remove nodes proximal to given node.
+
+        Reroots neurons to cut node.
 
         Parameters
         ----------
@@ -1943,8 +1953,9 @@ class CatmaidNeuronList:
         return x[0]
 
     def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
-        """ Prune neurons based on strahler order. Will reroot neurons to
-        soma if possible.
+        """ Prune neurons based on strahler order.
+
+        Will reroot neurons to soma if possible.
 
         Parameters
         ----------
@@ -2232,8 +2243,9 @@ class CatmaidNeuronList:
 
     def set_remote_instance(self, remote_instance=None, server_url=None,
                             http_user=None, http_pw=None, auth_token=None):
-        """Assign remote_instance to all neurons. Provide either existing
-        CatmaidInstance OR your credentials.
+        """Assign remote_instance to all neurons.
+
+        Provide either existing CatmaidInstance OR your credentials.
 
         Parameters
         ----------
@@ -2258,10 +2270,10 @@ class CatmaidNeuronList:
             n._remote_instance = remote_instance
 
     def plot3d(self, **kwargs):
-        """Plot neuron in 3D using :func:`pymaid.plot3d`.
+        """Plot neuron in 3D.
 
         Parameters
-        ---------
+        ----------
         **kwargs
                 Keyword arguments will be passed to :func:`pymaid.plot3d`.
                 See ``help(pymaid.plot3d)`` for a list of keywords.
@@ -2286,13 +2298,13 @@ class CatmaidNeuronList:
         Parameters
         ----------
         **kwargs
-                Keyword arguments will be passed to plot2d(). See
-                ``help(pymaid.plot3d)`` for a list of accepted keywords.
+                Keyword arguments will be passed to :func:`pymaid.plot2d`.
+                See ``help(pymaid.plot2d)`` for a list of accepted keywords.
 
         See Also
         --------
         :func:`~pymaid.plot2d`
-                Base function called to generate 2d plot
+                Base function called to generate 2d plot.
         """
 
         from pymaid import plotting
@@ -2310,9 +2322,11 @@ class CatmaidNeuronList:
                           Annotation(s) to filter for. Use tilde (~) as prefix
                           to look for neurons WITHOUT given annotation(s).
         intersect :       bool, optional
-                          If True, neuron must have/not have ALL provided
-                          annotations. Applies to include and exclude
-                          (~ prefix) annotations separately.
+                          If True, neuron must have ALL positive annotations to
+                          be included and ALL negative (~) annotations to be
+                          excluded. If False, must have at least one positive
+                          to be included and one of the negative annotations
+                          to be excluded.
         partial :         bool, optional
                           If True, allow partial match of annotation.
         raise_not_found : bool, optional
@@ -2329,11 +2343,11 @@ class CatmaidNeuronList:
         >>> # Get neurons that have "test1" annotation
         >>> nl.has_annotation('test1')
         >>> # Get neurons that have either "test1" or "test2"
-        >>> nl.has_annotation(['test1','test2'])
+        >>> nl.has_annotation(['test1', 'test2'])
         >>> # Get neurons that have BOTH "test1" and "test2"
-        >>> nl.has_annotation(['test1','test2'], intersect=True)
+        >>> nl.has_annotation(['test1', 'test2'], intersect=True)
         >>> # Get neurons that have "test1" but NOT "test2"
-        >>> nl.has_annotation(['test1','~test2'])
+        >>> nl.has_annotation(['test1', '~test2'])
 
         """
 
@@ -2437,8 +2451,9 @@ class CatmaidNeuronList:
                                        'connectors', 'tags'])
 
     def to_swc(self, filenames=None):
-        """ Generate SWC file from this neuron. This converts CATMAID
-        nanometer coordinates into microns.
+        """ Generate SWC file from this neuron.
+
+        This converts CATMAID nanometer coordinates into microns.
 
         Parameters
         ----------
@@ -2464,8 +2479,10 @@ class CatmaidNeuronList:
         return self.neurons
 
     def sort_values(self, key, ascending=False):
-        """Sort neurons by given key. Needs to be an attribute of all neurons:
-        for example ``n_presynapse``. Also works with custom attributes."""
+        """Sort neurons by given key.
+
+        Needs to be an attribute of all neurons: for example ``n_presynapse``.
+        Also works with custom attributes."""
         self.neurons = sorted(self.neurons,
                               key=lambda x: getattr(x, key),
                               reverse=ascending is False)
@@ -2595,17 +2612,17 @@ class Volume:
     volume_id : int, optional
                 CATMAID volume ID.
 
+    Attributes
+    ----------
+    bbox :      array
+                Bounding box of the volume.
+
+
     See Also
     --------
     :func:`~pymaid.get_volume`
         Retrieves volumes from CATMAID and returns :class:`pymaid.Volume`.
 
-    Notes
-    -----
-    This class is still in the making but the idea is to write methods for it
-    like .to_X(), .get_neurons().
-
-    Attributes could be: .volume, .bbox, .color
     """
 
     def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
@@ -2805,7 +2822,7 @@ class Volume:
         return trimesh.Trimesh(vertices=self.vertices, faces=self.faces)
 
     def _outlines_3d(self, view='xy', **kwargs):
-        """ Generate 3d outlines along a given view (see `.to_2d()`).
+        """ Generate 3d outlines along a given view (see ``.to_2d()``).
 
         Parameters
         ----------
@@ -2832,8 +2849,9 @@ class Volume:
         return np.append(co2d, third.reshape(co2d.shape[0], 1), axis=1)
 
     def to_2d(self, alpha=0.00017, view='xy', invert_y=False):
-        """ Computes the 2d alpha shape (concave hull) this volume. Uses Scipy
-        Delaunay and shapely.
+        """ Computes the 2d alpha shape (concave hull) this volume.
+
+        Uses Scipy Delaunay and shapely.
 
         Parameters
         ----------
@@ -2848,7 +2866,7 @@ class Volume:
         -------
         list
                     Coordinates of 2d circumference
-                    e.g. [(x1,y1),(x2,y2),(x3,y3),...]
+                    e.g. [(x1, y1), (x2, y2), (x3, y3), ...]
 
         """
 

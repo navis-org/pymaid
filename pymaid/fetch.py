@@ -885,6 +885,7 @@ get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
 def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
               tag_flag=1):
     """ Retrieve skeleton data for a list of skeleton ids.
+
     Similar to :func:`pymaid.get_neuron` but the connector data includes
     the whole chain::
 
@@ -975,8 +976,8 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
 @cache.undo_on_error
 def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
                            min_size=2):
-    """ Retrieve the synaptic/gap junction partners of neurons
-    of interest **within** a given CATMAID Volume.
+    """ Retrieve the synaptic/gap junction partners of neurons of interest
+    **within** a given CATMAID Volume.
 
     Important
     ---------
@@ -1425,8 +1426,7 @@ def get_names(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_node_details(x, remote_instance=None, chunk_size=10000):
-    """ Retrieve detailed treenode info for a list of treenodes and/or
-    connectors.
+    """ Retrieve detailed info for treenodes and/or connectors.
 
     Parameters
     ----------
@@ -1638,7 +1638,9 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
 
 @cache.undo_on_error
 def get_edges(x, remote_instance=None):
-    """ Retrieve edges (synaptic connections only!) between sets of neurons.
+    """ Retrieve edges between sets of neurons.
+
+    Synaptic connections only!
 
     Parameters
     ----------
@@ -1817,9 +1819,7 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 @cache.undo_on_error
 def get_connector_links(x, with_tags=False, chunk_size=50, remote_instance=None):
     """ Retrieve connectors links for a set of neurons.
-
-    Note
-    ----
+    
     In essence, this will get you all "arrows" that point from a connector to
     your neuron or from your neuron to a connector. It does NOT give you the
     entire battery of connectors for a set of connectors. For that you have
@@ -2250,7 +2250,7 @@ def remove_annotations(x, annotations, remote_instance=None):
                                            [a]['targetIds']),
                                        resp['left_uses'][a]
                                        )
-                               )
+                        )
     else:
         logger.info('No annotations removed.')
 
@@ -2383,8 +2383,9 @@ def get_user_annotations(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_annotation_details(x, remote_instance=None):
-    """ Retrieve annotations for a set of neuron. Returns more
-    details than :func:`~pymaid.get_annotations` but is slower.
+    """ Retrieve annotations for a set of neuron.
+
+    Returns more details than :func:`~pymaid.get_annotations` but is slower.
     Contains timestamps and user IDs (same API as neuron navigator).
 
     Parameters
@@ -2480,6 +2481,7 @@ def get_annotation_details(x, remote_instance=None):
 @cache.undo_on_error
 def get_annotations(x, remote_instance=None):
     """ Retrieve annotations for a list of skeleton ids.
+    
     If a neuron has no annotations, it will not show up in returned dict!
 
     Notes
@@ -2931,8 +2933,11 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
 
 @cache.never_cache
 def delete_neuron(x, no_prompt=False, remote_instance=None):
-    """ Completely delete neurons. Use this with EXTREME caution
-    as this is irreversible!
+    """ Completely delete neurons.
+
+    .. danger::
+
+        **Use this with EXTREME caution as this is irreversible!**
 
     Important
     ---------
@@ -2993,6 +2998,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 @cache.never_cache
 def delete_tags(node_list, tags, node_type, remote_instance=None):
     """ Remove tag(s) for a list of treenode(s) or connector(s).
+
     Works by getting existing tags, removing given tag(s) and then using
     pymaid.add_tags() to push updated tags back to CATMAID.
 
@@ -3206,7 +3212,7 @@ def get_segments(x, remote_instance=None):
 @cache.undo_on_error
 def get_review_details(x, remote_instance=None):
     """ Retrieve review status (reviewer + timestamp) for each node
-    of a given skeleton. Uses the review API.
+    of a given skeleton.
 
     Parameters
     -----------
@@ -3387,6 +3393,7 @@ def get_logs(remote_instance=None, operations=[], entries=50, display_start=0,
 def get_contributor_statistics(x, remote_instance=None, separate=False,
                                max_threads=500):
     """ Retrieve contributor statistics for given skeleton ids.
+
     By default, stats are given over all neurons.
 
     Parameters
@@ -3534,9 +3541,9 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
 def get_neuron_list(remote_instance=None, user=None, node_count=1,
                     start_date=[], end_date=[], reviewed_by=None,
                     minimum_cont=None):
-    """ Retrieves a list of all skeletons that fit given parameters (see
-    variables). If no parameters are provided, all existing skeletons are
-    returned!
+    """ Retrieves a list of all skeletons that fit given parameters.
+
+    If no parameters are provided, all existing skeletons are returned!
 
     Parameters
     ----------
@@ -3683,8 +3690,6 @@ def get_history(remote_instance=None,
                 end_date=datetime.date.today().isoformat(), split=True):
     """ Retrieves CATMAID project history.
 
-    Notes
-    -----
     If the time window is too large, the connection might time out which will
     result in an error! Make sure ``split=True`` to avoid that.
 
@@ -3956,7 +3961,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                  from_date=None, to_date=None, reviewed_by=None, skids=None,
                  intersect=False, partial_match=False, only_soma=False,
                  min_size=1, minimum_cont=None, remote_instance=None):
-    """ Find neurons matching given search criteria. Returns a CatmaidNeuronList.
+    """ Find neurons matching given search criteria.
 
     Warning
     -------
@@ -4257,9 +4262,11 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 @cache.undo_on_error
 def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
                           only_soma=False, remote_instance=None):
-    """ Retrieves neurons with processes within CATMAID volumes. This function
-    uses the **BOUNDING BOX** around volume as proxy and queries for neurons
-    that are within that volume. See examples on how to work around this.
+    """ Retrieves neurons with processes within CATMAID volumes.
+
+    This function uses the **BOUNDING BOX** around volume as proxy and queries
+    for neurons that are within that volume. See examples on how to work
+    around this.
 
     Warning
     -------
@@ -4360,11 +4367,12 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
 @cache.undo_on_error
 def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
                         **kwargs):
-    """ Retrieves neurons with processes within a defined box volume. Because the
-    API returns only a limited number of neurons at a time, the defined volume
-    has to be chopped into smaller pieces for crowded areas - may thus take
-    some time! This function will retrieve ALL neurons within the box - not
-    just the once entering/exiting.
+    """ Retrieves neurons with processes within a defined box volume.
+
+    Because the API returns only a limited number of neurons at a time, the
+    defined volume has to be chopped into smaller pieces for crowded areas -
+    may thus take some time! This function will retrieve ALL neurons within
+    the box - not just the once entering/exiting.
 
     Parameters
     ----------
@@ -4515,7 +4523,7 @@ def _subset_volume(bbox, max_vol=None):
 
 @cache.undo_on_error
 def get_user_list(remote_instance=None):
-    """ Get list of users for given CATMAID server (not project specific).
+    """ Get list of users.
 
     Parameters
     ----------
@@ -4700,8 +4708,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
 @cache.undo_on_error
 def get_volume(volume_name=None, remote_instance=None,
                color=(120, 120, 120, .6), combine_vols=False):
-    """ Retrieves volume (mesh) from Catmaid server and converts to set of
-    vertices and faces.
+    """ Retrieves volume (mesh).
 
     Parameters
     ----------
@@ -5099,8 +5106,9 @@ def get_label_list(remote_instance=None):
 
 @cache.undo_on_error
 def get_transactions(range_start=None, range_length=25, remote_instance=None):
-    """ Retrieve individual transactions with server. **This API endpoint is
-    extremely slow!**
+    """ Retrieve individual transactions with server.
+
+    **This API endpoint is extremely slow!**
 
     Parameters
     ----------

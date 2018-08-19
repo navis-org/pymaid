@@ -33,6 +33,7 @@ logger = config.logger
 
 class Cache(OrderedDict):
     """ Custom dictionary for handling the caching of request.responses.
+
     Implements a maximum size [mb] and a time limit [s].
     """
     def __init__(self, *args, **kwargs):
@@ -79,8 +80,10 @@ class Cache(OrderedDict):
         return resp
 
     def get_cached_url(self, url, future, post=None):
-        """ Looks for cached url. If not cached, will return
-        request futures for fetching the data from server.
+        """ Looks for cached url.
+
+        If not cached, will return request futures for fetching the data from
+        server.
         """
         try:
             # If response is cached, return a mock future object

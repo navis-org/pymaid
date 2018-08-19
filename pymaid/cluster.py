@@ -43,9 +43,6 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                             remote_instance=None):
     """ Calculate connectivity similarity.
 
-    Notes
-    -----
-
     This functions offers a selection of metrics to compare connectivity:
 
     .. list-table::
@@ -439,8 +436,6 @@ def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000,
                              restrict_cn=None):
     """ Calculates synapses similarity score.
 
-    Notes
-    -----
     Synapse similarity score is calculated by calculating for each synapse of
     neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
     and (2) comparing the synapse density around synapse A and B. This is type
@@ -516,8 +511,6 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
                                  restrict_cn=None, remote_instance=None):
     """ Clusters neurons based on their synapse placement.
 
-    Notes
-    -----
     Distances score is calculated by calculating for each synapse of
     neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
     and (2) comparing the synapse density around synapse A and B.
@@ -622,8 +615,9 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
 
 
 def cluster_xyz(x, labels=None):
-    """ Thin wrapper for scipy.scipy.spatial.distance. Takes a list of x,y,z
-    coordinates and calculates EUCLEDIAN distance matrix.
+    """ Thin wrapper for ``scipy.scipy.spatial.distance``.
+
+    Takes a list of x,y,z coordinates and calculates EUCLEDIAN distance matrix.
 
     Parameters
     ----------
@@ -669,6 +663,7 @@ def cluster_xyz(x, labels=None):
 
 class ClustResults:
     """ Class to handle, analyze and plot similarity/distance matrices.
+
     Contains thin wrappers for ``scipy.cluster``.
 
     Attributes
@@ -767,6 +762,7 @@ class ClustResults:
 
     def calc_cophenet(self):
         """ Returns Cophenetic Correlation coefficient of your clustering.
+
         This (very very briefly) compares (correlates) the actual pairwise
         distances of all your samples to those implied by the hierarchical
         clustering. The closer the value is to 1, the better the clustering
@@ -777,10 +773,11 @@ class ClustResults:
         return scipy.cluster.hierarchy.cophenet(self.linkage, self.condensed_dist_mat)
 
     def calc_agg_coeff(self):
-        """ Returns the agglomerative coefficient. This measures the clustering
-        structure of the linkage matrix. Because it grows with the number of
-        observations, this measure should not be used to compare datasets of
-        very different sizes.
+        """ Returns the agglomerative coefficient.
+
+        This measures the clustering structure of the linkage matrix. Because
+        it grows with the number of observations, this measure should not be
+        used to compare datasets of very different sizes.
 
         For each observation i, denote by m(i) its dissimilarity to the first
         cluster it is merged with, divided by the dissimilarity of the merger
@@ -813,8 +810,10 @@ class ClustResults:
             return (sim_mat - sim_mat.max()) * -1
 
     def cluster(self, method='ward'):
-        """ Cluster distance matrix. This will automatically be called when
-        attribute linkage is requested for the first time.
+        """ Cluster distance matrix.
+
+        This will automatically be called when attribute linkage is requested
+        for the first time.
 
         Parameters
         ----------
@@ -1086,7 +1085,7 @@ class ClustResults:
         return {n: colors[i] for i in range(len(cl)) for n in cl[i]}
 
     def get_clusters(self, k, criterion='maxclust', return_type='labels'):
-        """ Wrapper for cluster.hierarchy.fcluster to get clusters.
+        """ Wrapper for ``scipy.cluster.hierarchy.fcluster`` to get clusters.
 
         Parameters
         ----------

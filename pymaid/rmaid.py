@@ -90,8 +90,9 @@ __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
 
 
 def init_rcatmaid(**kwargs):
-    """ This function initializes the R catmaid package from Jefferis
-    (https://github.com/jefferis/rcatmaid).
+    """ Initialize the R catmaid package.
+
+    R package by Greg Jefferis: https://github.com/jefferis/rcatmaid
 
     Parameters
     ----------
@@ -261,8 +262,6 @@ def neuron2py(neuron, remote_instance=None):
     """ Converts an rcatmaid ``neuron`` or ``neuronlist`` object to a PyMaid
     :class:`~pymaid.CatmaidNeuron`/:class:`~pymaid.CatmaidNeuronList`.
 
-    Notes
-    -----
     Node creator and confidence are not included in R's neuron/neuronlist
     and will be imported as ``None``.
 
@@ -298,6 +297,8 @@ def neuron2py(neuron, remote_instance=None):
             # 'StartPoint','BranchPoints','EndPoints','nTrees', 'NumSeqs',
             # 'SegList', 'd', 'skid', 'connectors', 'tags','url', 'headers'  ]
         neuron = neuron_list
+
+    remote_instance = utils._eval_remote_instance(remote_instance, raise_error=False)
 
     # Nat function may return neuron objects that have ONLY nodes - no
     # connectors, skeleton_id, name or tags!
@@ -362,11 +363,9 @@ def neuron2py(neuron, remote_instance=None):
 
 
 def neuron2r(neuron, convert_to_um=False):
-    """ Converts a PyMaid neuron or neuronlist to the corresponding
+    """ Converts a pymaid neuron or neuronlist to the corresponding
     neuron/neuronlist object in R.
 
-    Notes
-    -----
     The way this works is essentially converting the PyMaid object back
     into what rcatmaid expects as a response from a CATMAID server, then
     we are calling the same functions as in rcatmaid's
@@ -546,8 +545,6 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     """ Wrapper to use R's ``nat:nblast_allbyall``
     (https://github.com/jefferislab/nat.nblast/).
 
-    Notes
-    -----
     Neurons are automatically resampled to 1 micron.
 
     Parameters
@@ -659,10 +656,11 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
 
 
 def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
-    """ Wrapper to use R's nblast (https://github.com/jefferis/nat). Provide
-    neuron to nblast either as skeleton ID or neuron object. This essentially
-    recapitulates what elmr's (https://github.com/jefferis/elmr) nblast_fafb
-    does.
+    """ Wrapper to use R's nblast (https://github.com/jefferis/nat). 
+
+    Provide neuron to nblast either as skeleton ID or neuron object. This
+    essentially recapitulates what `elmr's <https://github.com/jefferis/elmr>`_
+    ``nblast_fafb`` does.
 
     Notes
     -----
