@@ -22,6 +22,8 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 
+import numbers
+
 from scipy.sparse import csgraph, csr_matrix
 
 from pymaid import graph, core, utils, config
@@ -681,9 +683,9 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
                         May contain only a single neuron.
     n :                 int | slice, optional
                         Number of longest neurites to preserve. For example:
-                         - ``n=1`` preserves the longest neurites
-                         - ``n=2`` preserves two longest neurites
-                         - ``n=slice(1,None)`` removes the longest neurite
+                         - ``n=1`` keeps the longest neurites
+                         - ``n=2`` keeps the two longest neurites
+                         - ``n=slice(1, None)`` removes the longest neurite
     reroot_to_soma :    bool, optional
                         If True, neuron will be rerooted to soma.
     inplace :           bool, optional
@@ -712,7 +714,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
-    if n < 1:
+    if isinstance(n, numbers.Number) and n < 1:
         raise ValueError(
             'Number of longest neurites to preserve must be at least 1.')
 
@@ -724,7 +726,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
 
     segments = _generate_segments(x, weight='weight')
 
-    if isinstance(n, (int, np.int)):
+    if isinstance(n, (int, np.int_)):
         tn_to_preserve = [tn for s in segments[:n] for tn in s]
     elif isinstance(n, slice):
         tn_to_preserve = [tn for s in segments[n] for tn in s]
