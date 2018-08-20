@@ -714,7 +714,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     return core.CatmaidNeuron(df)
 
 
-def to_swc(x, filename=None, export_synapses=False):
+def to_swc(x, filename=None, export_synapses=False, min_radius=0):
     """ Generate SWC file from neuron(s).
 
     Follows the format specified `here <http://research.mssm.edu/cnic/swc.html>`_.
@@ -736,6 +736,10 @@ def to_swc(x, filename=None, export_synapses=False):
                         postsynapse ("8"). Because only one label can be given
                         this might drop synapses (i.e. in case of multiple
                         pre- or postsynapses on a single treenode)!
+    min_radius :        int, optional
+                        By default, nodes in CATMAID have a radius of -1. To
+                        prevent this from causing problems in other
+                        applications, set a minimum radius [nm].
 
     Returns
     -------
@@ -773,10 +777,14 @@ def to_swc(x, filename=None, export_synapses=False):
     if not filename.endswith('.swc'):
         filename += '.swc'
 
-    # Make copy of nodes and reorder such that the parent is always before a 
+    # Make copy of nodes and reorder such that the parent is always before a
     # treenode
     nodes_ordered = [n for seg in x.segments for n in seg[::-1]]
     this_tn = x.nodes.set_index('treenode_id').loc[nodes_ordered]
+
+    # Because the last treenode ID of each segment is a duplicate
+    # (except for the first segment ), we have to remove these
+    this_tn = this_tn[~this_tn.index.duplicated(keep='first')]
 
     # Add an index column (must start with "1", not "0")
     this_tn['index'] = list(range(1, this_tn.shape[0] + 1))
@@ -800,8 +808,9 @@ def to_swc(x, filename=None, export_synapses=False):
     this_tn.loc[this_tn.type=='branch', 'label'] = 5
     this_tn.loc[this_tn.type=='end', 'label'] = 6
 
-    # Make sure we don't have negative radii
-    this_tn.loc[this_tn.radius < 0, 'radius'] = 0
+    # Make sure we don't have too small radii
+    if min_radius:
+        this_tn.loc[this_tn.radius < min_radius, 'radius'] = min_radius
 
     # Generate table consisting of PointNo Label X Y Z Radius Parent
     # .copy() is to prevent pandas' chaining warnings
