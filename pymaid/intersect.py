@@ -116,39 +116,42 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
             volume = {v.name: v for v in volume}
 
         data = dict()
-        for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide, leave=config.pbar_leave):
-            data[v] = in_volume(
-                x, volume[v], remote_instance=remote_instance, inplace=False, mode=mode)
+        for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide,
+                             leave=config.pbar_leave):
+            data[v] = in_volume(x, volume[v], remote_instance=remote_instance,
+                                inplace=False, mode=mode)
         return data
 
     if isinstance(volume, str):
         volume = fetch.get_volume(volume, remote_instance)
 
+    # Make copy if necessary
+    if isinstance(x, (core.CatmaidNeuronList, core.CatmaidNeuron)):
+        if inplace is False:
+            x = x.copy()
+
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].values
     elif isinstance(x, core.CatmaidNeuron):
-        in_v = in_volume(
-            x.nodes[['x', 'y', 'z']].values, volume, mode=mode)
+        in_v = in_volume(x.nodes[['x', 'y', 'z']].values, volume)
 
         # If mode is OUT, invert selection
         if mode == 'OUT':
             in_v = ~np.array(in_v)
 
-        x = graph_utils.subset_neuron(
-            x, x.nodes[in_v].treenode_id.values, inplace=inplace)
+        x = graph_utils.subset_neuron(x, x.nodes[in_v].treenode_id.values,
+                                      inplace=True)
 
-        if not inplace:
+        if inplace is False:
             return x
-        else:
-            return
+        return
     elif isinstance(x, core.CatmaidNeuronList):
         for n in x:
-            n = in_volume(n, volume, inplace=inplace, mode=mode)
+            _ = in_volume(n, volume, inplace=True, mode=mode)
 
-        if not inplace:
+        if inplace is False:
             return x
-        else:
-            return
+        return
     else:
         points = x
 
