@@ -445,6 +445,10 @@ def plot2d(x, method='2d', **kwargs):
                                     disable=config.pbar_hide | len(dotprops) == 0)):
         this_color = colormap[neuron.skeleton_id]
 
+        if neuron.nodes.empty:
+            logger.warning('Skipping neuron w/o nodes: {}'.format(neuron.neuron_name))
+            continue
+
         if not connectors_only:
             soma = neuron.nodes[neuron.nodes.radius > 1]
 
