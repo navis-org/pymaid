@@ -121,21 +121,20 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
     -------
     pandas.DataFrame
         DataFrame in which each row represents a neuron. Example for two teams,
-        ``teamA`` and ``teamB``:
+        ``teamA`` and ``teamB``::
 
-        >>> df
            skeleton_id  total_nodes  teamA_nodes  teamB_nodes  ...
-        0
-        1
+         0
+         1
            total_reviews teamA_reviews  teamB_reviews  ...
-        0
-        1
+         0
+         1
            total_connectors  teamA_connectors  teamB_connectors ...
-        0
-        1
+         0
+         1
            total_time  teamA_time  teamB_time
-        0
-        1
+         0
+         1
 
     Examples
     --------
@@ -161,7 +160,8 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
     # Prepare teams
     if not isinstance(teams, dict):
-        raise TypeError('Expected teams of type dict, got {}'.format(type(teams)))
+        raise TypeError('Expected teams of type dict, got '
+                        '{}'.format(type(teams)))
 
     beginning_of_time = datetime.date(1900, 1, 1)
     today = datetime.date.today()
@@ -178,14 +178,18 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
                     try:
                         teams[t][u] = pd.date_range(*teams[t][u])
                     except BaseException:
-                        raise Exception('Error converting "{}" to pandas.date_range'.format(teams[t][u]))
+                        raise Exception('Error converting "{}" to pandas.'
+                                        'date_range'.format(teams[t][u]))
                 elif isinstance(teams[t][u],
                                 pd.core.indexes.datetimes.DatetimeIndex):
                     pass
                 else:
-                    TypeError('Expected user dates to be either None, tuple of datetimes or pandas.date_range, got {}'.format(type(teams[t][u])))
+                    TypeError('Expected user dates to be either None, tuple '
+                              'of datetimes or pandas.date_range, '
+                              'got {}'.format(type(teams[t][u])))
         else:
-            raise TypeError('Expected teams to be either lists or dicts of users, got {}'.format(type(teams[t])))
+            raise TypeError('Expected teams to be either lists or dicts of '
+                            'users, got {}'.format(type(teams[t])))
 
     # Get all users
     all_users = [u for t in teams for u in teams[t]]
@@ -356,12 +360,12 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a user.
+        DataFrame in which each row represents a user::
 
-        >>> df
-        ...   user  nodes  presynapses  postsynapses  nodes_reviewed
-        ... 0
-        ... 1
+            user  nodes  presynapses  postsynapses  nodes_reviewed
+         0
+         1
+         ...
 
     Examples
     --------
@@ -394,14 +398,16 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     if not isinstance(teams, type(None)):
         # Prepare teams
         if not isinstance(teams, dict):
-            raise TypeError('Expected teams of type dict, got {}'.format(type(teams)))
+            raise TypeError('Expected teams of type dict, got '
+                            '{}'.format(type(teams)))
 
         for t in teams:
             if not isinstance(teams[t], list):
-                raise TypeError('Teams need to list of user logins, got {}'.format(type(teams[t])))
+                raise TypeError('Teams need to list of user logins, '
+                                'got {}'.format(type(teams[t])))
 
         # Turn teams into a login -> team dict
-        teams = {u : t for t in teams for u in teams[t]}
+        teams = {u: t for t in teams for u in teams[t]}
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
@@ -410,8 +416,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     cont = fetch.get_contributor_statistics(
         skids, remote_instance, separate=False)
 
-    all_users = set(list(cont.node_contributors.keys(
-    )) + list(cont.pre_contributors.keys()) + list(cont.post_contributors.keys()))
+    all_users = set(list(cont.node_contributors.keys()) + list(cont.pre_contributors.keys()) + list(cont.post_contributors.keys()))
 
     stats = {
         'nodes': {u: 0 for u in all_users},
@@ -430,9 +435,9 @@ def get_user_contributions(x, teams=None, remote_instance=None):
         stats['nodes_reviewed'][u] = cont.review_contributors[u]
 
     stats = pd.DataFrame([[u, stats['nodes'][u],
-                             stats['presynapses'][u],
-                             stats['postsynapses'][u],
-                             stats['nodes_reviewed'][u]] for u in all_users],
+                           stats['presynapses'][u],
+                           stats['postsynapses'][u],
+                           stats['nodes_reviewed'][u]] for u in all_users],
                          columns=['user', 'nodes', 'presynapses',
                                   'postsynapses', 'nodes_reviewed']
                         ).sort_values('nodes', ascending=False).reset_index(drop=True)
@@ -490,19 +495,21 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     Returns
     -------
     pandas.DataFrame
-        If ``mode='SUM'``, values represent minutes invested.
+        If ``mode='SUM'``, values represent minutes invested::
 
-        >>> df
-        ...       total  creation  edition  review
-        ... user1
-        ... user2
+                 total  creation  edition  review
+          user1
+          user2
+          ..
+          .
 
-        If ``mode='OVER_TIME'`` or ``mode='ACTIONS'``:
+        If ``mode='OVER_TIME'`` or ``mode='ACTIONS'``::
 
-        >>> df
-        ...       date date date ...
-        ... user1
-        ... user2
+                 date1  date2  date3  ...
+          user1
+          user2
+          ..
+          .
 
         For `OVER_TIME`, values respresent minutes invested on that day. For
         `ACTIONS`, values represent actions (creation, edition, review) on that
@@ -574,7 +581,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     interval = max_inactive_time
     bin_width = '%iMin' % interval
 
-    # Update minimum_actions to reflect actions/interval instead of actions/minute
+    # Update minimum_actions to reflect actions/interval instead of
+    # actions/minute
     minimum_actions *= interval
 
     user_list = fetch.get_user_list(remote_instance).set_index('id')
@@ -615,15 +623,11 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
 
     # Remove timestamps outside of date range (if provided)
     if start_date:
-        node_details = node_details[node_details.creation_time >= np.datetime64(
-            start_date)]
-        link_details = link_details[link_details.creation_time >= np.datetime64(
-            start_date)]
+        node_details = node_details[node_details.creation_time >= np.datetime64(start_date)]
+        link_details = link_details[link_details.creation_time >= np.datetime64(start_date)]
     if end_date:
-        node_details = node_details[node_details.creation_time <= np.datetime64(
-            end_date)]
-        link_details = link_details[link_details.creation_time <= np.datetime64(
-            end_date)]
+        node_details = node_details[node_details.creation_time <= np.datetime64(end_date)]
+        link_details = link_details[link_details.creation_time <= np.datetime64(end_date)]
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
     creation_timestamps = np.append(node_details[['creator', 'creation_time']].values,
@@ -680,7 +684,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         all_ts.columns = ['all_users']
         all_ts = all_ts.T
         # Get total time spent
-        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
+        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total',
+                             disable=config.pbar_hide, leave=False):
             this_ts = all_timestamps[all_timestamps.user == u].set_index(
                 'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
             this_ts.columns = [user_list.loc[u, 'login']]
@@ -746,10 +751,12 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     Return
     ------
     pandas.DataFrame
-            >>> df
-                user      timestamp     action
-            0
-            1
+            DataFrame in which each row is a user action::
+
+                user   timestamp   action
+             0
+             1
+             ...
 
     Examples
     --------
@@ -769,15 +776,15 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
 
     >>> # Plot day-by-day activity
     >>> ax = plt.subplot()
-    >>> ax.scatter(actions.timestamp.date.tolist(),
-    ...            actions.timestamp.time.tolist(),
+    >>> ax.scatter(actions.timestamp.date.values,
+    ...            actions.timestamp.time.values,
     ...            marker='_')
 
     """
 
     if not neurons and not users and not (start_date or end_date):
-        raise ValueError(
-            'Query must be restricted by at least a single parameter!')
+        raise ValueError('Query must be restricted by at least a single '
+                         'parameter!')
 
     if users and not isinstance(users, (list, np.ndarray)):
         users = [users]
@@ -848,10 +855,8 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
 
     # Remove timestamps outside of date range (if provided)
     if start_date:
-        all_timestamps = all_timestamps[all_timestamps.timestamp.values >= np.datetime64(
-            start_date)]
+        all_timestamps = all_timestamps[all_timestamps.timestamp.values >= np.datetime64(start_date)]
     if end_date:
-        all_timestamps = all_timestamps[all_timestamps.timestamp.values <= np.datetime64(
-            end_date)]
+        all_timestamps = all_timestamps[all_timestamps.timestamp.values <= np.datetime64(end_date)]
 
     return all_timestamps.sort_values('timestamp').reset_index(drop=True)

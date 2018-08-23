@@ -92,7 +92,7 @@ def get_pymaid_style():
 
 
 def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
-                    clear_session=True):
+                     clear_session=True):
     """ Loads a CATMAID network into Cytoscape.
 
     Parameters
@@ -118,7 +118,8 @@ def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
     cy = get_client()
 
     if layout not in cy.layout.get_all() + [None]:
-        raise ValueError('Unknown layout. Available options: ' + ', '.join(cy.layout.get_all()))
+        raise ValueError('Unknown layout. Available options: '
+                         ', '.join(cy.layout.get_all()))
 
     # Clear session
     if clear_session:
@@ -131,8 +132,8 @@ def generate_network(x, layout='fruchterman-rheingold', apply_style=True,
     elif isinstance(x, pd.DataFrame):
         n = cy.network.create_from_dataframe(x)
     else:
-        raise TypeError(
-            'Unable to generate network from data of type "{0}"'.format(type(x)))
+        raise TypeError('Unable to generate network from data of '
+                        'type "{0}"'.format(type(x)))
 
     if layout:
         # Apply basic layout
@@ -307,7 +308,7 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
         ntable['id'] = ntable.name
         ntable['neuron_name'] = ntable.name.map(names)
         network.update_node_table(ntable, data_key_col='name',
-                                          network_key_col='name')
+                                  network_key_col='name')
 
         # Remove nodes that do not exist anymore
         ntable = network.get_node_table()

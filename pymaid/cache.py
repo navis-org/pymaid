@@ -196,7 +196,7 @@ def wipe_and_retry(function):
             # Execute function the first time (make sure no new data is added
             # if exception is raised)
             res = undo_on_error(function)(*args, **kwargs)
-        except:
+        except BaseException:
             # If caching is on, try the function without caching
             if rm.caching:
                 # If function failed without even using cached data, raise
@@ -208,7 +208,8 @@ def wipe_and_retry(function):
                     if q in rm._cache:
                         rm._cache.pop(q)
 
-                logger.info('Failed using cached data. Cleaning cache and retrying...')
+                logger.info('Failed using cached data. Cleaning cache and '
+                            'retrying...')
 
                 # Retry function
                 res = undo_on_error(function)(*args, **kwargs)
@@ -236,20 +237,22 @@ def clear_url_and_retry(*to_clear):
         @wraps(function)
         def wrapper(*args, **kwargs):
             # Get remote instance either from kwargs or global
-            rm = utils._eval_remote_instance(kwargs.get('remote_instance', None))
+            rm = utils._eval_remote_instance(kwargs.get('remote_instance',
+                                                        None))
             try:
                 # Execute function
                 res = function(*args, **kwargs)
-            except:
+            except BaseException:
                 # If caching is on, try the function without caching
                 if rm.caching:
-                    logger.info('Failed using cached data. Clearing relevant entries and retrying...')
+                    logger.info('Failed using cached data. Clearing relevant '
+                                'entries and retrying...')
                     for f in to_clear:
                         url = getattr(rm, f)()
                         rm._cache.clear_cached_url(url)
                     try:
                         res = function(*args, **kwargs)
-                    except:
+                    except BaseException:
                         raise
                 # If caching is off, raise right away
                 else:
@@ -271,14 +274,15 @@ def retry_no_caching(function):
         try:
             # Execute function
             res = function(*args, **kwargs)
-        except:
+        except BaseException:
             # If caching is on, try the function without caching
             if rm.caching:
-                logger.info('Failed using cached data. Retrying without caching...')
+                logger.info('Failed using cached data. Retrying without '
+                            'caching...')
                 rm.caching = False
                 try:
                     res = function(*args, **kwargs)
-                except:
+                except BaseException:
                     raise
                 finally:
                     # Make sure to re-enable caching

@@ -203,7 +203,7 @@ class handler:
                 'Unable to interpret data type ' + str(type(x)))
             raise AttributeError('Unable to add data of type' + str(type(x)))
 
-        print('Import done in {:.2}s'.format(time.time()-start))
+        print('Import done in {:.2}s'.format(time.time() - start))
 
         return
 
@@ -218,7 +218,7 @@ class handler:
             raise ValueError('Array must be of shape N,3')
 
         # Get & scale coordinates and invert y
-        coords = x.astype(float)[:,[0, 2, 1]]
+        coords = x.astype(float)[:, [0, 2, 1]]
         coords *= float(self.conversion)
         coords *= [1, 1, -1]
 
@@ -283,7 +283,7 @@ class handler:
         n_verts = 0
         for i, s in enumerate(x.segments):
             # Get and convert coordinates
-            coords = nodes.loc[s, ['x','y','z']].values.astype(float)
+            coords = nodes.loc[s, ['x', 'y', 'z']].values.astype(float)
             coords *= float(self.conversion)
 
             # Compute edge indices
@@ -303,7 +303,7 @@ class handler:
         edges = np.vstack(edges)
 
         # Swap z and y and invert y coords
-        verts = verts[:,[0, 2, 1]] * np.array([1, 1, -1])
+        verts = verts[:, [0, 2, 1]] * np.array([1, 1, -1])
 
         # Add all data at once
         mesh.from_pydata(verts, edges.astype(int), [])
@@ -318,11 +318,12 @@ class handler:
         ob['catmaid_object'] = True
         ob['skeleton_id'] = x.skeleton_id
 
-        # Link object to scene - this needs to happen BEFORE we convert to curve
+        # Link object to scene - this needs to happen BEFORE we convert to
+        # curve
         bpy.context.scene.objects.link(ob)
 
         # Select and make active object
-        ob.select=True
+        ob.select = True
         bpy.context.scene.objects.active = ob
 
         # Convert from mesh to curve
@@ -349,11 +350,12 @@ class handler:
         cu.bevel_resolution = 5
         cu.bevel_depth = 0.007
 
-        #DO NOT touch this: lookup via dict is >10X faster!
-        tn_coords = {r.treenode_id: (r.x * self.conversion, r.z * self.conversion, r.y * -self.conversion) for r in x.nodes.itertuples()}
+        # DO NOT touch this: lookup via dict is >10X faster!
+        tn_coords = {r.treenode_id: (r.x * self.conversion,
+                                     r.z * self.conversion,
+                                     r.y * -self.conversion) for r in x.nodes.itertuples()}
         if use_radii:
             tn_radii = {r.treenode_id: r.radius * self.conversion for r in x.nodes.itertuples()}
-
 
         for s in x.segments:
             sp = cu.splines.new('POLY')
@@ -383,7 +385,7 @@ class handler:
     def _create_soma(self, x, mat):
         """ Create soma """
         s = x.nodes.set_index('treenode_id').ix[x.soma]
-        loc = s[['x', 'z', 'y']].values * self.conversion * [1 ,1 ,-1]
+        loc = s[['x', 'z', 'y']].values * self.conversion * [1, 1, -1]
         rad = s.radius * self.conversion
 
         mesh = bpy.data.meshes.new('Soma of #{0} - mesh'.format(x.skeleton_id))
@@ -393,7 +395,7 @@ class handler:
         bpy.context.scene.objects.link(soma_ob)
         bpy.context.scene.objects.active = soma_ob
 
-        soma_ob.location=loc
+        soma_ob.location = loc
         soma_ob.select = True
 
         # Construct the bmesh cube and assign it to the blender mesh.
@@ -435,7 +437,8 @@ class handler:
             tn_coords = np.c_[tn_coords, [0] * con.shape[0]]
 
             # Combine cn and tn coords in pairs
-            # This will have to be transposed to get pairs of cn and tn (see below)
+            # This will have to be transposed to get pairs of cn and tn
+            # (see below)
             coords = np.dstack([cn_coords, tn_coords])
 
             ob_name = '%s of %s' % (self.cn_dict[i]['name'], x.skeleton_id)
@@ -627,10 +630,11 @@ class object_list:
     1.  Object_lists should normally be constructed via the handler
         (see :class:`pymaid.b3d.handler`)!
     2.  List works with object NAMES to prevent Blender from crashing when
-        trying to access neurons that do not exist anymore. This also means that
-        changing names manually will compromise a object list.
+        trying to access neurons that do not exist anymore. This also means
+        that changing names manually will compromise a object list.
     3.  Accessing a neuron list's attributes (see below) return another
-        ``object_list`` class which you can use to manipulate the new subselection.
+        ``object_list`` class which you can use to manipulate the new
+        subselection.
 
     Attributes
     ----------
@@ -841,7 +845,6 @@ def CalcSphere(radius, nrPolar, nrAzimuthal):
     dPolar = math.pi / (nrPolar - 1)
     dAzimuthal = 2.0 * math.pi / (nrAzimuthal)
 
-
     # 1/2: vertices
     verts = []
     currV = mathutils.Vector((0.0, 0.0, radius))        # top vertex
@@ -862,7 +865,6 @@ def CalcSphere(radius, nrPolar, nrAzimuthal):
             verts.append(currV)
     currV = mathutils.Vector((0.0, 0.0, - radius))        # bottom vertex
     verts.append(currV)
-
 
     # 2/2: faces
     faces = []

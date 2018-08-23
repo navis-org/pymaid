@@ -81,7 +81,8 @@ import io
 import copy
 import six
 
-from pymaid import graph, morpho, fetch, graph_utils, resample, intersect, utils, config
+from pymaid import (graph, morpho, fetch, graph_utils, resample, intersect,
+                    utils, config)
 
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
@@ -214,12 +215,13 @@ class CatmaidNeuron:
             if x.shape[0] == 1:
                 x = x.ix[0]
             else:
-                raise Exception(
-                    'Unable to construct CatmaidNeuron from data containing multiple neurons. Try CatmaidNeuronList instead.')
+                raise Exception('Unable to construct CatmaidNeuron from data '
+                                'containing multiple neurons. Try '
+                                'CatmaidNeuronList instead.')
 
-        if not isinstance(x, (str, int, pd.Series, CatmaidNeuron)):
-            raise TypeError(
-                'Unable to construct CatmaidNeuron from data type %s' % str(type(x)))
+        if not isinstance(x, (str, int, np.int64, pd.Series, CatmaidNeuron)):
+            raise TypeError('Unable to construct CatmaidNeuron from data '
+                            'type %s' % str(type(x)))
 
         if remote_instance is None:
             if 'remote_instance' in sys.modules:
@@ -245,16 +247,16 @@ class CatmaidNeuron:
                 int(x)  # Check if this is a skeleton ID
                 self.skeleton_id = str(x)  # Make sure skid is a string
             except BaseException:
-                raise Exception(
-                    'Unable to construct CatmaidNeuron from data provided: %s' % str(type(x)))
+                raise Exception('Unable to construct CatmaidNeuron from data '
+                                'provided: %s' % str(type(x)))
         else:
             # If we are dealing with a DataFrame or a CatmaidNeuron get the essentials
             essential_attributes = ['skeleton_id']
 
             # If we have been passed a DataFrame/Series, just get the essentials
             if isinstance(x, pd.Series):
-                essential_attributes += ['neuron_name',
-                                         'nodes', 'connectors', 'tags']
+                essential_attributes += ['neuron_name', 'nodes', 'connectors',
+                                         'tags']
             else:
                 # Move all attributes if CatmaidNeuron
                 for at in x.__dict__:
@@ -352,50 +354,57 @@ class CatmaidNeuron:
             return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
             if 'nodes' in self.__dict__:
-                closed = self.tags.get('ends', []) \
-                    + self.tags.get('uncertain end', []) \
-                    + self.tags.get('uncertain continuation', []) \
-                    + self.tags.get('not a branch', []) \
-                    + self.tags.get('soma', [])
-                return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.tolist() if n not in closed])
+                closed = set(self.tags.get('ends', [])
+                             + self.tags.get('uncertain end', [])
+                             + self.tags.get('uncertain continuation', [])
+                             + self.tags.get('not a branch', [])
+                             + self.tags.get('soma', []))
+                return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.values if n not in closed])
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'n_branch_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'branch'].shape[0]
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'n_end_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes[self.nodes.type == 'end'].shape[0]
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'n_nodes':
             if 'nodes' in self.__dict__:
                 return self.nodes.shape[0]
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'n_connectors':
             if 'connectors' in self.__dict__:
                 return self.connectors.shape[0]
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'n_presynapses':
             if 'connectors' in self.__dict__:
                 return self.connectors[self.connectors.relation == 0].shape[0]
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'n_postsynapses':
             if 'connectors' in self.__dict__:
                 return self.connectors[self.connectors.relation == 1].shape[0]
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'cable_length':
             if 'nodes' in self.__dict__:
@@ -406,13 +415,16 @@ class CatmaidNeuron:
                     w = nx.get_edge_attributes(self.graph, 'weight').values()
                 return sum(w) / 1000
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         elif key == 'bbox':
             if 'nodes' in self.__dict__:
-                return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
+                return self.nodes.describe().loc[['min', 'max'],
+                                                 ['x', 'y', 'z']].values.T
             else:
-                logger.info('No skeleton data available. Use .get_skeleton() to fetch.')
+                logger.info('No skeleton data available. Use .get_skeleton() '
+                            'to fetch.')
                 return 'NA'
         else:
             raise AttributeError('Attribute "%s" not found' % key)
@@ -468,8 +480,10 @@ class CatmaidNeuron:
                     Function called to get skeleton information
         """
         if not remote_instance and not self._remote_instance:
-            raise Exception(
-                'Get_skeleton - Unable to connect to server without remote_instance. See help(core.CatmaidNeuron) to learn how to assign.')
+            raise Exception('Get_skeleton - Unable to connect to server '
+                            'without remote_instance. See '
+                            'help(core.CatmaidNeuron) to learn how to '
+                            'assign.')
         elif not remote_instance:
             remote_instance = self._remote_instance
         logger.info('Retrieving skeleton data...')
@@ -618,8 +632,8 @@ class CatmaidNeuron:
     def get_partners(self, remote_instance=None):
         """Get connectivity table for this neuron."""
         if not remote_instance and not self._remote_instance:
-            logger.error(
-                'Get_partners: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
+            logger.error('Get_partners: Unable to connect to server. Please '
+                         'provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
@@ -632,8 +646,8 @@ class CatmaidNeuron:
     def get_review(self, remote_instance=None):
         """Get review status for neuron."""
         if not remote_instance and not self._remote_instance:
-            logger.error(
-                'Get_review: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
+            logger.error('Get_review: Unable to connect to server. Please '
+                         'provide CatmaidInstance as <remote_instance>.')
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
@@ -644,8 +658,9 @@ class CatmaidNeuron:
     def get_annotations(self, remote_instance=None):
         """Retrieve annotations for neuron."""
         if not remote_instance and not self._remote_instance:
-            logger.error(
-                'Get_annotations: Need CatmaidInstance to retrieve annotations. Use neuron.get_annotations( remote_instance = CatmaidInstance )')
+            logger.error('Get_annotations: Need CatmaidInstance to retrieve '
+                         'annotations. Use neuron.get_annotations( '
+                         'remote_instance = CatmaidInstance )')
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
@@ -745,8 +760,9 @@ class CatmaidNeuron:
     def get_name(self, remote_instance=None):
         """Retrieve/update name of neuron."""
         if not remote_instance and not self._remote_instance:
-            logger.error(
-                'Get_name: Need CatmaidInstance to retrieve annotations. Use neuron.get_annotations( remote_instance = CatmaidInstance )')
+            logger.error('Get_name: Need CatmaidInstance to retrieve '
+                         'annotations. Use neuron.get_annotations( '
+                         'remote_instance = CatmaidInstance )')
             return None
         elif not remote_instance:
             remote_instance = self._remote_instance
@@ -1047,8 +1063,8 @@ class CatmaidNeuron:
         """
 
         if not remote_instance and not self._remote_instance:
-            logger.error(
-                'Get_update: Unable to connect to server. Please provide CatmaidInstance as <remote_instance>.')
+            logger.error('Get_update: Unable to connect to server. Please '
+                         'provide CatmaidInstance as <remote_instance>.')
         elif not remote_instance:
             remote_instance = self._remote_instance
 
@@ -1158,15 +1174,14 @@ class CatmaidNeuron:
             soma_temp = 'NA'
 
         s = pd.Series([type(self), neuron_name, self.skeleton_id,
-                          self.n_nodes, self.n_connectors,
-                          self.n_branch_nodes, self.n_end_nodes,
-                          self.n_open_ends, self.cable_length,
-                          review_status, soma_temp],
-                         index=['type', 'neuron_name', 'skeleton_id',
-                                'n_nodes', 'n_connectors', 'n_branch_nodes',
-                                'n_end_nodes', 'n_open_ends', 'cable_length',
-                                'review_status', 'soma']
-                         )
+                       self.n_nodes, self.n_connectors,
+                       self.n_branch_nodes, self.n_end_nodes,
+                       self.n_open_ends, self.cable_length,
+                       review_status, soma_temp],
+                      index=['type', 'neuron_name', 'skeleton_id',
+                             'n_nodes', 'n_connectors', 'n_branch_nodes',
+                             'n_end_nodes', 'n_open_ends', 'cable_length',
+                             'review_status', 'soma'])
 
         logger.setLevel(l)
         return s
@@ -1184,8 +1199,8 @@ class CatmaidNeuron:
 
         return pd.DataFrame([[self.neuron_name, self.skeleton_id,
                               self.nodes, self.connectors, self.tags]],
-                              columns=['neuron_name', 'skeleton_id', 'nodes',
-                                       'connectors', 'tags'])
+                            columns=['neuron_name', 'skeleton_id', 'nodes',
+                                     'connectors', 'tags'])
 
     def to_swc(self, filename=None):
         """ Generate SWC file from this neuron.
@@ -1411,10 +1426,9 @@ class CatmaidNeuronList:
 
             else:
                 for n in config.tqdm(to_convert, desc='Make nrn',
-                              disable=config.pbar_hide,
-                              leave=config.pbar_leave):
-                    self.neurons[n[2]] = CatmaidNeuron(
-                        n[0], remote_instance=remote_instance)
+                                     disable=config.pbar_hide,
+                                     leave=config.pbar_leave):
+                    self.neurons[n[2]] = CatmaidNeuron(n[0], remote_instance=remote_instance)
 
         # Add indexer class
         self.ix = _IXIndexer(self.neurons)
@@ -1541,7 +1555,8 @@ class CatmaidNeuronList:
             return self.get_partners()
         elif key == 'skeleton_id':
             return np.array([n.skeleton_id for n in self.neurons])
-        elif key in ['nodes', 'connectors', 'presynapses', 'postsynapses', 'gap_junctions']:
+        elif key in ['nodes', 'connectors', 'presynapses', 'postsynapses',
+                     'gap_junctions']:
             self.get_skeletons(skip_existing=True)
             data = []
             for n in self.neurons:
@@ -1550,7 +1565,7 @@ class CatmaidNeuronList:
                 data.append(this_n)
             return pd.concat(data, axis=0, ignore_index=True, sort=True)
         elif key == 'bbox':
-            return self.nodes.describe().loc[['min','max'],['x','y','z']].values.T
+            return self.nodes.describe().loc[['min', 'max'],['x', 'y', 'z']].values.T
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]
@@ -1558,11 +1573,12 @@ class CatmaidNeuronList:
             if len(set(all_instances)) > 1:
                 # Note that multiprocessing causes remote_instances to be pickled
                 # and thus not be the same anymore
-                logger.debug(
-                    'Neurons are using multiple remote_instances! Returning first entry.')
+                logger.debug('Neurons are using multiple remote_instances! '
+                             'Returning first entry.')
             elif len(set(all_instances)) == 0:
-                raise Exception(
-                    'No remote_instance found. Use .set_remote_instance() to assign one to all neurons.')
+                raise Exception('No remote_instance found. Use '
+                                 '.set_remote_instance() to assign one to all '
+                                 'neurons.')
             else:
                 return all_instances[0]
         elif key == 'review_status':
@@ -1646,13 +1662,17 @@ class CatmaidNeuronList:
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
             if to_sub.skeleton_id in self and to_sub not in self.neurons:
-                logger.warning('Skeleton ID in neuronlist but neuron not identical! Substraction cancelled! Try using .skeleton_id instead.')
+                logger.warning('Skeleton ID in neuronlist but neuron not '
+                               'identical! Substraction cancelled! Try using '
+                               '.skeleton_id instead.')
                 return
             return CatmaidNeuronList([n for n in self.neurons if n != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuronList):
             if len(set(self.neurons) & set(to_sub.neurons)) != len(set(self.skeleton_id) & set(to_sub.skeleton_id)):
-                logger.warning('Skeleton ID(s) in neuronlist but neuron(s) not identical! Substraction cancelled! Try using .skeleton_id instead.')
+                logger.warning('Skeleton ID(s) in neuronlist but neuron(s) '
+                               'not identical! Substraction cancelled! Try '
+                               'using .skeleton_id instead.')
                 return
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub],
                                      make_copy=self.copy_on_subset)
@@ -1670,13 +1690,17 @@ class CatmaidNeuronList:
                                      make_copy=self.copy_on_subset)
         elif isinstance(other, CatmaidNeuron):
             if other.skeleton_id in self and other not in self.neurons:
-                logger.warning('Skeleton IDs overlap but neuron not identical! Bitwise cancelled! Try using .skeleton_id instead.')
+                logger.warning('Skeleton IDs overlap but neuron not '
+                               'identical! Bitwise cancelled! Try using '
+                               '.skeleton_id instead.')
                 return
             return CatmaidNeuronList([n for n in self.neurons if n == other],
                                      make_copy=self.copy_on_subset)
         elif isinstance(other, CatmaidNeuronList):
             if len(set(self.neurons) & set(other.neurons)) != len(set(self.skeleton_id) & set(other.skeleton_id)):
-                logger.warning('Skeleton IDs overlap but neuron(s) not identical! Bitwise cancelled! Try using .skeleton_id instead.')
+                logger.warning('Skeleton IDs overlap but neuron(s) not '
+                               'identical! Bitwise cancelled! Try using '
+                               '.skeleton_id instead.')
                 return
             return CatmaidNeuronList([n for n in self.neurons if n in other],
                                      make_copy=self.copy_on_subset)
@@ -2816,8 +2840,8 @@ class Volume:
         try:
             import trimesh
         except ImportError:
-            raise ImportError(
-                'Unable to import trimesh. Please make sure it is installed properly')
+            raise ImportError('Unable to import trimesh. Please make sure it '
+                              'is installed properly')
 
         return trimesh.Trimesh(vertices=self.vertices, faces=self.faces)
 

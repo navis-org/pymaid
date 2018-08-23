@@ -135,7 +135,7 @@ def _break_segments(x):
     Returns
     -------
     list
-                Segments as list of lists containing treenode ids.
+                Segments as list of lists containing treenode IDs.
 
     """
 
@@ -297,11 +297,11 @@ def distal_to(x, a=None, b=None):
     Returns
     -------
     bool
-            If *a* and *b* are single treenode IDs respectively.
+            If ``a`` and ``b`` are single treenode IDs respectively.
     pd.DataFrame
-            If *a* and/or *b* are lists of treenode IDs. Columns and rows
-            (index) represent treenode IDs. Neurons *a* are rows, neurons *b*
-            are columns.
+            If ``a`` and/or ``b`` are lists of treenode IDs. Columns and rows
+            (index) represent treenode IDs. Neurons ``a`` are rows, neurons
+            ``b`` are columns.
 
     Examples
     --------
@@ -500,7 +500,8 @@ def dist_between(x, a, b):
 
     if (utils._is_iterable(a) and len(a) > 1) or \
        (utils._is_iterable(b) and len(b) > 1):
-        raise ValueError('Can only process single treenodes. Use pymaid.geodesic_matrix instead.')
+        raise ValueError('Can only process single treenodes. Use '
+                         'pymaid.geodesic_matrix instead.')
 
     a = utils._make_non_iterable(a)
     b = utils._make_non_iterable(b)
@@ -508,7 +509,7 @@ def dist_between(x, a, b):
     try:
         _ = int(a)
         _ = int(b)
-    except:
+    except BaseException:
         raise ValueError('a, b need to be treenode IDs!')
 
     # If we're working with network X DiGraph
@@ -609,8 +610,8 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
         if x.shape[0] == 1:
             x = x[0]
         else:
-            logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
+            logger.error('%i neurons provided. Please provide only a single'
+                         ' neuron!' % x.shape[0])
             raise Exception
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
@@ -650,14 +651,16 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
 
         i += 1
 
-    # Next, make some virtual cuts and get the complement of treenodes for each fragment
+    # Next, make some virtual cuts and get the complement of treenodes for
+    # each fragment
     graphs = [x.graph.copy()]
     for fr in fragments[1:]:
         this_g = nx.bfs_tree(x.graph, fr[-1], reverse=True)
 
         graphs.append(this_g)
 
-    # Next, we need to remove treenodes that are in subsequent graphs from those graphs
+    # Next, we need to remove treenodes that are in subsequent graphs from
+    # those graphs
     for i, g in enumerate(graphs):
         for g2 in graphs[i + 1:]:
             g.remove_nodes_from(g2.nodes)
@@ -715,8 +718,8 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
     if isinstance(n, numbers.Number) and n < 1:
-        raise ValueError(
-            'Number of longest neurites to preserve must be at least 1.')
+        raise ValueError('Number of longest neurites to preserve must be at '
+                         'least 1.')
 
     if not inplace:
         x = x.copy()
@@ -779,20 +782,20 @@ def reroot_neuron(x, new_root, inplace=False):
         if x.shape[0] == 1:
             x = x.loc[0]
         else:
-            raise Exception(
-                '{0} neurons provided. Please provide only a single neuron!'.format(x.shape[0]))
+            raise Exception('{0} neurons provided. Please provide only '
+                            'a single neuron!'.format(x.shape[0]))
     else:
         raise Exception('Unable to process data of type "{0}"'.format(type(x)))
 
     # If new root is a tag, rather than a ID, try finding that node
     if isinstance(new_root, str):
         if new_root not in x.tags:
-            logger.error(
-                '#{}: Found no treenodes with tag {} - please double check!'.format(x.skeleton_id, new_root))
+            logger.error('#{}: Found no treenodes with tag {} - please double '
+                         'check!'.format(x.skeleton_id, new_root))
             return
         elif len(x.tags[new_root]) > 1:
-            logger.error(
-                '#{}: Found multiple treenodes with tag {} - please double check!'.format(x.skeleton_id, new_root))
+            logger.error('#{}: Found multiple treenodes with tag {} - please '
+                         'double check!'.format(x.skeleton_id, new_root))
             return
         else:
             new_root = x.tags[new_root][0]
@@ -929,8 +932,6 @@ def cut_neuron(x, cut_node, ret='both'):
     --------
     First example: single cut at node tag
 
-    >>> import pymaid
-    >>> rm = pymaid.CatmaidInstance(url, http_user, http_pw, token)
     >>> n = pymaid.get_neuron(16)
     >>> # Cut neuron
     >>> nl = cut_neuron(n, 'SCHLEGEL_LH')
@@ -970,10 +971,10 @@ def cut_neuron(x, cut_node, ret='both'):
         if x.shape[0] == 1:
             x = x[0]
         else:
-            logger.error(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
-            raise Exception(
-                '%i neurons provided. Please provide only a single neuron!' % x.shape[0])
+            logger.error('%i neurons provided. Please provide '
+                         'only a single neuron!' % x.shape[0])
+            raise Exception('%i neurons provided. Please provide '
+                            'only a single neuron!' % x.shape[0])
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
@@ -987,8 +988,8 @@ def cut_neuron(x, cut_node, ret='both'):
         # If cut_node is a tag (rather than an ID), try finding that node
         if isinstance(cn, str):
             if cn not in x.tags:
-                raise ValueError(
-                    '#{}: Found no treenode with tag {} - please double check!'.format(x.skeleton_id, cn))
+                raise ValueError('#{}: Found no treenode with tag {} - please '
+                                 'double check!'.format(x.skeleton_id, cn))
             cn_ids += x.tags[cn]
         elif cn not in x.nodes.treenode_id.values:
             raise ValueError('No treenode with ID "{}" found.'.format(cn))
@@ -1001,7 +1002,7 @@ def cut_neuron(x, cut_node, ret='both'):
 
     # Warn if not all returned
     if len(cn_ids) > 1 and ret != 'both':
-        logger.warning('Multiple cuts should use `ret = True`.')
+        logger.warning('Multiple cuts should use `ret = "both"`.')
 
     # Go over all cut_nodes -> order matters!
     res = [x]
@@ -1069,7 +1070,8 @@ def _cut_igraph(x, cut_node, ret):
         dist._clear_temp_attr(exclude=['igraph', 'type', 'classify_nodes'])
 
     if ret == 'proximal' or ret == 'both':
-        prox = subset_neuron(x, prox_graph.vs['node_id'] + [cut_node], clear_temp=False)
+        prox = subset_neuron(x, prox_graph.vs['node_id'] + [cut_node],
+                             clear_temp=False)
 
         # Change new root for dist
         prox.nodes.loc[prox.nodes.treenode_id == cut_node, 'type'] = 'end'
@@ -1276,7 +1278,7 @@ def node_label_sorting(x):
     Returns
     -------
     list
-        ``[ root, treenode_id, treenode_id, ... ]``
+        ``[root, treenode_id, treenode_id, ...]``
 
     """
     if not isinstance(x, core.CatmaidNeuron):
@@ -1292,7 +1294,7 @@ def node_label_sorting(x):
     geo = geodesic_matrix(x, tn_ids=term, directed=True)
     # Set distance between unreachable points to None
     # Need to reinitialise SparseMatrix to replace float('inf') with NaN
-    #dist_mat[geo == float('inf')] = None
+    # dist_mat[geo == float('inf')] = None
     dist_mat = pd.SparseDataFrame(np.where(geo == float('inf'),
                                            np.nan,
                                            geo),

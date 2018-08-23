@@ -172,8 +172,8 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                                           (connectivity_table.total >= threshold)]
 
     if not isinstance(include_skids, type(None)) or not isinstance(exclude_skids, type(None)):
-        logger.info(
-            'Filtering connectivity. %i entries before filtering' % (connectivity.shape[0]))
+        logger.info('Filtering connectivity. '
+                    '%i entries before filtering' % (connectivity.shape[0]))
 
         if not isinstance(include_skids, type(None)):
             connectivity = connectivity[
@@ -233,9 +233,11 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
             matching_scores[d].loc[v[0], v[1]
                                    ] = matching_indices[i][similarity]
 
-    # Attention! Averaging over incoming and outgoing pairing scores will give weird results with - for example -  sensory/motor neurons
+    # Attention! Averaging over incoming and outgoing pairing scores will
+    # give weird results with - for example -  sensory/motor neurons
     # that have predominantly either only up- or downstream partners!
-    # To compensate, the ratio of upstream to downstream partners (after applying filters!) is considered!
+    # To compensate, the ratio of upstream to downstream partners (after
+    # applying filters!) is considered!
     # Ratio is applied to neuronA of A-B comparison -> will be reversed at B-A
     # comparison
     logger.info('Finalizing scores')
@@ -288,7 +290,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     neuronA :         skeleton ID
     neuronB :         skeleton ID
     connectivity :    pandas DataFrame
-                      Connectivity data as provided by ``pymaid.get_partners()``
+                      Connectivity data as provided by :func:`pymaid.get_partners`.
     syn_threshold :   int, optional
                       Min number of synapses for a connection to be considered.
                       Default = 1
@@ -370,7 +372,8 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     # f(x,y) = min(x,y) - C1 * max(x,y) * e^(-C2 * min(x,y))
     # x,y = edge weights to compare
     # vertex_similarity is the sum of f over all vertices
-    # C1 determines how negatively a case where one edge is much stronger than another is punished
+    # C1 determines how negatively a case where one edge is much stronger than
+    #    another is punished
     # C2 determines the point where the similarity switches from negative to
     # positive
     C1 = kwargs.get('C1', 0.5)
@@ -597,9 +600,9 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
         futures = e.map(_unpack_synapse_helper, combinations)
 
         scores = [n for n in config.tqdm(futures, total=len(combinations),
-                                  desc='Processing',
-                                  disable=config.pbar_hide,
-                                  leave=config.pbar_leave)]
+                                         desc='Processing',
+                                         disable=config.pbar_hide,
+                                         leave=config.pbar_leave)]
 
     for i, v in enumerate(combinations):
         sim_matrix.loc[comb_skids[i][0], comb_skids[i][1]] = scores[i]
@@ -640,7 +643,8 @@ def cluster_xyz(x, labels=None):
     >>> import matplotlib.pyplot as plt
     >>> pymaid.remote_instance = CatmaidInstance('server','user','pw','token')
     >>> n = pymaid.get_neuron(16)
-    >>> rs = pymaid.cluster_xyz(n.connectors, labels=n.connectors.connector_id.tolist())
+    >>> rs = pymaid.cluster_xyz(n.connectors,
+    ...                         labels=n.connectors.connector_id.values)
     >>> rs.plot_matrix()
     >>> plt.show()
 
@@ -649,9 +653,9 @@ def cluster_xyz(x, labels=None):
     # Generate numpy array containing x, y, z coordinates
     try:
         s = x[['x', 'y', 'z']].values
-    except:
-        logger.error(
-            'Please provide dataframe connector data of exactly a single neuron')
+    except BaseException:
+        logger.error('Please provide dataframe connector data of '
+                     'exactly a single neuron')
         return
 
     # Calculate euclidean distance matrix
@@ -732,7 +736,8 @@ class ClustResults:
             self.cluster()
             return self.linkage
         elif key == 'condensed_dist_mat':
-            return scipy.spatial.distance.squareform(self.dist_mat, checks=False)
+            return scipy.spatial.distance.squareform(self.dist_mat,
+                                                     checks=False)
         elif key in ['leafs', 'leaves']:
             return self.get_leafs()
         elif key == 'cophenet':
@@ -770,7 +775,8 @@ class ClustResults:
 
         """
 
-        return scipy.cluster.hierarchy.cophenet(self.linkage, self.condensed_dist_mat)
+        return scipy.cluster.hierarchy.cophenet(self.linkage,
+                                                self.condensed_dist_mat)
 
     def calc_agg_coeff(self):
         """ Returns the agglomerative coefficient.
@@ -833,7 +839,8 @@ class ClustResults:
 
         logger.info('Clustering done using method "{0}"'.format(method))
 
-    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False, labels=None, fig=None, **kwargs):
+    def plot_dendrogram(self, color_threshold=None, return_dendrogram=False,
+                        labels=None, fig=None, **kwargs):
         """ Plot dendrogram using matplotlib.
 
         Parameters
@@ -885,7 +892,7 @@ class ClustResults:
 
         try:
             plt.tight_layout()
-        except:
+        except BaseException:
             pass
 
         if return_dendrogram:
@@ -914,11 +921,11 @@ class ClustResults:
 
         try:
             import seaborn as sns
-        except:
+        except BaseException:
             raise ImportError('Need seaborn package installed.')
 
-        cg = sns.clustermap(
-            self.dist_mat, row_linkage=self.linkage, col_linkage=self.linkage, **kwargs)
+        cg = sns.clustermap(self.dist_mat, row_linkage=self.linkage,
+                            col_linkage=self.linkage, **kwargs)
 
         # Rotate labels
         plt.setp(cg.ax_heatmap.xaxis.get_majorticklabels(), rotation=90)
@@ -1053,8 +1060,7 @@ class ClustResults:
         with open(fname, 'w') as outfile:
             json.dump(data, outfile)
 
-        logger.info('Selection saved as %s in %s' %
-                           (fname, os.getcwd()))
+        logger.info('Selection saved as %s in %s' % (fname, os.getcwd()))
 
         return
 
@@ -1103,7 +1109,7 @@ class ClustResults:
         Returns
         -------
         list
-                    list of clusters [ [leaf1, leaf5], [leaf2, ...], ... ]
+                    list of clusters ``[[leaf1, leaf5], [leaf2, ...], ...]``
 
         """
 
@@ -1134,7 +1140,7 @@ class ClustResults:
         """
         try:
             import ete3
-        except:
+        except BaseException:
             raise ImportError(
                 'Please install ete3 package to use this function.')
 
@@ -1191,7 +1197,7 @@ def _calc_sparseness(x, mode='activity_ratio'):
     """
 
     if mode not in ['activity_ratio', 'lifetime_sparseness', 'kurtosis']:
-        raise ValueError('Unknown mode: {0}'.format(mode))
+        raise ValueError('Unknown mode: {}'.format(mode))
 
     if isinstance(x, pd.DataFrame):
         mat = x.as_matrix()

@@ -19,8 +19,8 @@
 """
 
 # TO-DO:
-# - keyboard shortcuts to cycle back and forth through neurons
-# - DONE set_color method (takes colormap as input)
+# [x] keyboard shortcuts to cycle back and forth through neurons
+# [x] set_color method (takes colormap as input)
 # - method and shortcut for screenshot (generic filename for shortcut)
 # - animate method: makes camera rotate?
 # - CANCELLED grey, transparent background for legend
@@ -346,8 +346,7 @@ class Viewer:
         """ Update legend. """
 
         # Get existing labels
-        labels = {l._object_id: l for l in self.overlay.children if getattr(
-            l, '_object_id', None)}
+        labels = {l._object_id: l for l in self.overlay.children if getattr(l, '_object_id', None)}
 
         # If legend is not meant to be shown, make sure everything is hidden and return
         if not self.show_legend:
@@ -397,7 +396,7 @@ class Viewer:
 
     def toggle_overlay(self):
         """ Toggle legend on and off. """
-        self.overlay.visible = self.overlay.visible == False
+        self.overlay.visible = self.overlay.visible is False
 
     def center_camera(self):
         """ Center camera on visuals. """
@@ -528,7 +527,7 @@ class Viewer:
 
         for s in n:
             for v in obj[s]:
-                v.visible = v.visible == False
+                v.visible = v.visible is False
 
         self.update_legend()
 
@@ -626,8 +625,8 @@ class Viewer:
                     new_cmap[n] = this_c
             self.set_colors(new_cmap)
         else:
-            raise ValueError(
-                'Unknown cycle mode "{}". Use "hide" or "alpha"!'.format(self._cycle_mode))
+            raise ValueError('Unknown cycle mode '
+                             '"{}". Use "hide" or "alpha"!'.format(self._cycle_mode))
 
     def _draw_fps(self, fps):
         """ Callback for ``canvas.measure_fps``. """
@@ -710,6 +709,7 @@ class Viewer:
         im = png.from_array(m, mode='RGBA')
         im.save(filename)
 
+
 def on_mouse_press(event):
     """ Manage picking on canvas. """
     canvas = event.source
@@ -758,7 +758,7 @@ def on_key_press(event):
     if event.text.lower() == 'o':
         viewer.toggle_overlay()
     elif event.text.lower() == 'l':
-        viewer.show_legend = viewer.show_legend == False
+        viewer.show_legend = viewer.show_legend is False
     elif event.text.lower() == 'd':
         viewer.selected = []
     elif event.text.lower() == 'q':

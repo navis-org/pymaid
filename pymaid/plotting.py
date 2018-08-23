@@ -40,7 +40,8 @@ import numpy as np
 import math
 import numbers
 
-from pymaid import morpho, graph, core, fetch, graph_utils, utils, scene3d, config
+from pymaid import (morpho, graph, core, fetch, graph_utils, utils,
+                    scene3d, config)
 
 import plotly.graph_objs as go
 import plotly.offline
@@ -63,6 +64,7 @@ logger = config.logger
 
 if utils.is_jupyter():
     plotly.offline.init_notebook_mode(connected=True)
+
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active vispy 3D canvas.
@@ -348,11 +350,10 @@ def plot2d(x, method='2d', **kwargs):
         colormap = {}
 
         if not skdata.empty:
-            colormap.update(
-                {str(n): cm[i] for i, n in enumerate(skdata.skeleton_id.tolist())})
+            colormap.update({str(n): cm[i] for i, n in enumerate(skdata.skeleton_id)})
         if not dotprops.empty:
             colormap.update({str(n): cm[i + skdata.shape[0]]
-                             for i, n in enumerate(dotprops.gene_name.tolist())})
+                             for i, n in enumerate(dotprops.gene_name.values)})
     elif isinstance(color, dict):
         colormap = {n: mcl.to_rgb(color[n]) for n in color}
     elif isinstance(color, (list, tuple)):
@@ -383,8 +384,8 @@ def plot2d(x, method='2d', **kwargs):
         ax.set_aspect('equal')
     else:
         if not isinstance(ax, mpl.axes.Axes):
-            raise TypeError(
-                'Ax must be of type "mpl.axes.Axes", not "{}"'.format(type(ax)))
+            raise TypeError('Ax must be of type "mpl.axes.Axes", '
+                            'not "{}"'.format(type(ax)))
         fig = ax.get_figure()
         if method in ['3d', '3d_complex']:
             if ax.name != '3d':
@@ -401,7 +402,8 @@ def plot2d(x, method='2d', **kwargs):
 
     # Prepare some stuff for depth coloring
     if depth_coloring and method == '3d_complex':
-        raise logger.warning('Depth coloring unavailable for method "{}"'.format(method))
+        raise Exception('Depth coloring unavailable for method '
+                        '"{}"'.format(method))
     elif depth_coloring and method == '2d':
         all_co = skdata.nodes[['x', 'y', 'z']]
         norm = plt.Normalize(vmin=all_co.z.min(), vmax=all_co.z.max())
@@ -440,13 +442,15 @@ def plot2d(x, method='2d', **kwargs):
     # Create lines from segments
     line3D_collections = []
     surf3D_collections = []
-    for i, neuron in enumerate(config.tqdm(skdata.itertuples(), desc='Plot neurons',
-                                    total=skdata.shape[0], leave=False,
-                                    disable=config.pbar_hide | len(dotprops) == 0)):
+    for i, neuron in enumerate(config.tqdm(skdata.itertuples(),
+                                           desc='Plot neurons',
+                                           total=skdata.shape[0], leave=False,
+                                           disable=config.pbar_hide | len(dotprops) == 0)):
         this_color = colormap[neuron.skeleton_id]
 
         if neuron.nodes.empty:
-            logger.warning('Skipping neuron w/o nodes: {}'.format(neuron.neuron_name))
+            logger.warning('Skipping neuron w/o nodes: '
+                           '{}'.format(neuron.neuron_name))
             continue
 
         if not connectors_only:
@@ -458,8 +462,8 @@ def plot2d(x, method='2d', **kwargs):
 
             if method == '2d':
                 if not depth_coloring:
-                    # We have to add (None, None, None) to the end of each slab to
-                    # make that line discontinuous there
+                    # We have to add (None, None, None) to the end of each
+                    # slab to make that line discontinuous there
                     coords = np.vstack(
                         [np.append(t, [[None] * 3], axis=0) for t in coords])
 
@@ -495,7 +499,8 @@ def plot2d(x, method='2d', **kwargs):
             elif method in ['3d', '3d_complex']:
                 cmap = mpl.cm.jet if depth_coloring else None
 
-                # For simple scenes, add whole neurons at a time -> will speed up rendering
+                # For simple scenes, add whole neurons at a time -> will speed
+                # up rendering
                 if method == '3d':
                     if depth_coloring:
                         this_coords = _tn_pairs_to_coords(neuron,
@@ -565,7 +570,7 @@ def plot2d(x, method='2d', **kwargs):
                     )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
             elif method in ['3d', '3d_complex']:
                 all_cn = neuron.connectors
-                c = [cn_types[i] for i in all_cn.relation.tolist()]
+                c = [cn_types[i] for i in all_cn.relation.values]
                 ax.scatter(all_cn.x.values, all_cn.z.values, -all_cn.y.values,
                            c=c, s=cn_size, depthshade=False, edgecolor='none',
                            alpha=alpha)
@@ -720,10 +725,6 @@ def plot2d(x, method='2d', **kwargs):
             ax.set_ylim(new_min[2], new_max[2])
             ax.set_zlim(new_min[1], new_max[1])
 
-            #ax.set_xlim(lim_min[0], lim_min[0] + max_dim)
-            #ax.set_ylim(lim_min[2], lim_min[2] + max_dim)
-            #ax.set_zlim(lim_max[1] - max_dim, lim_max[1])
-
     if scalebar is not None:
         # Convert sc size to nm
         sc_size = scalebar * 1000
@@ -763,16 +764,6 @@ def plot2d(x, method='2d', **kwargs):
             lc.set_gid('{0}_um'.format(scalebar))
             ax.add_collection3d(lc)
 
-            """
-            sbar_x = ax.plot( [left, left+sc_size], [front,front], [bottom,bottom], c='black' )
-            sbar_y = ax.plot( [left, left], [front,front-sc_size], [bottom,bottom], c='black' )
-            sbar_z = ax.plot( [left, left], [front,front], [bottom,bottom+sc_size], c='black' )
-
-            sbar_x.set_gid('{0}_um'.format(scalebar))
-            sbar_y.set_gid('{0}_um'.format(scalebar))
-            sbar_z.set_gid('{0}_um'.format(scalebar))
-            """
-
     def set_depth():
         """Sets depth information for neurons according to camera position."""
 
@@ -793,7 +784,9 @@ def plot2d(x, method='2d', **kwargs):
         norm = plt.Normalize(vmin=z_min, vmax=z_max)
 
         # Go over all neurons and update Z information
-        for neuron, lc, surf in zip(skdata, line3D_collections, surf3D_collections):
+        for neuron, lc, surf in zip(skdata,
+                                    line3D_collections,
+                                    surf3D_collections):
             # Get this neurons coordinates
             this_co = lc._segments3d[:, 0, :]
 
@@ -866,7 +859,7 @@ def _tn_pairs_to_coords(x, modifier=(1, 1, 1)):
     Returns
     -------
     coords :    np.array
-                [ [[x1,y1,z1], [x2,y2,z2]], [[x3,y3,y4], [x4,y4,z4]] ]
+                ``[[[x1, y1, z1], [x2, y2, z2]], [[x3, y3, y4], [x4, y4, z4]] ]``
 
     """
 
@@ -961,9 +954,9 @@ def _random_colors(count, color_space='RGB', color_range=1):
             hsv = colorsys.hsv_to_rgb(h, s, v)
             colormap.append(tuple(v * color_range for v in hsv))
 
-    logger.debug('%i random colors created: %s' %
-                        (color_count, str(colormap)))
+    logger.debug('{} random colors created: {}'.format(color_count, colormap))
 
+    # Make sure we return exactly ne number of colors requested
     return colormap[:count]
 
 
@@ -1068,7 +1061,8 @@ def plot3d(x, **kwargs):
     See Also
     --------
     :class:`pymaid.Viewer`
-        Interactive vispy 3D viewer. Makes it easy to add/remove/select objects.
+        Interactive vispy 3D viewer. Makes it easy to add/remove/select
+        objects.
 
 
     Examples
@@ -1226,7 +1220,7 @@ def plot3d(x, **kwargs):
                     if cn_mesh_colors:
                         try:
                             c = neuron_cmap[i]
-                        except:
+                        except BaseException:
                             c = (10, 10, 10)
                     else:
                         c = syn_lay[j]['color']
@@ -1250,8 +1244,7 @@ def plot3d(x, **kwargs):
                         ))
                     elif syn_lay['display'] == 'lines':
                         # Find associated treenode
-                        tn = neuron.nodes.set_index(
-                            'treenode_id').ix[this_cn.treenode_id.tolist()]
+                        tn = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.values]
                         x_coords = [n for sublist in zip(this_cn.x.values * -1, tn.x.values * -1, [None] * this_cn.shape[0]) for n in sublist]
                         y_coords = [n for sublist in zip(this_cn.y.values * -1, tn.y.values * -1, [None] * this_cn.shape[0]) for n in sublist]
                         z_coords = [n for sublist in zip(this_cn.z.values * -1, tn.z.values * -1, [None] * this_cn.shape[0]) for n in sublist]
@@ -1289,7 +1282,7 @@ def plot3d(x, **kwargs):
 
             try:
                 c = 'rgb{}'.format(dotprop_cmap[i])
-            except:
+            except BaseException:
                 c = 'rgb(10,10,10)'
 
             trace_data.append(go.Scatter3d(x=x_coords, y=z_coords, z=y_coords,
@@ -1322,8 +1315,6 @@ def plot3d(x, **kwargs):
             )
             )
 
-        logger.debug('Tracing done.')
-
         # Now add neuropils:
         for v in volumes_data:
             # Skip empty data
@@ -1352,16 +1343,15 @@ def plot3d(x, **kwargs):
 
         # Add scatter plots
         for p in points:
-            trace_data.append(go.Scatter3d(
-                                x=-p[:,0],
-                                y=-p[:,2], # Z and Y are swapped
-                                z=-p[:,1],
-                                mode='markers',
-                                marker=dict(
-                                    size=scatter_kws.get('size',3),
-                                    color='rgb' + str(scatter_kws.get('color',(0,0,0))),
-                                    opacity=scatter_kws.get('opacity',1))
-                                          )
+            trace_data.append(go.Scatter3d(x=-p[:, 0],
+                                           y=-p[:, 2], # Z and Y are swapped
+                                           z=-p[:, 1],
+                                           mode='markers',
+                                           marker=dict(
+                                                       size=scatter_kws.get('size',3),
+                                                       color='rgb' + str(scatter_kws.get('color',(0,0,0))),
+                                                       opacity=scatter_kws.get('opacity',1))
+                                           )
                              )
 
         layout = dict(
@@ -1388,18 +1378,15 @@ def plot3d(x, **kwargs):
                     showbackground=True,
                     backgroundcolor='rgb(240, 240, 240)',
                 ),
-                camera=dict(
-                    up=dict(
-                        x=0,
-                        y=0,
-                        z=1
-                    ),
-                    eye=dict(
-                        x=-1.7428,
-                        y=1.0707,
-                        z=0.7100,
-                    )
-                ),
+                camera=dict(up=dict(x=0,
+                                    y=0,
+                                    z=1
+                                    ),
+                            eye=dict(x=-1.7428,
+                                     y=1.0707,
+                                     z=0.7100,
+                                     )
+                            ),
                 aspectratio=dict(x=1, y=1, z=1),
                 aspectmode='data'
             ),
@@ -1419,8 +1406,8 @@ def plot3d(x, **kwargs):
             plotly.offline.iplot(fig)
             return
         else:
-            logger.info(
-                'Use plotly.offline.plot(fig, filename="3d_plot.html") to plot. Optimized for Google Chrome.')
+            logger.info('Use plotly.offline.plot(fig, filename="3d_plot.html")'
+                        ' to plot. Optimized for Google Chrome.')
             return fig
 
 
@@ -1453,14 +1440,13 @@ def plot3d(x, **kwargs):
     use_neuron_color = kwargs.get('use_neuron_color', False)
     scatter_kws = kwargs.get('scatter_kws', {})
     syn_lay_new = kwargs.get('synapse_layout', {})
-    syn_lay = {
-                0: {'name': 'Presynapses',
-                    'color': (255, 0, 0)},
-                1: {'name': 'Postsynapses',
-                    'color': (0, 0, 255)},
-                2: {'name': 'Gap junctions',
-                    'color': (0, 255, 0)},
-                'display': 'lines'  # 'circles'
+    syn_lay = {0: {'name': 'Presynapses',
+                   'color': (255, 0, 0)},
+               1: {'name': 'Postsynapses',
+                   'color': (0, 0, 255)},
+               2: {'name': 'Gap junctions',
+                   'color': (0, 255, 0)},
+               'display': 'lines'  # 'circles'
                }
     syn_lay.update(syn_lay_new)
 
@@ -1498,8 +1484,8 @@ def plot3d(x, **kwargs):
     for v in volumes:
         if isinstance(v, str):
             if not remote_instance:
-                logger.error(
-                    'Unable to add volumes - please also pass a Catmaid Instance using <remote_instance = ... >')
+                logger.error('Unable to add volumes - please also pass a '
+                             'Catmaid Instance using <remote_instance = ... >')
                 return
             else:
                 v = fetch.get_volume(v, remote_instance)
@@ -1520,8 +1506,8 @@ def plot3d(x, **kwargs):
         return _plot3d_vispy()
 
 
-def _prepare_colormap(colors, skdata=None, dotprops=None, use_neuron_color=False,
-                      color_range=255):
+def _prepare_colormap(colors, skdata=None, dotprops=None,
+                      use_neuron_color=False, color_range=255):
     """ Maps color(s) to neuron/dotprop colorlists.
     """
 
@@ -1557,9 +1543,11 @@ def _prepare_colormap(colors, skdata=None, dotprops=None, use_neuron_color=False
         colors_required = skdata.shape[0] + dotprops.shape[0]
 
         if len(colors) < colors_required:
-            raise ValueError('Need colors for {} neurons/dotprops, got {}'.format(colors_required, len(colors)))
+            raise ValueError('Need colors for {} neurons/dotprops, got '
+                             '{}'.format(colors_required, len(colors)))
         elif len(colors) > colors_required:
-            logger.debug('More colors than required: got {}, needed {}'.format(len(colors), colors_required))
+            logger.debug('More colors than required: got {}, needed '
+                         '{}'.format(len(colors), colors_required))
 
         if skdata.shape[0]:
             neuron_cmap = [colors[i] for i in range(skdata.shape[0])]
@@ -1595,7 +1583,8 @@ def _eval_color(x, color_range=255):
     elif isinstance(x, type(None)):
         return None
     else:
-        raise TypeError('Unable to interpret color of type "{}"'.format(type(x)))
+        raise TypeError('Unable to interpret color of type '
+                        '"{}"'.format(type(x)))
 
     # Check if we need to convert
     if not any([v > 1 for v in c]) and color_range==255:
@@ -1624,7 +1613,7 @@ def plot_network(x, **kwargs):
     remote_instance : CATMAID Instance, optional
                       Need to pass this too if you are providing only skids.
     layout :          str | function, default = nx.spring_layout
-                      Layout function. See https://networkx.github.io/documentation/latest/reference/drawing.html
+                      Layout function. See `here <https://networkx.github.io/documentation/latest/reference/drawing.html>`_
                       for available layouts. Use either the function directly
                       or its name.
     syn_cutoff :      int, default=False
@@ -1706,8 +1695,8 @@ def plot_network(x, **kwargs):
                                np.ndarray)) and len(colormap) == 3:
         colors = {n: tuple(colormap) for n in g.nodes}
     else:
-        logger.error(
-            'I dont understand the colors you have provided. Please, see help(plot.plot_network).')
+        logger.error('I dont understand the colors you have provided. Please, '
+                     'see help(pymaid.plot_network).')
         return None
 
     edges = []
@@ -1838,8 +1827,8 @@ def plot_network(x, **kwargs):
 
     fig = go.Figure(data=data, layout=layout)
 
-    logger.info(
-        'Done! Use e.g. plotly.offline.plot(fig, filename="network_plot.html") to plot.')
+    logger.info('Done! Use e.g. plotly.offline.plot(fig, '
+                'filename="network_plot.html") to plot.')
 
     return fig
 
@@ -1895,8 +1884,8 @@ def plot1d(x, ax=None, color=None, **kwargs):
 
     max_x = []
     for ix, n in enumerate(config.tqdm(x, desc='Processing',
-                                disable=config.pbar_hide,
-                                leave=config.pbar_leave)):
+                                       disable=config.pbar_hide,
+                                       leave=config.pbar_leave)):
         if isinstance(color, dict):
             this_c = color[n.skeleton_id]
         else:
@@ -2083,7 +2072,8 @@ def _neuron2vispy(x, **kwargs):
     visuals = []
 
     for i, neuron in enumerate(x):
-        # Generate random ID -> we need this in case we have duplicate skeleton IDs
+        # Generate random ID -> we need this in case we have duplicate
+        # skeleton IDs
         object_id = uuid.uuid4()
 
         neuron_color = colormap[i]
@@ -2092,7 +2082,8 @@ def _neuron2vispy(x, **kwargs):
         if max(neuron_color) > 1:
             neuron_color = np.array(neuron_color) / 255
 
-        # Get root node indices (may be more than one if neuron has been cut weirdly)
+        # Get root node indices (may be more than one if neuron has been
+        # cut weirdly)
         root_ix = neuron.nodes[
             neuron.nodes.parent_id.isnull()].index.tolist()
 
@@ -2246,8 +2237,7 @@ def _neuron2vispy(x, **kwargs):
                     visuals.append(con)
 
                 elif syn_lay['display'] == 'lines':
-                    tn_coords = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.tolist(
-                    )][['x', 'y', 'z']].apply(pd.to_numeric).values
+                    tn_coords = neuron.nodes.set_index('treenode_id').ix[this_cn.treenode_id.values][['x', 'y', 'z']].apply(pd.to_numeric).values
 
                     segments = [item for sublist in zip(
                         pos, tn_coords) for item in sublist]
@@ -2300,7 +2290,8 @@ def _dp2vispy(x, **kwargs):
     visuals = []
 
     # Parse colors for dotprops
-    _, colormap = _prepare_colormap(kwargs.get('color', kwargs.get('colors', None)),
+    _, colormap = _prepare_colormap(kwargs.get('color',
+                                               kwargs.get('colors', None)),
                                     None, x, use_neuron_color=False,
                                     color_range=1)
 

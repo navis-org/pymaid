@@ -250,13 +250,12 @@ def to_dotproduct(x):
     -------
     pandas.DataFrame
             DataFrame in which each row represents a segments between two
-            treenodes.
+            treenodes::
 
-            >>> df
                 point  vector  vec_length
-            1
-            2
-            3
+             1
+             2
+             3
 
     Examples
     --------
@@ -369,9 +368,13 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
     if 'type' not in x.nodes:
         classify_nodes(x)
 
-    end_nodes = x.nodes[x.nodes.type == 'end'].treenode_id.tolist()
-    branch_nodes = x.nodes[x.nodes.type == 'branch'].treenode_id.tolist()
-    root = x.nodes[x.nodes.type == 'root'].treenode_id.tolist()
+    end_nodes = x.nodes[x.nodes.type == 'end'].treenode_id.values
+    branch_nodes = x.nodes[x.nodes.type == 'branch'].treenode_id.values
+    root = x.nodes[x.nodes.type == 'root'].treenode_id.values
+
+    end_nodes = set(end_nodes)
+    branch_nodes = set(branch_nodes)
+    root = set(root)
 
     nab_branch = []
     if fix_not_a_branch and 'not a branch' in x.tags:
@@ -393,8 +396,8 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
     nodes_processed = []
 
     while starting_points:
-        logger.debug('New starting point. Remaining: %i' %
-                            len(starting_points))
+        logger.debug('New starting point. Remaining: '
+                     '{}'.format(len(starting_points)))
         new_starting_points = []
         starting_points_done = []
 
@@ -443,7 +446,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
                 # Find next parent
                 try:
                     parent_node = this_tn.loc[this_node, 'parent_id']
-                except:
+                except BaseException:
                     # Will fail if at root (no parent)
                     break
 
@@ -467,10 +470,10 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             starting_points.remove(node)
 
         # Add new starting points
-        starting_points += new_starting_points
+        starting_points = starting_points | set(new_starting_points)
 
     x.nodes['strahler_index'] = [strahler_index.get(n, None)
-                                 for n in x.nodes.treenode_id.tolist()]
+                                 for n in x.nodes.treenode_id.values]
 
     # Fix not-a-branch branches
     if fix_not_a_branch and 'not a branch' in x.tags:
@@ -561,10 +564,10 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
 
     if not relocate_connectors:
         neuron.connectors = neuron.connectors[neuron.connectors.treenode_id.isin(
-            neuron.nodes.treenode_id.tolist())].reset_index(drop=True)
+            neuron.nodes.treenode_id.values)].reset_index(drop=True)
     else:
-        remaining_tns = neuron.nodes.treenode_id.tolist()
-        for cn in neuron.connectors[~neuron.connectors.treenode_id.isin(neuron.nodes.treenode_id.tolist())].itertuples():
+        remaining_tns = set(neuron.nodes.treenode_id.values)
+        for cn in neuron.connectors[~neuron.connectors.treenode_id.isin(neuron.nodes.treenode_id.values)].itertuples():
             this_tn = parent_dict[cn.treenode_id]
             while True:
                 if this_tn in remaining_tns:
@@ -579,7 +582,7 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
     # Theoretically we can end up with disconnected pieces, i.e. with more
     # than 1 root node -> we have to fix the nodes that lost their parents
     neuron.nodes.loc[~neuron.nodes.parent_id.isin(
-        neuron.nodes.treenode_id.tolist()), 'parent_id'] = None
+        neuron.nodes.treenode_id.values), 'parent_id'] = None
 
     # Remove temporary attributes
     neuron._clear_temp_attr()
@@ -590,7 +593,8 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
         return
 
 
-def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=True, return_point=False):
+def split_axon_dendrite(x, method='bending', primary_neurite=True,
+                        reroot_soma=True, return_point=False):
     """ Split a neuron into axon, dendrite and primary neurite.
 
     The result is highly dependent on the method and on your neuron's
@@ -617,8 +621,8 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
                         If True, will make sure neuron is rooted to soma if at
                         all possible.
     return_point :      bool, optional
-                        If True, will only return treenode ID of the node at which
-                        to split the neuron.
+                        If True, will only return treenode ID of the node at
+                        which to split the neuron.
 
     Returns
     -------
@@ -628,7 +632,8 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
     Examples
     --------
     >>> x = pymaid.get_neuron(123456)
-    >>> split = pymaid.split_axon_dendrite(x, method='centrifugal', reroot_soma=True)
+    >>> split = pymaid.split_axon_dendrite(x, method='centrifugal',
+    ...                                    reroot_soma=True)
     >>> split
     <class 'pymaid.CatmaidNeuronList'> of 3 neurons
                           neuron_name skeleton_id  n_nodes  n_connectors
@@ -655,13 +660,15 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
         return core.CatmaidNeuronList([n for l in nl for n in l])
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Can only process CatmaidNeuron, got "{}"'.format(type(x)))
+        raise TypeError('Can only process CatmaidNeuron, '
+                        'got "{}"'.format(type(x)))
 
     if method not in ['centrifugal', 'centripetal', 'sum', 'bending']:
         raise ValueError('Unknown parameter for mode: {0}'.format(method))
 
     if primary_neurite and method != 'bending':
-        logger.warning('Primary neurite splits only works well with method "bending"')
+        logger.warning('Primary neurite splits only works well with '
+                       'method "bending"')
 
     if x.soma and x.soma not in x.root and reroot_soma:
         x.reroot(x.soma)
@@ -669,7 +676,7 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
     # Calculate flow centrality if necessary
     try:
         last_method = x.centrality_method
-    except:
+    except BaseException:
         last_method = None
 
     if last_method != method:
@@ -687,7 +694,8 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
     cut = x.nodes[x.nodes.flow_centrality ==
                    x.nodes.flow_centrality.max()].treenode_id.values
 
-    # If there is more than one point we need to get one closest to the soma (root)
+    # If there is more than one point we need to get one closest to the soma
+    # (root)
     if len(cut) > 1:
         cut = sorted(cut, key=lambda y: graph_utils.dist_between(
             x.graph, y, x.root[0]))[0]
@@ -699,16 +707,18 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True, reroot_soma=T
 
     # If cut node is a branch point, we will try cutting off main neurite
     if x.graph.degree(cut) > 2 and primary_neurite:
-        # First make sure that there are no other branch points with flow between this one and the soma
+        # First make sure that there are no other branch points with flow
+        # between this one and the soma
         path_to_root = nx.shortest_path(x.graph, cut, x.root[0])
 
         # Get flow centrality along the path
         flows = x.nodes.set_index('treenode_id').loc[path_to_root]
 
         # Subset to those that are branches (exclude mere synapses)
-        flows = flows[flows.type=='branch']
+        flows = flows[flows.type == 'branch']
 
-        # Find the first branch point from the soma with no flow (fillna is important!)
+        # Find the first branch point from the soma with no flow (fillna is
+        # important!)
         last_with_flow = np.where(flows.flow_centrality.fillna(0).values > 0)[0][-1]
 
         if method != 'bending':
@@ -799,8 +809,8 @@ def segregation_index(x, centrality_method='centrifugal'):
     """
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise ValueError(
-            'Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
+        raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
+                         'not {0}'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList) and x.shape[0] == 1:
         x = x[0]
@@ -815,8 +825,7 @@ def segregation_index(x, centrality_method='centrifugal'):
         temp.downsample(10000)
 
         # Get one of its children
-        child = temp.nodes[temp.nodes.parent_id == split_point].treenode_id.tolist()[
-            0]
+        child = temp.nodes[temp.nodes.parent_id == split_point].treenode_id.values[0]
 
         # This will leave the proximal split with the primary neurite but
         # since that should not have synapses, we don't care at this point.
@@ -891,8 +900,8 @@ def bending_flow(x, polypre=False):
     start_time = time.time()
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise ValueError(
-            'Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
+        raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
+                         'not {0}'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
         return [bending_flow(n, mode=mode, polypre=polypre, ) for n in x]
@@ -901,7 +910,8 @@ def bending_flow(x, polypre=False):
         logger.warning(
             'Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
 
-    # We will be processing a super downsampled version of the neuron to speed up calculations
+    # We will be processing a super downsampled version of the neuron to speed
+    # up calculations
     current_level = logger.level
     logger.setLevel('ERROR')
     y = x.copy()
@@ -932,20 +942,24 @@ def bending_flow(x, polypre=False):
     distal_pre = graph_utils.distal_to(y, pre_node_ids, childs)
     distal_post = graph_utils.distal_to(y, post_node_ids, childs)
 
-    # Multiply columns (presynapses) by the number of postsynaptically connected nodes
+    # Multiply columns (presynapses) by the number of postsynaptically
+    # connected nodes
     if polypre:
         # Map vertex ID to number of postsynaptic nodes (avoid 0)
         distal_pre *= [max(1, len(cn_details[cn_details.presynaptic_to_node ==
                                              n].postsynaptic_to_node.sum())) for n in distal_pre.columns]
 
-    # Sum up axis - now each row represents the number of pre/postsynapses distal to that node
+    # Sum up axis - now each row represents the number of pre/postsynapses
+    # distal to that node
     distal_pre = distal_pre.T.sum(axis=1)
     distal_post = distal_post.T.sum(axis=1)
 
-    # Now go over all branch points and check flow between branches (centrifugal) vs flow from branches to root (centripetal)
+    # Now go over all branch points and check flow between branches
+    # (centrifugal) vs flow from branches to root (centripetal)
     flow = {bp: 0 for bp in bp_childs}
     for bp in bp_childs:
-        # We will use left/right to label the different branches here (even if there is more than two)
+        # We will use left/right to label the different branches here
+        # (even if there is more than two)
         for left, right in itertools.permutations(bp_childs[bp], r=2):
             flow[bp] += distal_post.loc[left] * distal_pre.loc[right]
 
@@ -1027,8 +1041,8 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
         raise ValueError('Unknown parameter for mode: {0}'.format(mode))
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise ValueError(
-            'Must pass CatmaidNeuron or CatmaidNeuronList, not {0}'.format(type(x)))
+        raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
+                         'not {0}'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
         return [flow_centrality(n, mode=mode, polypre=polypre) for n in x]
@@ -1070,26 +1084,30 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
     distal_pre = graph_utils.distal_to(y, pre_node_ids, calc_node_ids)
     distal_post = graph_utils.distal_to(y, post_node_ids, calc_node_ids)
 
-    # Multiply columns (presynapses) by the number of postsynaptically connected nodes
+    # Multiply columns (presynapses) by the number of postsynaptically
+    # connected nodes
     if polypre:
         # Map vertex ID to number of postsynaptic nodes (avoid 0)
         distal_pre *= [max(1, len(cn_details[cn_details.presynaptic_to_node ==
                                              n].postsynaptic_to_node.sum())) for n in distal_pre.columns]
         # Also change total_pre as accordingly
         total_pre = sum([max(1, len(row))
-                         for row in cn_details.postsynaptic_to_node.tolist()])
+                         for row in cn_details.postsynaptic_to_node.values])
 
-    # Sum up axis - now each row represents the number of pre/postsynapses that are distal to that node
+    # Sum up axis - now each row represents the number of pre/postsynapses
+    # that are distal to that node
     distal_pre = distal_pre.T.sum(axis=1)
     distal_post = distal_post.T.sum(axis=1)
 
     if mode != 'centripetal':
-        # Centrifugal is the flow from all non-distal postsynapses to all distal presynapses
+        # Centrifugal is the flow from all non-distal postsynapses to all
+        # distal presynapses
         centrifugal = {
             n: (total_post - distal_post[n]) * distal_pre[n] for n in calc_node_ids}
 
     if mode != 'centrifugal':
-        # Centripetal is the flow from all distal postsynapses to all non-distal presynapses
+        # Centripetal is the flow from all distal postsynapses to all
+        # non-distal presynapses
         centripetal = {
             n: distal_post[n] * (total_post - distal_pre[n]) for n in calc_node_ids}
 
@@ -1197,16 +1215,17 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
                 treenodesA = stitched_n.nodes.set_index(
                     'treenode_id').loc[tn_to_stitch].reset_index()
             else:
-                logger.warning(
-                    'None of the nodes in tn_to_stitch were found in the first {0} stitched neurons. Falling back to all nodes!'.format(i + 1))
+                logger.warning('None of the nodes in tn_to_stitch were found '
+                               'in the first {0} stitched neurons. Falling '
+                               'back to all nodes!'.format(i + 1))
                 treenodesA = stitched_n.nodes
 
             if set(tn_to_stitch) & set(nB.nodes.treenode_id):
                 treenodesB = nB.nodes.set_index(
                     'treenode_id').loc[tn_to_stitch].reset_index()
             else:
-                logger.warning(
-                    'None of the nodes in tn_to_stitch were found in neuron #{0}. Falling back to all nodes!'.format(nB.skeleton_id))
+                logger.warning('None of the nodes in tn_to_stitch were found '
+                               'in neuron #{0}. Falling back to all nodes!'.format(nB.skeleton_id))
                 treenodesB = nB.nodes
         elif method == 'LEAFS':
             treenodesA = stitched_n.nodes[stitched_n.nodes.type.isin(
@@ -1219,16 +1238,14 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
 
         # Calculate pairwise distances
         dist = scipy.spatial.distance.cdist(treenodesA[['x', 'y', 'z']].values,
-                                            treenodesB[[
-                                                'x', 'y', 'z']].values,
+                                            treenodesB[['x', 'y', 'z']].values,
                                             metric='euclidean')
 
         # Get the closest treenodes
         tnA = treenodesA.iloc[dist.argmin(axis=0)[0]].treenode_id
         tnB = treenodesB.iloc[dist.argmin(axis=1)[0]].treenode_id
 
-        logger.debug('Stitching treenodes %s and %s' %
-                            (str(tnA), str(tnB)))
+        logger.debug('Stitching treenodes {} and {}'.format(tnA, tnB))
 
         # Reroot neuronB onto the node that will be stitched
         nB.reroot(tnB)
@@ -1294,7 +1311,8 @@ def average_neurons(x, limit=10, base_neuron=None):
     for n in x:
         n.tree = graph.neuron2KDTree(n, tree_type='c', data='treenodes')
 
-    # Set base for average: we will use this neurons treenodes to query the KDTrees
+    # Set base for average: we will use this neurons treenodes to query
+    # the KDTrees
     if isinstance(base_neuron, core.CatmaidNeuron):
         base_neuron = base_neuron.copy()
     elif isinstance(base_neuron, int):
@@ -1302,13 +1320,14 @@ def average_neurons(x, limit=10, base_neuron=None):
     elif isinstance(base_neuron, type(None)):
         base_neuron = x[0].copy()
     else:
-        raise ValueError(
-            'Unable to interpret base_neuron of type "{0}"'.format(type(base_neuron)))
+        raise ValueError('Unable to interpret base_neuron of '
+                         'type "{0}"'.format(type(base_neuron)))
 
     base_nodes = base_neuron.nodes[['x', 'y', 'z']].values
     other_neurons = x[1:]
 
-    # Make sure these stay 2-dimensional arrays -> will add a colum for each "other" neuron
+    # Make sure these stay 2-dimensional arrays -> will add a colum for each
+    # "other" neuron
     base_x = base_nodes[:, 0:1]
     base_y = base_nodes[:, 1:2]
     base_z = base_nodes[:, 2:3]
@@ -1336,9 +1355,9 @@ def average_neurons(x, limit=10, base_neuron=None):
     mean_y = np.mean(base_y, axis=1)
     mean_z = np.mean(base_z, axis=1)
 
-    # If any of the base coords has NO nearest neighbour within limit whatsoever,
-    # the average of that row will be "NaN" -> in this case we will fall back to
-    # the base coordinate
+    # If any of the base coords has NO nearest neighbour within limit
+    # whatsoever, the average of that row will be "NaN" -> in this case we
+    # will fall back to the base coordinate
     mean_x[np.isnan(mean_x)] = base_nodes[np.isnan(mean_x), 0]
     mean_y[np.isnan(mean_y)] = base_nodes[np.isnan(mean_y), 1]
     mean_z[np.isnan(mean_z)] = base_nodes[np.isnan(mean_z), 2]
@@ -1510,7 +1529,8 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         if not inplace:
             x = x.copy()
 
-        for n in config.tqdm(x, desc='Removing', disable=config.pbar_hide, leave=config.pbar_leave):
+        for n in config.tqdm(x, desc='Removing', disable=config.pbar_hide,
+                             leave=config.pbar_leave):
             remove_tagged_branches(n, tag,
                                    how=how,
                                    preserve_connectors=preserve_connectors,
@@ -1519,14 +1539,15 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         if not inplace:
             return x
     elif not isinstance(x, core.CatmaidNeuron):
-        raise TypeError(
-            'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
+        raise TypeError('Can only process CatmaidNeuron or CatmaidNeuronList, '
+                        'not "{0}"'.format(type(x)))
 
     # Check if method is valid
     VALID_METHODS = ['segment', 'distal', 'proximal']
     if how not in VALID_METHODS:
-        raise ValueError('Invalid value for "how": {0}. Valid methods are: {1}'.format(
-            how, ', '.join(VALID_METHODS)))
+        raise ValueError('Invalid value for "how": '
+                         '{0}. Valid methods are: {1}'.format(how,
+                                                              ', '.join(VALID_METHODS)))
 
     # Skip if tag not present
     if tag not in x.tags:
@@ -1552,7 +1573,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
                 'Pruning {0} non-terminal segment(s)'.format(len(non_term)))
 
         # Get nodes to be removed (excluding the last node -> branch )
-        to_remove = [t for s in tagged_segs for t in s[:-1]]
+        to_remove = set([t for s in tagged_segs for t in s[:-1]])
 
         # Rewire connectors before we subset
         if preserve_connectors:
@@ -1560,18 +1581,17 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
             lost_cn = x.connectors[x.connectors.treenode_id.isin(to_remove)]
 
             # Map to a remaining treenode
-            # IMPORTANT: we do currently not account for the possibility that we might be removing the root segment
-            new_tn = [_find_next_remaining_parent(
-                tn) for tn in lost_cn.treenode_id.values]
-            x.connectors.loc[x.connectors.treenode_id.isin(
-                to_remove), 'treenode_id'] = new_tn
+            # IMPORTANT: we do currently not account for the possibility that
+            # we might be removing the root segment
+            new_tn = [_find_next_remaining_parent(tn) for tn in lost_cn.treenode_id.values]
+            x.connectors.loc[x.connectors.treenode_id.isin(to_remove), 'treenode_id'] = new_tn
 
         # Subset to remaining nodes - skip the last node in each segment
         graph_utils.subset_neuron(x,
-                                  subset = x.nodes[~x.nodes.treenode_id.isin(
+                                  subset=x.nodes[~x.nodes.treenode_id.isin(
                                       to_remove)].treenode_id.values,
-                                  remove_disconnected = preserve_connectors == False,
-                                  inplace = True)
+                                  remove_disconnected=preserve_connectors == False,
+                                  inplace=True)
 
         if not inplace:
             return x
@@ -1588,9 +1608,11 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
             elif how == 'proximal':
                 # Invert dist_graph
                 to_remove = x.nodes[~x.nodes.treenode_id.isin(
-                    dist_graph.nodes)].treenode_id.tolist()
+                    dist_graph.nodes)].treenode_id.values
                 # Make sure the tagged treenode is there too
                 to_remove += [x.tags[tag][0]]
+
+            to_remove = set(to_remove)
 
             # Rewire connectors before we subset
             if preserve_connectors:
@@ -1599,11 +1621,10 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
                     to_remove)]
 
                 # Map to a remaining treenode
-                # IMPORTANT: we do currently not account for the possibility that we might be removing the root segment
-                new_tn = [_find_next_remaining_parent(
-                    tn) for tn in lost_cn.treenode_id.values]
-                x.connectors.loc[x.connectors.treenode_id.isin(
-                    to_remove), 'treenode_id'] = new_tn
+                # IMPORTANT: we do currently not account for the possibility
+                # that we might be removing the root segment
+                new_tn = [_find_next_remaining_parent(tn) for tn in lost_cn.treenode_id.values]
+                x.connectors.loc[x.connectors.treenode_id.isin(to_remove), 'treenode_id'] = new_tn
 
             # Subset to remaining nodes
             graph_utils.subset_neuron(x,
@@ -1617,7 +1638,8 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         return
 
 
-def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False):
+def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False,
+                   reverse=False):
     """ Removes spikes in neuron traces (e.g. from jumps in image data).
 
     For each treenode A, the euclidean distance to its next successor (parent)
@@ -1658,15 +1680,15 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False)
             x = x.copy()
 
         for n in config.tqdm(x, desc='Despiking', disable=config.pbar_hide,
-                      leave=config.pbar_leave):
+                             leave=config.pbar_leave):
             despike_neuron(n, sigma=sigma, inplace=True)
 
         if not inplace:
             return x
         return
     elif not isinstance(x, core.CatmaidNeuron):
-        raise TypeError(
-            'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
+        raise TypeError('Can only process CatmaidNeuron or CatmaidNeuronList, '
+                        'not "{0}"'.format(type(x)))
 
     if not inplace:
         x = x.copy()
@@ -1681,13 +1703,13 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False)
 
     # For each spike length do -> do this in reverse to correct the long
     # spikes first
-    for l in list(range(1, max_spike_length+1))[::-1]:
+    for l in list(range(1, max_spike_length + 1))[::-1]:
         # Go over all segments
         for seg in x.segments:
             # Get nodes A, B and C of this segment
-            this_A = this_treenodes.loc[seg[:-l-1]]
+            this_A = this_treenodes.loc[seg[:-l - 1]]
             this_B = this_treenodes.loc[seg[l:-1]]
-            this_C = this_treenodes.loc[seg[l+1:]]
+            this_C = this_treenodes.loc[seg[l + 1:]]
 
             # Get coordinates
             A = this_A[['x', 'y', 'z']].values
@@ -1712,7 +1734,8 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False, reverse=False)
     x.nodes = this_treenodes.reset_index(drop=False)
 
     # The weights in the graph have changed, we need to update that
-    x._clear_temp_attr(exclude=['segments', 'small_segments','classify_nodes'])
+    x._clear_temp_attr(exclude=['segments', 'small_segments',
+                                'classify_nodes'])
 
     if not inplace:
         return x
@@ -1748,28 +1771,22 @@ def guess_radius(x, method='linear', limit=None, smooth=True, inplace=False):
 
     """
 
-
-    # TODOs:
-    # - teach other functions (e.g. resample) to preserve radii
-    # - take distances into account by switching to scipy.interpolate
-    #   - alternatively use method 'index' and set cumulative distance to index
-
     if isinstance(x, core.CatmaidNeuronList):
         if not inplace:
             x = x.copy()
 
         for n in config.tqdm(x, desc='Guessing', disable=config.pbar_hide,
-                      leave=config.pbar_leave):
+                             leave=config.pbar_leave):
             guess_radius(n, method=method, limit=limit, smooth=smooth,
-                        inplace=True)
+                         inplace=True)
 
         if not inplace:
             return x
         return
 
     elif not isinstance(x, core.CatmaidNeuron):
-        raise TypeError(
-            'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
+        raise TypeError('Can only process CatmaidNeuron or CatmaidNeuronList, '
+                        'not "{0}"'.format(type(x)))
 
     if not inplace:
         x = x.copy()
@@ -1796,7 +1813,8 @@ def guess_radius(x, method='linear', limit=None, smooth=True, inplace=False):
     dist = np.sqrt(np.sum((tn_locs - cn_locs) ** 2, axis=1).astype(int))
     cn['dist'] = dist
 
-    # Get max distance per treenode (in case of multiple connectors per treenode)
+    # Get max distance per treenode (in case of multiple connectors per
+    # treenode)
     cn_grouped = cn.groupby('treenode_id').max()
 
     # Set undefined radii to None
@@ -1807,14 +1825,16 @@ def guess_radius(x, method='linear', limit=None, smooth=True, inplace=False):
 
     # Go over each segment and interpolate radii
     for s in config.tqdm(x.segments, desc='Interp.', disable=config.pbar_hide,
-                  leave=config.pbar_leave):
+                         leave=config.pbar_leave):
 
         # Get this segments radii and parent dist
         this_radii = nodes.loc[s, ['radius', 'parent_dist']]
         this_radii['parent_dist_cum'] = this_radii.parent_dist.cumsum()
 
         # Set cumulative distance as index and drop parent_dist
-        this_radii = this_radii.set_index('parent_dist_cum', drop=True).drop('parent_dist', axis=1)
+        this_radii = this_radii.set_index('parent_dist_cum',
+                                          drop=True).drop('parent_dist',
+                                                          axis=1)
 
         # Interpolate missing radii
         interp = this_radii.interpolate(method=method, limit_direction='both',
@@ -1868,8 +1888,8 @@ def smooth_neuron(x, window=5, inplace=False):
         return
 
     elif not isinstance(x, core.CatmaidNeuron):
-        raise TypeError(
-            'Can only process CatmaidNeuron or CatmaidNeuronList, not "{0}"'.format(type(x)))
+        raise TypeError('Can only process CatmaidNeuron or CatmaidNeuronList, '
+                        'not "{0}"'.format(type(x)))
 
     if not inplace:
         x = x.copy()
@@ -1879,7 +1899,8 @@ def smooth_neuron(x, window=5, inplace=False):
     nodes = x.nodes.set_index('treenode_id')
 
     # Go over each segment and interpolate radii
-    for s in config.tqdm(x.segments, desc='Smoothing', disable=config.pbar_hide,
+    for s in config.tqdm(x.segments, desc='Smoothing',
+                         disable=config.pbar_hide,
                          leave=config.pbar_leave):
 
         # Get this segments radii and parent dist
@@ -1887,7 +1908,8 @@ def smooth_neuron(x, window=5, inplace=False):
         this_co['parent_dist_cum'] = this_co.parent_dist.cumsum()
 
         # Set cumulative distance as index and drop parent_dist
-        this_co = this_co.set_index('parent_dist_cum', drop=True).drop('parent_dist', axis=1)
+        this_co = this_co.set_index('parent_dist_cum',
+                                    drop=True).drop('parent_dist', axis=1)
 
         interp = this_co.rolling(window, min_periods=1).mean()
 
@@ -1962,7 +1984,8 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     target = target.tz_localize('UTC')
 
     if target > pd.Timestamp.now().tz_localize('UTC'):
-        raise ValueError("This is not Back to the Future II: for forward time travel, you'll have to trace yourself.")
+        raise ValueError("This is not Back to the Future II: for forward time "
+                         "travel, you'll have to trace yourself.")
 
     # First get the entire history of the neuron
     url = remote_instance._get_compact_details_url(x.skeleton_id,
@@ -1988,7 +2011,8 @@ def time_machine(x, target, inplace=False, remote_instance=None):
                                                 'modified_timestamp'])
     # This is a dictionary with {'tag': [[treenode_id, date_tagged], ...]}
     tags = data[2]
-    annotations = pd.DataFrame(data[4], columns=['annotation_id', 'annotated_timestamp'])
+    annotations = pd.DataFrame(data[4], columns=['annotation_id',
+                                                 'annotated_timestamp'])
     an_list = fetch.get_annotation_list(remote_instance=remote_instance)
     annotations['annotation'] = annotations.annotation_id.map(an_list.set_index('annotation_id').annotation.to_dict())
 
@@ -2080,7 +2104,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     l = links[['connector_id', 'treenode_id']].T.apply(tuple)
     c = x.connectors[['connector_id', 'treenode_id']].T.apply(tuple)
 
-    # Keep only those where connector -> treenode connection is present
+    # Keep only those where connector->treenode connection is present
     x.connectors = x.connectors[c.isin(l)]
 
     x._clear_temp_attr()

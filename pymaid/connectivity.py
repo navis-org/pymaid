@@ -23,14 +23,17 @@ import numpy as np
 import scipy
 import scipy.spatial
 
-from pymaid import fetch, core, intersect, utils, config
+from itertools import combinations
+
+from pymaid import fetch, core, intersect, utils, config, graph_utils
 
 # Set up logging
 logger = config.logger
 
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
                   'predict_connectivity', 'adjacency_matrix', 'group_matrix',
-                  'adjacency_from_connectors', 'cn_table_from_connectors'])
+                  'adjacency_from_connectors', 'cn_table_from_connectors',
+                  'connection_density'])
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
@@ -73,8 +76,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
     if not isinstance(restrict_to, (str, core.Volume,
                                     core.CatmaidNeuron,
                                     core.CatmaidNeuronList)):
-        raise TypeError(
-            'Unable to restrict connectivity to type'.format(type(restrict_to)))
+        raise TypeError('Unable to restrict connectivity '
+                        'to type {}'.format(type(restrict_to)))
 
     if isinstance(restrict_to, str):
         restrict_to = fetch.get_volume(
@@ -83,8 +86,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
     datatype = getattr(x, 'datatype', None)
 
     if datatype not in ['connectivity_table', 'adjacency_matrix']:
-        raise TypeError(
-            'Unknown connectivity data. See help(filter_connectivity) for details.')
+        raise TypeError('Unknown connectivity data. See '
+                        'help(filter_connectivity) for details.')
 
     if datatype == 'connectivity_table':
         neurons = [c for c in x.columns if c not in [
@@ -119,8 +122,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
         if not x[x.relation == 'downstream'].empty:
             downstream = fetch.get_connectors_between(neurons,
-                                                      x[x.relation ==
-                                                          'downstream'].skeleton_id,
+                                                      x[x.relation =='downstream'].skeleton_id,
                                                       directional=True,
                                                       remote_instance=remote_instance)
             # Now filter connectors
@@ -143,11 +145,11 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
     elif datatype == 'adjacency_matrix':
         if getattr(x, 'is_grouped', False):
-            raise TypeError(
-                'Adjacency matrix appears to be grouped. Unable to process that.')
+            raise TypeError('Adjacency matrix appears to be grouped. Unable '
+                            'to process that.')
 
-        cn_data = fetch.get_connectors_between(x.index.tolist(),
-                                               x.columns.tolist(),
+        cn_data = fetch.get_connectors_between(x.index.values,
+                                               x.columns.values,
                                                directional=True,
                                                remote_instance=remote_instance)
 
@@ -182,7 +184,9 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                            columns=unique_skids, index=unique_skids)
 
     # Fill in values
-    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide, desc='Regenerating', leave=config.pbar_leave)):
+    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide,
+                                      desc='Regenerating',
+                                      leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.at[str(e[0]), str(e[1])] = counts[i]
 
@@ -199,7 +203,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
         return x
 
-    # Generate connectivity table by subsetting adjacency matrix to our neurons of interest
+    # Generate connectivity table by subsetting adjacency matrix to our
+    # neurons of interest
     us_neurons = [n for n in neurons if n in adj_mat.columns]
     all_upstream = adj_mat[adj_mat[us_neurons].sum(axis=1) > 0][us_neurons]
     all_upstream['skeleton_id'] = all_upstream.index
@@ -221,9 +226,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
     # Use original connectivity table to populate data
     aux = x.set_index('skeleton_id')[['neuron_name', 'num_nodes']].to_dict()
-    df['num_nodes'] = [aux['num_nodes'][s] for s in df.skeleton_id.tolist()]
-    df['neuron_name'] = [aux['neuron_name'][s]
-                         for s in df.skeleton_id.tolist()]
+    df['num_nodes'] = [aux['num_nodes'][s] for s in df.skeleton_id.values]
+    df['neuron_name'] = [aux['neuron_name'][s] for s in df.skeleton_id.values]
     df['total'] = df[remaining_neurons].sum(axis=1)
 
     # Reorder columns
@@ -260,10 +264,9 @@ def cable_overlap(a, b, dist=2, method='min'):
     -------
     pandas.DataFrame
             Matrix in which neurons A are rows, neurons B are columns. Cable
-            within distance is given in microns.
+            within distance is given in microns::
 
-            >>> df
-                        skidB1   skidB2  skidB3 ...
+                        skidB1   skidB2  skidB3  ...
                 skidA1    5        1        0
                 skidA2    10       20       5
                 skidA3    4        3        15
@@ -288,10 +291,12 @@ def cable_overlap(a, b, dist=2, method='min'):
         raise ValueError('Unknown method "{0}". Allowed methods: "{0}"'.format(
             method, ','.join(allowed_methods)))
 
-    matrix = pd.DataFrame(
-        np.zeros((a.shape[0], b.shape[0])), index=a.skeleton_id, columns=b.skeleton_id)
+    matrix = pd.DataFrame(np.zeros((a.shape[0], b.shape[0])),
+                          index=a.skeleton_id, columns=b.skeleton_id)
 
-    with config.tqdm(total=len(a), desc='Calc. overlap', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
+    with config.tqdm(total=len(a), desc='Calc. overlap',
+                     disable=config.pbar_hide,
+                     leave=config.pbar_leave) as pbar:
         # Keep track of KDtrees
         trees = {}
         for nA in a:
@@ -371,7 +376,7 @@ def predict_connectivity(source, target, method='possible_contacts',
     Method ``possible_contacts``:
         1. Calculating mean distance ``d`` (connector->treenode) at which
            connections between neurons A and neurons B occur.
-        2. For all presynapses of neurons A, check if they are within `stdev`
+        2. For all presynapses of neurons A, check if they are within ``stdev``
            (default=2) standard deviations of ``d`` of a neurons B treenode.
 
 
@@ -379,10 +384,9 @@ def predict_connectivity(source, target, method='possible_contacts',
     -------
     pandas.DataFrame
             Matrix holding possible synaptic contacts. Sources are rows,
-            targets are columns.
+            targets are columns::
 
-            >>> df
-                        target1  target2  target3  ...
+                         target1  target2  target3  ...
                 source1    5        1        0
                 source2    10       20       5
                 source3    4        3        15
@@ -395,12 +399,13 @@ def predict_connectivity(source, target, method='possible_contacts',
     if not remote_instance:
         try:
             remote_instance = source._remote_instance
-        except:
+        except BaseException:
             pass
 
     for _ in [source, target]:
         if not isinstance(_, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            raise TypeError('Need CatmaidNeuron/List, got "{}"'.format(type(_)))
+            raise TypeError('Need CatmaidNeuron/List, got '
+                            '"{}"'.format(type(_)))
 
     if isinstance(source, core.CatmaidNeuron):
         source = core.CatmaidNeuronList(source)
@@ -430,21 +435,23 @@ def predict_connectivity(source, target, method='possible_contacts',
 
         distances = np.sqrt(np.sum((cn_locs - tn_locs) ** 2, axis=1))
 
-        logger.info(
-            'Average connector->treenode distances: {:.2f} +/- {:.2f} nm'.format(distances.mean(), distances.std()))
+        logger.info('Average connector->treenode distances: '
+                    '{:.2f} +/- {:.2f} nm'.format(distances.mean(),
+                                                  distances.std()))
     else:
-        logger.warning('No existing connectors to calculate average \
-                        connector->treenode distance found. Falling \
-                        back to default of 1um. Use <stdev> argument\
-                        to set manually.')
+        logger.warning('No existing connectors to calculate average'
+                       'connector->treenode distance found. Falling'
+                       'back to default of 1um. Use <stdev> argument'
+                       'to set manually.')
         distances = 1000
 
     # Calculate distances threshold
     n_std = kwargs.get('n_std', 2)
     dist_threshold = np.mean(distances) + n_std * np.std(distances)
 
-    with config.tqdm(total=len(target), desc='Predicting', disable=config.pbar_hide,
-              leave=config.pbar_leave) as pbar:
+    with config.tqdm(total=len(target), desc='Predicting',
+                     disable=config.pbar_hide,
+                     leave=config.pbar_leave) as pbar:
         for t in target:
             # Create cKDTree for target
             tree = scipy.spatial.cKDTree(
@@ -485,14 +492,13 @@ def cn_table_from_connectors(x, remote_instance=None):
     -------
     pandas.DataFrame
         DataFrame in which each row represents a neuron and the number of
-        synapses with the query neurons:
+        synapses with the query neurons::
 
-        >>> df
-          neuron_name  skeleton_id   relation    total  skid1  skid2 ...
-        0   name1         skid1      upstream    n_syn  n_syn  ...
-        1   name2         skid2     downstream   n_syn  n_syn  ..
-        2   name3         skid3      usptream    n_syn  n_syn  .
-        ... ...
+           neuron_name  skeleton_id   relation    total  skid1  skid2 ...
+         0   name1         skid1      upstream    n_syn  n_syn  ...
+         1   name2         skid2     downstream   n_syn  n_syn  ..
+         2   name3         skid3      usptream    n_syn  n_syn  .
+         ... ...
 
         ``relation`` can be ``'upstream'`` (incoming), ``'downstream'``
         (outgoing), ``'attachment'`` or ``'gapjunction'`` (gap junction).
@@ -574,7 +580,7 @@ def cn_table_from_connectors(x, remote_instance=None):
 
         # Now prepare downstream partners:
         # Get all downstream connectors
-        this_ds = all_post[all_post.presynaptic_to==int(n.skeleton_id)]
+        this_ds = all_post[all_post.presynaptic_to == int(n.skeleton_id)]
         # Prepare dict
         ds_dict[n] = {p: 0 for p in all_partners}
         # Easy cases first (single link to target per connector)
@@ -601,7 +607,7 @@ def cn_table_from_connectors(x, remote_instance=None):
     us_table['relation'] = 'upstream'
 
     # Generate table
-    cn_table = pd.concat([us_table,ds_table], axis=0)
+    cn_table = pd.concat([us_table, ds_table], axis=0)
 
     # Replace NaN with 0
     cn_table = cn_table.fillna(0)
@@ -647,9 +653,8 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
     -------
     pandas.DataFrame
             Matrix holding possible synaptic contacts. Sources are rows,
-            targets are columns. Labels are skeleton IDs. Order is preserved.
+            targets are columns. Labels are skeleton IDs. Order is preserved::
 
-            >>> df
                         target1  target2  target3  ...
                 source1    5        1        0
                 source2    10       20       5
@@ -742,7 +747,7 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
 
     Parameters
     ----------
-    a, b :      CatmaidNeuron | CatmaidNeuronList | skeleton IDs
+    a,b :       CatmaidNeuron | CatmaidNeuronList | skeleton IDs
                 Either a or b HAS to be a neuron object.
                 If ``b=None``, will use ``b=a``.
     """
@@ -823,7 +828,7 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
 
     Returns
     -------
-    matrix :          ``pandas.Dataframe``
+    matrix :          pandas.Dataframe
 
     See Also
     --------
@@ -862,8 +867,8 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     >>> # Take the top 10 downstream partners
     >>> top_ds = ds_partners.iloc[:10].skeleton_id.values
     >>> # Generate separate adjacency matrices for axon and dendrites
-    >>> adj_axon = pymaid.adjacency_matrix(nl_axon, top_ds, use_connectors=True )
-    >>> adj_dend = pymaid.adjacency_matrix(nl_dend, top_ds, use_connectors=True )
+    >>> adj_axon = pymaid.adjacency_matrix(nl_axon, top_ds, use_connectors=True)
+    >>> adj_dend = pymaid.adjacency_matrix(nl_dend, top_ds, use_connectors=True)
     >>> # Rename rows and merge dataframes
     >>> adj_axon.index += '_axon'
     >>> adj_dend.index += '_dendrite'
@@ -969,8 +974,8 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
     elif isinstance(mat, pd.DataFrame):
         mat = mat.copy()
     else:
-        raise TypeError(
-            'Can only work with numpy arrays or pandas DataFrames, got "{}"'.format(type(mat)))
+        raise TypeError('Can only work with numpy arrays or pandas '
+                        'DataFrames, got "{}"'.format(type(mat)))
 
     # Convert to neuron->group format if necessary
     if col_groups and utils._is_iterable(list(col_groups.values())[0]):

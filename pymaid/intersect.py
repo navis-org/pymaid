@@ -203,8 +203,8 @@ def _in_volume_ray(points, volume):
     in_points = points[~out]
 
     # Perform ray intersection on points inside bounding box
-    rayPointList = np.array(
-        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in in_points], dtype=np.float32)
+    rayPointList = np.array([[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in in_points],
+                            dtype=np.float32)
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # to those that occur "above" the point we are querying
@@ -217,7 +217,8 @@ def _in_volume_ray(points, volume):
     return isin
 
 
-def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
+def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
+                      ignore_axis=[]):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the pointcloud changes the
     convex hull -> if yes, that point is outside the convex hull.

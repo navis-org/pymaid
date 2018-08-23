@@ -165,7 +165,8 @@ def network2igraph(x, remote_instance=None, threshold=1):
     --------
     >>> import pymaid
     >>> import igraph
-    >>> g = pymaid.network2igraph('annotation:large network', remote_instance=rm)
+    >>> g = pymaid.network2igraph('annotation:large network',
+    ...                           remote_instance=rm)
     >>> # Plot graph
     >>> igraph.plot(g)
     >>> # Plot with edge width
@@ -246,7 +247,7 @@ def neuron2nx(x):
     )][['treenode_id', 'parent_id']].values
     # Collect weight
     weights = np.sqrt(np.sum((nodes.loc[edges[:, 0], ['x', 'y', 'z']].values.astype(int)
-                              - nodes.loc[edges[:, 1], ['x', 'y', 'z']].values.astype(int))**2, axis=1))
+                              - nodes.loc[edges[:, 1], ['x', 'y', 'z']].values.astype(int)) ** 2, axis=1))
     # Generate weight dictionary
     edge_dict = np.array([{'weight': w} for w in weights])
     # Add weights to dictionary
