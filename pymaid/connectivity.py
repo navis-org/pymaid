@@ -1035,3 +1035,123 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
     mat.is_grouped = True
 
     return mat
+
+
+def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
+                       remote_instance=None):
+    """ Calculate connection density.
+
+    Given source neuron(s) ``s`` and a target neuron ``t``, calculate the
+    local density of connections as function of the geodesic distance between
+    the postsynaptic contacts on target neuron ``t``.
+
+    The general idea here is that spread out contacts might be more
+    effective in depolarizing dendrites of the postsynaptic neuron than highly
+    localized ones. See `Gouwens and Wilson, Journal of Neuroscience (2009)
+    <https://www.ncbi.nlm.nih.gov/pubmed/19439602>`_ for example.
+
+    Parameters
+    ----------
+    s,t :               skeleton ID | CatmaidNeuron | CatmaidNeuronList
+                        Source and target neuron, respectively. Multiple
+                        sources are allowed. Target must be single neuron.
+                        If ``t`` is a CatmaidNeuron, will use connectors and
+                        total cable to this neuron. Use to subset density
+                        calculations to e.g. the dendrites.
+    method :            'SUM' | 'AVERAGE' | 'MEDIAN', optional
+                        Arithmetic method used to collapse pairwise geodesic
+                        distances over all synaptic contacts on ``t`` from
+                        ``s`` into connection density ``D``.
+    normalize :         'DENSITY' | 'CABLE' | False
+                        Normalization method:
+
+                        - ``DENSITY``: normalize by synapse density
+                          over all postsynapses of the target
+                        - ``CABLE``: normalize by total cable length
+                          of the target
+                        - ``False``: no normalization
+
+    remote_instance :   CatmaidInstance, optional
+
+    Returns
+    -------
+    connection density : float
+                         Will return ``None`` if no connections or if only a
+                         single connection between source and target.
+    """
+
+    source_skid = utils.eval_skids(s)
+    target_skid = utils.eval_skids(t)
+
+    if len(target_skid) != 1:
+        raise ValueError('Must provide a single target neuron.')
+
+    if normalize not in [False, 'DENSITY', 'CABLE']:
+        raise ValueError('Unknown normalization method "{}"'.format(normalize))
+
+    # Get connectors between source and target and extract postsynaptic
+    # treenode IDs
+    cn_between = fetch.get_connectors_between(source_skid, target_skid,
+                                              directional=True,
+                                              remote_instance=remote_instance)
+    post_tn = cn_between.treenode2_id.values
+
+    # Make sure we have neuron to work with
+    if not isinstance(t, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        t = fetch.get_neuron(t, remote_instance=remote_instance)
+    # If t already is a neuron, subset connectors to those that actually exists
+    else:
+        post_tn = np.intersect1d(post_tn, t.nodes.treenode_id.values)
+
+    if isinstance(t, core.CatmaidNeuronList):
+        t = t[0]
+
+    # If no connections, return 0
+    if not any(post_tn):
+        return None
+    # If there is only one connection, we won't be able to calculate a density
+    elif post_tn.shape[0] == 1:
+        return None
+
+    # If we are normalizing to density, include all synapses in geodesic
+    # calculations
+    if normalize == 'DENSITY':
+        to_calc = t.postsynapses.treenode_id.values
+    else:
+        to_calc = post_tn
+
+    # Get geodesic distances
+    m = graph_utils.geodesic_matrix(t,
+                                    tn_ids=to_calc,
+                                    directed=False,
+                                    weight='weight')
+
+    # Get distances from matrix and convert to microns
+    dist = np.array([m.loc[i, j] for i, j in combinations(post_tn, 2)]) / 1000
+
+    # Prepare normalization
+    if normalize is None:
+        norm = [1]
+    elif normalize == 'DENSITY':
+        all_post = t.postsynapses.treenode_id.values
+        norm = np.array([m.loc[i, j] for i, j in combinations(all_post, 2)]) / 1000
+    elif normalize == 'CABLE':
+        norm = [t.cable_length]
+
+    # Combine distances and turn distance into density (1/dist)
+    if method == 'SUM':
+        dist = np.sum(norm) / np.sum(dist)
+    elif method == 'AVERAGE':
+        dist =  np.average(norm) / np.average(dist)
+    elif method == 'MEDIAN':
+        dist = np.median(norm) / np.median(dist)
+    else:
+        raise ValueError('Unknown method "{}"'.format(method))
+
+    # It's possible that all connections are onto the same treenode in which
+    # case average/sum/median distance would be 0 -> we will return this as
+    # None
+    if dist == 0:
+        return None
+
+    return dist
