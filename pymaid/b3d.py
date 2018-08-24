@@ -508,7 +508,7 @@ class handler:
         scn.objects.active = ob
         ob.select = True
 
-        me.from_pydata(list(blender_verts), [], volume.faces)
+        me.from_pydata(list(blender_verts), [], list(volume.faces))
         me.update()
 
         bpy.ops.object.shade_smooth()
