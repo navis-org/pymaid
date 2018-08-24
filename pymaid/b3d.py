@@ -38,6 +38,10 @@ Examples
 >>> handler.select( nl[:10] ).color(1,0,0)
 """
 
+# Important bit of advice:
+# Avoid operators ("bpy.ops.") as much as possible:
+# They cause scene updates which will exponentially slow down processing
+
 import pandas as pd
 import numpy as np
 from pymaid import core, utils, config
@@ -179,6 +183,8 @@ class handler:
             exists = [ob.get('skeleton_id', None) for ob in bpy.data.objects]
 
         if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+            if redraw:
+                print('Set "redraw=False" to vastly speed up import!')
             if isinstance(x, core.CatmaidNeuron):
                 x = [x]
             wm = bpy.context.window_manager
@@ -199,8 +205,7 @@ class handler:
         elif isinstance(x, np.ndarray):
             self._create_scatter(x, **kwargs)
         else:
-            logger.error(
-                'Unable to interpret data type ' + str(type(x)))
+            logger.error('Unable to interpret data type ' + str(type(x)))
             raise AttributeError('Unable to add data of type' + str(type(x)))
 
         print('Import done in {:.2}s'.format(time.time() - start))
@@ -243,9 +248,9 @@ class handler:
 
         mesh = bpy.data.meshes.new(kwargs.get('name', 'scatter'))
         mesh.from_pydata(verts, [], sp_faces)
+        mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
         obj = bpy.data.objects.new(kwargs.get('name', 'scatter'), mesh)
         bpy.context.scene.objects.link(obj)
-        bpy.ops.object.shade_smooth()
         obj.location = (0, 0, 0)
         obj.show_name = False
 
@@ -396,7 +401,6 @@ class handler:
         bpy.context.scene.objects.active = soma_ob
 
         soma_ob.location = loc
-        soma_ob.select = True
 
         # Construct the bmesh cube and assign it to the blender mesh.
         bm = bmesh.new()
@@ -404,7 +408,8 @@ class handler:
         bm.to_mesh(mesh)
         bm.free()
 
-        bpy.ops.object.shade_smooth()
+        mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
+
         bpy.context.active_object.name = 'Soma of #{0}'.format(x.skeleton_id)
         bpy.context.active_object['type'] = 'SOMA'
         bpy.context.active_object['catmaid_object'] = True
@@ -511,7 +516,7 @@ class handler:
         me.from_pydata(list(blender_verts), [], list(volume.faces))
         me.update()
 
-        bpy.ops.object.shade_smooth()
+        me.polygons.foreach_set('use_smooth', [True] * len(me.polygons))
 
     def select(self, x, *args):
         """ Select given neurons.
