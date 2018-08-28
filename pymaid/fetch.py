@@ -84,7 +84,7 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'rename_neurons', 'get_label_list', 'find_neurons',
                   'get_skid_from_treenode', 'get_transactions',
                   'remove_annotations', 'get_connector_links',
-                  'get_nth_partners'])
+                  'get_nth_partners', 'get_treenodes_by_tag'])
 
 # Set up logging
 logger = config.logger
@@ -1812,6 +1812,21 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
          1
          ...
 
+    Examples
+    --------
+    Get all connectors for a single neuron:
+
+    >>> cn = pymaid.get_connectors(16)
+
+    Get every connector with a given tag:
+
+    >>> tagged_cn = pymaid.get_connectors(None, tags='FML_sample')
+
+    Get all tagged connectors for a set of neurons:
+
+    >>> tagged_cn2 = pymaid.get_connectors('annotation:glomerulus DA1',
+                                           tags='FML_sample')
+
     See Also
     --------
     :func:`~pymaid.get_connector_details`
@@ -1820,6 +1835,8 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
         If you need to find the connectors between sets of neurons.
     :func:`~pymaid.get_connector_links`
         If you ned details about links for each connector.
+    :func:`pymaid.get_treenodes_by_tag`
+            Function to get treenodes by tags.
 
     """
 
@@ -2718,6 +2735,84 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
 
 
 @cache.undo_on_error
+def get_treenodes_by_tag(x, skids=None, remote_instance=None):
+    """ Get treenodes by tag (label).
+
+    Parameters
+    ----------
+    x :                 str | list of str
+                        Tag(s) to retrieve.
+    skids :             str | int | CatmaidNeuron/List, optional
+                        Use to restrict to a set of neurons. Can be:
+
+                        1. skeleton ID(s) (int or str)
+                        2. neuron name(s) (str)
+                        3. annotation(s): e.g. 'annotation:PN right'
+                        4. CatmaidNeuron or CatmaidNeuronList object
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in which each row represents a treenode::
+
+           skeleton_id  treenode_id  parent_id   x  y  z  confidence ...
+         0
+         1
+         2
+         ...
+           radius  edition_time  creator_id
+         0
+         1
+         2
+
+    See Also
+    --------
+    :func:`pymaid.get_connectors`
+            Function to get connectors by neurons and/or by tags.
+
+
+    Examples
+    --------
+    Get all nodes with a given tag
+
+    >>> tagged = pymaid.get_treenodes_by_tag('SCHLEGEL_LH')
+
+    Get all nodes of a set of neurons with either of two tags
+
+    >>> tagged = pymaid.get_treenodes_by_tag(['SCHLEGEL_LH', 'SCHLEGEL_AL'],
+                                             skids='annotation:glomerulus DA1')
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    url = remote_instance._get_treenode_table_url()
+
+    x = utils._make_iterable(x)
+    post = {'label_names[{}]'.format(i): t for i, t in enumerate(x)}
+
+    if not isinstance(skids, type(None)):
+        skids = utils.eval_skids(skids, remote_instance=remote_instance)
+        post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)})
+
+    # Fetch  only treenodes that have the soma label
+    resp = remote_instance.fetch(url, post=post)
+
+    # Format is [[ID, parent ID, x, y, z, confidence, radius, skeleton_id,
+    # edition_time, user_id], ...]
+    df = pd.DataFrame(resp,
+                      columns=['treenode_id', 'parent_id', 'x', 'y', 'z', 'confidence',
+                               'radius', 'skeleton_id', 'edition_time',
+                               'creator_id'])
+
+    # Reorder and return
+    return df[['skeleton_id', 'treenode_id', 'parent_id', 'x', 'y', 'z',
+                'confidence', 'radius', 'edition_time', 'creator_id']]
+
+
+@cache.undo_on_error
 def has_soma(x, tag='soma', min_rad=500, return_ids=False,
              remote_instance=None):
     """ Check if neuron(s) has soma.
@@ -3020,7 +3115,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     -------
     dict
                 dictionary containing tags for each node:
-                ``{'skid1': ['tag1', 'tag2', ...], 'skid2' : [...], ...}``
+                ``{'nodeID': ['tag1', 'tag2', ...], 'nodeID' : [...], ...}``
 
     Examples
     --------
