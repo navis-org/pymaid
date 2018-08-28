@@ -4127,8 +4127,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                         multiple ``annotations``, ``volumes``, ``users`` and
                         ``reviewed_by``) and then ACROSS critera!
     partial_match :     bool, optional
-                        If True, partial *names* AND *annotations* matches are
-                        returned.
+                        If True, partial matches for *names* AND *annotations*
+                        are allowed.
     minimum_cont :      int, optional
                         If looking for specific ``users``: minimum contribution
                         (in nodes) to a neuron in order for it to be counted.
@@ -4142,8 +4142,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                         The lower this value, the longer it will take to
                         filter.
     only_soma :         bool, optional
-                        If True, only neurons with a soma are returned. This
-                        is a very time-consuming step!
+                        If True, only neurons with a soma are returned.
     remote_instance :   CATMAID instance
                         If not passed directly, will try using globally
                         defined CatmaidInstance.
@@ -4371,9 +4370,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     nl.get_names()
 
     if only_soma:
-        logger.info('Filtering neurons for somas...')
-        nl.get_skeletons(skip_existing=True)
-        nl = nl[nl.soma is not None]
+        hs = has_soma(nl, return_ids=False, remote_instance=remote_instance)
+        nl = core.CatmaidNeuronList([n for n in nl if hs[int(n.skeleton_id)]])
 
     if users and minimum_cont:
         nl.get_skeletons(skip_existing=True)
@@ -4418,9 +4416,6 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
                             in given volumes.
     only_soma :             bool, optional
                             If True, only neurons with a soma will be returned.
-                            In case you are going to retrieve skeleton data
-                            anyway, it is better to do that for all neurons
-                            and then filter for soma.
     remote_instance :       CATMAID instance
                             If not passed directly, will try using global.
 
@@ -4485,12 +4480,12 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     neurons = list(set(neurons))
 
     if only_soma:
-        logger.info('Filtering neurons for somas...')
-        soma = has_soma(neurons, remote_instance)
+        soma = has_soma(neurons, remote_instance=remote_instance)
         neurons = [n for n in neurons if soma[n] is True]
 
-    logger.info('Done. {0} unique neurons found in volume(s) {1}'.format(
-        len(neurons), ','.join([v.name for v in volumes])))
+    logger.info('Done. {0} unique neurons found in volume(s) '
+                '{1}'.format(len(neurons),
+                             ','.join([v.name for v in volumes])))
 
     return neurons
 
