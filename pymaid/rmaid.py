@@ -439,7 +439,7 @@ def neuron2r(neuron, convert_to_um=False):
         # replaced with -1
         parents = np.array(n.nodes.parent_id.values)
         # should technically be robjects.r('-1L')
-        parents[parents is None] = -1
+        parents[parents == None] = -1 # DO NOT turn this into "parents is None"!
 
         swc = robjects.DataFrame({'PointNo': robjects.IntVector(n.nodes.treenode_id.tolist()),
                                   'Label': robjects.IntVector([0] * n.nodes.shape[0]),
