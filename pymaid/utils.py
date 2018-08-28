@@ -22,6 +22,7 @@ import numpy as np
 import json
 import pandas as pd
 import uuid
+import random
 import csv
 
 from pymaid import core, fetch, config
@@ -641,7 +642,9 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                                                             leave=config.pbar_leave)])
 
     if not neuron_id:
-        neuron_id = uuid.uuid4().int
+        # Use 30 bit - 32bit raises error when converting to R StrVector
+        neuron_id = random.getrandbits(30)
+        #neuron_id = uuid.uuid4().int
 
     if not neuron_name:
         neuron_name = os.path.basename(f)

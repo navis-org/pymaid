@@ -208,7 +208,7 @@ class handler:
             logger.error('Unable to interpret data type ' + str(type(x)))
             raise AttributeError('Unable to add data of type' + str(type(x)))
 
-        print('Import done in {:.2}s'.format(time.time() - start))
+        print('Import done in {:.2f}s'.format(time.time() - start))
 
         return
 
@@ -396,10 +396,6 @@ class handler:
         mesh = bpy.data.meshes.new('Soma of #{0} - mesh'.format(x.skeleton_id))
         soma_ob = bpy.data.objects.new('Soma of #{0}'.format(x.skeleton_id), mesh)
 
-        # Add the object into the scene.
-        bpy.context.scene.objects.link(soma_ob)
-        bpy.context.scene.objects.active = soma_ob
-
         soma_ob.location = loc
 
         # Construct the bmesh cube and assign it to the blender mesh.
@@ -410,12 +406,15 @@ class handler:
 
         mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
 
-        bpy.context.active_object.name = 'Soma of #{0}'.format(x.skeleton_id)
-        bpy.context.active_object['type'] = 'SOMA'
-        bpy.context.active_object['catmaid_object'] = True
-        bpy.context.active_object['skeleton_id'] = x.skeleton_id
+        soma_ob.name = 'Soma of #{0}'.format(x.skeleton_id)
+        soma_ob['type'] = 'SOMA'
+        soma_ob['catmaid_object'] = True
+        soma_ob['skeleton_id'] = x.skeleton_id
 
-        bpy.context.scene.objects.active.active_material = mat
+        soma_ob.active_material = mat
+
+        # Add the object into the scene.
+        bpy.context.scene.objects.link(soma_ob)
 
         return
 
@@ -454,7 +453,6 @@ class handler:
             ob['catmaid_object'] = True
             ob['cn_type'] = i
             ob['skeleton_id'] = x.skeleton_id
-            bpy.context.scene.objects.link(ob)
             ob.location = (0, 0, 0)
             ob.show_name = False
             cu.dimensions = '3D'
@@ -480,6 +478,8 @@ class handler:
                                          bpy.data.materials.new(mat_name))
             mat.diffuse_color = self.cn_dict[i]['color']
             ob.active_material = mat
+
+            bpy.context.scene.objects.link(ob)
 
         return
 
