@@ -262,7 +262,7 @@ def data2py(data, **kwargs):
         return data
 
 
-def neuron2py(neuron, remote_instance=None):
+def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
     """ Converts an rcatmaid ``neuron`` or ``neuronlist`` object to a PyMaid
     :class:`~pymaid.CatmaidNeuron`/:class:`~pymaid.CatmaidNeuronList`.
 
@@ -273,6 +273,8 @@ def neuron2py(neuron, remote_instance=None):
     ----------
     neuron :            R neuron | R neuronlist
                         Neuron to convert to Python
+    convert_to_nm :     bool, optional
+                        If True will convert from um to nm.
     remote_instance :   CATMAID instance, optional
                         Provide if you want neuron names to be updated from.
 
@@ -328,7 +330,7 @@ def neuron2py(neuron, remote_instance=None):
                          'creator_id', 'x', 'y', 'z', 'radius', 'confidence']
         nodes.loc[nodes.parent_id == -1, 'parent_id'] = None
 
-        if 'connectors' in neuron:
+        if 'connectors' in neuron and isinstance(neuron.loc[i, 'connectors'], pd.DataFrame):
             connectors = pd.DataFrame([[cn.treenode_id, cn.connector_id, cn.prepost, cn.x, cn.y, cn.z]
                                        for cn in neuron.loc[i, 'connectors'].itertuples()], dtype=object)
             connectors.columns = ['treenode_id',
@@ -356,15 +358,25 @@ def neuron2py(neuron, remote_instance=None):
     if 'tags' in neuron:
         df['tags'] = neuron.tags.tolist()
     else:
-        df['tags'] = [{} for n in df.skeleton_id.tolist()]
+        df['tags'] = [{} for n in df.skeleton_id.values]
 
     if 'skid' in neuron and neuron_names is not None:
-        df['neuron_name'] = [neuron_names[
-            str(n)] for n in df.skeleton_id.tolist()]
+        df['neuron_name'] = [neuron_names.get(str(n), 'NA') for n in df.skeleton_id.values]
     else:
-        df['neuron_name'] = ['NA' for n in df.skeleton_id.tolist()]
+        df['neuron_name'] = ['NA' for n in df.skeleton_id.values]
 
-    return core.CatmaidNeuronList(df, remote_instance=remote_instance)
+    nl = core.CatmaidNeuronList(df, remote_instance=remote_instance)
+
+    # Do some clean up
+    for n in nl:
+        if not isinstance(n.tags, dict):
+            n.tags = {}
+
+        if convert_to_nm:
+            n.nodes[['x', 'y', 'z', 'radius']] *= 1000
+            n.connectors[['x', 'y', 'z', 'radius']] *= 1000
+
+    return nl
 
 
 def neuron2r(neuron, convert_to_um=False):
