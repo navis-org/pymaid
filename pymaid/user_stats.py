@@ -381,7 +381,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     >>> # Plot relative contributions
     >>> cont = pymaid.get_user_contributions(2333007)
     >>> cont = cont.set_index('user')
-    >>> # Normalise
+    >>> # Normalize
     >>> cont_rel = cont / cont.sum(axis=0).values
     >>> # Plot contributors with >5% node contributions
     >>> ax = cont_rel[cont_rel.nodes > .05].plot(kind='bar')

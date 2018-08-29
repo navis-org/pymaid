@@ -134,10 +134,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
 
     Examples
     --------
-    >>> import pymaid
     >>> import matplotlib.pyplot as plt
-    >>> # Initialise CatmaidInstance
-    >>> rm = pymaid.CatmaidInstance('url', 'user', 'pw', 'token' )
     >>> # Cluster a set of neurons by their inputs (ignore small fragments)
     >>> res = pymaid.cluster_by_connectivity('annotation:PBG6 P-EN right',
     ...                                      upstream=True, downstream=False,
@@ -637,11 +634,9 @@ def cluster_xyz(x, labels=None):
 
     Examples
     --------
-    This examples assumes you understand the basics of using pymaid.
+    This examples assumes you understand the basics of using pymaid:
 
-    >>> import pymaid
     >>> import matplotlib.pyplot as plt
-    >>> pymaid.remote_instance = CatmaidInstance('server','user','pw','token')
     >>> n = pymaid.get_neuron(16)
     >>> rs = pymaid.cluster_xyz(n.connectors,
     ...                         labels=n.connectors.connector_id.values)
@@ -680,18 +675,16 @@ class ClustResults:
 
     Examples
     --------
-    >>> import pymaid
     >>> import matplotlib.pyplot as plt
-    >>> rm = pymaid.CatmaidInstance('server_url','user','password','token')
     >>> # Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> # Perform all-by-all nblast
-    >>> res = pymaid.nblast_allbyall( nl )
+    >>> res = pymaid.nblast_allbyall(nl)
     >>> # res is a ClustResults object
     >>> res.plot_matrix()
     >>> plt.show()
     >>> # Extract 5 clusters
-    >>> res.get_clusters( 5, criterion = 'maxclust' )
+    >>> res.get_clusters(5, criterion = 'maxclust' )
 
     """
 

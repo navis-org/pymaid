@@ -844,8 +844,6 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
 
     >>> import seaborn as sns
     >>> import matplotlib.pyplot as plt
-    >>> import pymaid
-    >>> rm = pymaid.CatmaidInstance(url, user, pw,, token)
     >>> neurons = pymaid.get_neurons('annotation:test')
     >>> mat = pymaid.adjacency_matrix( neurons )
     >>> g = sns.heatmap(adj_mat, square=True)
@@ -1142,7 +1140,7 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
     if method == 'SUM':
         dist = np.sum(norm) / np.sum(dist)
     elif method == 'AVERAGE':
-        dist =  np.average(norm) / np.average(dist)
+        dist = np.average(norm) / np.average(dist)
     elif method == 'MEDIAN':
         dist = np.median(norm) / np.median(dist)
     else:

@@ -110,8 +110,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     >>> # Plot graph
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
-    >>> df = pd.DataFrame( list( cable.values() ),
-    ...                    index = list( cable.keys() )
+    >>> df = pd.DataFrame(list( cable.values() ),
+    ...                   index = list( cable.keys() )
     ...                   )
     >>> df.boxplot()
     >>> plt.show()

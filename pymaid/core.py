@@ -174,24 +174,18 @@ class CatmaidNeuron:
 
     Examples
     --------
-    >>> import pymaid
     >>> # Initialize a new neuron
     >>> n = pymaid.CatmaidNeuron( 123456 )
-    >>> # Initialize Catmaid connections
-    >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token)
-    >>> # Add CatmaidInstance to the neuron for convenience
-    >>> n.remote_instance = rm
     >>> # Retrieve node data from server on-demand
     >>> n.nodes
-    ... CatmaidNeuron - INFO - Retrieving skeleton data...
-    ...    treenode_id  parent_id  creator_id  x  y  z radius confidence
-    ... 0  ...
-    ...
+    CatmaidNeuron - INFO - Retrieving skeleton data...
+      treenode_id  parent_id  creator_id  x  y  z radius confidence
+    0  ...
     >>> # Initialize with skeleton data
-    >>> n = pymaid.get_neuron( 123456, remote_instance = rm )
+    >>> n = pymaid.get_neuron(123456)
     >>> # Get annotations from server
     >>> n.annotations
-    ... [ 'annotation1', 'annotation2' ]
+    [ 'annotation1', 'annotation2' ]
     >>> # Force update of annotations
     >>> n.get_annotations()
 
@@ -1310,30 +1304,27 @@ class CatmaidNeuronList:
     Examples
     --------
     >>> # Initialize with just a Skeleton ID
-    >>> nl = pymaid.CatmaidNeuronList( [ 123456, 45677 ] )
-    >>> # Add CatmaidInstance to neurons in neuronlist
-    >>> rm = pymaid.CatmaidInstance(server_url, http_user, http_pw, token)
-    >>> nl.set_remote_instance( rm )
+    >>> nl = pymaid.CatmaidNeuronList([123456, 45677])
     >>> # Retrieve review status from server on-demand
     >>> nl.review_status
-    ... array([ 90, 23 ])
+    array([90, 23])
     >>> # Initialize with skeleton data
-    >>> nl = pymaid.get_neuron( [ 123456, 45677 ] )
+    >>> nl = pymaid.get_neuron([123456, 45677])
     >>> # Get annotations from server
     >>> nl.annotations
-    ... [ ['annotation1','annotation2'],['annotation3','annotation4'] ]
+    [['annotation1', 'annotation2'], ['annotation3', 'annotation4']]
     >>> Index using node count
-    >>> subset = nl [ nl.n_nodes > 6000 ]
+    >>> subset = nl[nl.n_nodes > 6000]
     >>> # Get neuron by its skeleton ID
-    >>> n = nl.skid[ 123456 ]
+    >>> n = nl.skid[123456]
     >>> # Index by multiple skeleton ID
-    >>> subset = nl [ [ '123456', '45677' ] ]
+    >>> subset = nl[['123456', '45677']]
     >>> # Index by neuron name
-    >>> subset = nl [ 'name1' ]
+    >>> subset = nl['name1']
     >>> # Index using annotation
-    >>> subset = nl ['annotation:uPN right']
+    >>> subset = nl['annotation:uPN right']
     >>> # Concatenate lists
-    >>> nl += pymaid.get_neuron( [ 912345 ], remote_instance = rm )
+    >>> nl += pymaid.get_neuron([912345])
 
     """
 
@@ -1565,7 +1556,7 @@ class CatmaidNeuronList:
                 data.append(this_n)
             return pd.concat(data, axis=0, ignore_index=True, sort=True)
         elif key == 'bbox':
-            return self.nodes.describe().loc[['min', 'max'],['x', 'y', 'z']].values.T
+            return self.nodes.describe().loc[['min', 'max'], ['x', 'y', 'z']].values.T
         elif key == '_remote_instance':
             all_instances = [
                 n._remote_instance for n in self.neurons if n._remote_instance != None]
@@ -1611,8 +1602,7 @@ class CatmaidNeuronList:
                     key, remote_instance=self._remote_instance)
                 subset = self[skids]
             else:
-                subset = [
-                    n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
+                subset = [n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
         elif isinstance(key, np.ndarray) and key.dtype == 'bool':
             subset = [n for i, n in enumerate(self.neurons) if key[i]]
         elif utils._is_iterable(key):
@@ -1844,7 +1834,7 @@ class CatmaidNeuronList:
         --------
         >>> # Reroot all neurons to soma
         >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
-        >>> nl.reroot( nl.soma )
+        >>> nl.reroot(nl.soma)
         """
 
         if not utils._is_iterable(new_root):
@@ -2817,7 +2807,7 @@ class Volume:
 
         Examples
         --------
-        >>> vol = pymaid.get_volume('v13.LH_R')
+        >>> vol = pymaid.get_volume('v14.LH_R')
         >>> vol.plot3d(color = (255, 0, 0))
         """
 
@@ -2857,7 +2847,7 @@ class Volume:
         -------
         list
                     Coordinates of 2d circumference.
-                    e.g. [(x1, y1, z1), (x2, y2, z2), (x3, y3, z3), ...]
+                    e.g. ``[(x1, y1, z1), (x2, y2, z2), (x3, y3, z3), ...]``
                     Third dimension is averaged
         """
 
@@ -2890,7 +2880,7 @@ class Volume:
         -------
         list
                     Coordinates of 2d circumference
-                    e.g. [(x1, y1), (x2, y2), (x3, y3), ...]
+                    e.g. ``[(x1, y1), (x2, y2), (x3, y3), ...]``
 
         """
 

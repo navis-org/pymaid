@@ -20,22 +20,19 @@ not automatically imported as it only works from within Blender.
 
 Examples
 --------
->>> import pymaid
 >>> # b3d module has to be imported explicitly
 >>> from pymaid import b3d
->>> # Initialise connection to CATMAID server
->>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
 >>> # Load a bunch of neurons
 >>> neuronlist = pymaid.get_neuron('annotation:glomerulus DA1')
 >>> handler = b3d.handler()
 >>> # Export neurons into Blender
->>> handler.add( neuronlist )
+>>> handler.add(neuronlist)
 >>> # Colorize
 >>> handler.colorize()
 >>> # Change bevel
->>> handler.bevel( .05 )
+>>> handler.bevel(.05)
 >>> # Select subset and set color
->>> handler.select( nl[:10] ).color(1,0,0)
+>>> handler.select(nl[:10]).color(1, 0, 0)
 """
 
 # Important bit of advice:
@@ -98,19 +95,19 @@ class handler:
     >>> # b3d module has to be imported explicitly
     >>> from pymaid import b3d
     >>> # Get some neurons (you have already set up a remote instance?)
-    >>> nl = pymaid.CatmaidNeuronList( [ 12345, 67890 ] )
+    >>> nl = pymaid.CatmaidNeuronList([12345, 67890])
     >>> # Initialize handler
     >>> handler = b3d.handler()
     >>> # Add neurons
-    >>> handler.add( nl )
+    >>> handler.add(nl)
     >>> # Assign colors to all neurons
     >>> handler.colorize()
     >>> # Select all somas and change color to black
-    >>> handler.soma.color(0,0,0)
+    >>> handler.soma.color(0, 0, 0)
     >>> # Clear scene
     >>> handler.clear()
     >>> # Add only soma
-    >>> handler.add( nl, neurites=False, connectors=False )
+    >>> handler.add(nl, neurites=False, connectors=False)
     """
     cn_dict = {
         0: dict(name='presynapses',
@@ -531,13 +528,13 @@ class handler:
 
         Examples
         --------
-        >>> selection = handler.select( [123456,7890] )
+        >>> selection = handler.select([123456, 7890])
         >>> # Get only connectors
         >>> cn = selection.connectors
         >>> # Hide everything else
         >>> cn.hide_others()
         >>> # Change color of presynapses
-        >>> selection.presynapses.color( 0, 1, 0 )
+        >>> selection.presynapses.color(0, 1, 0)
         """
 
         skids = utils.eval_skids(x)
@@ -572,7 +569,7 @@ class handler:
         This will only change color of neurons, if you want to change
         color of e.g. connectors, use:
 
-        >>> handler.connectors.color( r,g,b )
+        >>> handler.connectors.color(r, g, b)
         """
         self.neurons.color(r, g, b)
 
@@ -613,7 +610,7 @@ class handler:
         This will only change bevel of neurons, if you want to change
         bevel of e.g. connectors, use:
 
-        >>> handler.connectors.bevel( .02 )
+        >>> handler.connectors.bevel(.02)
         """
         self.neurons.bevel_depth(r)
 
@@ -654,17 +651,15 @@ class object_list:
 
     Examples
     --------
-    >>> import pymaid
     >>> # b3d module has to be import explicitly
     >>> from pymaid import b3d
-    >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> handler = b3d.handler()
-    >>> handler.add( nl )
+    >>> handler.add(nl)
     >>> # Select only neurons on the right
     >>> right = handler.select('annotation:uPN right')
     >>> # This can be nested to change e.g. color of all right presynases
-    >>> handler.select('annotation:uPN right').presynapses.color( 0, 1, 0 )
+    >>> handler.select('annotation:uPN right').presynapses.color(0, 1, 0)
 
     """
 

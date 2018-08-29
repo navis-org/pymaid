@@ -1260,7 +1260,7 @@ def generate_list_of_childs(x):
     Returns
     -------
     dict
-        ``{ treenode_id : [ child_treenode, child_treenode, ... ] }``
+        ``{treenode_id: [child_treenode, child_treenode, ...]}``
 
     """
 

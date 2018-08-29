@@ -21,7 +21,7 @@ Examples
 --------
 >>> import pymaid
 >>> # HTTP_USER AND HTTP_PASSWORD are only necessary if your server requires a
-... # http authentification
+>>> # http authentification
 >>> myInstance = pymaid.CatmaidInstance( 'www.your.catmaid-server.org' ,
 ...                                      'HTTP_USER' ,
 ...                                      'HTTP_PASSWORD',
@@ -91,9 +91,9 @@ logger = config.logger
 
 
 class CatmaidInstance:
-    """ Class giving access to a CATMAID instance. Holds base url,
-    credentials and fetches data. You can either pass it to
-    functions individually or define globally (default).
+    """ Class giving access to a CATMAID instance. Holds base url, credentials
+    and fetches data. You can either pass it to functions individually or
+    define globally (default).
 
     Attributes
     ----------
@@ -796,7 +796,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
         nodes / connectors :    pandas.DataFrames containing treenode/connector
                                 ID, coordinates, parent nodes, etc.
         tags :                  dict containing the treenode tags:
-                                {'tag': [ treenode_id, treenode_id, ... ]}
+                                ``{'tag': [treenode_id, treenode_id, ...]}``
 
     Dataframe column titles for ``nodes`` and ``connectors`` should be
     self-explanatory with the exception of ``relation`` in connector table::
@@ -969,7 +969,8 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
         -> treenode2
 
     This means that connectors can shop up multiple times (i.e. if they have
-    multiple postsynaptic targets). Does include connector x,y,z coordinates!
+    multiple postsynaptic targets). Does include connector ``x, y, z``
+    coordinates!
 
     Parameters
     ----------
@@ -1351,10 +1352,8 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
     >>> # Get partners with more than e.g. 5 synapses across all neurons
     >>> subset2 = cn[ cn[example_skids].sum(axis=1) > 5 ]
     >>> # Combine above conditions (watch parentheses!)
-    >>> subset3 = cn[
-    ...               (cn.relation=='upstream') &
-    ...               (cn[example_skids].sum(axis=1) > 5)
-    ...             ]
+    >>> subset3 = cn[(cn.relation=='upstream') &
+    ...              (cn[example_skids].sum(axis=1) > 5)]
 
     See Also
     --------
@@ -2309,7 +2308,7 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     Returns
     -------
-    Nothing
+    None
 
     See Also
     --------
@@ -2623,7 +2622,7 @@ def get_annotations(x, remote_instance=None):
     Returns
     -------
     dict
-                        ``{skeleton_id: [annnotation, annotation ], ...}``
+                        ``{skeleton_id: [annnotation, annotation], ...}``
 
     See Also
     --------
@@ -2809,7 +2808,7 @@ def get_treenodes_by_tag(x, skids=None, remote_instance=None):
 
     # Reorder and return
     return df[['skeleton_id', 'treenode_id', 'parent_id', 'x', 'y', 'z',
-                'confidence', 'radius', 'edition_time', 'creator_id']]
+               'confidence', 'radius', 'edition_time', 'creator_id']]
 
 
 @cache.undo_on_error
@@ -3248,7 +3247,6 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     --------
     Remove end-related tags from non-end treenodes
 
-    >>> import pymaid
     >>> # Load neuron
     >>> n = pymaid.get_neuron(16)
     >>> # Get non-end nodes
@@ -3379,7 +3377,7 @@ def get_segments(x, remote_instance=None):
     """ Retrieve list of segments for a neuron just like the review widget.
 
     Parameters
-    -----------
+    ----------
     x
                         Neurons to retrieve. Can be either:
 
@@ -3394,7 +3392,7 @@ def get_segments(x, remote_instance=None):
     -------
     list
                 List of treenode IDs, ordered by length. If multiple neurons
-                are requested, returns a dict ``{skid: [], ... }``.
+                are requested, returns a dict ``{skid: [], ...}``.
 
     See Also
     --------
@@ -3949,15 +3947,7 @@ def get_history(remote_instance=None,
     Examples
     --------
     >>> import matplotlib.pyplot as plt
-    >>> import pymaid
-    >>> rm = pymaid.CatmaidInstance( 'server_url',
-    ...                              'http_user',
-    ...                              'http_pw',
-    ...                              'token')
-    >>> # Get last week's history (using the default start/end dates)
-    >>> hist = pymaid.get_history( remote_instance = rm )
     >>> # Plot cable created by all users over time
-    >>> import matplotlib.pyplot as plt
     >>> hist.cable.T.plot()
     >>> plt.show()
     >>> # Collapse users and plot sum of cable over time
@@ -4119,7 +4109,7 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
          2
 
            "labels" : dictionary
-         {treenode_id: [label1, label2, ... ], ... }
+         {treenode_id: [label1, label2, ...], ...}
 
            "node_limit_reached" : boolean
           True/False; if True, node limit was exceeded
@@ -4351,9 +4341,9 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         # Intersect within search criteria if applicable
         if intersect:
-           sets_of_skids.append(set.intersection(*annotated))
+            sets_of_skids.append(set.intersection(*annotated))
         else:
-           sets_of_skids.append(set.union(*annotated))
+            sets_of_skids.append(set.union(*annotated))
 
     # Get skids by user
     if users:
@@ -4362,7 +4352,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                      'created_by': u} for u in users]
 
         if from_date and to_date:
-            dates = {'from' : ''.join([str(d) for d in from_date]),
+            dates = {'from': ''.join([str(d) for d in from_date]),
                      'to': ''.join([str(d) for d in to_date])}
             GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
@@ -4371,9 +4361,9 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         # Intersect within search criteria if applicable
         if intersect:
-           sets_of_skids.append(set.intersection(*[set(res) for res in results]))
+            sets_of_skids.append(set.intersection(*[set(res) for res in results]))
         else:
-           sets_of_skids.append(set.union(*[set(res) for res in results]))
+            sets_of_skids.append(set.union(*[set(res) for res in results]))
 
     # Get skids by reviewer
     if reviewed_by:
@@ -4382,7 +4372,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                      'reviewed_by': u} for u in reviewed_by]
 
         if from_date and to_date:
-            dates = {'from' : ''.join([str(d) for d in from_date]),
+            dates = {'from': ''.join([str(d) for d in from_date]),
                      'to': ''.join([str(d) for d in to_date])}
             GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
@@ -4391,9 +4381,9 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         # Intersect within search criteria if applicable
         if intersect:
-           sets_of_skids.append(set.intersection(*[set(res) for res in results]))
+            sets_of_skids.append(set.intersection(*[set(res) for res in results]))
         else:
-           sets_of_skids.append(set.union(*[set(res) for res in results]))
+            sets_of_skids.append(set.union(*[set(res) for res in results]))
 
     # Get by volume
     if volumes:
@@ -4411,14 +4401,20 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
         # Intersect within search criteria if applicable
         if intersect:
-           sets_of_skids.append(set.intersection(*temp))
+            sets_of_skids.append(set.intersection(*temp))
         else:
-           sets_of_skids.append(set.union(*temp))
+            sets_of_skids.append(set.union(*temp))
 
-
-    # Get neurons by size if only min_size and no other no parameters were provided
-    if False not in [isinstance(param, type(None)) for param in [names, annotations, volumes, users, reviewed_by, skids]]:
-        # Make sure people don't accidentally request ALL neurons in the dataset
+    # Get neurons by size if only min_size and no other no parameters were
+    # provided
+    if False not in [isinstance(param, type(None)) for param in [names,
+                                                                 annotations,
+                                                                 volumes,
+                                                                 users,
+                                                                 reviewed_by,
+                                                                 skids]]:
+        # Make sure people don't accidentally request ALL neurons in the
+        # dataset
         if min_size <= 1:
             answer = ""
             while answer not in ["y", "n"]:
@@ -4534,14 +4530,14 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     >>> # Get a volume
     >>> lh = pymaid.get_volume('LH_R')
     >>> # Get neurons within the bounding box of a volume
-    >>> skids = pymaid.get_neurons_in_volume(lh, min_nodes = 10)
+    >>> skids = pymaid.get_neurons_in_volume(lh, min_nodes=10)
     >>> # Retrieve 3D skeletons of these neurons
     >>> lh_neurons = pymaid.get_neurons(skids)
     >>> # Prune by volume
     >>> lh_pruned = lh_neurons.copy()
     >>> lh_pruned.prune_by_volume(lh)
     >>> # Filter neurons with more than 100um of cable in the volume
-    >>> n = lh_neurons[ lh_pruned.cable_length > 100  ]
+    >>> n = lh_neurons[lh_pruned.cable_length > 100]
 
     """
 
@@ -4568,8 +4564,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
 
     if intersect:
         # Filter for neurons that show up in all neuropils
-        neurons = [n for l in neurons for n in l if False not in [
-            n in v for v in neurons]]
+        neurons = [n for l in neurons for n in l if False not in [n in v for v in neurons]]
 
     # Need to do this in case we have several volumes
     neurons = list(set(neurons))
@@ -4617,7 +4612,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
     Returns
     --------
     list
-                            ``[skeleton_id, skeleton_id, ... ]``
+                            ``[skeleton_id, skeleton_id, ...]``
 
     """
 
@@ -4763,9 +4758,9 @@ def get_user_list(remote_instance=None):
 
     Examples
     --------
-    >>> user_list = pymaid.get_user_list(remote_instance = rm)
+    >>> user_list = pymaid.get_user_list()
     >>> # To search for e.g. user ID 22
-    >>> user_list.set_index('id',inplace=True)
+    >>> user_list.set_index('id', inplace=True)
     >>> user_list.ix[ 22 ]
     id                                  22
     login                      mustermannm
@@ -4853,8 +4848,8 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
     >>> # This assumes that you have already set up a Catmaid Instance
     >>> import networkx as nx
     >>> import matplotlib.pyplot as plt
-    >>> g, paths = pymaid.get_paths( ['annotation:glomerulus DA1'],
-    ...                              ['2333007'] )
+    >>> g, paths = pymaid.get_paths(['annotation:glomerulus DA1'],
+    ...                             ['2333007'])
     >>> g
     <networkx.classes.digraph.DiGraph at 0x127d12390>
     >>> paths
@@ -5129,13 +5124,13 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     Examples
     --------
     >>> # Get URL for a single coordinate
-    >>> url = pymaid.url_to_coordinates([1000,1000,1000], stack_id=5)
+    >>> url = pymaid.url_to_coordinates([1000, 1000, 1000], stack_id=5)
     >>> # Get URLs for all low-confidence nodes of a neuron
     >>> n = pymaid.get_neuron(27295)
     >>> low_c = n.nodes.loc[n.nodes.confidence < 5]
-    >>> urls = pymaid.url_to_coordinates(low_c[['x','y','z']].values,
-                                         stack_id = 5,
-                                         active_node_id = low_c.treenode_id.values)
+    >>> urls = pymaid.url_to_coordinates(low_c[['x', 'y', 'z']].values,
+    ...                                  stack_id=5,
+    ...                                  active_node_id=low_c.treenode_id.values)
     """
 
     def gen_url(c, stid, nid, sid):
@@ -5219,7 +5214,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
     >>> # Get their current names
     >>> names = pymaid.get_names('annotation:Philipps neurons')
     >>> # Add initials to names
-    >>> new_names = {skid : name + ' PS' for skid, name in names.items()}
+    >>> new_names = {skid: name + ' PS' for skid, name in names.items()}
     >>> # Rename neurons
     >>> pymaid.rename_neurons(list(names.keys()), new_names)
 

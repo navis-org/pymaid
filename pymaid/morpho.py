@@ -505,8 +505,8 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
                     Strahler indices to prune:
 
                       (1) ``to_prune=1`` removes all leaf branches
-                      (2) ``to_prune=[1,2]`` removes indices 1 and 2
-                      (3) ``to_prune=range(1,4)`` removes indices 1, 2 and 3
+                      (2) ``to_prune=[1, 2]`` removes indices 1 and 2
+                      (3) ``to_prune=range(1, 4)`` removes indices 1, 2 and 3
                       (4) ``to_prune=-1`` removes everything but the highest
                           index
     reroot_soma :   bool, optional
@@ -692,7 +692,7 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True,
 
     # Now get the node point with the highest flow centrality.
     cut = x.nodes[x.nodes.flow_centrality ==
-                   x.nodes.flow_centrality.max()].treenode_id.values
+                  x.nodes.flow_centrality.max()].treenode_id.values
 
     # If there is more than one point we need to get one closest to the soma
     # (root)
