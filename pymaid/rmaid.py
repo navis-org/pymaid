@@ -379,6 +379,19 @@ def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
         n.nodes.confidence = n.nodes.confidence.fillna(5)
         n.nodes.creator_id = n.nodes.creator_id.fillna(0)
 
+        # Convert columns to appropriate dtypes
+        dtypes = {'treenode_id': int, 'parent_id': object, 'x': int, 'y': int,
+                  'z': int, 'radius': int, 'confidence': int}
+
+        for k, v in dtypes.items():
+            n.nodes[k] = n.nodes[k].astype(v)
+
+        dtypes = {'treenode_id': int, 'connector_id': object, 'x': int, 'y': int,
+                  'z': int}
+
+        for k, v in dtypes.items():
+            n.connectors[k] = n.connectors[k].astype(v)
+
     return nl
 
 
@@ -575,7 +588,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
     normalize :         bool, optional
-                        If true, matrix is normalized using z-score.
+                        If True, matrix is normalized using z-score.
     n_cores :           int, optional
                         Number of cores to use for nblasting. Default is
                         ``os.cpu_count()``.
@@ -586,7 +599,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     Returns
     -------
     nblast_results
-        Instance of :class:`pymaid.rmaid.NBLASTresults` that holds distance
+        Instance of :class:`pymaid.ClustResults` that holds distance
         matrix and contains wrappers to cluster and plot data. Please use
         ``help(nblast_results)`` to learn more and see example below.
 
@@ -663,15 +676,14 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
         # Perform z-score normalization
         matrix = (matrix - matrix.mean()) / matrix.std()
 
-    logger.info('Done! Use results.plot_dendrgram() and '
+    logger.info('Done! Use results.plot_dendrogram() and '
                 'matplotlib.pyplot.show() to plot dendrogram.')
 
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
-        name_dict = x.summary().set_index('skeleton_id')[
-            'neuron_name'].to_dict()
-        res = pyclust.ClustResults(
-            matrix, labels=[name_dict[n] for n in matrix.columns],
-            mat_type='similarity')
+        name_dict = x.summary().set_index('skeleton_id')['neuron_name'].to_dict()
+        res = pyclust.ClustResults(matrix,
+                                   labels=[name_dict[n] for n in matrix.columns],
+                                   mat_type='similarity')
         res.neurons = x
         return res
     else:
