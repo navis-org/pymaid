@@ -376,6 +376,9 @@ def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
             n.nodes[['x', 'y', 'z', 'radius']] *= 1000
             n.connectors[['x', 'y', 'z']] *= 1000
 
+        n.nodes.confidence = n.nodes.confidence.fillna(5)
+        n.nodes.creator_id = n.nodes.creator_id.fillna(0)
+
     return nl
 
 
