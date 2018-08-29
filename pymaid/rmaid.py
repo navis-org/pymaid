@@ -374,7 +374,7 @@ def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
 
         if convert_to_nm:
             n.nodes[['x', 'y', 'z', 'radius']] *= 1000
-            n.connectors[['x', 'y', 'z', 'radius']] *= 1000
+            n.connectors[['x', 'y', 'z']] *= 1000
 
     return nl
 
@@ -443,7 +443,7 @@ def neuron2r(neuron, convert_to_um=False):
         if convert_to_um:
             n = n.copy()
             n.nodes[['x', 'y', 'z', 'radius']] /= 1000
-            n.connectors[['x', 'y', 'z', 'radius']] /= 1000
+            n.connectors[['x', 'y', 'z']] /= 1000
 
         # First convert into format that rcatmaid expects as server response
 
