@@ -700,6 +700,12 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
         dtype=object
     )
 
+    # Add confidences and creator (this is to prevent errors in other
+    # functions)
+    for i in range(df.shape[0]):
+        df.loc[i, 'nodes']['confidence'] = 5
+        df.loc[i, 'nodes']['creator_id'] = 0
+
     # Placeholder for graph representations of neurons
     df['igraph'] = None
     df['graph'] = None
