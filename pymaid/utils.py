@@ -705,7 +705,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # functions)
     for i in range(df.shape[0]):
         df.loc[i, 'nodes']['confidence'] = 5
-        df.n.loc[i, 'nodes']['creator_id'] = 0
+        df.loc[i, 'nodes']['creator_id'] = 0
 
     # Placeholder for graph representations of neurons
     df['igraph'] = None
