@@ -49,14 +49,19 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     Parameters
     ----------
-    x :               list of tuples | CatmaidNeuron | CatmaidNeuronList
+    x :               list of tuples | numpy.array | pandas.DataFrame | CatmaidNeuron | CatmaidNeuronList
 
-                      - if ``list/numpy.array``: needs to be shape (N,3):
-                        ``[[x1,y1,z1], [x2,y2,z2], ..]``
-                      - if ``pandas.DataFrame``: needs to have ``x,y,z`` columns
+                      - list/numpy.array is treated as list of x/y/z
+                        coordinates. Needs to be shape (N,3): e.g.
+                        ``[[x1, y1, z1], [x2, y2, z2], ..]``
+                      - ``pandas.DataFrame`` needs to have ``x, y, z`` columns
 
-    volume :          str | list of str | core.Volume
-                      :class:`pymaid.Volume` or name of a CATMAID volume to test.
+    volume :          str | pymaid.Volume | list or dict of either
+                      :class:`pymaid.Volume` or name of a CATMAID volume to
+                      test. Multiple volumes can be given as list
+                      (``[volume1, volume2, ...]``) or dict
+                      (``{'label1': volume1, ...}``) of either str or
+                      :class:`pymaid.Volume`.
     inplace :         bool, optional
                       If False, a copy of the original DataFrames/Neuron is
                       returned. Does only apply to CatmaidNeuron or
@@ -72,15 +77,18 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     -------
     CatmaidNeuron
                       If input is CatmaidNeuron or CatmaidNeuronList, will
-                      return subset of the neuron (nodes and connectors) that
-                      are within given volume.
+                      return subset of the neuron(s) (nodes and connectors)
+                      that are within given volume.
     list of bools
-                      If input is list or DataFrame, returns boolean: ``True``
-                      if in volume, ``False`` if not.
+                      If input is a set of coordinates, returns boolean:
+                      ``True`` if in volume, ``False`` if not in order.
     dict
-                      If multiple volumes are provided as list of strings,
-                      results will be returned in dictionary with volumes as
-                      keys.
+                      If multiple volumes are provided, results will be
+                      returned in dictionary with volumes as keys::
+
+                        {'volume1': in_volume(x, volume1),
+                         'volume2': in_volume(x, volume2),
+                         ... }
 
     Examples
     --------
@@ -88,8 +96,10 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     intersects.
 
     >>> # First prepare some volume names
-    >>> gloms = ['DA1','DA2', 'DA3', 'DA4l' ,'DL4', 'VA2', 'DC3', 'VM7v',
-    ... 'DC4', 'DC1', 'DM5', 'D', 'VM2', 'VC4', 'VL1', 'DM3', 'DL1', 'DP1m']
+    >>> gloms = ['v14.DA1','v14.DA2', 'v14.DA3', 'v14.DA4l' ,'v14.DL4',
+    ...          'v14.VA2', 'v14.DC3', 'v14.VM7v', 'v14.DC4', 'v14.DC1',
+    ...          'v14.DM5', 'v14.D', 'v14.VM2', 'v14.VC4', 'v14.VL1',
+    ...          'v14.DM3', 'v14.DL1', 'v14.DP1m']
     >>> # Get neuron to check
     >>> n = pymaid.get_neuron('name:PN unknown glomerulus',
     ...                       remote_instance = remote_instance )
@@ -100,8 +110,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
     >>> # Plot graph
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
-    >>> df = pd.DataFrame( list( cable.values() ),
-    ...                    index = list( cable.keys() )
+    >>> df = pd.DataFrame(list( cable.values() ),
+    ...                   index = list( cable.keys() )
     ...                   )
     >>> df.boxplot()
     >>> plt.show()
@@ -110,45 +120,51 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if isinstance(volume, (list, dict, np.ndarray)) and not isinstance(volume, core.Volume):
-        # Turn into dict
+    # If we are given multiple volumes
+    if isinstance(volume, (list, dict, np.ndarray)):
+        # Force into dict
         if not isinstance(volume, dict):
-            volume = {v.name: v for v in volume}
+            temp = {v: v for v in volume if isinstance(v, str)}
+            temp.update({v.name: v for v in volume if isinstance(v, core.Volume)})
+            volume = temp
 
         data = dict()
-        for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide, leave=config.pbar_leave):
-            data[v] = in_volume(
-                x, volume[v], remote_instance=remote_instance, inplace=False, mode=mode)
+        for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide,
+                             leave=config.pbar_leave):
+            data[v] = in_volume(x, volume[v], remote_instance=remote_instance,
+                                inplace=False, mode=mode)
         return data
 
     if isinstance(volume, str):
         volume = fetch.get_volume(volume, remote_instance)
 
+    # Make copy if necessary
+    if isinstance(x, (core.CatmaidNeuronList, core.CatmaidNeuron)):
+        if inplace is False:
+            x = x.copy()
+
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].values
     elif isinstance(x, core.CatmaidNeuron):
-        in_v = in_volume(
-            x.nodes[['x', 'y', 'z']].values, volume, mode=mode)
+        in_v = in_volume(x.nodes[['x', 'y', 'z']].values, volume)
 
         # If mode is OUT, invert selection
         if mode == 'OUT':
             in_v = ~np.array(in_v)
 
-        x = graph_utils.subset_neuron(
-            x, x.nodes[in_v].treenode_id.values, inplace=inplace)
+        x = graph_utils.subset_neuron(x, x.nodes[in_v].treenode_id.values,
+                                      inplace=True)
 
-        if not inplace:
+        if inplace is False:
             return x
-        else:
-            return
+        return
     elif isinstance(x, core.CatmaidNeuronList):
         for n in x:
-            n = in_volume(n, volume, inplace=inplace, mode=mode)
+            _ = in_volume(n, volume, inplace=True, mode=mode)
 
-        if not inplace:
+        if inplace is False:
             return x
-        else:
-            return
+        return
     else:
         points = x
 
@@ -187,8 +203,8 @@ def _in_volume_ray(points, volume):
     in_points = points[~out]
 
     # Perform ray intersection on points inside bounding box
-    rayPointList = np.array(
-        [[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in in_points], dtype=np.float32)
+    rayPointList = np.array([[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in in_points],
+                            dtype=np.float32)
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # to those that occur "above" the point we are querying
@@ -201,7 +217,8 @@ def _in_volume_ray(points, volume):
     return isin
 
 
-def _in_volume_convex(points, volume, remote_instance=None, approximate=False, ignore_axis=[]):
+def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
+                      ignore_axis=[]):
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the pointcloud changes the
     convex hull -> if yes, that point is outside the convex hull.

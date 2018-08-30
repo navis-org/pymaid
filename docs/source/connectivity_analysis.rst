@@ -19,9 +19,13 @@ to specific parts of a neuron (e.g. dendrite vs axon) or to a given volume
    :func:`~pymaid.filter_connectivity`): *they work fine with a single fragment
    per neuron* but if you pass multiple fragments of the same neuron, they will
    collapse these duplicate skeleton IDs back into a single neuron. There are
-   two ways to deal with this. Option A: run your analysis on each fragment
-   separately and merge results at the end. Option B: use the "fragment-safe"
-   functions :func:`~pymaid.adjacency_from_connectors` or
+   two ways to deal with this.
+
+   **Option A**: run your analysis on each fragment separately and merge results
+   at the end.
+
+   **Option B**: use the "fragment-safe" functions
+   :func:`~pymaid.adjacency_from_connectors` or
    :func:`~pymaid.cn_table_from_connectors`. Both functions are able to deal
    with non-unique skeleton IDs. Because they bypass higher level CATMAID API
    and regenerate connectivity from scratch they are somewhat slow though.

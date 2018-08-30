@@ -78,14 +78,15 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
 
     if isinstance(x, core.CatmaidNeuronList):
         results = [resample_neuron(x[i], resample_to,
-                                  method='method', inplace=inplace,
-                                  skip_errors=skip_errors)
+                                   method=method, inplace=inplace,
+                                   skip_errors=skip_errors)
                    for i in config.trange(x.shape[0],
                                           desc='Resampl. neurons',
                                           disable=config.pbar_hide,
                                           leave=config.pbar_leave)]
         if not inplace:
             return core.CatmaidNeuronList(results)
+        return
     elif not isinstance(x, core.CatmaidNeuron):
         logger.error('Unexpected datatype: %s' % str(type(x)))
         raise ValueError
@@ -104,8 +105,10 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     errors = 0
 
     # Iterate over segments
-    for i, seg in enumerate(config.tqdm(x.small_segments, desc='Proc. segments',
-                                        disable=config.pbar_hide, leave=False)):
+    for i, seg in enumerate(config.tqdm(x.small_segments,
+                                        desc='Proc. segments',
+                                        disable=config.pbar_hide,
+                                        leave=False)):
         # Get coordinates
         coords = locs.loc[seg].values.astype(float)
         # Get radii
@@ -172,16 +175,19 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         max_tn_id += len(new_ids)
 
     if errors:
-        logger.warning(
-            '{} ({:.0%}) segments skipped due to errors'.format(errors, errors / i))
+        logger.warning('{} ({:.0%}) segments skipped due to '
+                       'errors'.format(errors, errors / i))
 
     # Add root node(s)
     root = x.root
     if not isinstance(root, (np.ndarray, list)):
         root = [x.root]
-    root = x.nodes.loc[x.nodes.treenode_id.isin(root), [
-        'treenode_id', 'parent_id', 'creator_id', 'x', 'y',
-        'z', 'radius', 'confidence']]
+    root = x.nodes.loc[x.nodes.treenode_id.isin(root), ['treenode_id',
+                                                        'parent_id',
+                                                        'creator_id',
+                                                        'x', 'y', 'z',
+                                                        'radius',
+                                                        'confidence']]
     new_nodes += [list(r) for r in root.values]
 
     # Generate new nodes dataframe

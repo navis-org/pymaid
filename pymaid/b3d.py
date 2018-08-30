@@ -20,23 +20,24 @@ not automatically imported as it only works from within Blender.
 
 Examples
 --------
->>> import pymaid
 >>> # b3d module has to be imported explicitly
 >>> from pymaid import b3d
->>> # Initialise connection to CATMAID server
->>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
 >>> # Load a bunch of neurons
 >>> neuronlist = pymaid.get_neuron('annotation:glomerulus DA1')
 >>> handler = b3d.handler()
 >>> # Export neurons into Blender
->>> handler.add( neuronlist )
+>>> handler.add(neuronlist)
 >>> # Colorize
 >>> handler.colorize()
 >>> # Change bevel
->>> handler.bevel( .05 )
+>>> handler.bevel(.05)
 >>> # Select subset and set color
->>> handler.select( nl[:10] ).color(1,0,0)
+>>> handler.select(nl[:10]).color(1, 0, 0)
 """
+
+# Important bit of advice:
+# Avoid operators ("bpy.ops.") as much as possible:
+# They cause scene updates which will exponentially slow down processing
 
 import pandas as pd
 import numpy as np
@@ -94,19 +95,19 @@ class handler:
     >>> # b3d module has to be imported explicitly
     >>> from pymaid import b3d
     >>> # Get some neurons (you have already set up a remote instance?)
-    >>> nl = pymaid.CatmaidNeuronList( [ 12345, 67890 ] )
+    >>> nl = pymaid.CatmaidNeuronList([12345, 67890])
     >>> # Initialize handler
     >>> handler = b3d.handler()
     >>> # Add neurons
-    >>> handler.add( nl )
+    >>> handler.add(nl)
     >>> # Assign colors to all neurons
     >>> handler.colorize()
     >>> # Select all somas and change color to black
-    >>> handler.soma.color(0,0,0)
+    >>> handler.soma.color(0, 0, 0)
     >>> # Clear scene
     >>> handler.clear()
     >>> # Add only soma
-    >>> handler.add( nl, neurites=False, connectors=False )
+    >>> handler.add(nl, neurites=False, connectors=False)
     """
     cn_dict = {
         0: dict(name='presynapses',
@@ -179,6 +180,8 @@ class handler:
             exists = [ob.get('skeleton_id', None) for ob in bpy.data.objects]
 
         if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+            if redraw:
+                print('Set "redraw=False" to vastly speed up import!')
             if isinstance(x, core.CatmaidNeuron):
                 x = [x]
             wm = bpy.context.window_manager
@@ -199,11 +202,10 @@ class handler:
         elif isinstance(x, np.ndarray):
             self._create_scatter(x, **kwargs)
         else:
-            logger.error(
-                'Unable to interpret data type ' + str(type(x)))
+            logger.error('Unable to interpret data type ' + str(type(x)))
             raise AttributeError('Unable to add data of type' + str(type(x)))
 
-        print('Import done in {:.2}s'.format(time.time()-start))
+        print('Import done in {:.2f}s'.format(time.time() - start))
 
         return
 
@@ -218,7 +220,7 @@ class handler:
             raise ValueError('Array must be of shape N,3')
 
         # Get & scale coordinates and invert y
-        coords = x.astype(float)[:,[0, 2, 1]]
+        coords = x.astype(float)[:, [0, 2, 1]]
         coords *= float(self.conversion)
         coords *= [1, 1, -1]
 
@@ -243,9 +245,9 @@ class handler:
 
         mesh = bpy.data.meshes.new(kwargs.get('name', 'scatter'))
         mesh.from_pydata(verts, [], sp_faces)
+        mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
         obj = bpy.data.objects.new(kwargs.get('name', 'scatter'), mesh)
         bpy.context.scene.objects.link(obj)
-        bpy.ops.object.shade_smooth()
         obj.location = (0, 0, 0)
         obj.show_name = False
 
@@ -283,7 +285,7 @@ class handler:
         n_verts = 0
         for i, s in enumerate(x.segments):
             # Get and convert coordinates
-            coords = nodes.loc[s, ['x','y','z']].values.astype(float)
+            coords = nodes.loc[s, ['x', 'y', 'z']].values.astype(float)
             coords *= float(self.conversion)
 
             # Compute edge indices
@@ -303,7 +305,7 @@ class handler:
         edges = np.vstack(edges)
 
         # Swap z and y and invert y coords
-        verts = verts[:,[0, 2, 1]] * np.array([1, 1, -1])
+        verts = verts[:, [0, 2, 1]] * np.array([1, 1, -1])
 
         # Add all data at once
         mesh.from_pydata(verts, edges.astype(int), [])
@@ -318,11 +320,12 @@ class handler:
         ob['catmaid_object'] = True
         ob['skeleton_id'] = x.skeleton_id
 
-        # Link object to scene - this needs to happen BEFORE we convert to curve
+        # Link object to scene - this needs to happen BEFORE we convert to
+        # curve
         bpy.context.scene.objects.link(ob)
 
         # Select and make active object
-        ob.select=True
+        ob.select = True
         bpy.context.scene.objects.active = ob
 
         # Convert from mesh to curve
@@ -349,11 +352,12 @@ class handler:
         cu.bevel_resolution = 5
         cu.bevel_depth = 0.007
 
-        #DO NOT touch this: lookup via dict is >10X faster!
-        tn_coords = {r.treenode_id: (r.x * self.conversion, r.z * self.conversion, r.y * -self.conversion) for r in x.nodes.itertuples()}
+        # DO NOT touch this: lookup via dict is >10X faster!
+        tn_coords = {r.treenode_id: (r.x * self.conversion,
+                                     r.z * self.conversion,
+                                     r.y * -self.conversion) for r in x.nodes.itertuples()}
         if use_radii:
             tn_radii = {r.treenode_id: r.radius * self.conversion for r in x.nodes.itertuples()}
-
 
         for s in x.segments:
             sp = cu.splines.new('POLY')
@@ -383,18 +387,13 @@ class handler:
     def _create_soma(self, x, mat):
         """ Create soma """
         s = x.nodes.set_index('treenode_id').ix[x.soma]
-        loc = s[['x', 'z', 'y']].values * self.conversion * [1 ,1 ,-1]
+        loc = s[['x', 'z', 'y']].values * self.conversion * [1, 1, -1]
         rad = s.radius * self.conversion
 
         mesh = bpy.data.meshes.new('Soma of #{0} - mesh'.format(x.skeleton_id))
         soma_ob = bpy.data.objects.new('Soma of #{0}'.format(x.skeleton_id), mesh)
 
-        # Add the object into the scene.
-        bpy.context.scene.objects.link(soma_ob)
-        bpy.context.scene.objects.active = soma_ob
-
-        soma_ob.location=loc
-        soma_ob.select = True
+        soma_ob.location = loc
 
         # Construct the bmesh cube and assign it to the blender mesh.
         bm = bmesh.new()
@@ -402,13 +401,17 @@ class handler:
         bm.to_mesh(mesh)
         bm.free()
 
-        bpy.ops.object.shade_smooth()
-        bpy.context.active_object.name = 'Soma of #{0}'.format(x.skeleton_id)
-        bpy.context.active_object['type'] = 'SOMA'
-        bpy.context.active_object['catmaid_object'] = True
-        bpy.context.active_object['skeleton_id'] = x.skeleton_id
+        mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
 
-        bpy.context.scene.objects.active.active_material = mat
+        soma_ob.name = 'Soma of #{0}'.format(x.skeleton_id)
+        soma_ob['type'] = 'SOMA'
+        soma_ob['catmaid_object'] = True
+        soma_ob['skeleton_id'] = x.skeleton_id
+
+        soma_ob.active_material = mat
+
+        # Add the object into the scene.
+        bpy.context.scene.objects.link(soma_ob)
 
         return
 
@@ -435,7 +438,8 @@ class handler:
             tn_coords = np.c_[tn_coords, [0] * con.shape[0]]
 
             # Combine cn and tn coords in pairs
-            # This will have to be transposed to get pairs of cn and tn (see below)
+            # This will have to be transposed to get pairs of cn and tn
+            # (see below)
             coords = np.dstack([cn_coords, tn_coords])
 
             ob_name = '%s of %s' % (self.cn_dict[i]['name'], x.skeleton_id)
@@ -446,7 +450,6 @@ class handler:
             ob['catmaid_object'] = True
             ob['cn_type'] = i
             ob['skeleton_id'] = x.skeleton_id
-            bpy.context.scene.objects.link(ob)
             ob.location = (0, 0, 0)
             ob.show_name = False
             cu.dimensions = '3D'
@@ -472,6 +475,8 @@ class handler:
                                          bpy.data.materials.new(mat_name))
             mat.diffuse_color = self.cn_dict[i]['color']
             ob.active_material = mat
+
+            bpy.context.scene.objects.link(ob)
 
         return
 
@@ -505,10 +510,10 @@ class handler:
         scn.objects.active = ob
         ob.select = True
 
-        me.from_pydata(list(blender_verts), [], volume.faces)
+        me.from_pydata(list(blender_verts), [], list(volume.faces))
         me.update()
 
-        bpy.ops.object.shade_smooth()
+        me.polygons.foreach_set('use_smooth', [True] * len(me.polygons))
 
     def select(self, x, *args):
         """ Select given neurons.
@@ -523,13 +528,13 @@ class handler:
 
         Examples
         --------
-        >>> selection = handler.select( [123456,7890] )
+        >>> selection = handler.select([123456, 7890])
         >>> # Get only connectors
         >>> cn = selection.connectors
         >>> # Hide everything else
         >>> cn.hide_others()
         >>> # Change color of presynapses
-        >>> selection.presynapses.color( 0, 1, 0 )
+        >>> selection.presynapses.color(0, 1, 0)
         """
 
         skids = utils.eval_skids(x)
@@ -564,7 +569,7 @@ class handler:
         This will only change color of neurons, if you want to change
         color of e.g. connectors, use:
 
-        >>> handler.connectors.color( r,g,b )
+        >>> handler.connectors.color(r, g, b)
         """
         self.neurons.color(r, g, b)
 
@@ -605,7 +610,7 @@ class handler:
         This will only change bevel of neurons, if you want to change
         bevel of e.g. connectors, use:
 
-        >>> handler.connectors.bevel( .02 )
+        >>> handler.connectors.bevel(.02)
         """
         self.neurons.bevel_depth(r)
 
@@ -627,10 +632,11 @@ class object_list:
     1.  Object_lists should normally be constructed via the handler
         (see :class:`pymaid.b3d.handler`)!
     2.  List works with object NAMES to prevent Blender from crashing when
-        trying to access neurons that do not exist anymore. This also means that
-        changing names manually will compromise a object list.
+        trying to access neurons that do not exist anymore. This also means
+        that changing names manually will compromise a object list.
     3.  Accessing a neuron list's attributes (see below) return another
-        ``object_list`` class which you can use to manipulate the new subselection.
+        ``object_list`` class which you can use to manipulate the new
+        subselection.
 
     Attributes
     ----------
@@ -645,17 +651,15 @@ class object_list:
 
     Examples
     --------
-    >>> import pymaid
     >>> # b3d module has to be import explicitly
     >>> from pymaid import b3d
-    >>> rm = pymaid.CatmaidInstance( 'server_url', 'user', 'pw', 'token' )
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> handler = b3d.handler()
-    >>> handler.add( nl )
+    >>> handler.add(nl)
     >>> # Select only neurons on the right
     >>> right = handler.select('annotation:uPN right')
     >>> # This can be nested to change e.g. color of all right presynases
-    >>> handler.select('annotation:uPN right').presynapses.color( 0, 1, 0 )
+    >>> handler.select('annotation:uPN right').presynapses.color(0, 1, 0)
 
     """
 
@@ -841,7 +845,6 @@ def CalcSphere(radius, nrPolar, nrAzimuthal):
     dPolar = math.pi / (nrPolar - 1)
     dAzimuthal = 2.0 * math.pi / (nrAzimuthal)
 
-
     # 1/2: vertices
     verts = []
     currV = mathutils.Vector((0.0, 0.0, radius))        # top vertex
@@ -862,7 +865,6 @@ def CalcSphere(radius, nrPolar, nrAzimuthal):
             verts.append(currV)
     currV = mathutils.Vector((0.0, 0.0, - radius))        # bottom vertex
     verts.append(currV)
-
 
     # 2/2: faces
     faces = []

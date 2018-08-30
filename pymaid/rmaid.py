@@ -61,7 +61,7 @@ import numpy as np
 from colorsys import hsv_to_rgb
 
 import pymaid.cluster as pyclust
-from pymaid import core, fetch, plotting, config
+from pymaid import core, fetch, plotting, config, utils
 
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
@@ -86,7 +86,8 @@ except:
         'R library "nat" not found! Please install from within R.')
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
-                  'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall'])
+                  'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall',
+                  'get_neuropil'])
 
 
 def init_rcatmaid(**kwargs):
@@ -144,7 +145,7 @@ def init_rcatmaid(**kwargs):
     # Import R Catmaid
     try:
         catmaid = importr('catmaid')
-    except:
+    except BaseException:
         logger.error(
             'RCatmaid not found. Please install before proceeding.')
         return None
@@ -156,8 +157,10 @@ def init_rcatmaid(**kwargs):
     catmaid.token = authtoken
 
     # Create the connection
-    con = catmaid.catmaid_connection(
-        server=catmaid.server, authname=catmaid.authname, authpassword=catmaid.authpassword, token=catmaid.token)
+    con = catmaid.catmaid_connection(server=catmaid.server,
+                                     authname=catmaid.authname,
+                                     authpassword=catmaid.authpassword,
+                                     token=catmaid.token)
 
     # Login
     catmaid.catmaid_login(con)
@@ -190,8 +193,9 @@ def data2py(data, **kwargs):
     """
 
     if 'neuronlistfh' in cl(data):
-        logger.error(
-            'On-demand neuronlist found. Conversion cancelled to prevent loading large datasets in memory. Please use rmaid.dotprops2py() and its "subset" parameter.')
+        logger.error('On-demand neuronlist found. Conversion cancelled to '
+                     'prevent loading large datasets in memory. Please use '
+                     'rmaid.dotprops2py() and its "subset" parameter.')
         return None
     elif 'neuronlist' in cl(data):
         if 'catmaidneuron' in cl(data[0]):
@@ -249,8 +253,8 @@ def data2py(data, **kwargs):
                                    'reverse_score', 'mu_score']
                           )
 
-        logger.info(
-            'Returning only nblast results. Neuron object is stored in your original_data[2].')
+        logger.info('Returning only nblast results. Neuron object is stored '
+                    'in your original_data[2].')
         return df
     else:
         logger.error(
@@ -258,7 +262,7 @@ def data2py(data, **kwargs):
         return data
 
 
-def neuron2py(neuron, remote_instance=None):
+def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
     """ Converts an rcatmaid ``neuron`` or ``neuronlist`` object to a PyMaid
     :class:`~pymaid.CatmaidNeuron`/:class:`~pymaid.CatmaidNeuronList`.
 
@@ -269,6 +273,8 @@ def neuron2py(neuron, remote_instance=None):
     ----------
     neuron :            R neuron | R neuronlist
                         Neuron to convert to Python
+    convert_to_nm :     bool, optional
+                        If True will convert from um to nm.
     remote_instance :   CATMAID instance, optional
                         Provide if you want neuron names to be updated from.
 
@@ -279,8 +285,8 @@ def neuron2py(neuron, remote_instance=None):
 
     if 'rpy2' in str(type(neuron)):
         if cl(neuron)[0] == 'neuronlist':
-            neuron_list = pd.DataFrame(
-                data=[[data2py(e) for e in n] for n in neuron], columns=list(neuron[0].names))
+            neuron_list = pd.DataFrame(data=[[data2py(e) for e in n] for n in neuron],
+                                       columns=list(neuron[0].names))
             # neuron_list.columns =  data.names #[ 'NumPoints',
             # 'StartPoint','BranchPoints','EndPoints','nTrees', 'NumSeqs',
             # 'SegList', 'd', 'skid', 'connectors', 'tags','url', 'headers'  ]
@@ -298,7 +304,8 @@ def neuron2py(neuron, remote_instance=None):
             # 'SegList', 'd', 'skid', 'connectors', 'tags','url', 'headers'  ]
         neuron = neuron_list
 
-    remote_instance = utils._eval_remote_instance(remote_instance, raise_error=False)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
 
     # Nat function may return neuron objects that have ONLY nodes - no
     # connectors, skeleton_id, name or tags!
@@ -323,14 +330,14 @@ def neuron2py(neuron, remote_instance=None):
                          'creator_id', 'x', 'y', 'z', 'radius', 'confidence']
         nodes.loc[nodes.parent_id == -1, 'parent_id'] = None
 
-        if 'connectors' in neuron:
+        if 'connectors' in neuron and isinstance(neuron.loc[i, 'connectors'], pd.DataFrame):
             connectors = pd.DataFrame([[cn.treenode_id, cn.connector_id, cn.prepost, cn.x, cn.y, cn.z]
                                        for cn in neuron.loc[i, 'connectors'].itertuples()], dtype=object)
             connectors.columns = ['treenode_id',
                                   'connector_id', 'relation', 'x', 'y', 'z']
         else:
-            connectors = pd.DataFrame(
-                columns=['treenode_id', 'connector_id', 'relation', 'x', 'y', 'z'])
+            connectors = pd.DataFrame(columns=['treenode_id', 'connector_id',
+                                               'relation', 'x', 'y', 'z'])
 
         if 'skid' in neuron:
             skid = neuron.loc[i, 'skid'][0]
@@ -351,15 +358,41 @@ def neuron2py(neuron, remote_instance=None):
     if 'tags' in neuron:
         df['tags'] = neuron.tags.tolist()
     else:
-        df['tags'] = [{} for n in df.skeleton_id.tolist()]
+        df['tags'] = [{} for n in df.skeleton_id.values]
 
     if 'skid' in neuron and neuron_names is not None:
-        df['neuron_name'] = [neuron_names[
-            str(n)] for n in df.skeleton_id.tolist()]
+        df['neuron_name'] = [neuron_names.get(str(n), 'NA') for n in df.skeleton_id.values]
     else:
-        df['neuron_name'] = ['NA' for n in df.skeleton_id.tolist()]
+        df['neuron_name'] = ['NA' for n in df.skeleton_id.values]
 
-    return core.CatmaidNeuronList(df, remote_instance=remote_instance)
+    nl = core.CatmaidNeuronList(df, remote_instance=remote_instance)
+
+    # Do some clean up
+    for n in nl:
+        if not isinstance(n.tags, dict):
+            n.tags = {}
+
+        if convert_to_nm:
+            n.nodes[['x', 'y', 'z', 'radius']] *= 1000
+            n.connectors[['x', 'y', 'z']] *= 1000
+
+        n.nodes.confidence = n.nodes.confidence.fillna(5)
+        n.nodes.creator_id = n.nodes.creator_id.fillna(0)
+
+        # Convert columns to appropriate dtypes
+        dtypes = {'treenode_id': int, 'parent_id': object, 'x': int, 'y': int,
+                  'z': int, 'radius': int, 'confidence': int}
+
+        for k, v in dtypes.items():
+            n.nodes[k] = n.nodes[k].astype(v)
+
+        dtypes = {'treenode_id': int, 'connector_id': object, 'x': int, 'y': int,
+                  'z': int}
+
+        for k, v in dtypes.items():
+            n.connectors[k] = n.connectors[k].astype(v)
+
+    return nl
 
 
 def neuron2r(neuron, convert_to_um=False):
@@ -390,7 +423,8 @@ def neuron2r(neuron, convert_to_um=False):
         """
         The way neuronlist are constructed is a bit more complicated:
         They are essentially named lists { 'neuronA' : neuronobject, ... }
-        BUT they also contain a dataframe that holds a DataFrame as attribute ( attr('df') = df )
+        BUT they also contain a dataframe that holds a DataFrame as attribute
+        ( attr('df') = df )
         This dataframe looks like this
 
                 pid   skid     name
@@ -424,7 +458,7 @@ def neuron2r(neuron, convert_to_um=False):
 
         if convert_to_um:
             n = n.copy()
-            n.nodes[['x', 'y', 'z']] /= 1000
+            n.nodes[['x', 'y', 'z', 'radius']] /= 1000
             n.connectors[['x', 'y', 'z']] /= 1000
 
         # First convert into format that rcatmaid expects as server response
@@ -433,7 +467,7 @@ def neuron2r(neuron, convert_to_um=False):
         # replaced with -1
         parents = np.array(n.nodes.parent_id.values)
         # should technically be robjects.r('-1L')
-        parents[parents == None] = -1
+        parents[parents == None] = -1 # DO NOT turn this into "parents is None"!
 
         swc = robjects.DataFrame({'PointNo': robjects.IntVector(n.nodes.treenode_id.tolist()),
                                   'Label': robjects.IntVector([0] * n.nodes.shape[0]),
@@ -554,7 +588,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only skeleton IDs are provided
     normalize :         bool, optional
-                        If true, matrix is normalized using z-score.
+                        If True, matrix is normalized using z-score.
     n_cores :           int, optional
                         Number of cores to use for nblasting. Default is
                         ``os.cpu_count()``.
@@ -565,7 +599,7 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     Returns
     -------
     nblast_results
-        Instance of :class:`pymaid.rmaid.NBLASTresults` that holds distance
+        Instance of :class:`pymaid.ClustResults` that holds distance
         matrix and contains wrappers to cluster and plot data. Please use
         ``help(nblast_results)`` to learn more and see example below.
 
@@ -612,23 +646,25 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
         raise ValueError('You have to provide more than a single neuron.')
     elif isinstance(x, list):
         if not remote_instance:
-            logger.error(
-                'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
+            logger.error('You have to provide a CATMAID instance using the '
+                         '<remote_instance> parameter. See help(rmaid.nblast) '
+                         'for details.')
             return
         x = fetch.get_neuron(x, remote_instance)
         rn = neuron2r(x, convert_to_um=True)
     else:
-        logger.error(
-            'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
-        raise ValueError(
-            'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
+        logger.error('Unable to intepret <neuron> parameter provided. See '
+                     'help(rmaid.nblast) for details.')
+        raise ValueError('Unable to intepret <neuron> parameter provided. See'
+                         'help(rmaid.nblast) for details.')
 
     # Make dotprops and resample
     xdp = nat.dotprops(rn, k=5, resample=1)
 
     # Calculate scores
-    scores = r_nblast.nblast(
-        xdp, xdp, **{'normalised': False, '.parallel': True, 'UseAlpha': UseAlpha})
+    scores = r_nblast.nblast(xdp, xdp, **{'normalised': False,
+                                          '.parallel': True,
+                                          'UseAlpha': UseAlpha})
 
     # Generate matrix with skeleton IDs as indices/columns
     matrix = pd.DataFrame(np.array(scores),
@@ -640,23 +676,24 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
         # Perform z-score normalization
         matrix = (matrix - matrix.mean()) / matrix.std()
 
-    logger.info(
-        'Done! Use results.plot_dendrgram() and matplotlib.pyplot.show() to plot dendrogram.')
+    logger.info('Done! Use results.plot_dendrogram() and '
+                'matplotlib.pyplot.show() to plot dendrogram.')
 
     if isinstance(x, core.CatmaidNeuronList) or isinstance(x, pd.DataFrame):
-        name_dict = x.summary().set_index('skeleton_id')[
-            'neuron_name'].to_dict()
-        res = pyclust.ClustResults(
-            matrix, labels=[name_dict[n] for n in matrix.columns],
-            mat_type='similarity')
+        name_dict = x.summary().set_index('skeleton_id')['neuron_name'].to_dict()
+        res = pyclust.ClustResults(matrix,
+                                   labels=[name_dict[n] for n in matrix.columns],
+                                   mat_type='similarity')
         res.neurons = x
         return res
     else:
         return pyclust.ClustResults(matrix, mat_type='similarity')
 
 
-def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), reverse=False, normalised=True, UseAlpha=False, mirror=True, reference='nat.flybrains::FCWB'):
-    """ Wrapper to use R's nblast (https://github.com/jefferis/nat). 
+def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
+           reverse=False, normalised=True, UseAlpha=False, mirror=True,
+           reference='nat.flybrains::FCWB'):
+    """ Wrapper to use R's nblast (https://github.com/jefferis/nat).
 
     Provide neuron to nblast either as skeleton ID or neuron object. This
     essentially recapitulates what `elmr's <https://github.com/jefferis/elmr>`_
@@ -746,18 +783,18 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     try:
         flycircuit = importr('flycircuit')
         datadir = robjects.r('getOption("flycircuit.datadir")')[0]
-    except:
+    except BaseException:
         logger.error('R Flycircuit not found.')
 
-    if db == None:
+    if db is None:
         if not os.path.isfile(datadir + '/dpscanon.rds'):
-            logger.error(
-                'Unable to find default DPS database dpscanon.rds in flycircuit.datadir. Please provide database using db parameter.')
+            logger.error('Unable to find default DPS database dpscanon.rds in '
+                         'flycircuit.datadir. Please provide database using '
+                         'db parameter.')
             return
-        logger.info(
-            'DPS database not explicitly provided. Loading local FlyCircuit DB from dpscanon.rds')
-        dps = robjects.r('read.neuronlistfh("%s")' %
-                         (datadir + '/dpscanon.rds'))
+        logger.info('DPS database not explicitly provided. Loading local '
+                    'FlyCircuit DB from dpscanon.rds')
+        dps = robjects.r('read.neuronlistfh("%s")' %(datadir + '/dpscanon.rds'))
     elif isinstance(db, str):
         if db.startswith('http') or '/' in db:
             dps = robjects.r('read.neuronlistfh("%s")' % db)
@@ -766,29 +803,30 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
     elif 'rpy2' in str(type(db)):
         dps = db
     else:
-        logger.error(
-            'Unable to process the DPS database you have provided. See help(rmaid.nblast) for details.')
+        logger.error('Unable to process the DPS database you have provided. '
+                     'See help(rmaid.nblast) for details.')
         return
 
     if 'rpy2' in str(type(neuron)):
         rn = neuron
     elif isinstance(neuron, pd.DataFrame) or isinstance(neuron, core.CatmaidNeuronList):
         if neuron.shape[0] > 1:
-            logger.warning(
-                'You provided more than a single neuron. Blasting only against the first: %s' % neuron.ix[0].neuron_name)
+            logger.warning('You provided more than a single neuron. Blasting '
+                           'only against the first: %s' % neuron.ix[0].neuron_name)
         rn = neuron2r(neuron.ix[0], convert_to_um=False)
     elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
         rn = neuron2r(neuron, convert_to_um=False)
     elif isinstance(neuron, str) or isinstance(neuron, int):
         if not remote_instance:
-            logger.error(
-                'You have to provide a CATMAID instance using the <remote_instance> parameter. See help(rmaid.nblast) for details.')
+            logger.error('You have to provide a CATMAID instance using the '
+                         '<remote_instance> parameter. See help(rmaid.nblast) '
+                         'for details.')
             return
         rn = neuron2r(fetch.get_neuron(
             neuron, remote_instance), convert_to_um=False)
     else:
-        logger.error(
-            'Unable to intepret <neuron> parameter provided. See help(rmaid.nblast) for details.')
+        logger.error('Unable to intepret <neuron> parameter provided. See '
+                     'help(rmaid.nblast) for details.')
         return
 
     # Bring catmaid neuron into reference brain space -> this also converts to
@@ -831,8 +869,11 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
 
         # Use ".rx()" like "[]" and "rx2()" like "[[]]" to extract subsets of R
         # objects
-        scr = r_nblast.nblast(nat.neuronlist(xdp), dps.rx(robjects.StrVector(sc_df.name.tolist(
-        )[:nrev])), **{'normalised': normalised, '.parallel': True, 'UseAlpha': UseAlpha})
+        scr = r_nblast.nblast(nat.neuronlist(xdp),
+                              dps.rx(robjects.StrVector(sc_df.name.tolist()[:nrev])),
+                              **{'normalised': normalised,
+                                 '.parallel': True,
+                                 'UseAlpha': UseAlpha})
     else:
         sc = r_nblast.nblast(nat.neuronlist(xdp), dps, **
                              {'normalised': normalised, '.parallel': True})
@@ -845,8 +886,11 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
 
         # Use ".rx()" like "[]" and "rx2()" like "[[]]" to extract subsets of R
         # objects
-        scr = r_nblast.nblast(dps.rx(robjects.StrVector(sc_df.name.tolist()[:nrev])), nat.neuronlist(
-            xdp), **{'normalised': normalised, '.parallel': True, 'UseAlpha': UseAlpha})
+        scr = r_nblast.nblast(dps.rx(robjects.StrVector(sc_df.name.tolist()[:nrev])),
+                              nat.neuronlist(xdp),
+                              **{'normalised': normalised,
+                                 '.parallel': True,
+                                 'UseAlpha': UseAlpha})
 
     sc_df.set_index('name', inplace=True, drop=True)
 
@@ -856,10 +900,13 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(), revers
                                'reverse_score', 'mu_score']
                       )
 
-    logger.info('Blasting done in %s seconds' %
-                       round(time.time() - start_time))
+    logger.info('Blasting done in %s seconds' % round(time.time() - start_time))
 
-    return NBLASTresults(df, sc, scr, rn, xdp, dps, {'mirror': mirror, 'reference': reference, 'UseAlpha': UseAlpha, 'normalised': normalised, 'reverse': reverse})
+    return NBLASTresults(df, sc, scr, rn, xdp, dps, {'mirror': mirror,
+                                                     'reference': reference,
+                                                     'UseAlpha': UseAlpha,
+                                                     'normalised': normalised,
+                                                     'reverse': reverse})
 
 
 class NBLASTresults:
@@ -1021,6 +1068,6 @@ class NBLASTresults:
             elif isinstance(entries[0], str):
                 return self.db.rx(robjects.StrVector(entries))
         else:
-            logger.error(
-                'Unable to intepret entries provided. See help(NBLASTresults.plot3d) for details.')
+            logger.error('Unable to intepret entries provided. See '
+                         'help(NBLASTresults.plot3d) for details.')
             return None

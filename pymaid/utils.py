@@ -22,6 +22,7 @@ import numpy as np
 import json
 import pandas as pd
 import uuid
+import random
 import csv
 
 from pymaid import core, fetch, config
@@ -280,8 +281,8 @@ def _eval_remote_instance(remote_instance, raise_error=True):
             return globals()['remote_instance']
         else:
             if raise_error:
-                raise Exception(
-                    'Please either pass a CATMAID instance or define globally as "remote_instance" ')
+                raise Exception('Please either pass a CATMAID instance or '
+                                'define globally as "remote_instance" ')
             else:
                 logger.warning('No global remote instance found.')
     elif not isinstance(remote_instance, fetch.CatmaidInstance):
@@ -361,10 +362,11 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
         return [x.skeleton_id]
     elif isinstance(x, core.CatmaidNeuronList):
         if len(x.skeleton_id) != len(set(x.skeleton_id)) and warn_duplicates:
-            logger.warning('Duplicate skeleton IDs found in neuronlist. ' +
-                           'The function you are using might not respect ' +
-                           'fragments of the same neuron. For explanation see ' +
-                           'http://pymaid.readthedocs.io/en/latest/source/connectivity_analysis.html.')
+            logger.warning('Duplicate skeleton IDs found in neuronlist. '
+                           'The function you are using might not respect '
+                           'fragments of the same neuron. For explanation see '
+                           'http://pymaid.readthedocs.io/en/latest/source/conn'
+                           'ectivity_analysis.html.')
         return list(x.skeleton_id)
     elif isinstance(x, pd.DataFrame):
         if 'skeleton_id' not in x.columns:
@@ -376,8 +378,8 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
         elif 'skeleton_id' in x:
             return [x.skeleton_id]
         else:
-            raise ValueError(
-                'Unable to extract skeleton ID from Pandas series {0}'.format(x))
+            raise ValueError('Unable to extract skeleton ID from Pandas '
+                             'series {0}'.format(x))
     elif isinstance(x, type(None)):
         return None
     else:
@@ -440,8 +442,8 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
                     logger.warning(
                         'User "{0}" not found. Skipping...'.format(u))
                 elif len(found) > 1:
-                    logger.warning(
-                        'Multiple matching entries for "{0}" found. Skipping...'.format(u))
+                    logger.warning('Multiple matching entries for '
+                                   '"{0}" found. Skipping...'.format(u))
                 else:
                     user_ids.append(int(found[0]))
 
@@ -595,7 +597,8 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
              post_label=None):
     """ Generate neuron object from SWC file.
 
-    This import is following format specified `here <http://research.mssm.edu/cnic/swc.html>`_
+    This import is following format specified
+    `here <http://research.mssm.edu/cnic/swc.html>`_
 
     Important
     ---------
@@ -639,7 +642,9 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                                                             leave=config.pbar_leave)])
 
     if not neuron_id:
-        neuron_id = uuid.uuid4().int
+        # Use 30 bit - 32bit raises error when converting to R StrVector
+        neuron_id = random.getrandbits(30)
+        #neuron_id = uuid.uuid4().int
 
     if not neuron_name:
         neuron_name = os.path.basename(f)
@@ -695,6 +700,12 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
         dtype=object
     )
 
+    # Add confidences and creator (this is to prevent errors in other
+    # functions)
+    for i in range(df.shape[0]):
+        df.loc[i, 'nodes']['confidence'] = 5
+        df.loc[i, 'nodes']['creator_id'] = 0
+
     # Placeholder for graph representations of neurons
     df['igraph'] = None
     df['graph'] = None
@@ -717,7 +728,8 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
 def to_swc(x, filename=None, export_synapses=False, min_radius=0):
     """ Generate SWC file from neuron(s).
 
-    Follows the format specified `here <http://research.mssm.edu/cnic/swc.html>`_.
+    Follows the format specified
+    `here <http://research.mssm.edu/cnic/swc.html>`_.
 
     Important
     ---------
@@ -761,8 +773,8 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
         return
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise ValueError(
-                'Can only process CatmaidNeurons, got "{}"'.format(type(x)))
+        raise ValueError('Can only process CatmaidNeurons, '
+                         'got "{}"'.format(type(x)))
 
     # If not specified, generate generic filename
     if isinstance(filename, type(None)):
@@ -770,8 +782,8 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     # Check if filename is of correct type
     if not isinstance(filename, str):
-        raise ValueError(
-                'Filename must be str or None, got "{}"'.format(type(filename)))
+        raise ValueError('Filename must be str or None, '
+                         'got "{}"'.format(type(filename)))
 
     # Make sure file ending is correct
     if not filename.endswith('.swc'):
@@ -798,6 +810,9 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     # Set Label column to 0 (undefined)
     this_tn['label'] = 0
+    # Add end/branch labels
+    this_tn.loc[this_tn.type == 'branch', 'label'] = 5
+    this_tn.loc[this_tn.type == 'end', 'label'] = 6
     # Add soma label
     if x.soma:
         this_tn.loc[x.soma, 'label'] = 1
@@ -805,8 +820,6 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
         # Add synapse label
         this_tn.loc[x.presynapses.treenode_id.values, 'label'] = 7
         this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
-    this_tn.loc[this_tn.type=='branch', 'label'] = 5
-    this_tn.loc[this_tn.type=='end', 'label'] = 6
 
     # Make sure we don't have too small radii
     if min_radius:
@@ -814,7 +827,8 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     # Generate table consisting of PointNo Label X Y Z Radius Parent
     # .copy() is to prevent pandas' chaining warnings
-    swc = this_tn[['index', 'label', 'x', 'y', 'z', 'radius', 'parent_ix']].copy()
+    swc = this_tn[['index', 'label', 'x', 'y', 'z',
+                   'radius', 'parent_ix']].copy()
 
     # Adjust column titles
     swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']

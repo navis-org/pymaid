@@ -42,6 +42,7 @@ Treenodes
 
     ~pymaid.get_treenode_table
     ~pymaid.get_treenode_info
+    ~pymaid.get_treenodes_by_tag
     ~pymaid.get_skid_from_treenode
     ~pymaid.get_node_details
 
@@ -298,6 +299,7 @@ Predicting connectivity
     :toctree: generated/
 
     ~pymaid.predict_connectivity
+    ~pymaid.connection_density
 
 Adjacency matrices
 ------------------
