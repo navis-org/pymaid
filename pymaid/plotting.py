@@ -1511,11 +1511,13 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
     """ Maps color(s) to neuron/dotprop colorlists.
     """
 
+    # Prepare dummies in case either no skdata or no dotprops
     if isinstance(skdata, type(None)):
-        skdata = np.array([])
+        skdata = core.CatmaidNeuronList([])
 
     if isinstance(dotprops, type(None)):
-        dotprops = np.array([])
+        dotprops = core.DotProps()
+        dotprops['gene_name'] = []
 
     # If no colors, generate random colors
     if isinstance(colors, type(None)) and (skdata.shape[0] + dotprops.shape[0]) > 0:
