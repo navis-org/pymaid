@@ -1537,7 +1537,7 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
     neuron_cmap = []
     if isinstance(colors, dict):
         neuron_cmap = [colors.get(s, (0, 0, 0)) for s in skdata.skeleton_id]
-        dotprop_cmap = [colors.get(s, (0, 0, 0)) for s in dotprop.gene_name.values]
+        dotprop_cmap = [colors.get(s, (0, 0, 0)) for s in dotprops.gene_name.values]
     # If list of colors
     elif isinstance(colors, (list, tuple, np.ndarray)):
         colors_required = skdata.shape[0] + dotprops.shape[0]
