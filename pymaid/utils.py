@@ -566,6 +566,7 @@ def _parse_objects(x, remote_instance=None):
         dotprops = dotprops[0]
     elif len(dotprops) == 0:
         dotprops = core.Dotprops()
+        dotprops['gene_name'] = []
     elif len(dotprops) > 1:
         dotprops = pd.concat(dotprops)
 
@@ -704,7 +705,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # functions)
     for i in range(df.shape[0]):
         df.loc[i, 'nodes']['confidence'] = 5
-        df.loc[i, 'nodes']['creator_id'] = 0
+        df.n.loc[i, 'nodes']['creator_id'] = 0
 
     # Placeholder for graph representations of neurons
     df['igraph'] = None
