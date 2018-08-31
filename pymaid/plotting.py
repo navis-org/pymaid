@@ -1349,7 +1349,7 @@ def plot3d(x, **kwargs):
                                            mode='markers',
                                            marker=dict(
                                                        size=scatter_kws.get('size',3),
-                                                       color='rgb' + str(scatter_kws.get('color',(0,0,0))),
+                                                       color='rgb' + str(scatter_kws.get('color',(0, 0, 0))),
                                                        opacity=scatter_kws.get('opacity',1))
                                            )
                              )
@@ -1421,9 +1421,7 @@ def plot3d(x, **kwargs):
         else:
             backend = 'vispy'
     elif backend not in ['plotly', 'vispy']:
-        logger.error(
-            'Unknown backend: {}. See help(plot.plot3d).'.format(backend))
-        return
+        raise ValueError('Unknown backend: {}. See help(plot.plot3d).'.format(backend))
 
     # CatmaidInstance
     remote_instance = kwargs.get('remote_instance', None)
@@ -1520,9 +1518,14 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
         dotprops['gene_name'] = []
 
     # If no colors, generate random colors
-    if isinstance(colors, type(None)) and (skdata.shape[0] + dotprops.shape[0]) > 0:
-        colors = _random_colors(skdata.shape[0] + dotprops.shape[0],
-                                color_space='RGB', color_range=color_range)
+    if isinstance(colors, type(None)):
+        if (skdata.shape[0] + dotprops.shape[0]) > 0:
+            colors = _random_colors(skdata.shape[0] + dotprops.shape[0],
+                                    color_space='RGB', color_range=color_range)
+        else:
+            # If no neurons to plot, just return None
+            # This happens when there is only a scatter plot
+            return [None], [None]
     else:
         colors = _eval_color(colors, color_range=color_range)
 
