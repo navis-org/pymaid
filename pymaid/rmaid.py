@@ -81,7 +81,7 @@ try:
     # even if not used, these packages are important!
     flycircuit = importr('flycircuit')
     elmr = importr('elmr')
-except:
+except BaseException:
     logger.error(
         'R library "nat" not found! Please install from within R.')
 
@@ -858,8 +858,10 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
 
     logger.info('Blasting neuron...')
     if reverse:
-        sc = r_nblast.nblast(dps, nat.neuronlist(
-            xdp), **{'normalised': normalised, '.parallel': True})
+        sc = r_nblast.nblast(dps, nat.neuronlist(xdp),
+                             **{'normalised': normalised,
+                                '.parallel': True,
+                                'UseAlpha': UseAlpha})
 
         # Have to convert to dataframe to sort them -> using
         # 'robjects.r("sort")' looses the names for some reason
@@ -875,8 +877,10 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
                                  '.parallel': True,
                                  'UseAlpha': UseAlpha})
     else:
-        sc = r_nblast.nblast(nat.neuronlist(xdp), dps, **
-                             {'normalised': normalised, '.parallel': True})
+        sc = r_nblast.nblast(nat.neuronlist(xdp), dps,
+                             **{'normalised': normalised,
+                                '.parallel': True,
+                                'UseAlpha': UseAlpha})
 
         # Have to convert to dataframe to sort them -> using
         # 'robjects.r("sort")' looses the names for some reason
@@ -894,7 +898,7 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
 
     sc_df.set_index('name', inplace=True, drop=True)
 
-    df = pd.DataFrame([[scr.names[i], sc_df.ix[scr.names[i]].score, scr[i], (sc_df.ix[scr.names[i]].score + scr[i]) / 2]
+    df = pd.DataFrame([[scr.names[i], sc_df.loc[scr.names[i]].score, scr[i], (sc_df.loc[scr.names[i]].score + scr[i]) / 2]
                        for i in range(len(scr))],
                       columns=['gene_name', 'forward_score',
                                'reverse_score', 'mu_score']
