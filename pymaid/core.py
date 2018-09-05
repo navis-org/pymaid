@@ -80,6 +80,7 @@ import networkx as nx
 import io
 import copy
 import six
+import numbers
 
 from pymaid import (graph, morpho, fetch, graph_utils, resample, intersect,
                     utils, config)
@@ -308,8 +309,7 @@ class CatmaidNeuron:
         elif key == 'dps':
             return self.get_dps()
         elif key == 'nodes_geodesic_distance_matrix':
-            self.nodes_geodesic_distance_matrix = graph_utils.geodesic_matrix(
-                self)
+            self.nodes_geodesic_distance_matrix = graph_utils.geodesic_matrix(self)
             return self.nodes_geodesic_distance_matrix
         elif key == 'neuron_name':
             return self.get_name()
@@ -348,11 +348,11 @@ class CatmaidNeuron:
             return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
             if 'nodes' in self.__dict__:
-                closed = set(self.tags.get('ends', [])
-                             + self.tags.get('uncertain end', [])
-                             + self.tags.get('uncertain continuation', [])
-                             + self.tags.get('not a branch', [])
-                             + self.tags.get('soma', []))
+                closed = set(self.tags.get('ends', []) +
+                             self.tags.get('uncertain end', []) +
+                             self.tags.get('uncertain continuation', []) +
+                             self.tags.get('not a branch', []) +
+                             self.tags.get('soma', []))
                 return len([n for n in self.nodes[self.nodes.type == 'end'].treenode_id.values if n not in closed])
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
@@ -1134,21 +1134,45 @@ class CatmaidNeuron:
         _ = plt.clf()
         return output.getvalue()
 
-    def __add__(self, to_add):
-        """Implements addition. """
-        if isinstance(to_add, list):
-            if False not in [isinstance(n, CatmaidNeuron) for n in to_add]:
-                return CatmaidNeuronList([self] + [to_add], make_copy=False)
-            else:
-                return CatmaidNeuronList([self] + [CatmaidNeuron[n] for n in to_add],
-                                         make_copy=False)
-        elif isinstance(to_add, CatmaidNeuron):
-            return CatmaidNeuronList([self, to_add], make_copy=False)
-        elif isinstance(to_add, CatmaidNeuronList):
-            return CatmaidNeuronList([self] + to_add.neurons, make_copy=False)
+    def __eq__(self, other):
+        """Implements neuron comparison."""
+        if isinstance(other, CatmaidNeuron):
+            return all(self.summary() == other.summary()) and \
+                   self.root == other.root and \
+                   self.soma == other.soma
         else:
-            raise TypeError('Unable to add data of type "{0}"'.format(
-                type(to_add)))
+            return NotImplemented
+
+    def __add__(self, other):
+        """ Implements addition. """
+        if isinstance(other, CatmaidNeuron):
+            return CatmaidNeuronList([self, other])
+        else:
+            return NotImplemented
+
+    def __truediv__(self, other):
+        """Implements division for coordinates (nodes, connectors)."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            n = self.copy()
+            n.nodes.loc[:, ['x', 'y', 'z', 'radius']] /= other
+            n.connectors.loc[: ,['x', 'y', 'z']] /= other
+            n._clear_temp_attr(exclude=['classify_nodes'])
+            return n
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Implements multiplication for coordinates (nodes, connectors)."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            n = self.copy()
+            n.nodes.loc[:, ['x', 'y', 'z', 'radius']] *= other
+            n.connectors.loc[: ,['x', 'y', 'z']] *= other
+            n._clear_temp_attr(exclude=['classify_nodes'])
+            return n
+        else:
+            return NotImplemented
 
     def summary(self):
         """Get a summary of this neuron."""
@@ -1642,13 +1666,22 @@ class CatmaidNeuronList:
                                          + [CatmaidNeuron[n] for n in to_add],
                                          make_copy=self.copy_on_subset)
         else:
-            raise TypeError(
-                'Unable to add data of type {0}'.format(type(to_add)))
+            return NotImplemented
+
+    def __eq__(self, other):
+        """Implements equality. """
+        if isinstance(other, CatmaidNeuronList):
+            if len(self) != len(other):
+                return False
+            else:
+                return all([n1 == n2 for n1, n2 in zip(self, other)])
+        else:
+            return NotImplemented
 
     def __sub__(self, to_sub):
         """Implements substraction. """
         if isinstance(to_sub, (str, int)):
-            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != to_sub and n.neuron_name != to_sub],
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id != str(to_sub) and n.neuron_name != to_sub],
                                      make_copy=self.copy_on_subset)
         elif isinstance(to_sub, CatmaidNeuron):
             if to_sub.skeleton_id in self and to_sub not in self.neurons:
@@ -1667,16 +1700,43 @@ class CatmaidNeuronList:
             return CatmaidNeuronList([n for n in self.neurons if n not in to_sub],
                                      make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_sub):
+            # Make sure everything is a string
+            other = [str(s) for s in other]
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub],
                                      make_copy=self.copy_on_subset)
         else:
-            raise TypeError(
-                'Unable to substract data of type {0}'.format(type(to_sub)))
+            return NotImplemented
+
+    def __truediv__(self, other):
+        """Implements division for coordinates (nodes, connectors)."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            nl = self.copy()
+            for n in nl:
+                n.nodes.loc[:, ['x', 'y', 'z', 'radius']] /= other
+                n.connectors.loc[: ,['x', 'y', 'z']] /= other
+                n._clear_temp_attr(exclude=['classify_nodes'])
+            return nl
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Implements multiplication for coordinates (nodes, connectors)."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            nl = self.copy()
+            for n in nl:
+                n.nodes.loc[:, ['x', 'y', 'z', 'radius']] *= other
+                n.connectors.loc[: ,['x', 'y', 'z']] *= other
+                n._clear_temp_attr(exclude=['classify_nodes'])
+            return nl
+        else:
+            return NotImplemented
 
     def __and__(self, other):
-        """Implements bitwise and using the & operator. """
+        """Implements bitwise AND using the & operator. """
         if isinstance(other, (str, int)):
-            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id == other or n.neuron_name == other],
+            return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id == str(other) or n.neuron_name == other],
                                      make_copy=self.copy_on_subset)
         elif isinstance(other, CatmaidNeuron):
             if other.skeleton_id in self and other not in self.neurons:
@@ -1695,11 +1755,12 @@ class CatmaidNeuronList:
             return CatmaidNeuronList([n for n in self.neurons if n in other],
                                      make_copy=self.copy_on_subset)
         elif utils._is_iterable(other):
+            # Make sure everything is a string
+            other = [str(s) for s in other]
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id in other or n.neuron_name in other],
                                      make_copy=self.copy_on_subset)
         else:
-            raise TypeError(
-                'Unable to substract data of type {0}'.format(type(other)))
+            return NotImplemented
 
     def sum(self):
         """Returns sum numeric and boolean values over all neurons. """
