@@ -61,18 +61,23 @@ from pymaid import cytoscape
 from pymaid import b3d
 
 
-# -- Remove execution numbers from Jupyter notebooks ----------------------
+# -- Make execution numbers in Jupyter notebooks ascending -------------------
 source_path = os.path.dirname(os.path.abspath(__file__)) + '/source'
 all_nb = [f for f in os.listdir(source_path) if f.endswith('.ipynb')]
 
 for nb in all_nb:
     with open(os.path.join(source_path, nb), 'r') as f:
         data = json.load(f)
+        i = 1
         for c in data['cells']:
             if c['cell_type'] == 'code':
-                c['execution_count'] = None
+                if 'execution_count' in c:
+                    c['execution_count'] = i
                 for o in c['outputs']:
-                    o['execution_count'] = None
+                    if 'execution_count' in o:
+                        o['execution_count'] = i
+                i += 1
+
     with open(os.path.join(source_path, nb), 'w') as f:
         json.dump(data, f, indent=3)
 
