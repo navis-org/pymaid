@@ -308,7 +308,7 @@ class CatmaidInstance:
         # Get the responses
         resp = [f.result() for f in config.tqdm(futures,
                                                 desc=desc,
-                                                disable=disable_pbar | config.pbar_hide | len(futures) == 1,
+                                                disable=disable_pbar or config.pbar_hide or len(futures) == 1,
                                                 leave=leave_pbar & config.pbar_leave)]
 
         # Make sure all responses returned data
