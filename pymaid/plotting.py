@@ -292,7 +292,7 @@ def plot2d(x, method='2d', **kwargs):
                         'ax', 'color', 'view', 'scalebar', 'cn_mesh_colors',
                         'linewidth', 'cn_size', 'group_neurons', 'scatter_kws',
                         'figsize', 'linestyle', 'alpha', 'depth_coloring',
-                        'autoscale', 'depth_scale']
+                        'autoscale', 'depth_scale', 'use_neuron_color']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
@@ -312,6 +312,7 @@ def plot2d(x, method='2d', **kwargs):
     connectors = kwargs.get('connectors', True)
     connectors_only = kwargs.get('connectors_only', False)
     cn_mesh_colors = kwargs.get('cn_mesh_colors', False)
+    use_neuron_color = kwargs.get('use_neuron_color', False)
     ax = kwargs.get('ax', None)
     color = kwargs.get('color', None)
     scalebar = kwargs.get('scalebar', None)
@@ -338,32 +339,11 @@ def plot2d(x, method='2d', **kwargs):
                                    tag_flag=0, get_history=False,
                                    get_abutting=True)
 
-    all_identifiers = []
-    if not skdata.empty:
-        all_identifiers += skdata.skeleton_id.tolist()
-    if not dotprops.empty:
-        all_identifiers += dotprops.gene_name.tolist()
-
-    if not color and (skdata.shape[0] + dotprops.shape[0]) > 0:
-        cm = _random_colors(skdata.shape[0] + dotprops.shape[0],
-                            color_space='RGB', color_range=1)
-        colormap = {}
-
-        if not skdata.empty:
-            colormap.update({str(n): cm[i] for i, n in enumerate(skdata.skeleton_id)})
-        if not dotprops.empty:
-            colormap.update({str(n): cm[i + skdata.shape[0]]
-                             for i, n in enumerate(dotprops.gene_name.values)})
-    elif isinstance(color, dict):
-        colormap = {n: mcl.to_rgb(color[n]) for n in color}
-    elif isinstance(color, (list, tuple)):
-        colormap = {n: mcl.to_rgb(color) for n in all_identifiers}
-    elif isinstance(color, str):
-        color = tuple([c for c in mcl.to_rgb(color)])
-        colormap = {n: color for n in all_identifiers}
-    elif (skdata.shape[0] + dotprops.shape[0]) > 0:
-        raise ValueError(
-            'Unable to interpret colors of type "{0}"'.format(type(color)))
+    # Generate the colormaps
+    neuron_cmap, dotprop_cmap = _prepare_colormap(color,
+                                                  skdata, dotprops,
+                                                  use_neuron_color=use_neuron_color,
+                                                  color_range=1)
 
     # Make sure axes are projected orthogonally
     if method in ['3d', '3d_complex']:
@@ -446,7 +426,7 @@ def plot2d(x, method='2d', **kwargs):
                                            desc='Plot neurons',
                                            total=skdata.shape[0], leave=False,
                                            disable=config.pbar_hide | len(dotprops) == 0)):
-        this_color = colormap[neuron.skeleton_id]
+        this_color = neuron_cmap[i]
 
         if neuron.nodes.empty:
             logger.warning('Skipping neuron w/o nodes: '
@@ -582,9 +562,11 @@ def plot2d(x, method='2d', **kwargs):
             lim.append(coords.max(axis=0))
             lim.append(coords.min(axis=0))
 
-    for neuron in config.tqdm(dotprops.itertuples(), desc='Plt dotprops',
-                              total=dotprops.shape[0], leave=False,
-                              disable=config.pbar_hide | len(dotprops) == 0):
+    for i, neuron in enumerate(config.tqdm(dotprops.itertuples(),
+                                           desc='Plt dotprops',
+                                           total=dotprops.shape[0],
+                                           leave=False,
+                                           disable=config.pbar_hide | len(dotprops) == 0)):
         # Prepare lines - this is based on nat:::plot3d.dotprops
         halfvect = neuron.points[
             ['x_vec', 'y_vec', 'z_vec']] / 2
@@ -595,7 +577,7 @@ def plot2d(x, method='2d', **kwargs):
                              ].values + halfvect.values
 
         try:
-            this_color = colormap[neuron.gene_name]
+            this_color = dotprop_cmap[i]
         except BaseException:
             this_color = (.1, .1, .1)
 
@@ -1144,8 +1126,6 @@ def plot3d(x, **kwargs):
                                                       use_neuron_color=use_neuron_color,
                                                       color_range=255)
 
-        logger.debug('Generating traces...')
-
         for i, neuron in enumerate(skdata.itertuples()):
             logger.debug('Working on neuron {}'.format(neuron.skeleton_id))
 
@@ -1193,8 +1173,7 @@ def plot3d(x, **kwargs):
                                                legendgroup=neuron_name,
                                                showlegend=True,
                                                hoverinfo='none'
-                                               )
-                                 )
+                                               ))
 
                 # Add soma(s):
                 for n in soma.itertuples():
