@@ -1514,7 +1514,7 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
         skdata = core.CatmaidNeuronList([])
 
     if isinstance(dotprops, type(None)):
-        dotprops = core.DotProps()
+        dotprops = core.Dotprops()
         dotprops['gene_name'] = []
 
     # If no colors, generate random colors
