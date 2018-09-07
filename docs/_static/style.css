@@ -92,6 +92,11 @@ ul.dropdown-menu {
     /*width: 50%; */
 }
 
+.red {
+    color: #C0392B !important;
+    font-weight: bold !important;
+}
+
 /* From https://github.com/twbs/bootstrap/issues/1768 */
 *[id]:before {
   display: block;
