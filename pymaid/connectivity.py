@@ -570,38 +570,36 @@ def cn_table_from_connectors(x, remote_instance=None):
         # Get all treenodes
         this_tn = set(n.nodes.treenode_id.values)
         # Prepare upstream partners
-        this_us = all_pre[all_pre.connector_id.isin(n.connectors.connector_id.values)]
+        this_us = all_pre[all_pre.connector_id.isin(n.connectors.connector_id.values)].copy()
         # Get the number of all links per connector
         this_us['n_links'] = [len(this_tn & set(r.postsynaptic_to_node))
                                            for r in this_us.itertuples()]
         # Group by input and store as dict
-        us_dict[n] = this_us.groupby('presynaptic_to').n_links.sum().to_dict()
+        us_dict[n.skeleton_id] = this_us.groupby('presynaptic_to').n_links.sum().to_dict()
         this_us = this_us.groupby('presynaptic_to').n_links.sum()
 
         # Now prepare downstream partners:
         # Get all downstream connectors
-        this_ds = all_post[all_post.presynaptic_to == int(n.skeleton_id)]
+        this_ds = all_post[all_post.presynaptic_to == int(n.skeleton_id)].copy()
         # Prepare dict
-        ds_dict[n] = {p: 0 for p in all_partners}
+        ds_dict[n.skeleton_id] = {p: 0 for p in all_partners}
         # Easy cases first (single link to target per connector)
         is_single = this_ds.postsynaptic_to.apply(len) >= this_ds.postsynaptic_to_node.apply(len)
         for r in this_ds[is_single].itertuples():
             for s in r.postsynaptic_to:
-                ds_dict[n][s] += 1
+                ds_dict[n.skeleton_id][s] += 1
         # Now hard cases - will have to look up skeleton ID via treenode ID
         for r in this_ds[~is_single].itertuples():
             for s in r.postsynaptic_to_node:
-                ds_dict[n][tn_to_skid[s]] += 1
+                ds_dict[n.skeleton_id][tn_to_skid[s]] += 1
 
     # Now that we have all data, let's generate the table
     us_table = pd.DataFrame.from_dict(us_dict)
     ds_table = pd.DataFrame.from_dict(ds_dict)
 
     # Make sure we keep the order of the original neuronlist
-    us_table = us_table[[n for n in x]]
-    us_table.columns=[n.skeleton_id for n in us_table.columns]
-    ds_table = ds_table[[n for n in x]]
-    ds_table.columns=[n.skeleton_id for n in ds_table.columns]
+    us_table = us_table[[n.skeleton_id for n in x]]
+    ds_table = ds_table[[n.skeleton_id for n in x]]
 
     ds_table['relation'] = 'downstream'
     us_table['relation'] = 'upstream'
@@ -625,7 +623,7 @@ def cn_table_from_connectors(x, remote_instance=None):
     cn_table = cn_table[cn_table.total > 0]
 
     # Sort by number of synapses
-    cn_table = cn_table.sort_values(['relation', 'total'], ascending=False)
+    cn_table = cn_table.sort_values(['relation', 'total'], ascending=False).reset_index(drop=True)
 
     # Sort columnes
     cn_table = cn_table[['neuron_name', 'skeleton_id', 'relation', 'total'] + list(set(x.skeleton_id))]
