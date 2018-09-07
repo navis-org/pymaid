@@ -1445,7 +1445,8 @@ def plot3d(x, **kwargs):
         except BaseException:
             pass
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
 
     if skids and remote_instance:
         skdata += fetch.get_neuron(skids, remote_instance,
