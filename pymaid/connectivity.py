@@ -521,7 +521,7 @@ def cn_table_from_connectors(x, remote_instance=None):
     >>> # Regenerate cn_table
     >>> cn_table = pymaid.cn_table_from_connectors(split)
     >>> # Skeleton IDs are non-unique but column order = input order:
-    >>> # in this example, the first occurrence is axon, the second dendrites
+    >>> # in this example the first occurrence is axon, the second dendrites
     >>> cn_table.head()
 
     """
@@ -574,32 +574,35 @@ def cn_table_from_connectors(x, remote_instance=None):
         # Get the number of all links per connector
         this_us['n_links'] = [len(this_tn & set(r.postsynaptic_to_node))
                                            for r in this_us.itertuples()]
-        # Group by input and store as dict
-        us_dict[n.skeleton_id] = this_us.groupby('presynaptic_to').n_links.sum().to_dict()
+        # Group by input and store as dict. Attention: we NEED to index by
+        # neuron as skeleton IDs might not be unique!
+        us_dict[n] = this_us.groupby('presynaptic_to').n_links.sum().to_dict()
         this_us = this_us.groupby('presynaptic_to').n_links.sum()
 
         # Now prepare downstream partners:
         # Get all downstream connectors
-        this_ds = all_post[all_post.presynaptic_to == int(n.skeleton_id)].copy()
+        this_ds = all_post[all_post.presynaptic_to == int(n.skeleton_id)]
         # Prepare dict
-        ds_dict[n.skeleton_id] = {p: 0 for p in all_partners}
+        ds_dict[n] = {p: 0 for p in all_partners}
         # Easy cases first (single link to target per connector)
         is_single = this_ds.postsynaptic_to.apply(len) >= this_ds.postsynaptic_to_node.apply(len)
         for r in this_ds[is_single].itertuples():
             for s in r.postsynaptic_to:
-                ds_dict[n.skeleton_id][s] += 1
+                ds_dict[n][s] += 1
         # Now hard cases - will have to look up skeleton ID via treenode ID
         for r in this_ds[~is_single].itertuples():
             for s in r.postsynaptic_to_node:
-                ds_dict[n.skeleton_id][tn_to_skid[s]] += 1
+                ds_dict[n][tn_to_skid[s]] += 1
 
     # Now that we have all data, let's generate the table
     us_table = pd.DataFrame.from_dict(us_dict)
     ds_table = pd.DataFrame.from_dict(ds_dict)
 
     # Make sure we keep the order of the original neuronlist
-    us_table = us_table[[n.skeleton_id for n in x]]
-    ds_table = ds_table[[n.skeleton_id for n in x]]
+    us_table = us_table[[n for n in x]]
+    us_table.columns=[n.skeleton_id for n in us_table.columns]
+    ds_table = ds_table[[n for n in x]]
+    ds_table.columns=[n.skeleton_id for n in ds_table.columns]
 
     ds_table['relation'] = 'downstream'
     us_table['relation'] = 'upstream'
@@ -623,7 +626,7 @@ def cn_table_from_connectors(x, remote_instance=None):
     cn_table = cn_table[cn_table.total > 0]
 
     # Sort by number of synapses
-    cn_table = cn_table.sort_values(['relation', 'total'], ascending=False).reset_index(drop=True)
+    cn_table = cn_table.sort_values(['relation', 'total'], ascending=False).reset_index()
 
     # Sort columnes
     cn_table = cn_table[['neuron_name', 'skeleton_id', 'relation', 'total'] + list(set(x.skeleton_id))]
@@ -843,10 +846,10 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     >>> import seaborn as sns
     >>> import matplotlib.pyplot as plt
     >>> neurons = pymaid.get_neurons('annotation:test')
-    >>> mat = pymaid.adjacency_matrix( neurons )
+    >>> mat = pymaid.adjacency_matrix(neurons)
     >>> g = sns.heatmap(adj_mat, square=True)
-    >>> g.set_yticklabels(g.get_yticklabels(), rotation = 0, fontsize = 7)
-    >>> g.set_xticklabels(g.get_xticklabels(), rotation = 90, fontsize = 7)
+    >>> g.set_yticklabels(g.get_yticklabels(), rotation=0, fontsize=7)
+    >>> g.set_xticklabels(g.get_xticklabels(), rotation=90, fontsize=7)
     >>> plt.show()
 
     Cut neurons into axon dendrites and compare their connectivity:
@@ -859,12 +862,14 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
     >>> nl_dend = nl.prune_distal_to('axon', inplace=False)
     >>> # Get a list of the downstream partners
     >>> cn_table = pymaid.get_partners(nl)
-    >>> ds_partners = cn_table[ cn_table.relation == 'downstream' ]
+    >>> ds_partners = cn_table[cn_table.relation == 'downstream']
     >>> # Take the top 10 downstream partners
     >>> top_ds = ds_partners.iloc[:10].skeleton_id.values
     >>> # Generate separate adjacency matrices for axon and dendrites
-    >>> adj_axon = pymaid.adjacency_matrix(nl_axon, top_ds, use_connectors=True)
-    >>> adj_dend = pymaid.adjacency_matrix(nl_dend, top_ds, use_connectors=True)
+    >>> adj_axon = pymaid.adjacency_matrix(nl_axon, top_ds,
+    ...                                    use_connectors=True)
+    >>> adj_dend = pymaid.adjacency_matrix(nl_dend, top_ds,
+    ...                                    use_connectors=True)
     >>> # Rename rows and merge dataframes
     >>> adj_axon.index += '_axon'
     >>> adj_dend.index += '_dendrite'
@@ -938,8 +943,8 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
                         Matrix to group.
     row_groups :        dict, optional
                         Row groups to be formed. Can be either:
-                          1. ``{group1 : [neuron1, neuron2, ...], ...}``
-                          2. ``{neuron1 : group1, neuron2: group2, ...}``
+                          1. ``{group1: [neuron1, neuron2, ...], ...}``
+                          2. ``{neuron1: group1, neuron2:group2, ...}``
                         If grouping numpy arrays, use indices!
     col_groups :        dict, optional
                         Col groups. See ``row_groups`` for details.
