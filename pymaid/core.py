@@ -1143,6 +1143,11 @@ class CatmaidNeuron:
         else:
             return NotImplemented
 
+    def __hash__(self):
+        """Generate a hashable value."""
+        # We will simply use the neuron's memory address
+        return id(self)
+
     def __add__(self, other):
         """ Implements addition. """
         if isinstance(other, CatmaidNeuron):
