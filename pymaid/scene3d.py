@@ -38,14 +38,19 @@
 # - keyboard shortcut to toggle volumes
 
 import uuid
+import platform
 
 import vispy as vp
+
 import numpy as np
+import pandas as pd
+
 import scipy
 import seaborn as sns
 import png
 
 import matplotlib.colors as mcl
+import colorsys
 
 from pymaid import utils, plotting, fetch, config
 
@@ -102,7 +107,7 @@ class Viewer:
         # Update some defaults as necessary
         defaults = dict(keys=None,
                         show=True,
-                        bgcolor='white')
+                        bgcolor='black')
         defaults.update(kwargs)
 
         # Generate canvas
@@ -165,40 +170,66 @@ class Viewer:
                                   color=(0,0,0), font_size=9)
         """
 
+        # Text color depends on background color
+        v = self.canvas.bgcolor.hsv[2]
+        text_color = colorsys.hsv_to_rgb(0, 0, 1-v)
+
         # Define shortcuts here: key -> description
-        self._available_shortcuts = {
-
-            'O': 'toggle overlay',
-            'L': 'toggle legend',
-            'shift+click': 'select neuron',
-            'D': 'deselect all',
-            'Q/W': 'cycle neurons',
-            'U': 'unhide all',
-            'F': 'show/hide FPS',
-
-        }
+        self._key_shortcuts = {'O': 'toggle overlay',
+                               'L': 'toggle legend',
+                               'Q/W': 'cycle neurons',
+                               'U': 'unhide all',
+                               'F': 'show/hide FPS',
+                               'P': 'toggle picking'}
 
         # Keyboard shortcuts
         shorts_text = 'SHORTCUTS | ' + \
-            ' '.join(['<{0}> {1} |'.format(k, v)
-                      for k, v in self._available_shortcuts.items()])
+                      ' '.join(['<{0}> {1} |'.format(k, v)
+                                for k, v in self._key_shortcuts.items()])
         self._shortcuts = vp.scene.visuals.Text(shorts_text,
                                                 pos=(10, overlay.size[1]),
                                                 anchor_x='left',
                                                 anchor_y='bottom',
                                                 name='permanent',
                                                 parent=overlay,
-                                                color=(0, 0, 0), font_size=6)
+                                                color=text_color,
+                                                font_size=6)
 
         # FPS (hidden at start)
-        self._fps_text = vp.scene.visuals.Text(
-            'FPS',
-            pos=(overlay.size[0] - 10, 10),
-            anchor_x='right', anchor_y='top',
-            name='permanent',
-            parent=overlay,
-            color=(0, 0, 0), font_size=6)
+        self._fps_text = vp.scene.visuals.Text('FPS',
+                                               pos=(overlay.size[0] - 10, 10),
+                                               anchor_x='right',
+                                               anchor_y='top',
+                                               name='permanent',
+                                               parent=overlay,
+                                               color=(0, 0, 0), font_size=6)
         self._fps_text.visible = False
+
+        # Picking shortcuts (hidden at start)
+        self._picking_shortcuts = {'LMB legend': 'show/hide neuron',
+                                   'LMB neuron': 'select neuron',
+                                   'SHIFT+LMB': 'select neuron',
+                                   'D': 'deselect all',
+                                   'H': 'hide selected'}
+        # Add platform-specific modifiers
+        if platform.system() == 'darwin':
+            self._picking_shortcuts['CMD+LMB'] = 'print url'
+        else:
+            self._picking_shortcuts['CTRL+LMB'] = 'print url'
+
+        shorts_text = 'PICKING ON | ' + \
+                      ' '.join(['<{0}> {1} |'.format(k, v)
+                                for k, v in self._picking_shortcuts.items()])
+        self._picking_text = vp.scene.visuals.Text(shorts_text,
+                                                   pos=(10,
+                                                        overlay.size[1] - 10),
+                                                   anchor_x='left',
+                                                   anchor_y='bottom',
+                                                   name='permanent',
+                                                   parent=overlay,
+                                                   color=text_color,
+                                                   font_size=6)
+        self._picking_text.visible = False
 
         return overlay
 
@@ -231,6 +262,15 @@ class Viewer:
     def picking(self):
         """ Set to ``True`` to allow picking."""
         return self.__picking
+
+    def toggle_picking(self):
+        """ Toggle picking and overlay text."""
+        if self.picking:
+            self.picking = False
+            self._picking_text.visible = False
+        else:
+            self.picking = True
+            self._picking_text.visible = True
 
     @picking.setter
     def picking(self, v):
@@ -431,7 +471,8 @@ class Viewer:
         None
         """
 
-        skids, skdata, dotprops, volumes, points, visuals = utils._parse_objects(x)
+        (skids, skdata, dotprops, volumes,
+         points, visuals) = utils._parse_objects(x)
 
         # Parse colors for neurons and dotprops
         neuron_cmap, skdata_cmap = plotting._prepare_colormap(kwargs.get('color',
@@ -489,6 +530,10 @@ class Viewer:
                     v.visible = False
 
         self.update_legend()
+
+    def hide_selected(self):
+        """ Hide currently selected neuron(s). """
+        self.hide_neurons(self.selected)
 
     def unhide_neurons(self, n=None, check_alpha=False):
         """ Unhide given neuron(s).
@@ -582,6 +627,44 @@ class Viewer:
 
         self.update_legend()
 
+    def set_alpha(self, a, include_connectors=True):
+        """ Set neuron color alphas.
+
+        Parameters
+        ----------
+        a :      tuple | dict
+                 Alpha value(s) to apply. Values must be 0-1. Accepted:
+                   1. Tuple of single alpha. Applied to all visible neurons.
+                   2. Dictionary mapping skeleton IDs to alpha.
+
+        """
+
+        if isinstance(a, (tuple, list, np.ndarray, str)):
+            amap = {s: a for s in self.neurons}
+        elif isinstance(a, dict):
+            amap = a
+        else:
+            raise TypeError(
+                'Unable to use colors of type "{}"'.format(type(a)))
+
+        for n in self.neurons:
+            if n in amap:
+                for v in self.neurons[n]:
+                    if v._neuron_part == 'connectors' and not include_connectors:
+                        continue
+                    try:
+                        this_c = v.color.rgba
+                    except BaseException:
+                        this_c = v.color
+
+                    new_c = tuple([this_c[0], this_c[1], this_c[2], amap[n]])
+                    if isinstance(v, vp.scene.visuals.Mesh):
+                        v.color = mcl.to_rgba(new_c)
+                    else:
+                        v.set_data(color=mcl.to_rgba(new_c))
+
+        self.update_legend()
+
     def colorize(self, palette='hls', include_connectors=False):
         """ Colorize neurons using a seaborn color palette."""
 
@@ -605,28 +688,34 @@ class Viewer:
             neurons_sorted) if i != self._cycle_index]
         to_show = [neurons_sorted[self._cycle_index]]
 
+        # Depending on background color, we have to use different alphas
+        v = self.canvas.bgcolor.hsv[2]
+        out_alpha = .05 + .2 * v
+
         if self._cycle_mode == 'hide':
             self.hide_neurons(to_hide)
             self.unhide_neurons(to_show)
         elif self._cycle_mode == 'alpha':
             # Get current colors
-            new_cmap = {}
+            new_amap = {}
             for n in self.neurons:
                 this_c = list(self.neurons[n][0].color)
-                # Make sure colors are (r,g,b,a)
+                # Make sure colors are (r, g, b, a)
                 if len(this_c) < 4:
-                    this_c = np.append(this_c, 1).astype(float)
+                    this_a = 1
+                else:
+                    this_a = this_c[3]
+
                 # If neuron needs to be hidden, add to cmap
-                if n in to_hide and this_c[3] != .1:
-                    this_c[3] = .1
-                    new_cmap[n] = this_c
-                elif n in to_show and this_c[3] != 1:
-                    this_c[3] = 1
-                    new_cmap[n] = this_c
-            self.set_colors(new_cmap)
+                if n in to_hide and this_a != out_alpha:
+                    new_amap[n] = out_alpha
+                elif n in to_show and this_a != 1:
+                    new_amap[n] = 1
+            self.set_alpha(new_amap)
         else:
             raise ValueError('Unknown cycle mode '
-                             '"{}". Use "hide" or "alpha"!'.format(self._cycle_mode))
+                             '"{}". Use "hide" or '
+                             '"alpha"!'.format(self._cycle_mode))
 
     def _draw_fps(self, fps):
         """ Callback for ``canvas.measure_fps``. """
@@ -653,24 +742,37 @@ class Viewer:
         if not self._cursor.parent:
             self.add(self._cursor, center=False)
 
-        # Snap cursor to closest vertex
+        # Get vertices for this visual
         if isinstance(visual, vp.scene.visuals.Line):
             verts = visual.pos
         elif isinstance(visual, vp.scene.visuals.Mesh):
             verts = visual.mesh_data.get_vertices()
 
-        # Find the closest vertex to this position
-        tree = scipy.spatial.cKDTree(verts)
-        dist, ix = tree.query(pos[:-1])
+        # Map vertices to canvas
+        tr = visual.get_transform(map_to='canvas')
+        co_on_canvas = tr.map(verts)[:, [0, 1]]
+
+        # Find the closest vertex to this mouse click pos
+        tree = scipy.spatial.cKDTree(co_on_canvas)
+        dist, ix = tree.query(pos)
+
+        # Map canvas pos back to world coordinates
         snap_pos = verts[ix]
 
         # Generate arrow coords
         snap_pos = np.array(snap_pos)
-        start = snap_pos - 10000
-        arrows = np.array([np.append(snap_pos - 10, snap_pos)])
+        #snap_pos = np.array(pos[:-1])
+        vec_to_center = np.array(self.camera3d.center) - snap_pos
+        norm_to_center = vec_to_center / np.sqrt(np.sum(vec_to_center**2))
+        start = snap_pos - (norm_to_center * 10000)
+        arrows = np.array([np.append(snap_pos - (norm_to_center * 200),
+                                     snap_pos - (norm_to_center * 100))])
 
         self._cursor.set_data(pos=np.array([start, snap_pos]),
                               arrows=arrows)
+
+        logger.debug('World coordinates: {}'.format(snap_pos))
+        print('URL: {}'.format(fetch.url_to_coordinates(snap_pos, 5)))
 
     def screenshot(self, filename='screenshot.png', pixel_scale=2,
                    alpha=True, hide_overlay=True):
@@ -709,20 +811,60 @@ class Viewer:
         im = png.from_array(m, mode='RGBA')
         im.save(filename)
 
+    def visuals_at(self, pos):
+        """ Returns visuals at given canvas position. """
+
+        # There appears to be some odd y offset - perhaps because of the
+        # window's top bar? On OSX this is about 15px
+        pos = (pos[0], pos[1] - 15)
+
+        # Map mouse pos to framebuffer
+        tr = self.canvas.transforms.get_transform(map_from='canvas',
+                                                  map_to='framebuffer')
+        pos = tr.map(pos)
+
+        # Render framebuffer in picking mode
+        p = self.canvas._render_picking(region=(pos[0] - self._picking_radius / 2,
+                                                pos[1] - self._picking_radius / 2,
+                                                self._picking_radius,
+                                                self._picking_radius))
+
+        # List visuals in order from distance to center
+        ids = []
+        seen = set()
+        center = (np.array(p.shape) / 2).astype(int)
+        for i in range(self._picking_radius * self.canvas.pixel_scale):
+            subr = p[center[0] - i: center[0] + i + 1,
+                     center[1] - i: center[1] + i + 1]
+            subr_ids = set(list(np.unique(subr)))
+            ids.extend(list(subr_ids - seen))
+            seen |= subr_ids
+        visuals = [vp.scene.visuals.VisualNode._visual_ids.get(x, None) for x in ids]
+
+        return [v for v in visuals if v is not None]
+
 
 def on_mouse_press(event):
     """ Manage picking on canvas. """
     canvas = event.source
     viewer = canvas._wrapper
 
-    logger.debug('Mouse press at {0}: {1}'.format(
-        event.pos, canvas.visuals_at(event.pos)))
+    try:
+        viewer.interactive = False
+        canvas._overlay.interactive = False
+        vis_at = viewer.visuals_at([event.pos[0] + 15,
+                                    event.pos[1] + 15])
+    finally:
+        viewer.interactive = True
+        canvas._overlay.interactive = True
+
+    logger.debug('Mouse press at {0}: {1}'.format(event.pos, vis_at))
 
     if event.modifiers:
         logger.debug('Modifiers found: {0}'.format(event.modifiers))
 
     # Iterate over visuals in this canvas at cursor position
-    for v in canvas.visuals_at(event.pos, viewer._picking_radius):
+    for v in vis_at:
         # Skip views
         if isinstance(v, vp.scene.widgets.ViewBox):
             continue
@@ -731,7 +873,9 @@ def on_mouse_press(event):
             viewer.toggle_neurons(v._object_id)
             break
         # If shift modifier, add to/remove from current selection
-        elif isinstance(v, vp.scene.visuals.VisualNode) and getattr(v, '_skeleton_id', None) and 'Shift' in [key.name for key in event.modifiers]:
+        elif isinstance(v, vp.scene.visuals.VisualNode) and \
+             getattr(v, '_skeleton_id', None) and \
+             'Shift' in [key.name for key in event.modifiers]:
             if v._skeleton_id not in set(viewer.selected):
                 viewer.selected = np.append(viewer.selected, v._skeleton_id)
             else:
@@ -740,12 +884,7 @@ def on_mouse_press(event):
             break
 
         if 'Control' in [key.name for key in event.modifiers]:
-            tr = canvas._view3d.node_transform(v)
-            co = tr.map(event.pos)
-            viewer._snap_cursor(co, v)
-            logger.debug('World coordinates: {}'.format(co))
-            logger.debug('URL: {}'.format(
-                fetch.url_to_coordinates(co, 5)))
+            viewer._snap_cursor(event.pos, v)
             break
 
 
@@ -765,15 +904,20 @@ def on_key_press(event):
         viewer._cycle_neurons(-1)
     elif event.text.lower() == 'w':
         viewer._cycle_neurons(1)
+    elif event.text.lower() == 'h':
+        viewer.hide_selected()
     elif event.text.lower() == 'u':
         viewer.unhide_neurons(check_alpha=True)
     elif event.text.lower() == 'f':
         viewer._toggle_fps()
+    elif event.text.lower() == 'p':
+        viewer.toggle_picking()
 
 
 def on_resize(event):
     """ Keep overlay in place upon resize. """
     viewer = event.source._wrapper
     viewer._shortcuts.pos = (10, event.size[1])
+    viewer._picking_text.pos = (10, event.size[1] - 10)
 
     viewer._fps_text.pos = (event.size[0] - 10, 10)
