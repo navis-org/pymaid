@@ -2180,11 +2180,13 @@ def _neuron2vispy(x, **kwargs):
             soma = neuron.nodes[neuron.nodes.radius > 1]
             if soma.shape[0] >= 1:
                 radius = soma.ix[soma.index[0]].radius
-                sp = create_sphere(5, 5, radius=radius)
-                s = scene.visuals.Mesh(vertices=sp.get_vertices() + soma.ix[soma.index[0]][
-                                       ['x', 'y', 'z']].values,
+                sp = create_sphere(7, 7, radius=radius)
+                verts = sp.get_vertices() + soma.ix[soma.index[0]][['x', 'y', 'z']].values
+                s = scene.visuals.Mesh(vertices=verts,
+                                       shading='smooth',
                                        faces=sp.get_faces(),
                                        color=neuron_color)
+                s.ambient_light_color = vispy.color.Color('white')
 
                 # Make visual discoverable
                 s.interactive = True
