@@ -314,7 +314,9 @@ def plot2d(x, method='2d', **kwargs):
     cn_mesh_colors = kwargs.get('cn_mesh_colors', False)
     use_neuron_color = kwargs.get('use_neuron_color', False)
     ax = kwargs.get('ax', None)
-    color = kwargs.get('color', None)
+    color = kwargs.get('color',
+                       kwargs.get('c',
+                                  kwargs.get('colors', None)))
     scalebar = kwargs.get('scalebar', None)
     group_neurons = kwargs.get('group_neurons', False)
     alpha = kwargs.get('alpha', .9)
@@ -1406,7 +1408,9 @@ def plot3d(x, **kwargs):
     remote_instance = kwargs.get('remote_instance', None)
 
     # Parameters for neurons
-    color = kwargs.get('color', kwargs.get('colors', None))
+    color = kwargs.get('color',
+                       kwargs.get('c',
+                                  kwargs.get('colors', None)))
     downsampling = kwargs.get('downsampling', 1)
     connectors = kwargs.get('connectors', False)
     by_strahler = kwargs.get('by_strahler', False)
@@ -2031,7 +2035,11 @@ def _neuron2vispy(x, **kwargs):
     else:
         raise TypeError('Unable to process data of type "{}"'.format(type(x)))
 
-    colormap, _ = _prepare_colormap(kwargs.get('color', kwargs.get('colors', None)),
+    colors = kwargs.get('color',
+                        kwargs.get('c',
+                                   kwargs.get('colors', None)))
+
+    colormap, _ = _prepare_colormap(colors,
                                     x, None,
                                     use_neuron_color=kwargs.get('use_neuron_color', False),
                                     color_range=1)
@@ -2275,8 +2283,10 @@ def _dp2vispy(x, **kwargs):
     visuals = []
 
     # Parse colors for dotprops
-    _, colormap = _prepare_colormap(kwargs.get('color',
-                                               kwargs.get('colors', None)),
+    colors = kwargs.get('color',
+                        kwargs.get('c',
+                                   kwargs.get('colors', None)))
+    _, colormap = _prepare_colormap(colors,
                                     None, x, use_neuron_color=False,
                                     color_range=1)
 
@@ -2354,6 +2364,9 @@ def _points2vispy(x, **kwargs):
     list
                     Contains vispy visuals for points.
     """
+    colors = kwargs.get('color',
+                        kwargs.get('c',
+                                   kwargs.get('colors', (0, 0, 0))))
 
     visuals = []
     for p in x:
@@ -2363,8 +2376,8 @@ def _points2vispy(x, **kwargs):
 
         con = scene.visuals.Markers()
         con.set_data(pos=p,
-                     face_color=kwargs.get('color', (0, 0, 0)),
-                     edge_color=kwargs.get('color', (0, 0, 0)),
+                     face_color=colors,
+                     edge_color=colors,
                      size=kwargs.get('size', 2))
 
         # Add custom attributes
