@@ -1,6 +1,6 @@
 ###### Requirements without Version Specifiers ######
 ipykernel==4.9.0
-nbsphinx
+nbsphinx==0.3.5
 numpydoc
 sphinx_bootstrap_theme
 
