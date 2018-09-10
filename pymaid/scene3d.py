@@ -52,6 +52,10 @@ import png
 import matplotlib.colors as mcl
 import colorsys
 
+import webbrowser
+
+from functools import wraps
+
 from pymaid import utils, plotting, fetch, config
 
 __all__ = ['Viewer']
@@ -59,9 +63,47 @@ __all__ = ['Viewer']
 logger = config.logger
 
 
+def block_all(function):
+    """ Decorator to block all events on canvas and view while changes
+    are being made. """
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        viewer = args[0]
+        viewer.canvas.events.block_all()
+        viewer.view3d.events.block_all()
+        try:
+            # Execute function
+            res = function(*args, **kwargs)
+        except BaseException:
+            raise
+        finally:
+            viewer.canvas.events.unblock_all()
+            viewer.view3d.events.unblock_all()
+        # Return result
+        return res
+    return wrapper
+
+
+def block_canvas(function):
+    """ Decorator to block all events on canvas are being made. """
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+        viewer = args[0]
+        viewer.canvas.events.block_all()
+        try:
+            # Execute function
+            res = function(*args, **kwargs)
+        except BaseException:
+            raise
+        finally:
+            viewer.canvas.events.unblock_all()
+        # Return result
+        return res
+    return wrapper
+
+
 class Viewer:
-    """
-    Vispy 3D viewer.
+    """ Vispy 3D viewer.
 
     Parameters
     ----------
@@ -102,11 +144,19 @@ class Viewer:
     >>> # Clear the canvas
     >>> v.clear()
 
+    You can change the background color from the start or on-the-go:
+
+    >>> # Set background to green
+    >>> v = pymaid.Viewer(bgcolor='green')
+    >>> # Set background back to white
+    >>> v.canvas.bgcolor = (1, 1, 1)
+
     """
     def __init__(self, picking=False, **kwargs):
         # Update some defaults as necessary
         defaults = dict(keys=None,
                         show=True,
+                        title='pymaid Viewer',
                         bgcolor='black')
         defaults.update(kwargs)
 
@@ -132,6 +182,9 @@ class Viewer:
             self.picking = True
         else:
             self.picking = False
+
+        # Set cursor_pos to None
+        self.cursor_pos = None
 
         # Add keyboard shortcuts
         self.canvas.connect(on_key_press)
@@ -174,17 +227,19 @@ class Viewer:
         v = self.canvas.bgcolor.hsv[2]
         text_color = colorsys.hsv_to_rgb(0, 0, 1-v)
 
-        # Define shortcuts here: key -> description
+        # Keyboard shortcuts
         self._key_shortcuts = {'O': 'toggle overlay',
                                'L': 'toggle legend',
+                               'P': 'toggle picking',
                                'Q/W': 'cycle neurons',
                                'U': 'unhide all',
                                'F': 'show/hide FPS',
-                               'P': 'toggle picking'}
+                               '1': 'XY',
+                               '2': 'XZ',
+                               '3': 'YZ'}
 
-        # Keyboard shortcuts
-        shorts_text = 'SHORTCUTS | ' + \
-                      ' '.join(['<{0}> {1} |'.format(k, v)
+        shorts_text = 'SHORTCUTS: ' + \
+                      ' | '.join(['<{0}> {1}'.format(k, v)
                                 for k, v in self._key_shortcuts.items()])
         self._shortcuts = vp.scene.visuals.Text(shorts_text,
                                                 pos=(10, overlay.size[1]),
@@ -197,8 +252,8 @@ class Viewer:
 
         # FPS (hidden at start)
         self._fps_text = vp.scene.visuals.Text('FPS',
-                                               pos=(overlay.size[0] - 10, 10),
-                                               anchor_x='right',
+                                               pos=(overlay.size[0]/2, 10),
+                                               anchor_x='center',
                                                anchor_y='top',
                                                name='permanent',
                                                parent=overlay,
@@ -206,19 +261,19 @@ class Viewer:
         self._fps_text.visible = False
 
         # Picking shortcuts (hidden at start)
-        self._picking_shortcuts = {'LMB legend': 'show/hide neuron',
-                                   'LMB neuron': 'select neuron',
-                                   'SHIFT+LMB': 'select neuron',
+        self._picking_shortcuts = {'LMB @legend': 'show/hide neuron',
+                                   'SHIFT+LMB @neuron': 'select neuron',
                                    'D': 'deselect all',
-                                   'H': 'hide selected'}
+                                   'H': 'hide selected',
+                                   'C': 'url to cursor',}
         # Add platform-specific modifiers
         if platform.system() == 'darwin':
-            self._picking_shortcuts['CMD+LMB'] = 'print url'
+            self._picking_shortcuts['CMD+LMB'] = 'set cursor'
         else:
-            self._picking_shortcuts['CTRL+LMB'] = 'print url'
+            self._picking_shortcuts['CTRL+LMB'] = 'set cursor'
 
-        shorts_text = 'PICKING ON | ' + \
-                      ' '.join(['<{0}> {1} |'.format(k, v)
+        shorts_text = 'PICKING: ' + \
+                      ' | '.join(['<{0}> {1}'.format(k, v)
                                 for k, v in self._picking_shortcuts.items()])
         self._picking_text = vp.scene.visuals.Text(shorts_text,
                                                    pos=(10,
@@ -230,6 +285,16 @@ class Viewer:
                                                    color=text_color,
                                                    font_size=6)
         self._picking_text.visible = False
+
+        # Text box in top right to display arbitrary data
+        self._data_text = vp.scene.visuals.Text('',
+                                                pos=(overlay.size[0] - 10, 10),
+                                                anchor_x='right',
+                                                anchor_y='top',
+                                                name='permanent',
+                                                parent=overlay,
+                                                color=text_color,
+                                                font_size=6)
 
         return overlay
 
@@ -256,7 +321,8 @@ class Viewer:
     @legend_font_size.setter
     def legend_font_size(self, val):
         self.__legend_font_size = val
-        self.update_legend()
+        if self.show_legend:
+            self.update_legend()
 
     @property
     def picking(self):
@@ -329,7 +395,16 @@ class Viewer:
 
         self.__selected = skids
 
-        self.update_legend()
+        # Update legend
+        if self.show_legend:
+            self.update_legend()
+
+        # Update data text
+        # Currently nly the development version of vispy supports escape
+        # character (e.g. \n)
+        t = '| '.join(['{} - #{}'.format(self.neurons[s][0]._neuron_name,
+                                         s) for s in self.__selected])
+        self._data_text.text = t
 
     @property
     def visuals(self):
@@ -382,6 +457,18 @@ class Viewer:
 
         self.clear_legend()
 
+    def remove(self, to_remove):
+        """ Remove given neurons/visuals from canvas.
+        """
+
+        if not isinstance(to_remove, vp.scene.visuals.VisualNode):
+            skids = utils.eval_skids(to_remove)
+            to_remove = [v for v in self.neurons[s] if s in self.neurons]
+
+        for v in to_remove:
+            v.parent = None
+
+    @block_canvas
     def update_legend(self):
         """ Update legend. """
 
@@ -506,7 +593,8 @@ class Viewer:
         if center:
             self.center_camera()
 
-        # self.update_legend()
+        if self.show_legend:
+            self.update_legend()
 
     def show(self):
         """ Show viewer. """
@@ -595,6 +683,7 @@ class Viewer:
 
         self.update_legend()
 
+    @block_all
     def set_colors(self, c, include_connectors=False):
         """ Set neuron color.
 
@@ -620,13 +709,16 @@ class Viewer:
                 for v in self.neurons[n]:
                     if v._neuron_part == 'connectors' and not include_connectors:
                         continue
+                    new_c = mcl.to_rgba(cmap[n])
                     if isinstance(v, vp.scene.visuals.Mesh):
-                        v.color = mcl.to_rgba(cmap[n])
+                        v.color = new_c
                     else:
                         v.set_data(color=mcl.to_rgba(cmap[n]))
 
-        self.update_legend()
+        if self.show_legend:
+            self.update_legend()
 
+    @block_all
     def set_alpha(self, a, include_connectors=True):
         """ Set neuron color alphas.
 
@@ -657,13 +749,17 @@ class Viewer:
                     except BaseException:
                         this_c = v.color
 
+                    if len(this_c) == 4 and this_c[3] == amap[n]:
+                        continue
+
                     new_c = tuple([this_c[0], this_c[1], this_c[2], amap[n]])
                     if isinstance(v, vp.scene.visuals.Mesh):
                         v.color = mcl.to_rgba(new_c)
                     else:
                         v.set_data(color=mcl.to_rgba(new_c))
 
-        self.update_legend()
+        if self.show_legend:
+            self.update_legend()
 
     def colorize(self, palette='hls', include_connectors=False):
         """ Colorize neurons using a seaborn color palette."""
@@ -677,15 +773,21 @@ class Viewer:
         """ Cycle through neurons. """
         self._cycle_index += increment
 
+        # If mode is 'hide' cycle over all neurons
+        if self._cycle_mode == 'hide':
+            to_cycle = self.neurons
+        # If mode is 'alpha' ignore all hidden neurons
+        else:
+            to_cycle = {s: self.neurons[s] for s in self.visible}
+
         if self._cycle_index < 0:
-            self._cycle_index = len(self.neurons) - 1
-        elif self._cycle_index > len(self.neurons) - 1:
+            self._cycle_index = len(to_cycle) - 1
+        elif self._cycle_index > len(to_cycle) - 1:
             self._cycle_index = 0
 
-        neurons_sorted = sorted(self.neurons.keys())
+        neurons_sorted = sorted(to_cycle.keys())
 
-        to_hide = [n for i, n in enumerate(
-            neurons_sorted) if i != self._cycle_index]
+        to_hide = [n for i, n in enumerate(neurons_sorted) if i != self._cycle_index]
         to_show = [neurons_sorted[self._cycle_index]]
 
         # Depending on background color, we have to use different alphas
@@ -698,8 +800,8 @@ class Viewer:
         elif self._cycle_mode == 'alpha':
             # Get current colors
             new_amap = {}
-            for n in self.neurons:
-                this_c = list(self.neurons[n][0].color)
+            for n in to_cycle:
+                this_c = list(to_cycle[n][0].color)
                 # Make sure colors are (r, g, b, a)
                 if len(this_c) < 4:
                     this_a = 1
@@ -730,7 +832,7 @@ class Viewer:
             self.canvas.measure_fps(1, None)
             self._fps_text.visible = False
 
-    def _snap_cursor(self, pos, visual):
+    def _snap_cursor(self, pos, visual, open_browser=False):
         """ Snap cursor to clostest vertex of visual."""
         if not getattr(self, '_cursor', None):
             self._cursor = vp.scene.visuals.Arrow(pos=np.array([(0, 0, 0), (1000, 0, 0)]),
@@ -757,22 +859,53 @@ class Viewer:
         dist, ix = tree.query(pos)
 
         # Map canvas pos back to world coordinates
-        snap_pos = verts[ix]
+        self.cursor_pos = np.array(verts[ix])
+        self.cursor_active_skeleton = getattr(visual, '_skeleton_id', None)
 
         # Generate arrow coords
-        snap_pos = np.array(snap_pos)
-        #snap_pos = np.array(pos[:-1])
-        vec_to_center = np.array(self.camera3d.center) - snap_pos
+        vec_to_center = np.array(self.camera3d.center) - self.cursor_pos
         norm_to_center = vec_to_center / np.sqrt(np.sum(vec_to_center**2))
-        start = snap_pos - (norm_to_center * 10000)
-        arrows = np.array([np.append(snap_pos - (norm_to_center * 200),
-                                     snap_pos - (norm_to_center * 100))])
+        start = self.cursor_pos - (norm_to_center * 10000)
+        arrows = np.array([np.append(self.cursor_pos - (norm_to_center * 200),
+                                     self.cursor_pos - (norm_to_center * 100))])
 
-        self._cursor.set_data(pos=np.array([start, snap_pos]),
+        self._cursor.set_data(pos=np.array([start, self.cursor_pos]),
                               arrows=arrows)
 
-        logger.debug('World coordinates: {}'.format(snap_pos))
-        print('URL: {}'.format(fetch.url_to_coordinates(snap_pos, 5)))
+        logger.debug('World coordinates: {}'.format(self.cursor_pos))
+
+        url = fetch.url_to_coordinates(self.cursor_pos, 5,
+                                       active_skeleton_id=self.cursor_active_skeleton)
+        print('URL: {}'.format(url))
+
+        if open_browser:
+            webbrowser.open_new_tab(url)
+
+    def url_to_cursor(self, open_browser=False):
+        """ Open or return URL to current cursor position.
+
+        Parameters
+        ----------
+        open_browser :  bool, optional
+                        If True, will try opening URL in new tab.
+
+        Returns
+        -------
+        URL :           str
+                        Only if open_browser is False.
+        """
+
+        if isinstance(self.cursor_pos, type(None)):
+            logger.info('Must place cursor first.')
+            return
+
+        url = fetch.url_to_coordinates(self.cursor_pos, 5,
+                                       active_skeleton_id=self.cursor_active_skeleton)
+
+        if open_browser:
+            webbrowser.open_new_tab(url)
+        else:
+            return url
 
     def screenshot(self, filename='screenshot.png', pixel_scale=2,
                    alpha=True, hide_overlay=True):
@@ -843,6 +976,30 @@ class Viewer:
 
         return [v for v in visuals if v is not None]
 
+    def set_view(self, view):
+        """ Reset camera position.
+
+        Parameters
+        ----------
+        view :      XY | XZ | YZ
+
+        """
+
+        if isinstance(view, vp.util.quaternion.Quaternion):
+            q = view
+        elif view == 'XY':
+            q = vp.util.quaternion.Quaternion(w=1, x=.4, y=0, z=0)
+        elif view == 'XZ':
+            q = vp.util.quaternion.Quaternion(w=1, x=-.4, y=0, z=0)
+        elif view == 'YZ':
+            q = vp.util.quaternion.Quaternion(w=.6, x=0.5, y=0.5, z=-.4)
+        else:
+            raise TypeError('Unable to set view from {}'.format(type(view)))
+
+        self.camera3d._quaternion = q
+        # This is necessary to force a redraw
+        self.camera3d.set_range()
+
 
 def on_mouse_press(event):
     """ Manage picking on canvas. """
@@ -860,8 +1017,9 @@ def on_mouse_press(event):
 
     logger.debug('Mouse press at {0}: {1}'.format(event.pos, vis_at))
 
+    modifiers = [key.name for key in event.modifiers]
     if event.modifiers:
-        logger.debug('Modifiers found: {0}'.format(event.modifiers))
+        logger.debug('Modifiers found: {0}'.format(modifiers))
 
     # Iterate over visuals in this canvas at cursor position
     for v in vis_at:
@@ -872,19 +1030,19 @@ def on_mouse_press(event):
         elif isinstance(v, vp.scene.visuals.Text):
             viewer.toggle_neurons(v._object_id)
             break
+        # If control modifier, try snapping cursor
+        if 'Control' in modifiers:
+            viewer._snap_cursor(event.pos, v,
+                                open_browser='Shift' in modifiers)
+            break
         # If shift modifier, add to/remove from current selection
         elif isinstance(v, vp.scene.visuals.VisualNode) and \
-             getattr(v, '_skeleton_id', None) and \
-             'Shift' in [key.name for key in event.modifiers]:
+             getattr(v, '_skeleton_id', None) and 'Shift' in modifiers:
             if v._skeleton_id not in set(viewer.selected):
                 viewer.selected = np.append(viewer.selected, v._skeleton_id)
             else:
                 viewer.selected = viewer.selected[viewer.selected !=
                                                   v._skeleton_id]
-            break
-
-        if 'Control' in [key.name for key in event.modifiers]:
-            viewer._snap_cursor(event.pos, v)
             break
 
 
@@ -912,6 +1070,14 @@ def on_key_press(event):
         viewer._toggle_fps()
     elif event.text.lower() == 'p':
         viewer.toggle_picking()
+    elif event.text.lower() == '1':
+        viewer.set_view('XY')
+    elif event.text.lower() == '2':
+        viewer.set_view('XZ')
+    elif event.text.lower() == '3':
+        viewer.set_view('YZ')
+    elif event.text.lower() == 'c':
+        viewer.url_to_cursor(open_browser=True)
 
 
 def on_resize(event):
@@ -919,5 +1085,9 @@ def on_resize(event):
     viewer = event.source._wrapper
     viewer._shortcuts.pos = (10, event.size[1])
     viewer._picking_text.pos = (10, event.size[1] - 10)
-
     viewer._fps_text.pos = (event.size[0] - 10, 10)
+
+    # Idea for fixing fontsize/linebreaks:
+    # Render canvas to framebuffer via `_render_picking` and with region
+    # outside the current canvas size: if a text ID shows up, we have to
+    # resize
