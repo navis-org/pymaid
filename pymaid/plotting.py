@@ -289,10 +289,11 @@ def plot2d(x, method='2d', **kwargs):
     """
 
     _ACCEPTED_KWARGS = ['remote_instance', 'connectors', 'connectors_only',
-                        'ax', 'color', 'view', 'scalebar', 'cn_mesh_colors',
-                        'linewidth', 'cn_size', 'group_neurons', 'scatter_kws',
-                        'figsize', 'linestyle', 'alpha', 'depth_coloring',
-                        'autoscale', 'depth_scale', 'use_neuron_color']
+                        'ax', 'color', 'colors', 'c', 'view', 'scalebar',
+                        'cn_mesh_colors', 'linewidth', 'cn_size',
+                        'group_neurons', 'scatter_kws', 'figsize', 'linestyle',
+                        'alpha', 'depth_coloring', 'autoscale', 'depth_scale',
+                        'use_neuron_color']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
@@ -901,7 +902,7 @@ def _random_colors(count, color_space='RGB', color_range=1):
 
     """
     if count == 1:
-        return [(0, 0, 0)]
+        return [_eval_color(config.default_color, color_range)]
 
     # Make count_color an even number
     if count % 2 != 0:
@@ -1513,10 +1514,6 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
     else:
         colors = _eval_color(colors, color_range=color_range)
 
-    # If color is a single color, convert to list
-    if all([isinstance(elem, numbers.Number) for elem in colors]):
-        colors = [colors] * (skdata.shape[0] + dotprops.shape[0])
-
     # In order to cater for duplicate skeleton IDs in skdata (e.g. from
     # splitting into fragments), we will not map skids to colors but instead
     # keep colors as a list. That way users can pass a simple list of colors.
@@ -1525,13 +1522,24 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
     dotprop_cmap = []
     neuron_cmap = []
     if isinstance(colors, dict):
-        neuron_cmap = [colors.get(s, (0, 0, 0)) for s in skdata.skeleton_id]
-        dotprop_cmap = [colors.get(s, (0, 0, 0)) for s in dotprops.gene_name.values]
+        # We will try to get the skid first as str, then as int
+        neuron_cmap = [colors.get(s,
+                                  colors.get(int(s),
+                                             _eval_color(config.default_color,
+                                                         color_range)))
+                       for s in skdata.skeleton_id]
+        dotprop_cmap = [colors.get(s,
+                                   _eval_color(config.default_color,
+                                               color_range))
+                        for s in dotprops.gene_name.values]
     # If list of colors
     elif isinstance(colors, (list, tuple, np.ndarray)):
         colors_required = skdata.shape[0] + dotprops.shape[0]
 
-        if len(colors) < colors_required:
+        # If color is a single color, convert to list
+        if all([isinstance(elem, numbers.Number) for elem in colors]):
+            colors = [colors] * colors_required
+        elif len(colors) < colors_required:
             raise ValueError('Need colors for {} neurons/dotprops, got '
                              '{}'.format(colors_required, len(colors)))
         elif len(colors) > colors_required:
@@ -1547,7 +1555,10 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
 
     # Override neuron cmap if we are supposed to use neuron colors
     if use_neuron_color:
-        neuron_cmap = [n.getattr('color', (0, 0, 0)) for i, n in enumerate(skdata)]
+        neuron_cmap = [n.getattr('color',
+                                 _eval_color(config.default_color,
+                                             color_range))
+                       for i, n in enumerate(skdata)]
 
     return neuron_cmap, dotprop_cmap
 
@@ -2368,7 +2379,8 @@ def _points2vispy(x, **kwargs):
     """
     colors = kwargs.get('color',
                         kwargs.get('c',
-                                   kwargs.get('colors', (0, 0, 0))))
+                                   kwargs.get('colors',
+                                              _eval_color(config.default_color, 1))))
 
     visuals = []
     for p in x:
