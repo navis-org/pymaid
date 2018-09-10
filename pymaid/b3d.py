@@ -152,7 +152,7 @@ class handler:
         else:
             raise AttributeError('Unknown attribute ' + key)
 
-    def add(self, x, neurites=True, soma=True, connectors=True, redraw=True,
+    def add(self, x, neurites=True, soma=True, connectors=True, redraw=False,
             use_radii=False, skip_existing=False, **kwargs):
         """ Add neuron(s) to scene.
 
@@ -161,14 +161,14 @@ class handler:
         x :             CatmaidNeuron | CatmaidNeuronList | core.Volume
                         Objects to import into Blender.
         neurites :      bool, optional
-                        Plot neurites. Default = True
+                        Plot neurites.
         soma :          bool, optional
-                        Plot somas. Default = True
+                        Plot somas.
         connectors :    bool, optional
-                        Plot connectors. Default = True
+                        Plot connectors.
         redraw :        bool, optional
-                        If True, will redraw update window after each neuron.
-                        May slow down loading!
+                        If True, will redraw window after each neuron. This
+                        will slow down loading!
         use_radii :     bool, optional
                         If True, will use treenode radii.
         skip_existing : bool, optional
@@ -213,6 +213,47 @@ class handler:
         """ Clear all neurons """
         self.all.delete()
 
+    def _create_scatter2(self, x, **kwargs):
+        """ Create scatter by reusing mesh data. This generate an individual
+        objects for each data point. This is slower! """
+
+        if x.ndim != 2 or x.shape[1] != 3:
+            raise ValueError('Array must be of shape N,3')
+
+        # Get & scale coordinates and invert y
+        coords = x.astype(float)[:, [0, 2, 1]]
+        coords *= float(self.conversion)
+        coords *= [1, 1, -1]
+
+        verts, faces = CalcSphere(kwargs.get('size', 0.02),
+                                            kwargs.get('sp_res', 7),
+                                            kwargs.get('sp_res', 7))
+
+        mesh = bpy.data.meshes.new(kwargs.get('name', 'scatter'))
+        mesh.from_pydata(verts, [], faces)
+        mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
+
+        objects = []
+        for i, co in enumerate(coords):
+            obj = bpy.data.objects.new(kwargs.get('name', 'scatter') + str(i),
+                                       mesh)
+            obj.location = co
+            obj.show_name = False
+            objects.append(obj)
+
+        # Link to scene and add to group
+        group_name = kwargs.get('name', 'scatter')
+        if group_name != 'scatter' and group_name in bpy.data.groups:
+            group = bpy.data.groups[group_name]
+        else:
+            group = byp.data.groups.new(group_name)
+
+        for obj in objects:
+            bpy.context.scene.objects.link(obj)
+            group.objects.link(obj)
+
+        return
+
     def _create_scatter(self, x, **kwargs):
         """ Create scatter. """
 
@@ -231,6 +272,8 @@ class handler:
         n_verts = base_verts.shape[0]
         sp_verts = []
         sp_faces = []
+        wm = bpy.context.window_manager
+        wm.progress_begin(0, coords.shape[0])
         for i, co in enumerate(coords):
             this_verts = base_verts.copy()
             # Offset spatially
@@ -240,6 +283,8 @@ class handler:
 
             sp_verts.append(this_verts)
             sp_faces += this_faces
+            wm.progress_update(i)
+        wm.progress_end()
 
         verts = np.concatenate(sp_verts, axis=0)
 
