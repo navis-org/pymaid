@@ -64,6 +64,8 @@ import networkx as nx
 from pymaid import core, graph, utils, config, cache
 from pymaid.intersect import in_volume
 
+import webbrowser
+
 __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_3D_skeleton', 'get_3D_skeletons',
                   'get_annotation_details', 'get_annotation_id',
@@ -5094,8 +5096,8 @@ def get_annotation_list(remote_instance=None):
 
 
 def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
-                       active_node_id=None, remote_instance=None, zoom=0,
-                       tool='tracingtool'):
+                       active_node_id=None, zoom=0, tool='tracingtool',
+                       open_browser=False, remote_instance=None):
     """ Generate URL to a location.
 
     Parameters
@@ -5113,6 +5115,9 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
                             active.
     zoom :                  int, optional
     tool :                  str, optional
+    open_browser :          bool, optional
+                            If True will open *all* generated URLs as new
+                            tabs in the standard webbrowser.
     remote_instance :       CatmaidInstance, optional
                             If not passed directly, will try using global.
 
@@ -5178,9 +5183,21 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
         active_skeleton_id = list_helper(active_skeleton_id)
         active_node_id = list_helper(active_node_id)
 
-        return [gen_url(c, stid, nid, sid) for c, stid, nid, sid in zip(coords, stack_id, active_node_id, active_skeleton_id)]
+        urls = [gen_url(c, stid, nid, sid) for c, stid, nid, sid in zip(coords, stack_id, active_node_id, active_skeleton_id)]
+
+        if open_browser:
+            for u in urls:
+                webbrowser.open_new_tab(u)
+
+        return urls
     else:
-        return gen_url(coords, stack_id, active_node_id, active_skeleton_id)
+        url = gen_url(coords, stack_id, active_node_id, active_skeleton_id)
+
+        if open_browser:
+            for u in url:
+                webbrowser.open_new_tab(u)
+
+        return url
 
 
 @cache.never_cache
