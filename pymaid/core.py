@@ -2648,8 +2648,11 @@ class _SkidIndexer():
         # Turn into list and force strings
         skid = utils._make_iterable(skid, force_type=str)
 
-        # Get objects that match in skid
+        # Get objects that match skid
         sel = [n for n in self.obj if str(n.skeleton_id) in skid]
+
+        # Reorder to keep in the order requested
+        sel = sorted(sel, key=lambda x : np.where(skid == str(x.skeleton_id))[0][0])
 
         if len(sel) == 0:
             raise ValueError('No neuron with skeleton ID(s) {0}'.format(skid))
