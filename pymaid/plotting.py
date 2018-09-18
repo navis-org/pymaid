@@ -1598,20 +1598,23 @@ def _eval_color(x, color_range=255):
 def plot_network(x, **kwargs):
     """ Uses NetworkX to generate a Plotly network plot.
 
+    The purpose of this function is to have a quick 'n dirty look at your
+    neurons' connectivity. For higher quality, interactive visualizations
+    have a look at `Cytoscape <http://cytoscape.org/>`_.
+
+
     Parameters
     ----------
     x
-                      Neurons as single or list of either:
+                      Neurons as list of either:
 
                       1. skeleton IDs (int or str)
-                      2. neuron name (str, exact match)
+                      2. neuron names (str, exact match)
                       3. annotation: e.g. ``'annotation:PN right'``
-                      4. CatmaidNeuron or CatmaidNeuronList object
+                      4. CatmaidNeuronList object
                       5. pandas.DataFrame containing an adjacency matrix.,
                          e.g. from :funct:`~pymaid.create_adjacency_matrix`
                       6. NetworkX Graph
-    remote_instance : CATMAID Instance, optional
-                      Need to pass this too if you are providing only skids.
     layout :          str | function, default = nx.spring_layout
                       Layout function. See `here <https://networkx.github.io/documentation/latest/reference/drawing.html>`_
                       for available layouts. Use either the function directly
@@ -1622,13 +1625,13 @@ def plot_network(x, **kwargs):
                       Edges with less connections are ignored.
     groups :          dict
                       Use to group neurons. Format:
-                      ``{ 'Group A' : [skid1, skid2, ..], }``
+                      ``{'Group A': [skid1, skid2, ...], ...}``
     colormap :        str | tuple, dict
                 | Set to 'random' (default) to assign random colors to neurons
                 | Use single tuple to assign the same color to all neurons:
-                | e.g. ``( (220,10,50) )``
+                | e.g. ``(220, 10, 50)``
                 | Use dict to assign rgb colors to individual neurons:
-                | e.g. ``{ neuron1 : (200,200,0), .. }``
+                | e.g. ``{ neuron1: (200, 200, 0), ...}``
     label_nodes :     bool, default=True
                       Plot neuron labels.
     label_edges :     bool, default=True
@@ -1637,11 +1640,11 @@ def plot_network(x, **kwargs):
                       Figure width and height.
     node_hover_text : dict
                       Provide custom hover text for neurons:
-                      ``{ neuron1 : 'hover text', .. }``
+                      ``{neuron1: 'hover text', ...}``
     node_size :       int | dict
                       | Use int to set node size once.
                       | Use dict to set size for individual nodes:
-                      | ``{ neuron1 : 20, neuron2 : 5,  .. }``
+                      | ``{neuron1: 20, neuron2: 5, ...}``
 
     Returns
     -------
@@ -1701,7 +1704,11 @@ def plot_network(x, **kwargs):
 
     edges = []
     annotations = []
-    max_weight = max(nx.get_edge_attributes(g, 'weight').values())
+    try:
+        max_weight = max(nx.get_edge_attributes(g, 'weight').values())
+    except:
+        # This will fail if there are no edges
+        max_weight = 1
     for e in list(g.edges.data()):
         e_width = 2 + 5 * round(e[2]['weight']) / max_weight
 
