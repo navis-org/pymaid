@@ -625,36 +625,24 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     doParallel = importr('doParallel')
     doParallel.registerDoParallel(cores=n_cores)
 
-    if remote_instance is None:
-        if 'remote_instance' in sys.modules:
-            remote_instance = sys.modules['remote_instance']
-        elif 'remote_instance' in globals():
-            remote_instance = globals()['remote_instance']
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if 'rpy2' in str(type(x)):
         rn = x
     elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] < 2:
-            logger.warning(
-                'You have to provide more than a single neuron.')
             raise ValueError('You have to provide more than a single neuron.')
-
         rn = neuron2r(x, convert_to_um=True)
     elif isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
-        logger.warning(
-            'You have to provide more than a single neuron.')
         raise ValueError('You have to provide more than a single neuron.')
     elif isinstance(x, list):
         if not remote_instance:
-            logger.error('You have to provide a CATMAID instance using the '
-                         '<remote_instance> parameter. See help(rmaid.nblast) '
-                         'for details.')
-            return
+            raise Valueerror('You have to provide a CATMAID instance using '
+                             ' the <remote_instance> parameter. See '
+                             'help(rmaid.nblast) for details.')
         x = fetch.get_neuron(x, remote_instance)
         rn = neuron2r(x, convert_to_um=True)
     else:
-        logger.error('Unable to intepret <neuron> parameter provided. See '
-                     'help(rmaid.nblast) for details.')
         raise ValueError('Unable to intepret <neuron> parameter provided. See'
                          'help(rmaid.nblast) for details.')
 
