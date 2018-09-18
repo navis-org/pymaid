@@ -82,8 +82,8 @@ import copy
 import six
 import numbers
 
-from pymaid import (graph, morpho, fetch, graph_utils, resample, intersect,
-                    utils, config)
+from . import (graph, morpho, fetch, graph_utils, resample, intersect,
+               utils, config)
 
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
@@ -2436,36 +2436,38 @@ class CatmaidNeuronList:
         if not inc and not exc:
             raise ValueError('Must provide at least a single annotation')
 
-        if not partial:
-            if not intersect:
-                inc_sel = [self.neurons[i] for i, an in enumerate(
-                    self.annotations) if True in [a in inc for a in an]]
-                exc_sel = [self.neurons[i] for i, an in enumerate(
-                    self.annotations) if True in [a in exc for a in an]]
-            else:
-                inc_sel = [self.neurons[i] for i, an in enumerate(
-                    self.annotations) if False not in [a in an for a in inc]]
-                exc_sel = [self.neurons[i] for i, an in enumerate(
-                    self.annotations) if False not in [a in an for a in exc]]
-        else:
-            if not intersect:
-                inc_sel = [self.neurons[i] for i, an in enumerate(self.annotations) if True in [
-                    a_x in a for a_x in inc for a in an]]
-                exc_sel = [self.neurons[i] for i, an in enumerate(self.annotations) if True in [
-                    a_x in a for a_x in exc for a in an]]
-            else:
-                inc_sel = [self.neurons[i] for i, an in enumerate(self.annotations) if False not in [
-                    True in [a_x in a for a in an] for a_x in inc]]
-                exc_sel = [self.neurons[i] for i, an in enumerate(self.annotations) if False not in [
-                    True in [a_x in a for a in an] for a_x in exc]]
+        # Make sure we have annotations to begin with
+        self.get_annotations(skip_existing=True)
 
-        # Open selection if no inclusive or exclusive annotations given
-        if not inc:
-            inc_sel = [n for n in self.neurons]
-        if not exc:
-            exc_sel = []
+        selection = []
+        for n in self.neurons:
+            if inc:
+                if not partial:
+                    pos = [a in n.annotations for a in inc]
+                else:
+                    pos = [any(a in b for b in n.annotations) for a in inc]
 
-        selection = [n for n in inc_sel if n not in exc_sel]
+                # Skip if any positive annotation is missing
+                if intersect and not all(pos):
+                    continue
+                # Skip if none of the positive annotations are there
+                elif not intersect and not any(pos):
+                    continue
+
+            if exc:
+                if not partial:
+                    neg = [a in n.annotations for a in exc]
+                else:
+                    neg = [any(a in b for b in n.annotations) for a in exc]
+
+                # Skip if all negative annotations are present
+                if intersect and all(neg):
+                    continue
+                # Skip if any of the negative annotations are present
+                elif not intersect and any(neg):
+                    continue
+
+            selection.append(n)
 
         if not selection and raise_not_found:
             raise ValueError('No neurons with matching annotation(s) found')
