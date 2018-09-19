@@ -1146,7 +1146,7 @@ class CatmaidNeuron:
                 # Make sure to go from simple to computationally expensive
                 to_comp += ['n_nodes', 'n_connectors', 'soma', 'root',
                             'n_branch_nodes', 'n_end_nodes', 'n_open_ends',
-                            'cable_length', 'review_status']
+                            'cable_length']
 
             for at in to_comp:
                 if getattr(self, at) != getattr(other, at):
