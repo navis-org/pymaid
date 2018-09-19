@@ -1137,9 +1137,22 @@ class CatmaidNeuron:
     def __eq__(self, other):
         """Implements neuron comparison."""
         if isinstance(other, CatmaidNeuron):
-            return all(self.summary() == other.summary()) and \
-                   self.root == other.root and \
-                   self.soma == other.soma
+            # We will do this sequentially and stop as soon as we find a
+            # discrepancy -> this saves tons of time
+            to_comp = ['skeleton_id', 'neuron_name']
+
+            # Make some morphological comparisons if we have node data
+            if 'nodes' in self.__dict__ and 'nodes' in other.__dict__:
+                # Make sure to go from simple to computationally expensive
+                to_comp += ['n_nodes', 'n_connectors', 'soma', 'root',
+                            'n_branch_nodes', 'n_end_nodes', 'n_open_ends',
+                            'cable_length', 'review_status']
+
+            for at in to_comp:
+                if getattr(self, at) != getattr(other, at):
+                    return False
+            # If all comparisons have passed, return True
+            return True
         else:
             return NotImplemented
 
