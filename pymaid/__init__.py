@@ -1,4 +1,4 @@
-__version__ = "0.89"
+__version__ = "0.9"
 
 from pymaid import config
 

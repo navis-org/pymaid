@@ -10,8 +10,22 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.90
+     - 20/09/18
+     - - vispy 3d viewer overhaul: prettier, better picking, new shortcuts
+       - indexing of :class:`~pymaid.CatmaidNeuronList` via ``.skid[]`` now returns results in order of query
+       - new function: :func:`~pymaid.get_treenodes_by_tag`
+       - new function: :func:`~pymaid.connection_density`
+       - improved :func:`~pymaid.split_axon_dendrite`
+       - improved :func:`~pymaid.to_swc` and :func:`~pymaid.from_swc`
+       - improved :ref:`neuronlist math and comparisons <neuronlist_math>`
+       - :func:`~pymaid.plot2d` and :func:`~pymaid.plot3d` now accept lists of colors
+       - :func:`~pymaid.has_soma` is now much faster
+       - faster neuron import in :ref:`blender_3d`
+       - improved docstrings
+       - various bugfixes
    * - 0.89
-     - 14/09/18
+     - 14/08/18
      - - new function: :func:`~pymaid.cytoscape.watch_network` constantly pushes updates Cytoscape
        - new function: :func:`~pymaid.get_nth_partners` returns neurons connected via n hops
        - by default, :func:`~pymaid.plot3d` now chooses the backend automatically: vispy for terminal sessions, plotly for Jupyter notebook/lab
