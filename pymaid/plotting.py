@@ -46,10 +46,13 @@ from pymaid import (morpho, graph, core, fetch, graph_utils, utils,
 import plotly.graph_objs as go
 import plotly.offline
 
-import vispy
-from vispy import scene
-from vispy.geometry import create_sphere
-from vispy.gloo.util import _screenshot
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import vispy
+    from vispy import scene
+    from vispy.geometry import create_sphere
+    from vispy.gloo.util import _screenshot
 
 try:
     # Try setting vispy backend to PyQt5

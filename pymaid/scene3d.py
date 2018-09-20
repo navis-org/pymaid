@@ -40,7 +40,10 @@
 import uuid
 import platform
 
-import vispy as vp
+import warnings
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import vispy as vp
 
 import numpy as np
 import pandas as pd
