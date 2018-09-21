@@ -50,21 +50,19 @@ import json
 import time
 import base64
 import sys
+import datetime
+import re
+import webbrowser
 
 import requests
 from requests_futures.sessions import FuturesSession
 
-import datetime
-import re
 import pandas as pd
 import numpy as np
-import sys
 import networkx as nx
 
-from pymaid import core, graph, utils, config, cache
-from pymaid.intersect import in_volume
-
-import webbrowser
+from . import core, graph, utils, config, cache
+from .intersect import in_volume
 
 __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_3D_skeleton', 'get_3D_skeletons',
@@ -101,11 +99,11 @@ class CatmaidInstance:
     ----------
     server :        str
                     The url for a CATMAID server.
-    authname :      str
+    authname :      str | None
                     The http user.
-    authpassword :  str
+    authpassword :  str | None
                     The http password.
-    authtoken :     str
+    authtoken :     str | None
                     User token - see CATMAID documentation on how to get it.
     project_id :    int, optional
                     ID of your project. Default = 1.

@@ -19,18 +19,15 @@ module requires py2cytoscape (https://github.com/cytoscape/py2cytoscape)
 """
 
 import logging
-
-import networkx as nx
-
-import numpy as np
-import pandas as pd
-
-from pymaid import utils, fetch, graph
-
 import time
 import datetime
 
+import networkx as nx
+import numpy as np
+import pandas as pd
 from py2cytoscape.data.cyrest_client import CyRestClient
+
+from . import utils, fetch, graph
 
 # Set up logging
 logger = logging.getLogger(__name__)

@@ -18,15 +18,15 @@
 representations.
 """
 
+import numbers
+
 import pandas as pd
 import numpy as np
 import networkx as nx
 
-import numbers
-
 from scipy.sparse import csgraph, csr_matrix
 
-from pymaid import graph, core, utils, config
+from . import graph, core, utils, config
 
 # Set up logging
 logger = config.logger

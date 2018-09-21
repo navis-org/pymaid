@@ -17,42 +17,41 @@
 """ Module contains functions to plot neurons in 2D and 3D.
 """
 
+import random
+import colorsys
+import uuid
+import math
+import numbers
+import warnings
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import mpl_toolkits
+import matplotlib.colors as mcl
 from mpl_toolkits.mplot3d.art3d import Line3DCollection
 from mpl_toolkits.mplot3d import proj3d
 from matplotlib.collections import LineCollection
-import matplotlib.colors as mcl
 
-import random
-import colorsys
+import seaborn as sns
 import png
-
-import uuid
-
 import networkx as nx
-
 import pandas as pd
 import numpy as np
-import math
-import numbers
-
-from pymaid import (morpho, graph, core, fetch, graph_utils, utils,
-                    scene3d, config)
+import scipy.cluster.hierarchy
 
 import plotly.graph_objs as go
 import plotly.offline
 
-import warnings
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import vispy
     from vispy import scene
     from vispy.geometry import create_sphere
     from vispy.gloo.util import _screenshot
+
+from . import morpho, graph, core, fetch, graph_utils, utils, scene3d, config
 
 try:
     # Try setting vispy backend to PyQt5

@@ -54,18 +54,17 @@ import os
 import sys
 import time
 from datetime import datetime
+from colorsys import hsv_to_rgb
 
 import pandas as pd
 import numpy as np
 
-from colorsys import hsv_to_rgb
-
-import pymaid.cluster as pyclust
-from pymaid import core, fetch, plotting, config, utils
-
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
+
+from . import cluster as pyclust
+from . import core, fetch, plotting, config, utils
 
 cl = robjects.r('class')
 names = robjects.r('names')

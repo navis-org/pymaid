@@ -65,9 +65,6 @@ also allow quick access to other PyMaid functions:
 """
 
 import datetime
-import pandas as pd
-
-import numpy as np
 import math
 import random
 import json
@@ -75,12 +72,16 @@ import os
 import sys
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
-import scipy
-import networkx as nx
 import io
 import copy
 import six
 import numbers
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+import scipy.spatial
+import scipy.cluster.hierarchy
 
 from . import (graph, morpho, fetch, graph_utils, resample, intersect,
                utils, config)

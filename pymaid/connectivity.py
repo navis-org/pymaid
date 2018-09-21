@@ -18,14 +18,13 @@
 """ This module contains functions to analyse connectivity.
 """
 
-import pandas as pd
-import numpy as np
-import scipy
-import scipy.spatial
-
 from itertools import combinations
 
-from pymaid import fetch, core, intersect, utils, config, graph_utils
+import pandas as pd
+import numpy as np
+import scipy.spatial
+
+from . import fetch, core, intersect, utils, config, graph_utils
 
 # Set up logging
 logger = config.logger

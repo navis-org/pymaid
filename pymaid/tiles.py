@@ -15,22 +15,18 @@
 #    along
 
 import urllib.request
-
 import gc
-
-from pymaid import fetch, core, utils, config
-
-import pandas as pd
-import numpy as np
+import threading
 import math
-
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
-
 import time
 import urllib
 
-import threading
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider
+
+from . import fetch, core, utils, config
 
 # Set up logging
 logger = config.logger

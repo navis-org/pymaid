@@ -39,9 +39,6 @@ Examples
 # Avoid operators ("bpy.ops.") as much as possible:
 # They cause scene updates which will exponentially slow down processing
 
-import pandas as pd
-import numpy as np
-from pymaid import core, utils, config
 import colorsys
 import json
 import os
@@ -49,13 +46,17 @@ import time
 import math
 import mathutils
 
+import pandas as pd
+import numpy as np
+
+from . import core, utils, config
+
 logger = config.logger
 
 try:
     import bpy
     import bmesh
 except ImportError:
-
     logger.error(
         'Unable to load Blender API - this module only works from within Blender!')
 

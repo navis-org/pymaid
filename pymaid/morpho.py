@@ -19,15 +19,14 @@
 """
 
 import math
-import time
-import logging
-import pandas as pd
-import numpy as np
-import scipy
-import networkx as nx
 import itertools
 
-from pymaid import fetch, core, graph_utils, graph, utils, config, resample
+import pandas as pd
+import numpy as np
+import scipy.spatial.distance
+import networkx as nx
+
+from . import fetch, core, graph_utils, graph, utils, config, resample
 
 # Set up logging
 logger = config.logger
@@ -341,10 +340,6 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
 
     """
 
-    logger.debug('Calculating Strahler indices...')
-
-    start_time = time.time()
-
     if isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
         x = x
     elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
@@ -487,8 +482,6 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             # Set these nodes strahler index to that of the last branch point
             x.nodes.loc[x.nodes.treenode_id.isin(
                 this_seg), 'strahler_index'] = new_SI
-
-    logger.debug('Done in %is' % round(time.time() - start_time))
 
     if not inplace:
         return x
@@ -897,7 +890,6 @@ def bending_flow(x, polypre=False):
     Adds a new column ``'flow_centrality'`` to ``x.nodes``. Branch points only!
 
     """
-    start_time = time.time()
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
@@ -976,9 +968,6 @@ def bending_flow(x, polypre=False):
     x.centrality_method = 'bending'
 
     x.nodes.reset_index(inplace=True)
-
-    logger.debug('Total time for bending flow calculation: {0}s'.format(
-        round(time.time() - start_time)))
 
     return
 

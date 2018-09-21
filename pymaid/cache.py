@@ -22,10 +22,10 @@ for responses from the CATMAID server.
 import pickle
 import sys
 import datetime
-
 from functools import wraps
 from collections import OrderedDict
-from pymaid import utils, config
+
+from . import utils, config
 
 # Set up logging
 logger = config.logger

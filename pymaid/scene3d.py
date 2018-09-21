@@ -21,45 +21,41 @@
 # TO-DO:
 # [x] keyboard shortcuts to cycle back and forth through neurons
 # [x] set_color method (takes colormap as input)
-# - method and shortcut for screenshot (generic filename for shortcut)
-# - animate method: makes camera rotate?
-# - CANCELLED grey, transparent background for legend
-# - DONE logging
-# - DONE modifier keys for selection (shift)
-# - how to deal with duplicate skeleton IDs? Use id() or hex(id())?
-#   -> would have to link somas & connectors to that ID (set as parent)
-# - dragging selection (ctrl+shift?) - see gist
-# - DONE show shortcuts at bottom in overlay
-# - function to show/hide connectors (if available)
-# - crosshair for picking? shows on_mouse_move with modifier key
-# -> could snap to closest position on given neuron?
-# -> for line visuals, `.pos` contains all points of that visual
-# - make ctrl-click display a marker at given position
-# - keyboard shortcut to toggle volumes
+# [/] method and shortcut for screenshot (generic filename for shortcut)
+# [ ] animate method: makes camera rotate?
+# [-] CANCELLED grey, transparent background for legend
+# [x] logging
+# [x] modifier keys for selection (shift)
+# [ ] how to deal with duplicate skeleton IDs? Use id() or hex(id())?
+#    -> would have to link somas & connectors to that ID (set as parent)
+# [ ] dragging selection (ctrl+shift?) - see gist
+# [x] show shortcuts at bottom in overlay
+# [ ] function/shortcut to show/hide connectors (if available)
+# [ ] crosshair for picking? shows on_mouse_move with modifier key
+# [x] could snap to closest position on given neuron?
+#     -> for line visuals, `.pos` contains all points of that visual
+# [x] make ctrl-click display a marker at given position
+# [ ] keyboard shortcut to toggle volumes
 
 import uuid
 import platform
-
+import colorsys
+import webbrowser
+from functools import wraps
 import warnings
+
+import numpy as np
+import pandas as pd
+import scipy.spatial
+import seaborn as sns
+import png
+import matplotlib.colors as mcl
+
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import vispy as vp
 
-import numpy as np
-import pandas as pd
-
-import scipy
-import seaborn as sns
-import png
-
-import matplotlib.colors as mcl
-import colorsys
-
-import webbrowser
-
-from functools import wraps
-
-from pymaid import utils, plotting, fetch, config
+from . import utils, plotting, fetch, config
 
 __all__ = ['Viewer', 'Browser']
 

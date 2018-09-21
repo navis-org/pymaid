@@ -55,10 +55,12 @@ Examples
 # TODOs
 # - Github punch card-like figure
 
-from pymaid import core, fetch, utils, config
+import datetime
+
 import pandas as pd
 import numpy as np
-import datetime
+
+from . import core, fetch, utils, config
 
 # Set up logging
 logger = config.logger

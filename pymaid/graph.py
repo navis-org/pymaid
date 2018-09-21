@@ -19,16 +19,14 @@
 
 import numpy as np
 import pandas as pd
-import scipy.spatial
-
-from pymaid import core, fetch, utils, config
-
 import networkx as nx
 
 try:
     import igraph
 except ImportError:
     igraph = None
+
+from . import core, fetch, utils, config
 
 # Set up logging
 logger = config.logger
@@ -375,6 +373,9 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
     ``scipy.spatial.cKDTree`` or ``scipy.spatial.KDTree``
 
     """
+
+    # Rarely used, so import in function
+    import scipy.spatial
 
     if tree_type not in ['c', 'normal']:
         raise ValueError('"tree_type" needs to be either "c" or "normal"')

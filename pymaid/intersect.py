@@ -22,7 +22,7 @@ import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from pymaid import fetch, core, utils, graph_utils, config
+from . import fetch, core, utils, graph_utils, config
 
 # Set up logging -> has to be before try statement!
 logger = config.logger

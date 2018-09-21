@@ -14,19 +14,19 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
+import os
+import json
+import colorsys
+import math
+
 import numpy as np
 import pandas as pd
-import math
-import scipy.cluster
+import scipy.cluster.hierarchy
 import scipy.spatial
-import colorsys
 
 from concurrent.futures import ThreadPoolExecutor
 
-import os
-import json
-
-from pymaid import fetch, core, plotting, utils, config
+from . import fetch, core, plotting, utils, config
 
 # Set up logging
 logger = config.logger

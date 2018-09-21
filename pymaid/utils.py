@@ -18,14 +18,15 @@ import collections
 import six
 import sys
 import os
-import numpy as np
 import json
-import pandas as pd
 import uuid
 import random
 import csv
 
-from pymaid import core, fetch, config
+import pandas as pd
+import numpy as np
+
+from . import core, fetch, config
 
 # Set up logging
 logger = config.logger
