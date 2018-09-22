@@ -44,6 +44,7 @@ find out details about a given function.
    3D plots <plotting_3d>
    Depth coloring <depth_coloring>
    Highlight connectors <highlight_connectors>
+   EM image data <tiles.ipynb>
 
 .. raw:: html
 
@@ -93,7 +94,7 @@ find out details about a given function.
          <div class="col-md-3">
             <div class="panel panel-default">
                <div class="panel-heading">
-                  <h3 class="panel-title">Misc</h3>
+                  <h3 class="panel-title">Interfaces</h3>
                </div>
                <div class="panel-body">
 
@@ -103,7 +104,22 @@ find out details about a given function.
    Pymaid & Blender3D <blender>
    Pymaid & Cytoscape <python2cytoscape>
    Pymaid & R <rmaid_doc>
-   EM image data <tiles.ipynb>      
+
+.. raw:: html
+
+               </div>
+            </div>
+         </div>
+         <div class="col-md-3">
+            <div class="panel panel-default">
+               <div class="panel-heading">
+                  <h3 class="panel-title">Misc</h3>
+               </div>
+               <div class="panel-body">
+
+.. toctree::
+   :maxdepth: 1
+
    URLs & random sampling <generate_urls>
    User contributions <user_contributions>
    Data caching <data_caching>
