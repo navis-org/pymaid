@@ -264,7 +264,7 @@ class CatmaidNeuron:
                 setattr(self, at, getattr(x, at))
 
         # Classify nodes if applicable
-        if 'nodes' in self.__dict__ and 'type' not in self.nodes:
+        if self.node_data and 'type' not in self.nodes:
             graph_utils.classify_nodes(self)
 
         # If a CatmaidNeuron is used to initialize, we need to make this
@@ -293,9 +293,8 @@ class CatmaidNeuron:
 
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
-        if 'nodes' in self.__dict__ and \
-            self.nodes.empty and key in ['n_open_ends', 'n_branch_nodes',
-                                         'n_end_nodes', 'cable_length']:
+        if key in ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
+                  'cable_length'] and self.node_data and self.nodes.empty:
             return 0
 
         if key == 'igraph':
@@ -348,7 +347,7 @@ class CatmaidNeuron:
         elif key == 'sampling_resolution':
             return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 closed = set(self.tags.get('ends', []) +
                              self.tags.get('uncertain end', []) +
                              self.tags.get('uncertain continuation', []) +
@@ -360,49 +359,49 @@ class CatmaidNeuron:
                             'to fetch.')
                 return 'NA'
         elif key == 'n_branch_nodes':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes[self.nodes.type == 'branch'].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_end_nodes':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes[self.nodes.type == 'end'].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_nodes':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes.shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_connectors':
-            if 'connectors' in self.__dict__:
+            if self.cn_data:
                 return self.connectors.shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_presynapses':
-            if 'connectors' in self.__dict__:
+            if self.cn_data:
                 return self.connectors[self.connectors.relation == 0].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_postsynapses':
-            if 'connectors' in self.__dict__:
+            if self.cn_data:
                 return self.connectors[self.connectors.relation == 1].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'cable_length':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 # Simply sum up edge weight of all graph edges
                 if self.igraph and config.use_igraph:
                     w = self.igraph.es.get_attribute_values('weight')
@@ -414,13 +413,17 @@ class CatmaidNeuron:
                             'to fetch.')
                 return 'NA'
         elif key == 'bbox':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes.describe().loc[['min', 'max'],
                                                  ['x', 'y', 'z']].values.T
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
+        elif key == 'node_data':
+            return 'nodes' in self.__dict__
+        elif key == 'cn_data':
+            return 'connectors' in self.__dict__
         else:
             raise AttributeError('Attribute "%s" not found' % key)
 
@@ -574,8 +577,6 @@ class CatmaidNeuron:
 
     def _get_segments(self, how='length'):
         """Generate segments for neuron."""
-        logger.debug(
-            'Generating segments for neuron {}'.format(self.skeleton_id))
         if how == 'length':
             self.segments = graph_utils._generate_segments(self)
         elif how == 'break':
@@ -602,7 +603,7 @@ class CatmaidNeuron:
 
         """
         tn = self.nodes[self.nodes.radius >
-                        self.soma_detection_radius].treenode_id.tolist()
+                        self.soma_detection_radius].treenode_id.values
 
         if self.soma_detection_tag:
             if self.soma_detection_tag not in self.tags:
@@ -730,7 +731,7 @@ class CatmaidNeuron:
 
         Returns
         -------
-        scipy.hierarchy.dendrogram
+        scipy.cluster.hierarchy.dendrogram
         """
 
         # First get the all by all distances
@@ -1143,7 +1144,7 @@ class CatmaidNeuron:
             to_comp = ['skeleton_id', 'neuron_name']
 
             # Make some morphological comparisons if we have node data
-            if 'nodes' in self.__dict__ and 'nodes' in other.__dict__:
+            if self.node_data and other.node_data:
                 # Make sure to go from simple to computationally expensive
                 to_comp += ['n_nodes', 'n_connectors', 'soma', 'root',
                             'n_branch_nodes', 'n_end_nodes', 'n_open_ends',
@@ -1196,7 +1197,7 @@ class CatmaidNeuron:
     def summary(self):
         """Get a summary of this neuron."""
 
-        # Set logger to warning only - otherwise you miht get tons of
+        # Set logger to warning only - otherwise you might get tons of
         # "skeleton data not available" messages
         l = logger.level
         logger.setLevel('WARNING')
@@ -1204,17 +1205,13 @@ class CatmaidNeuron:
         # Look up these values without requesting them
         neuron_name = self.__dict__.get('neuron_name', 'NA')
         review_status = self.__dict__.get('review_status', 'NA')
-
-        if 'nodes' in self.__dict__:
-            soma_temp = self.soma
-        else:
-            soma_temp = 'NA'
+        soma = self.soma if self.node_data else 'NA'
 
         s = pd.Series([type(self), neuron_name, self.skeleton_id,
                        self.n_nodes, self.n_connectors,
                        self.n_branch_nodes, self.n_end_nodes,
                        self.n_open_ends, self.cable_length,
-                       review_status, soma_temp],
+                       review_status, soma],
                       index=['type', 'neuron_name', 'skeleton_id',
                              'n_nodes', 'n_connectors', 'n_branch_nodes',
                              'n_end_nodes', 'n_open_ends', 'cable_length',
@@ -1224,8 +1221,8 @@ class CatmaidNeuron:
         return s
 
     def to_dataframe(self):
-        """ Turn this Catmaidneuron into a pandas DataFrame containing
-        only the original Catmaid data.
+        """ Turn this CatmaidNeuron into a pandas DataFrame containing
+        only the original CATMAID data.
 
         Returns
         -------
@@ -1239,7 +1236,7 @@ class CatmaidNeuron:
                             columns=['neuron_name', 'skeleton_id', 'nodes',
                                      'connectors', 'tags'])
 
-    def to_swc(self, filename=None):
+    def to_swc(self, filename=None, **kwargs):
         """ Generate SWC file from this neuron.
 
         This converts CATMAID nanometer coordinates into microns.
@@ -1248,6 +1245,8 @@ class CatmaidNeuron:
         ----------
         filename :      str | None, optional
                         If ``None``, will use "neuron_{skeletonID}.swc".
+        kwargs
+                        Additional arguments passed to :func:`~pymaid.to_swc`.
 
         Returns
         -------
@@ -1260,7 +1259,7 @@ class CatmaidNeuron:
 
         """
 
-        return utils.to_swc(self, filename)
+        return utils.to_swc(self, filename, **kwargs)
 
     @classmethod
     def from_swc(self, filename, neuron_name=None, neuron_id=None):
@@ -1613,8 +1612,7 @@ class CatmaidNeuronList:
                 raise Exception('No remote_instance found. Use '
                                  '.set_remote_instance() to assign one to all '
                                  'neurons.')
-            else:
-                return all_instances[0]
+            return all_instances[0]
         elif key == 'review_status':
             self.get_review(skip_existing=True)
             return np.array([n.review_status for n in self.neurons])
@@ -1629,6 +1627,8 @@ class CatmaidNeuronList:
             return np.array([n.annotations for n in self.neurons])
         elif key == 'empty':
             return len(self.neurons) == 0
+        elif key == 'skeletons_missing':
+            return any([not n.node_data for n in self.neurons])
         else:
             if False not in [key in n.__dict__ for n in self.neurons]:
                 return np.array([getattr(n, key) for n in self.neurons])
