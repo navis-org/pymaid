@@ -946,7 +946,7 @@ class TestTiles(unittest.TestCase):
                               stack_id=5,
                               coords='PIXEL')
         # Load, stich and crop the required EM image tiles
-        job.generate_img()
+        job.load_in_memory()
         # Render image
         ax = job.render_im(slider=False, figsize=(12, 12))
         # Add treenodes
