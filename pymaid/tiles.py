@@ -320,7 +320,11 @@ class LoadTiles:
             raise ValueError('`image_mirror` must be int, str or "auto".')
 
         if not match:
-            raise ValueError('No mirror matching "{}" found'.format(image_mirror))
+            raise ValueError('No mirror matching "{}" found. Available '
+                             'mirrors: {}'.format(image_mirror,
+                                                 '\n'.join([m['image_base']
+                                                    for m in info['mirrors']]))
+                             )
 
         self.img_mirror = match[0]
 
@@ -331,7 +335,7 @@ class LoadTiles:
         # Memory size per tile in byte
         self.bytes_per_tile = self.tile_width ** 2 * 8
 
-        logger.info('Fastest image mirror: {0}'.format(self.mirror_url))
+        logger.info('Image mirror: {0}'.format(self.mirror_url))
 
     def bboxes2imgcoords(self):
         """ Converts bounding box(es) to coordinates for individual images.
@@ -447,7 +451,10 @@ class LoadTiles:
 
         tiles = list(set(tiles))
 
-        future_session = FuturesSession(max_workers=30)
+        if self.remote_instance:
+            future_session = self.remote_instance._future_session
+        else:
+            future_session = FuturesSession(max_workers=30)
 
         urls = [self._get_tile_url(*c) for c in tiles]
         futures = [future_session.get(u, params=None) for u in urls]
