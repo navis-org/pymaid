@@ -5192,8 +5192,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
         url = gen_url(coords, stack_id, active_node_id, active_skeleton_id)
 
         if open_browser:
-            for u in url:
-                webbrowser.open_new_tab(u)
+            webbrowser.open_new_tab(url)
 
         return url
 
