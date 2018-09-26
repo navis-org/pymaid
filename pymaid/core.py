@@ -939,19 +939,25 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
-        """ Prune neuron based on strahler order.
+    def prune_by_strahler(self, to_prune, inplace=True):
+        """ Prune neuron based on `Strahler order
+        <https://en.wikipedia.org/wiki/Strahler_number>`_.
 
         Will reroot neuron to soma if possible.
 
         Parameters
         ----------
-        to_prune :  int | list | range, optional
-                    Strahler indices to prune.
-                    1. ``to_prune = 1`` removes all leaf branches
-                    2. ``to_prune = [1,2]`` removes indices 1 and 2
-                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3
-                    4. ``to_prune = -1`` keep only the highest index
+        to_prune :  int | list | range | slice
+                    Strahler indices to prune. For example:
+
+                    1. ``to_prune=1`` removes all leaf branches
+                    2. ``to_prune=[1, 2]`` removes SI 1 and 2
+                    3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
+                    4. ``to_prune=slice(1, -1)`` removes everything but the
+                       highest SI
+                    5. ``to_prune=slice(-1, None)`` removes only the highest
+                       SI
+
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
@@ -2046,19 +2052,25 @@ class CatmaidNeuronList:
         x[0].prune_proximal_to(x[1], inplace=True)
         return x[0]
 
-    def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
-        """ Prune neurons based on strahler order.
+    def prune_by_strahler(self, to_prune, inplace=True):
+        """ Prune neurons based on `Strahler order
+        <https://en.wikipedia.org/wiki/Strahler_number>`_.
 
         Will reroot neurons to soma if possible.
 
         Parameters
         ----------
-        to_prune :  int | list | range, optional
-                    Strahler indices to prune.
-                    1. ``to_prune = 1`` remove all leaf branches
-                    2. ``to_prune = [1,2]`` remove indices 1 and 2
-                    3. ``to_prune = range(1,4)`` remove indices 1, 2 and 3
-                    4. ``to_prune = -1`` keep only the highest index
+        to_prune :  int | list | range | slice
+                    Strahler indices to prune. For example:
+
+                    1. ``to_prune=1`` removes all leaf branches
+                    2. ``to_prune=[1, 2]`` removes SI 1 and 2
+                    3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
+                    4. ``to_prune=slice(1, -1)`` removes everything but the
+                       highest SI
+                    5. ``to_prune=slice(-1, None)`` removes only the highest
+                       SI
+
         inplace :   bool, optional
                     If False, pruning is done on a copy of this
                     CatmaidNeuronList which is then returned.

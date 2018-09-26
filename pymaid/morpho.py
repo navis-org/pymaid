@@ -487,21 +487,25 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
         return x
 
 
-def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
+def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
                       force_strahler_update=False, relocate_connectors=False):
-    """ Prune neuron based on strahler order.
+    """ Prune neuron based on `Strahler order
+    <https://en.wikipedia.org/wiki/Strahler_number>`_.
 
     Parameters
     ----------
     x :             CatmaidNeuron | CatmaidNeuronList
-    to_prune :      int | list | range, optional
-                    Strahler indices to prune:
+    to_prune :      int | list | range | slice
+                    Strahler indices (SI) to prune. For example:
 
-                      (1) ``to_prune=1`` removes all leaf branches
-                      (2) ``to_prune=[1, 2]`` removes indices 1 and 2
-                      (3) ``to_prune=range(1, 4)`` removes indices 1, 2 and 3
-                      (4) ``to_prune=-1`` removes everything but the highest
-                          index
+                    1. ``to_prune=1`` removes all leaf branches
+                    2. ``to_prune=[1, 2]`` removes SI 1 and 2
+                    3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
+                    4. ``to_prune=slice(1, -1)`` removes everything but the
+                       highest SI
+                    5. ``to_prune=slice(-1, None)`` removes only the highest
+                       SI
+
     reroot_soma :   bool, optional
                     If True, neuron will be rerooted to its soma
     inplace :       bool, optional
@@ -542,10 +546,17 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
     # Prepare indices
     if isinstance(to_prune, int) and to_prune < 0:
         to_prune = range(1, neuron.nodes.strahler_index.max() + (to_prune + 1))
-    elif isinstance(to_prune, int):
+
+    if isinstance(to_prune, int):
+        if to_prune < 1:
+            raise ValueError('SI to prune must be positive. Please see help'
+                             'for additional options.')
         to_prune = [to_prune]
     elif isinstance(to_prune, range):
         to_prune = list(to_prune)
+    elif isinstance(to_prune, slice):
+        SI_range = range(1, neuron.nodes.strahler_index.max() + 1)
+        to_prune = list(SI_range)[to_prune]
 
     # Prepare parent dict if needed later
     if relocate_connectors:
