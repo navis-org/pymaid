@@ -205,8 +205,8 @@ class LoadTiles:
     >>> job = pymaid.tiles.LoadTiles([119000, 124000,
     ...                               36000, 42000,
     ...                               4050],
-    ...                               coords = 'PIXEL',
-    ...                               remote_instance=rm)
+    ...                               stack_id=5,
+    ...                               coords='PIXEL')
     >>> # Load, stich and crop the required EM image tiles
     >>> job.load_in_memory()
     >>> # Render image
