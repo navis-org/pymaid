@@ -944,34 +944,3 @@ def test_response_time(url, calls=5):
             return float('inf')
 
     return np.mean(resp_times)
-
-
-class _retrieveTileThreaded(threading.Thread):
-    """ Class to retrieve a URL by threading
-    """
-
-    def __init__(self, url):
-        try:
-            self.url = url
-            threading.Thread.__init__(self)
-        except BaseException:
-            logger.error(
-                'Failed to initiate thread for ' + self.url)
-
-    def run(self):
-        """
-        Retrieve data from single url
-        """
-        with urllib.request.urlopen(self.url) as req:
-            self.tile = imageio.imread(req.read())
-
-        return
-
-    def join(self):
-        try:
-            threading.Thread.join(self)
-            return self.tile
-        except BaseException:
-            logger.error(
-                'Failed to join thread for ' + self.url)
-            return None
