@@ -44,9 +44,11 @@ From shell:
 import warnings
 import os
 import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    warnings.warn('No display found. Using non-interactive Agg backend.')
-    mpl.use('Agg')
+#if os.environ.get('DISPLAY', '') == '':
+#    warnings.warn('No display found. Using template backend (nothing '
+#                  'will show).')
+#    mpl.use('template')
+mpl.use('template')
 import matplotlib.pyplot as plt
 
 import unittest
@@ -536,7 +538,7 @@ class TestMorpho(unittest.TestCase):
 
     @try_conditions
     def test_prune_by_strahler(self):
-        nl2 = self.nl.prune_by_strahler(inplace=False)
+        nl2 = self.nl.prune_by_strahler(inplace=False, to_prune=1)
         self.assertLess(nl2.n_nodes.sum(), self.nl.n_nodes.sum())
 
     @try_conditions
@@ -941,6 +943,7 @@ class TestTiles(unittest.TestCase):
         from pymaid import tiles
         # Generate the job
         job = tiles.LoadTiles([119000, 119500, 36000, 36500, 4050],
+                              stack_id=5,
                               coords='PIXEL')
         # Load, stich and crop the required EM image tiles
         job.generate_img()
