@@ -37,7 +37,7 @@ pbar_leave = False
 use_igraph = True
 
 # Default color for neurons
-default_color = (0, 0, 0)
+default_color = (.95, .65, .04)
 
 def _type_of_script():
     """ Returns context in which pymaid is run. """
