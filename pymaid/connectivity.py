@@ -183,24 +183,16 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                            columns=unique_skids, index=unique_skids)
 
     # Fill in values
-    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide,
+    for i, e in enumerate(config.tqdm(unique_edges,
+                                      disable=config.pbar_hide,
                                       desc='Regenerating',
                                       leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.at[str(e[0]), str(e[1])] = counts[i]
 
     if datatype == 'adjacency_matrix':
-        # Make a copy of original adjaceny matrix
-        x = x.copy()
-        x.datatype = 'adjacency_matrix'
-
-        # Set everything to 0
-        x[:] = 0
-
-        # Update from filtered connectivity
-        x.update(adj_mat)
-
-        return x
+        return adj_mat.reindex(index=x.index.astype(str),
+                               columns=x.columns.astype(str)).fillna(0)
 
     # Generate connectivity table by subsetting adjacency matrix to our
     # neurons of interest
