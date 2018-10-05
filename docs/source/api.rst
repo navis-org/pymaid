@@ -45,6 +45,7 @@ Treenodes
     ~pymaid.get_treenodes_by_tag
     ~pymaid.get_skid_from_treenode
     ~pymaid.get_node_details
+    pymaid.get_node_location
 
 Tags
 ----

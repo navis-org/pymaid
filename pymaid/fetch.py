@@ -84,7 +84,8 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'rename_neurons', 'get_label_list', 'find_neurons',
                   'get_skid_from_treenode', 'get_transactions',
                   'remove_annotations', 'get_connector_links',
-                  'get_nth_partners', 'get_treenodes_by_tag'])
+                  'get_nth_partners', 'get_treenodes_by_tag',
+                  'get_node_location'])
 
 # Set up logging
 logger = config.logger
@@ -5291,6 +5292,40 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     return
 
+@cache.undo_on_error
+def get_node_location(x, remote_instance=None):
+    """ Retrieves location for a set of nodes.
+
+    Parameters
+    ----------
+    x :                 int | list of int
+                        Node ID(s).
+    remote_instance :   CatmaidInstance, optional
+                        If not provided, will search for globally defined
+                        remote instance.
+
+    Returns
+    -------
+    pandas.DataFrame
+            DataFrame in which each row represents a node::
+
+                node_id  x  y  z
+             0
+             1
+             ...
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    x = utils.eval_node_ids(x, connectors=True, treenodes=True)
+
+    url = remote_instance._get_node_location_url()
+    post = {'node_ids[{}]'.format(i): n for i, n in enumerate(x)}
+
+    data = remote_instance.fetch(url, post)
+    df = pd.DataFrame(data, columns=['node_id', 'x', 'y', 'z'])
+
+    return df
 
 @cache.undo_on_error
 def get_label_list(remote_instance=None):
