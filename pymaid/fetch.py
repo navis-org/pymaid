@@ -727,6 +727,10 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'treenodes', 'compact-detail',
                              **GET)
 
+    def _get_node_location_url(self, **GET):
+        """ Use to get treenode table. Does need postdata."""
+        return self.make_url(self.project_id, 'nodes', 'location', **GET)
+
 
 @cache.undo_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
