@@ -501,13 +501,13 @@ def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
                     1. ``to_prune=1`` removes all leaf branches
                     2. ``to_prune=[1, 2]`` removes SI 1 and 2
                     3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
-                    4. ``to_prune=slice(1, -1)`` removes everything but the
+                    4. ``to_prune=slice(0, -1)`` removes everything but the
                        highest SI
                     5. ``to_prune=slice(-1, None)`` removes only the highest
                        SI
 
     reroot_soma :   bool, optional
-                    If True, neuron will be rerooted to its soma
+                    If True, neuron will be rerooted to its soma.
     inplace :       bool, optional
                     If False, pruning is performed on copy of original neuron
                     which is then returned.
