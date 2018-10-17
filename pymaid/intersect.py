@@ -34,7 +34,7 @@ except ImportError:
     logger.warning("Module pyoctree not found. Falling back to scipy's \
                             ConvexHull for intersection calculations.")
 
-__all__ = sorted(['in_volume'])
+__all__ = sorted(['in_volume', 'intersection_matrix'])
 
 
 def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
@@ -251,3 +251,58 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
             bbox[a] = (float('-inf'), float('inf'))
 
         return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
+
+
+def intersection_matrix(x, volumes, attr=None, remote_instance=None):
+    """ Computes intersection matrix between a set of neurons and a set of
+    volumes.
+
+    Parameters
+    ----------
+    x :               pymaid.CatmaidNeuronList | pymaid.CatmaidNeuron
+                      Neurons to intersect.
+    volume :          list or dict of pymaid.Volume
+    attr :            str | None, optional
+                      Attribute to return for intersected neurons (e.g.
+                      'cable_length'). If None, will return CatmaidNeuron.
+    remote_instance : CATMAID instance, optional
+                      Pass if ``volume`` is a volume name.
+
+    Returns
+    -------
+    pandas DataFrame
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = core.CatmaidNeuronList(x)
+
+    if not isinstance(x, core.CatmaidNeuronList):
+        raise TypeError('x must be CatmaidNeuron/List, not "{}"'.format(type(x)))
+
+    if isinstance(volumes, list):
+        volumes = {v.name: v for v in volumes}
+
+    if not isinstance(volumes, (list, dict)):
+        raise TypeError('volumes must be given as list or dict, not "{}"'.format(type(volumes)))
+
+    for v in volumes.values():
+        if not isinstance(v, core.Volume):
+            raise TypeError('Wrong data type found in volumes: "{}"'.format(type(v)))
+
+
+    data = in_volume(x, volumes, inplace=False, mode='IN',
+                     remote_instance=remote_instance)
+
+    if not attr:
+        df = pd.DataFrame([[n for n in data[v]] for v in data],
+                          index=list(data.keys()),
+                          columns=x.skeleton_id)
+    else:
+        df = pd.DataFrame([[getattr(n, attr) for n in data[v]] for v in data],
+                          index=list(data.keys()),
+                          columns=x.skeleton_id)
+
+    return df
+
+
+

@@ -276,7 +276,8 @@ Intersection
 .. autosummary::
     :toctree: generated/
 
-    ~pymaid.in_volume
+    pymaid.in_volume
+    pymaid.intersection_matrix
 
 .. _api_con:
 
