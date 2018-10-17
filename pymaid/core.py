@@ -2884,6 +2884,12 @@ class Volume:
         # Recalculate vertex positions
         v.vertices = vec + cn
 
+        # Make sure to reset any pyoctree data on this volume
+        try:
+            delattr(v, 'pyoctree')
+        except BaseException:
+            pass
+
         if not inplace:
             return v
 
