@@ -340,16 +340,13 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
 
     """
 
-    if isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
-        x = x
-    elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
+    if isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] == 1:
-            x = x.loc[0]
+            x = x[0]
         else:
             res = []
-            for i in config.trange(0, x.shape[0]):
-                res.append(strahler_index(
-                    x.loc[i], inplace=inplace, method=method))
+            for n in config.tqdm(x):
+                res.append(strahler_index(n, inplace=inplace, method=method))
 
             if not inplace:
                 return core.CatmaidNeuronList(res)
@@ -384,7 +381,8 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
     # Reindex according to treenode_id
     this_tn = x.nodes.set_index('treenode_id')
 
-    strahler_index = {n: None for n in list_of_childs if n is not None}
+    # Do NOT name anything strahler_index - this overwrites the function!
+    SI = {}
 
     starting_points = end_nodes
 
@@ -402,8 +400,8 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             # Calculate index for this branch
             previous_indices = []
             for child in list_of_childs[this_node]:
-                if strahler_index[child]:
-                    previous_indices.append(strahler_index[child])
+                if SI.get(child, None):
+                    previous_indices.append(SI[child])
 
             # If this is a not-a-branch branch
             if this_node in nab_branch:
@@ -445,7 +443,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
                     # Will fail if at root (no parent)
                     break
 
-            strahler_index.update({n: this_branch_index for n in spine})
+            SI.update({n: this_branch_index for n in spine})
 
             # The last this_node is either a branch node or the root
             # If a branch point: check, if all its childs have already been
@@ -467,7 +465,9 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
         # Add new starting points
         starting_points = starting_points | set(new_starting_points)
 
-    x.nodes['strahler_index'] = [strahler_index.get(n, None)
+    # Disconnected single nodes (e.g. after pruning) will end up w/o an entry
+    # --> we will give them an SI of 1
+    x.nodes['strahler_index'] = [SI.get(n, 1)
                                  for n in x.nodes.treenode_id.values]
 
     # Fix not-a-branch branches
