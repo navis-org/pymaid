@@ -662,7 +662,7 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
 
         self.annotations = fetch.get_annotations(
-            self.skeleton_id, remote_instance)[str(self.skeleton_id)]
+            self.skeleton_id, remote_instance).get(str(self.skeleton_id), [])
         return self.annotations
 
     def plot2d(self, **kwargs):
@@ -2262,8 +2262,7 @@ class CatmaidNeuronList:
             annotations = fetch.get_annotations(
                 to_update, remote_instance=self._remote_instance)
             for n in self.neurons:
-                if str(n.skeleton_id) in annotations:
-                    n.annotations = annotations.get(str(n.skeleton_id), [])
+                n.annotations = annotations.get(str(n.skeleton_id), [])
 
     def get_names(self, skip_existing=False):
         """ Use to get/update neuron names."""
