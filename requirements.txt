@@ -1,7 +1,7 @@
 decorator>=4.1.0
 matplotlib==3.0.0
 Shapely==1.6.4.post2
-tqdm==4.25.0
+tqdm==4.28.0
 numpy==1.15.2
 six==1.11.0
 setuptools==40.4.3
