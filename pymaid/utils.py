@@ -15,13 +15,15 @@
 #    along
 
 import collections
+import csv
+import itertools
+import json
+import os
+import random
+import re
 import six
 import sys
-import os
-import json
 import uuid
-import random
-import csv
 
 import pandas as pd
 import numpy as np
@@ -524,6 +526,25 @@ def eval_node_ids(x, connectors=True, treenodes=True):
     else:
         raise TypeError(
             'Unable to extract node IDs from type %s' % str(type(x)))
+
+
+def _unpack_neurons(x, raise_on_error=True):
+    """ Unpacks neurons and returns a list of individual neurons.
+    """
+
+    neurons = []
+
+    if isinstance(x, (list, np.ndarray, tuple)):
+        for l in x:
+            neurons += _unpack_neurons(l)
+    elif isinstance(x, core.CatmaidNeuron):
+        neurons.append(x)
+    elif isinstance(x, core.CatmaidNeuronList):
+        neurons += x.neurons
+    elif raise_on_error:
+        raise TypeError('Unknown neuron format: "{}"'.format(type(x)))
+
+    return neurons
 
 
 def _parse_objects(x, remote_instance=None):
