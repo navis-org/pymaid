@@ -66,7 +66,89 @@ from . import core, fetch, utils, config
 logger = config.logger
 
 __all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions',
-           'get_team_contributions']
+           'get_team_contributions', 'get_user_stats']
+
+
+def get_user_stats(start_date=None, end_date=None, remote_instance=None):
+    """ Returns user stats similar to the pie chart statistics widget in
+    CATMAID: cable [nm], nodes created/reviewed and connector links created.
+
+    Parameters
+    ----------
+    start_date :        tuple | datetime.date, optional
+    end_date :          tuple | datetime.date, optional
+                        Start and end date of time window to check. If
+                        ``None``, will use entire project history.
+    remote_instance :   Catmaid Instance, optional
+                        Either pass explicitly or define globally.
+
+    Returns
+    -------
+    pandas.DataFrame
+                Dataframe in which each row represents a user::
+
+                          cable  nodes_created  nodes_reviewed  links_created
+                username
+                   user1  ...
+                   user2  ...
+
+    Examples
+    --------
+    Create a pie chart similar to the stats widget in CATMAID:
+
+    >>> import matplotlib.pyplot as plt
+    >>> stats = pymaid.get_user_stats()
+    >>> stats_to_plot = ['cable', 'nodes_created', 'nodes_reviewed',
+    ...                  'links_created']
+    >>> fig, axes = plt.subplots(1, len(stats_to_plot), figsize=(12, 4))
+    >>> for s, ax in zip(stats_to_plot, axes):
+    ...     # Get the top 10 contributors for this stat
+    ...     this_stats = stats[s].sort_values(ascending=False).iloc[:10]
+    ...     # Calculate "others"
+    ...     this_stats.loc['others'] = stats[s].sort_values(ascending=False).iloc[10:].sum()
+    ...     # Plot
+    ...     this_stats.plot.pie(ax=ax, textprops={'size': 6},
+    ...                         explode=[.05] * this_stats.shape[0],
+    ...                         rotatelabels=True)
+    ...     # Make labels a bit smaller
+    ...     ax.set_ylabel(s.replace('_', ' '), fontsize=8)
+    >>> plt.show()
+
+    See Also
+    --------
+    :func:`~pymaid.get_history`
+            Returns day-by-day stats.
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(start_date, type(None)):
+        start_date = datetime.date(2010, 1, 1)
+    elif not isinstance(start_date, datetime.date):
+        start_date = datetime.date(*start_date)
+
+    if isinstance(end_date, type(None)):
+        end_date = datetime.date.today()
+    elif not isinstance(end_date, datetime.date):
+        end_date = datetime.date(*end_date)
+
+    # Get and summarize other stats
+    hist = fetch.get_history(remote_instance=remote_instance,
+                             start_date=start_date,
+                             end_date=end_date)
+
+    stats = pd.concat([hist.cable.sum(axis=1),
+                       hist.treenodes.sum(axis=1),
+                       hist.reviewed.sum(axis=1),
+                       hist.connector_links.sum(axis=1)],
+                       axis=1, sort=True).fillna(0).astype(int)
+
+    stats.index.name = 'username'
+    stats.columns = ['cable', 'nodes_created', 'nodes_reviewed',
+                     'links_created']
+
+    stats.sort_values('nodes_created', ascending=False, inplace=True)
+
+    return stats
 
 
 def get_team_contributions(teams, neurons=None, remote_instance=None):
