@@ -210,7 +210,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
            skeleton_id  total_nodes  teamA_nodes  teamB_nodes  ...
          0
          1
-           total_reviews teamA_reviews  teamB_reviews  ...
+           total_reviews  teamA_reviews  teamB_reviews  ...
          0
          1
            total_connectors  teamA_connectors  teamB_connectors ...
@@ -559,9 +559,10 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                         Minimum number of actions per minute to be counted as
                         active.
     treenodes :         bool, optional
-                        If False, treenodes will not be taken into account
+                        If False, treenodes will not be taken into account.
     connectors :        bool, optional
-                        If False, connectors will not be taken into account
+                        If False, connectors and connector links will not be
+                        taken into account.
     mode :              'SUM' | 'OVER_TIME' | 'ACTIONS', optional
                         (1) 'SUM' will return total time invested (in minutes)
                             per user.
@@ -644,6 +645,8 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     """
 
     def _extract_timestamps(ts, desc='Calc'):
+        if ts.empty:
+            return {}
         grouped = ts.set_index('timestamp',
                                drop=False).groupby(['user',
                                                     pd.Grouper(freq=bin_width)]).count() >= minimum_actions
@@ -698,12 +701,15 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     node_details = fetch.get_node_details(
         node_ids + connector_ids, remote_instance=remote_instance)
 
-    # Get details for links
-    link_details = fetch.get_connector_links(skdata)
+    if connectors:
+        # Get details for links
+        link_details = fetch.get_connector_links(skdata)
 
-    # link_details contains all links. We have to subset this to existing
-    # connectors in case the input neurons have been pruned
-    link_details = link_details[link_details.connector_id.isin(connector_ids)]
+        # link_details contains all links. We have to subset this to existing
+        # connectors in case the input neurons have been pruned
+        link_details = link_details[link_details.connector_id.isin(connector_ids)]
+    else:
+        link_details = pd.DataFrame([], columns=['creator_id', 'creation_time'])
 
     # Remove timestamps outside of date range (if provided)
     if start_date:
