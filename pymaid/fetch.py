@@ -3992,6 +3992,11 @@ def get_history(remote_instance=None,
     >>> # Get number of active (non-zero) users
     >>> active_users = hist.cable.astype(bool).sum(axis=0)
 
+    See Also
+    -------
+    :func:`~pymaid.get_user_stats`
+            Returns a summary of user stats as table.
+
     """
 
     def _constructor_helper(data, key, days):
@@ -5327,7 +5332,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
 @cache.undo_on_error
 def get_node_location(x, remote_instance=None):
-    """ Retrieves location for a set of nodes.
+    """ Retrieves location for a set of tree- or connector nodes.
 
     Parameters
     ----------
