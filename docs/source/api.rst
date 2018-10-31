@@ -453,4 +453,5 @@ Utility
     pymaid.set_pbars
     pymaid.set_loggers
     pymaid.eval_skids
+    pymaid.shorten_name
 
