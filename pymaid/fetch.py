@@ -4975,13 +4975,16 @@ def get_volume(volume_name=None, remote_instance=None,
     get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
 
-    if not volume_name:
-        return pd.DataFrame.from_dict(response)
+    all_vols = pd.DataFrame(response['data'], columns=response['columns'])
 
-    volume_ids = [e['id'] for e in response if e['name'] in volume_names]
+    if not volume_name:
+        return all_vols
+
+    req_vols = all_vols[all_vols.name.isin(volume_names)]
+    volume_ids = req_vols.id.values
 
     if len(volume_ids) != len(volume_names):
-        not_found = [v for v in volume_names if v not in response.name.values]
+        not_found = set(volume_names).difference(set(all_vols.name.values))
         raise Exception(
             'No volume(s) found for: {}'.format(not_found.split(',')))
 
