@@ -395,6 +395,32 @@ class CatmaidInstance:
 
         return s
 
+    @property
+    def catmaid_version(self):
+        """ Version of CATMAID your server is running. """        
+
+        return self.fetch(self._get_catmaid_version())['SERVER_VERSION']        
+
+    @property
+    def available_projects(self):
+        """ List of projects hosted on your server. Depends on your user's
+        permission! """        
+
+        return pd.DataFrame(self.fetch(self._get_projects_url())).sort_values('id')
+
+    @property
+    def image_stacks(self):
+        """ Image stacks available under this project id. """
+        stacks = self.fetch(self._get_stacks_url())
+        details = self.fetch([self._get_stack_info_url(s['id']) for s in stacks])
+
+        # Add details to stacks
+        for s, d in zip(stacks, details):
+            s.update(d)
+
+        # Return as DataFrame
+        return pd.DataFrame(stacks).set_index('id')    
+
     def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
         return self.make_url('version', **GET)
