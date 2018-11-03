@@ -15,13 +15,15 @@
 #    along
 
 import collections
+import csv
+import itertools
+import json
+import os
+import random
+import re
 import six
 import sys
-import os
-import json
 import uuid
-import random
-import csv
 
 import pandas as pd
 import numpy as np
@@ -32,7 +34,8 @@ from . import core, fetch, config
 logger = config.logger
 
 __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
-           'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache']
+           'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache',
+           'shorten_name']
 
 
 def clear_cache():
@@ -526,6 +529,25 @@ def eval_node_ids(x, connectors=True, treenodes=True):
             'Unable to extract node IDs from type %s' % str(type(x)))
 
 
+def _unpack_neurons(x, raise_on_error=True):
+    """ Unpacks neurons and returns a list of individual neurons.
+    """
+
+    neurons = []
+
+    if isinstance(x, (list, np.ndarray, tuple)):
+        for l in x:
+            neurons += _unpack_neurons(l)
+    elif isinstance(x, core.CatmaidNeuron):
+        neurons.append(x)
+    elif isinstance(x, core.CatmaidNeuronList):
+        neurons += x.neurons
+    elif raise_on_error:
+        raise TypeError('Unknown neuron format: "{}"'.format(type(x)))
+
+    return neurons
+
+
 def _parse_objects(x, remote_instance=None):
     """ Helper class to extract objects for plotting.
 
@@ -854,3 +876,138 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
         writer = csv.writer(file, delimiter=' ')
         writer.writerows(swc.astype(str).values)
+
+
+def __guess_sentiment(x):
+    """ Tries to classify a list of words into either <type>, <nickname>,
+    <tracer> or <generic> annotations.
+    """
+
+    sent = []
+    for i, w in enumerate(x):
+        # If word is a number, it's most likely something generic
+        if w.isdigit():
+            sent.append('generic')
+        elif w == 'neuron':
+            # If there is a lonely "neuron" followed by a number, it's generic
+            if i != len(x) and x[i + 1].isdigit():
+                sent.append('generic')
+            # If not, it's probably type
+            else:
+                sent.append('type')
+        # If there is a short, all upper case word after the generic information
+        elif w.isupper() and len(w) > 1 and w.isalpha() and 'generic' in sent:
+            # If there is no number in that word, it's probably tracer initials
+            sent.append('tracer')
+        else:
+            # If the word is AFTER the generic number, it's probably a nickname
+            if 'generic' in sent:
+                sent.append('nickname')
+            # If not, it's likely type information
+            else:
+                sent.append('type')
+
+    return sent
+
+
+def parse_neuronname(x):
+    """ Tries parsing neuron names into type, nickname, tracer and generic
+    information.
+
+    This works best if neuron name follows this convention::
+
+    '{type} {generic} {nickname} {tracer initials}'
+
+    Parameters
+    ----------
+    x :     str | CatmaidNeuron
+            Neuron name.
+
+    Returns
+    -------
+    type :          str
+    nickname :      str
+    tracer :        str
+    generic :       str
+
+    Examples
+    --------
+    >>> pymaid.utils.parse_neuronname('AD1b2#7 3080184 Dust World JJ PS')
+    ('AD1b2#7', 'Dust World', 'JJ PS', '3080184')
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = x.neuron_name
+
+    if not isinstance(x, str):
+        raise TypeError('Unable to parse name: must be str, not {}'.format(type(x)))
+
+    # Split name into single words
+    words = x.split(' ')
+    sentiments = __guess_sentiment(words)
+
+    type_str = [w for w, s in zip(words, sentiments) if s == 'type']
+    nick_str = [w for w, s in zip(words, sentiments) if s == 'nickname']
+    tracer_str = [w for w, s in zip(words, sentiments) if s == 'tracer']
+    gen_str = [w for w, s in zip(words, sentiments) if s == 'generic']
+
+    return ' '.join(type_str), ' '.join(nick_str), ' '.join(tracer_str), ' '.join(gen_str)
+
+
+def shorten_name(x, max_len=30):
+    """ Shorten a neuron name by iteratively removing non-essential
+    information.
+
+    Prioritises generic -> tracer -> nickname -> type information when removing
+    until target length is reached. This works best if neuron name follows
+    this convention::
+
+    '{type} {generic} {nickname} {tracers}'
+
+    Parameters
+    ----------
+    x :         str | CatmaidNeuron
+                Neuron name.
+    max_len :   int, optional
+                Max length of shortened name.
+
+    Returns
+    -------
+    shortened name :    str
+
+    Examples
+    --------
+    >>> pymaid.shorten_name('AD1b2#7 3080184 Dust World JJ PS', 30)
+    'AD1b2#7 Dust World [..]'
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = x.neuron_name
+
+    # Split into individual words and guess their type
+    words = x.split(' ')
+    sentiments = __guess_sentiment(words)
+
+    # Make sure we're working on a copy of the original neuron name
+    short = str(x)
+
+    ty = ['generic', 'tracer', 'nickname', 'type']
+    # Iteratively remove generic -> tracer -> nickname -> type information
+    for t, (w, sent) in itertools.product(ty, zip(words[::-1], sentiments[::-1])):
+        # Stop if we are below max length
+        if len(short) <= max_len:
+            break
+        # Stop if there is only a single word left
+        elif len(short.replace('[..]', '').strip().split(' ')) == 1:
+            break
+        # Skip if this word is not of the right sentiment
+        elif t != sent:
+            continue
+        # Remove this word
+        short = short.replace(w, '[..]').strip()
+        # Make sure to merge consecutive '[..]''
+        while '[..] [..]' in short:
+            short = short.replace('[..] [..]', '[..]')
+
+    return short
+
