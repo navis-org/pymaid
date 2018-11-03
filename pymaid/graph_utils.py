@@ -81,7 +81,7 @@ def _generate_segments(x, weight=None):
     else:
         raise ValueError('Unable to use weight "{}"'.format(weight))
 
-    if x.igraph and config.use_igraph:
+    if config.use_igraph and x.igraph:
         g = x.igraph
         # Convert endNodeIDs to indices
         id2ix = {n: ix for ix, n in zip(g.vs.indices,
@@ -109,7 +109,7 @@ def _generate_segments(x, weight=None):
             sequences.append(sequence)
 
     # If igraph, turn indices back to node IDs
-    if x.igraph and config.use_igraph:
+    if config.use_igraph and x.igraph:
         ix2id = {v: k for k, v in id2ix.items()}
         sequences = [[ix2id[ix] for ix in s] for s in sequences]
 
