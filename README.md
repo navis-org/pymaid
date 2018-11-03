@@ -33,7 +33,7 @@ Alternatively click on the *launch binder* badge above to try out pymaid hosted 
 This code is under GNU GPL V3
 
 ## References:
-Pymaid implements algorithms described in:
+Pymaid implements/provides an interfaces with algorithms described in:
 
 1. **Comparison of neurons based on morphology**: Neuron. 2016 doi: 10.1016/j.neuron.2016.06.012
 *NBLAST: Rapid, Sensitive Comparison of Neuronal Structure and Construction of Neuron Family Databases.*
