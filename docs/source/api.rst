@@ -30,10 +30,13 @@ Annotations
     :toctree: generated/
 
     pymaid.add_annotations
-    pymaid.get_annotations
+    pymaid.add_meta_annotations
+    pymaid.get_annotations    
     pymaid.get_annotation_details
+    pymaid.get_annotated
     pymaid.get_user_annotations
     pymaid.remove_annotations
+    pymaid.remove_meta_annotations
 
 Treenodes
 ----------
