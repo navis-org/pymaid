@@ -35,7 +35,7 @@ This code is under GNU GPL V3
 ## References:
 Pymaid implements algorithms described in:
 
-1. **Comparison of neurons based on morphology**: Cell. 2016 doi: 10.1016/j.neuron.2016.06.012
+1. **Comparison of neurons based on morphology**: Neuron. 2016 doi: 10.1016/j.neuron.2016.06.012
 *NBLAST: Rapid, Sensitive Comparison of Neuronal Structure and Construction of Neuron Family Databases.*
 Costa M, Manton JD, Ostrovsky AD, Prohaska S, Jefferis GSXE.
 http://www.cell.com/abstract/S0092-8674(13)01476-1
