@@ -2454,6 +2454,127 @@ def add_annotations(x, annotations, remote_instance=None):
     return
 
 
+@cache.never_cache
+def add_meta_annotations(to_annotate, to_add, remote_instance=None):
+    """ Add meta-annotation(s) to annotation(s).
+
+    Parameters
+    ----------
+    to_annotate :       str | list of str
+                        Annotation(s) to meta-annotate.
+    to_add :            str | list of str
+                        Meta-annotation(s) to add to annotations.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Nothing
+
+    See Also
+    --------
+    :func:`~pymaid.remove_meta_annotations`
+                        Delete given annotations from neurons.
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    # Get annotation IDs
+    to_annotate = utils._make_iterable(to_annotate)
+    an = get_annotation_list(remote_instance=remote_instance)
+    an = an[an.annotation.isin(to_annotate)]
+
+    if an.shape[0] != len(to_annotate):
+        missing = set(to_annotate).difference(an.annotation.values)
+        raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
+
+    an_ids = an.annotation_id.values
+
+    to_add = utils._make_iterable(to_add)
+
+    add_annotations_url = remote_instance._get_add_annotations_url()
+
+    add_annotations_postdata = {}
+
+    for i, x in enumerate(an_ids):
+        key = 'entity_ids[%i]' % i
+        add_annotations_postdata[key] = str(x)
+
+    for i, x in enumerate(to_add):
+        key = 'annotations[%i]' % i
+        add_annotations_postdata[key] = str(x)
+
+    logger.info(remote_instance.fetch(
+        add_annotations_url, add_annotations_postdata))
+
+    return
+
+
+@cache.never_cache
+def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
+    """ Remove meta-annotation(s) from annotation(s).
+
+    Parameters
+    ----------
+    remove_from :       str | list of str
+                        Annotation(s) to de-meta-annotate.
+    to_remove :         str | list of str
+                        Meta-annotation(s) to remove from annotations.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Nothing
+
+    See Also
+    --------
+    :func:`~pymaid.add_meta_annotations`
+                        Delete given annotations from neurons.
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    an = get_annotation_list(remote_instance=remote_instance)
+
+    # Get annotation IDs
+    remove_from = utils._make_iterable(remove_from)    
+    rm = an[an.annotation.isin(remove_from)]
+    if rm.shape[0] != len(remove_from):
+        missing = set(remove_from).difference(rm.annotation.values)
+        raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
+    an_ids = rm.annotation_id.values
+
+    # Get meta-annotation IDs
+    to_remove = utils._make_iterable(to_remove)
+    rm = an[an.annotation.isin(to_remove)]
+    if rm.shape[0] != len(to_remove):
+        missing = set(to_remove).difference(rm.annotation.values)
+        raise ValueError('Meta-annotation(s) not found: {}'.format(','.join(missing)))
+    rm_ids = rm.annotation_id.values
+
+    add_annotations_url = remote_instance._get_remove_annotations_url()
+
+    remove_annotations_postdata = {}
+
+    for i, x in enumerate(an_ids):
+        key = 'entity_ids[%i]' % i
+        remove_annotations_postdata[key] = str(x)
+
+    for i, x in enumerate(rm_ids):
+        key = 'annotation_ids[%i]' % i
+        remove_annotations_postdata[key] = str(x)
+
+    print(remove_annotations_postdata)
+
+    logger.info(remote_instance.fetch(
+        add_annotations_url, remove_annotations_postdata))
+
+    return
+
+
 @cache.undo_on_error
 def get_user_annotations(x, remote_instance=None):
     """ Retrieve annotations used by given user(s).
