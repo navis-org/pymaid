@@ -3028,6 +3028,82 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
 
 
 @cache.undo_on_error
+def get_annotated(x, remote_instance=None, include_sub_annotations=False,
+                  allow_partial=True):
+    """ Retrieve entities (neurons and annotations) with given
+    (meta-)annotation(s).
+
+    This works similar to CATMAID's neuron search widget: multiple annotations
+    are intersected!
+
+    Parameters
+    ----------
+    x :                       str | list of str
+                              (Meta-)annotations(s) to search for. Like
+                              CATMAID's search widget, you can use regex to
+                              search for names by starting the query with a
+                              leading ``/``. Use a leading ``~`` (tilde) to
+                              indicate ``NOT`` condition.
+    include_sub_annotations : bool, optional
+                              If True, will include entities that have
+                              annotations meta-annotated with ``x``. Does not
+                              work on `NOT` search conditions.
+    allow_partial :           bool, optional
+                              If True, partially matching annotations are
+                              searched to.
+    remote_instance :         CATMAID instance, optional
+                              If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in which each row represents an entity::
+
+           id  name  skeleton_ids type
+         0
+         1
+         2
+         ...
+
+    See Also
+    --------
+    :func:`pymaid.find_neurons`
+                            Use to retrieve neurons by combining various
+                            search criteria. For example names, reviewers,
+                            annotations, etc.
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    pos, neg = utils._eval_conditions(x)
+
+    post = {'with_annotations': False}
+    if pos:
+        pos_ids = get_annotation_id(pos, allow_partial=allow_partial,
+                                    remote_instance=remote_instance)
+        post.update({'annotated_with[{}]'.format(i): n for
+                                    i, n in enumerate(pos_ids.values())})
+        if include_sub_annotations:
+            post.update({'sub_annotated_with[{}]'.format(i): n for
+                                    i, n in enumerate(pos_ids.values())})
+    if neg:
+        neg_ids = get_annotation_id(neg, allow_partial=allow_partial,
+                                    remote_instance=remote_instance)
+        post.update({'not_annotated_with[{}]'.format(i): n for
+                                    i, n in enumerate(neg_ids.values())})
+
+    logger.info('Searching for: {}'.format(','.join([str(s) for s in pos_ids])))
+    if neg:
+        logger.info('..... and NOT: {}'.format(','.join([str(s) for s in neg_ids])))
+
+    urls = remote_instance._get_annotated_url()
+    
+    resp = remote_instance.fetch(urls, post=post, desc='Fetching')
+
+    return pd.DataFrame(resp['entities'])
+
+
+@cache.undo_on_error
 def get_skids_by_name(names, remote_instance=None, allow_partial=True):
     """ Retrieve the all neurons with matching name.
 
