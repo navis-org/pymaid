@@ -246,10 +246,10 @@ def plot2d(x, method='2d', **kwargs):
     ``cn_size`` (int | float, default = 1)
       Size of connectors.
 
-    ``linewidth`` (int | float, default = .5)
+    ``linewidth``/``lw`` (int | float, default = .5)
       Width of neurites.
 
-    ``linestyle`` (str, default = '-')
+    ``linestyle``/``ls`` (str, default = '-')
       Line style of neurites.
 
     ``autoscale`` (bool, default=True)
@@ -295,7 +295,7 @@ def plot2d(x, method='2d', **kwargs):
                         'cn_mesh_colors', 'linewidth', 'cn_size',
                         'group_neurons', 'scatter_kws', 'figsize', 'linestyle',
                         'alpha', 'depth_coloring', 'autoscale', 'depth_scale',
-                        'use_neuron_color']
+                        'use_neuron_color', 'ls', 'lw']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
@@ -328,9 +328,9 @@ def plot2d(x, method='2d', **kwargs):
 
     scatter_kws = kwargs.get('scatter_kws', {})
 
-    linewidth = kwargs.get('linewidth', .5)
+    linewidth = kwargs.get('linewidth', kwargs.get('lw', .5))
     cn_size = kwargs.get('cn_size', 1)
-    linestyle = kwargs.get('linestyle', '-')
+    linestyle = kwargs.get('linestyle', kwargs.get('ls', '-'))
     autoscale = kwargs.get('autoscale', True)
 
     remote_instance = utils._eval_remote_instance(
