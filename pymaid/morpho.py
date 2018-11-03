@@ -1135,8 +1135,8 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
 
     Parameters
     ----------
-    x :                 CatmaidNeuron | CatmaidNeuronList
-                        Neurons to stitch.
+    x :                 CatmaidNeuron | CatmaidNeuronList | list of either
+                        Neurons to stitch (see examples).
     method :            'LEAFS' | 'ALL' | 'NONE', optional
                         Set stitching method:
                             (1) 'LEAFS': Only leaf (including root) nodes will
@@ -1158,23 +1158,31 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     core.CatmaidNeuron
                         Stitched neuron.
 
+    Examples
+    --------
+    Stitching using a neuron list:
+
+    >>> nl = pymaid.get_neuron('annotation:glomerulus DA1 right')
+    >>> stitched = pymaid.stitch_neurons(nl, method='NONE')
+
+    Stitching using individual neurons:
+
+    >>> a = pymaid.get_neuron(16)
+    >>> b = pymaid.get_neuron(2863104)
+    >>> stitched = pymaid.stitch_neurons(a, b, method='NONE')
+    >>> # Or alternatively:
+    >>> stitched = pymaid.stitch_neurons([a, b], method='NONE')
+
     """
 
     if method not in ['LEAFS', 'ALL', 'NONE', None]:
         raise ValueError('Unknown method: %s' % str(method))
 
     # Compile list of individual neurons
-    neurons = []
-    for n in x:
-        if not isinstance(n, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            raise TypeError('Unable to stitch non-CatmaidNeuron objects')
-        elif isinstance(n, core.CatmaidNeuronList):
-            neurons += n.neurons
-        else:
-            neurons.append(n)
+    neurons = utils._unpack_neurons(x)
 
     # Use copies of the original neurons!
-    neurons = [n.copy() for n in neurons if isinstance(n, core.CatmaidNeuron)]
+    neurons = [n.copy() for n in neurons]
 
     if len(neurons) < 2:
         logger.warning(
