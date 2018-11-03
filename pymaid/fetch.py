@@ -395,6 +395,32 @@ class CatmaidInstance:
 
         return s
 
+    @property
+    def catmaid_version(self):
+        """ Version of CATMAID your server is running. """        
+
+        return self.fetch(self._get_catmaid_version())['SERVER_VERSION']        
+
+    @property
+    def available_projects(self):
+        """ List of projects hosted on your server. Depends on your user's
+        permission! """        
+
+        return pd.DataFrame(self.fetch(self._get_projects_url())).sort_values('id')
+
+    @property
+    def image_stacks(self):
+        """ Image stacks available under this project id. """
+        stacks = self.fetch(self._get_stacks_url())
+        details = self.fetch([self._get_stack_info_url(s['id']) for s in stacks])
+
+        # Add details to stacks
+        for s, d in zip(stacks, details):
+            s.update(d)
+
+        # Return as DataFrame
+        return pd.DataFrame(stacks).set_index('id')    
+
     def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
         return self.make_url('version', **GET)
@@ -3966,6 +3992,11 @@ def get_history(remote_instance=None,
     >>> # Get number of active (non-zero) users
     >>> active_users = hist.cable.astype(bool).sum(axis=0)
 
+    See Also
+    -------
+    :func:`~pymaid.get_user_stats`
+            Returns a summary of user stats as table.
+
     """
 
     def _constructor_helper(data, key, days):
@@ -4975,13 +5006,16 @@ def get_volume(volume_name=None, remote_instance=None,
     get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
 
-    if not volume_name:
-        return pd.DataFrame.from_dict(response)
+    all_vols = pd.DataFrame(response['data'], columns=response['columns'])
 
-    volume_ids = [e['id'] for e in response if e['name'] in volume_names]
+    if not volume_name:
+        return all_vols
+
+    req_vols = all_vols[all_vols.name.isin(volume_names)]
+    volume_ids = req_vols.id.values
 
     if len(volume_ids) != len(volume_names):
-        not_found = [v for v in volume_names if v not in response.name.values]
+        not_found = set(volume_names).difference(set(all_vols.name.values))
         raise Exception(
             'No volume(s) found for: {}'.format(not_found.split(',')))
 
@@ -5298,7 +5332,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
 @cache.undo_on_error
 def get_node_location(x, remote_instance=None):
-    """ Retrieves location for a set of nodes.
+    """ Retrieves location for a set of tree- or connector nodes.
 
     Parameters
     ----------

@@ -10,6 +10,11 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.91
+     - 31/10/18
+     - - new CatmaidInstance attributes to get info on your server: ``catmaid_version``, ``available_projects`` and ``image_stacks``
+       - new functions: :func:`~pymaid.shorten_name`, :func:`~pymaid.get_user_stats`, :func:`~pymaid.intersection_matrix`, :func:`~pymaid.get_node_location`
+       - various improvements and bugfixes
    * - 0.90
      - 20/09/18
      - - vispy 3d viewer overhaul: prettier, better picking, new shortcuts
