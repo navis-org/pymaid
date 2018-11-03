@@ -85,7 +85,8 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_skid_from_treenode', 'get_transactions',
                   'remove_annotations', 'get_connector_links',
                   'get_nth_partners', 'get_treenodes_by_tag',
-                  'get_node_location'])
+                  'get_node_location', 'add_meta_annotations',
+                  'remove_meta_annotations', 'get_annotated'])
 
 # Set up logging
 logger = config.logger
