@@ -5160,8 +5160,9 @@ def get_volume(volume_name=None, remote_instance=None,
 
     Parameters
     ----------
-    volume_name :       str | list of str
-                        Name(s) of the volume to import - must be EXACT!
+    volume_name :       int | str | list of str or int
+                        Name(s) (as ``str``) or ID (as ``int``) of the volume
+                        to import. Names must be EXACT!
                         If ``volume_name=None``, will return list of all
                         available CATMAID volumes. If list of volume names,
                         will return a dictionary ``{name: Volume, ... }``
@@ -5194,7 +5195,7 @@ def get_volume(volume_name=None, remote_instance=None,
 
     if isinstance(volume_name, type(None)):
         logger.info('Retrieving list of available volumes.')
-    elif not isinstance(volume_name, (str, list, np.ndarray)):
+    elif not isinstance(volume_name, (int, str, list, np.ndarray)):
         raise TypeError('Volume name must be str or list of str.')
 
     volume_names = utils._make_iterable(volume_name)
@@ -5208,13 +5209,15 @@ def get_volume(volume_name=None, remote_instance=None,
     if not volume_name:
         return all_vols
 
-    req_vols = all_vols[all_vols.name.isin(volume_names)]
+    req_vols = all_vols[(all_vols.name.isin(volume_names)) |
+                        (all_vols.id.isin(volume_names))]
     volume_ids = req_vols.id.values
 
-    if len(volume_ids) != len(volume_names):
-        not_found = set(volume_names).difference(set(all_vols.name.values))
+    if len(volume_ids) < len(volume_names):
+        not_found = set(volume_names).difference(set(all_vols.name) |
+                                                 set(all_vols.id))
         raise Exception(
-            'No volume(s) found for: {}'.format(not_found.split(',')))
+            'No volume(s) found for: {}'.format(','.join(not_found)))
 
     url_list = [remote_instance._get_volume_details(v) for v in volume_ids]
 
