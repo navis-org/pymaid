@@ -971,9 +971,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
 
     # Convert to neuron->group format if necessary
     if col_groups and utils._is_iterable(list(col_groups.values())[0]):
-        col_groups = {n: g for g in col_groups for n in col_groups[g]}
+        col_groups = {n: g for g in col_groups for n in utils.eval_skids(col_groups[g])}
     if row_groups and utils._is_iterable(list(row_groups.values())[0]):
-        row_groups = {n: g for g in row_groups for n in row_groups[g]}
+        row_groups = {n: g for g in row_groups for n in utils.eval_skids(row_groups[g])}
 
     # Make sure everything is string
     mat.index = mat.index.astype(str)
