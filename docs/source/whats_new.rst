@@ -10,6 +10,12 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.92
+     - 06/11/18
+     - - new pymaid.Volume methods: ``to_csv`` and ``from_csv``
+       - new functions: :func:`~pymaid.add_meta_annotations`, :func:`~pymaid.remove_meta_annotations`, :func:`~pymaid.get_annotated`
+       - some under-the-hood changes following change in CATMAID's API
+       - general bug fixes and improvements
    * - 0.91
      - 31/10/18
      - - new CatmaidInstance attributes to get info on your server: ``catmaid_version``, ``available_projects`` and ``image_stacks``
