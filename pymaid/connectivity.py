@@ -679,13 +679,13 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(source, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        skids = utils.eval_skids(source)
+        skids = utils.eval_skids(source, remote_instance=remote_instance)
         source = fetch.get_neuron(skids, remote_instance=remote_instance)
 
     if isinstance(target, type(None)):
         target = source
     elif not isinstance(target, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        skids = utils.eval_skids(target)
+        skids = utils.eval_skids(target, remote_instance=remote_instance)
         target = fetch.get_neuron(skids, remote_instance=remote_instance)
 
     if isinstance(source, core.CatmaidNeuron):
@@ -925,7 +925,7 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
 
 
 def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
-                 method='SUM'):
+                 method='SUM', remote_instance=None):
     """ Groups adjacency matrix into neuron groups.
 
     Parameters
@@ -950,6 +950,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
     pandas.DataFrame
     """
 
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
+
     PERMISSIBLE_METHODS = ['AVERAGE', 'MIN', 'MAX', 'SUM']
     if method not in PERMISSIBLE_METHODS:
         raise ValueError('Unknown method "{0}". Please use either {1}'.format(
@@ -971,9 +974,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
 
     # Convert to neuron->group format if necessary
     if col_groups and utils._is_iterable(list(col_groups.values())[0]):
-        col_groups = {n: g for g in col_groups for n in utils.eval_skids(col_groups[g])}
+        col_groups = {n: g for g in col_groups for n in utils.eval_skids(col_groups[g], remote_instance=remote_instance)}
     if row_groups and utils._is_iterable(list(row_groups.values())[0]):
-        row_groups = {n: g for g in row_groups for n in utils.eval_skids(row_groups[g])}
+        row_groups = {n: g for g in row_groups for n in utils.eval_skids(row_groups[g], remote_instance=remote_instance)}
 
     # Make sure everything is string
     mat.index = mat.index.astype(str)
@@ -1072,8 +1075,10 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
                          single connection between source and target.
     """
 
-    source_skid = utils.eval_skids(s)
-    target_skid = utils.eval_skids(t)
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    source_skid = utils.eval_skids(s, remote_instance=remote_instance)
+    target_skid = utils.eval_skids(t, remote_instance=remote_instance)
 
     if len(target_skid) != 1:
         raise ValueError('Must provide a single target neuron.')

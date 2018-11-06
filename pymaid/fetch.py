@@ -4528,8 +4528,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     sets_of_skids = []
 
     if not isinstance(skids, type(None)):
-        skids = utils.eval_skids(skids)
-        sets_of_skids.append(set(skids))
+        skids = utils.eval_skids(skids, remote_instance=remote_instance)
+        sets_of_skids.append(set(skids, remote_instance=remote_instance))
 
     # Get skids by name
     if names:
