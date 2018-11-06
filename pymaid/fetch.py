@@ -1447,6 +1447,8 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
     # {'skid': [0, 1, 2, 3, 4, 5]}
     # This is being collapsed into a single value before returning it.
     for d in relations:
+        if d not in connectivity_data:
+            continue
         df_temp = pd.DataFrame([[
             names[str(n)],
             str(n),
