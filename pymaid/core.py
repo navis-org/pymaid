@@ -64,18 +64,19 @@ also allow quick access to other PyMaid functions:
 
 """
 
-import datetime
-import math
-import random
-import json
-import os
-import sys
-import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
-import io
 import copy
-import six
+import csv
+import datetime
+import io
+import json
+import math
+import multiprocessing as mp
 import numbers
+import os
+import random
+import sys
+import six
 
 import networkx as nx
 import numpy as np
@@ -2742,6 +2743,56 @@ class Volume:
         self.faces = faces
         self.color = color
         self.volume_id = volume_id
+
+    @classmethod
+    def from_csv(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+                 volume_id=None, **kwargs):
+        """ Load volume from csv files containing vertices and faces.
+
+        Parameters
+        ----------
+        vertices :      filepath | file-like
+                        CSV file containing vertices.
+        faces :         filepath | file-like
+                        CSV file containing faces.
+        **kwargs
+                        Keyword arguments passed to ``csv.reader``.
+
+        Returns
+        -------
+        pymaid.Volume
+
+        """
+
+        with open(vertices, 'r') as f:
+            reader = csv.reader(f, **kwargs)
+            vertices = np.array([r for r in reader]).astype(float)
+
+        with open(faces, 'r') as f:
+            reader = csv.reader(f, **kwargs)
+            faces = np.array([r for r in reader]).astype(int)
+
+        return Volume(faces=faces, vertices=vertices, name=name, color=color,
+                      volume_id=volume_id)
+
+    def to_csv(self, filename, **kwargs):
+        """ Save volume as two separated csv files containing vertices and
+        faces.
+
+        Parameters
+        ----------
+        filename :      str
+                        Filename to use. Will get a ``_vertices.csv`` and 
+                        ``_faces.csv`` suffix.
+        **kwargs
+                        Keyword arguments passed to ``csv.reader``.
+        """
+
+        for data, suffix in zip([self.faces, self.vertices],
+                                ['_faces.csv', '_vertices.csv']):
+            with open(filename + suffix, 'w') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerows(data)    
 
     @classmethod
     def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
