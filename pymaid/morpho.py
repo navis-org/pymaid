@@ -1598,7 +1598,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         graph_utils.subset_neuron(x,
                                   subset=x.nodes[~x.nodes.treenode_id.isin(
                                       to_remove)].treenode_id.values,
-                                  remove_disconnected=preserve_connectors == False,
+                                  keep_disc_cn=preserve_connectors,
                                   inplace=True)
 
         if not inplace:
@@ -1638,7 +1638,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
             graph_utils.subset_neuron(x,
                                       subset=x.nodes[~x.nodes.treenode_id.isin(
                                           to_remove)].treenode_id.values,
-                                      remove_disconnected=preserve_connectors == False,
+                                      keep_disc_cn=preserve_connectors,
                                       inplace=True)
 
         if not inplace:
