@@ -1407,13 +1407,13 @@ def connected_subgraph(x, ss):
         it = iter(p)
         n = next(it, None)
         while n:
-            include.add(n)
-            n = next(it, None)
             if n in include:
                 break
             if n == first_common:
                 include.add(n)
                 break
+            include.add(n)
+            n = next(it, None)            
 
     # Make sure to keep nodes that are even more distal to the common ancestor
     include = set.union(include, ss)
