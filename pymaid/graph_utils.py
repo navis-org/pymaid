@@ -18,6 +18,7 @@
 representations.
 """
 
+import itertools
 import numbers
 
 import pandas as pd
@@ -264,7 +265,11 @@ def classify_nodes(x, inplace=True):
                 # [ n for n in g.nodes if g.degree(n) > 2 ]
                 branches = deg[deg.iloc[:, 0] > 2].index.values
 
-            x.nodes['type'] = 'slab'
+            if 'type' not in x.nodes:
+                x.nodes['type'] = 'slab'
+            else:
+                x.nodes.loc[:, 'type'] = 'slab'
+
             x.nodes.loc[x.nodes.treenode_id.isin(ends), 'type'] = 'end'
             x.nodes.loc[x.nodes.treenode_id.isin(branches), 'type'] = 'branch'
             x.nodes.loc[x.nodes.parent_id.isnull(), 'type'] = 'root'
@@ -683,7 +688,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     Parameters
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
-                        May contain only a single neuron.
+                        Must be a single neuron.
     n :                 int | slice, optional
                         Number of longest neurites to preserve. For example:
                          - ``n=1`` keeps the longest neurites
@@ -698,7 +703,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     Returns
     -------
     CatmaidNeuron
-                        Pruned neuron. Only if ``inplace==False``.
+                        Pruned neuron. Only if ``inplace=False``.
 
     See Also
     --------
@@ -1142,8 +1147,8 @@ def _cut_networkx(x, cut_node, ret):
         return prox
 
 
-def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
-                  inplace=False):
+def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
+                  prevent_fragments=False, inplace=False):
     """ Subsets a neuron to a set of treenodes.
 
     Parameters
@@ -1155,9 +1160,12 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
                           If True, will reset temporary attributes (graph,
                           node classification, etc. ). In general, you should
                           leave this at ``True``.
-    remove_disconnected : bool, optional
-                          If True, will remove disconnected connectors that
+    keep_disc_cn :        bool, optional
+                          If False, will remove disconnected connectors that
                           have "lost" their parent treenode.
+    prevent_fragments :   bool, optional
+                          If True, will add nodes to ``subset`` required to
+                          keep neuron from fragmenting.
     inplace :             bool, optional
                           If False, a copy of the neuron is returned.
 
@@ -1202,6 +1210,9 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
         raise TypeError('Can only subset to list, set, numpy.ndarray or \
                          networkx.Graph, not "{0}"'.format(type(subset)))
 
+    if prevent_fragments:
+        subset = connected_subgraph(x, subset)
+
     # Make a copy of the neuron
     if not inplace:
         x = x.copy(deepcopy=False)
@@ -1218,7 +1229,7 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
                         axis=1)
 
     # Filter connectors
-    if remove_disconnected:
+    if not keep_disc_cn:
         x.connectors = x.connectors[x.connectors.treenode_id.isin(subset)]
 
     # Filter tags

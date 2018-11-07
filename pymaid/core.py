@@ -1020,18 +1020,24 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def prune_by_volume(self, v, mode='IN', inplace=True):
+    def prune_by_volume(self, v, mode='IN', prevent_fragments=False,
+                        inplace=True):
         """ Prune neuron by intersection with given volume(s).
 
         Parameters
         ----------
-        v :         str | pymaid.Volume | list of either
-                    Volume(s) to check for intersection
-        mode :      'IN' | 'OUT', optional
-                    If 'IN', parts of the neuron inside the volume are kept.
-        inplace :   bool, optional
-                    If True, operation will be performed on itself. If False,
-                    operation is performed on copy which is then returned.
+        v :                 str | pymaid.Volume | list of either
+                            Volume(s) to check for intersection
+        mode :              'IN' | 'OUT', optional
+                            If 'IN', parts of the neuron inside the volume are
+                            kept.
+        prevent_fragments : bool, optional
+                            If True, will add nodes to ``subset`` required to
+                            keep neuron from fragmenting.
+        inplace :           bool, optional
+                            If True, operation will be performed on itself. If
+                            False, operation is performed on copy which is then
+                            returned.
 
         See Also
         --------
@@ -1049,6 +1055,7 @@ class CatmaidNeuron:
             x = self.copy()
 
         intersect.in_volume(x, v, inplace=True,
+                            prevent_fragments=prevent_fragments,
                             remote_instance=self._remote_instance, mode=mode)
 
         # Clear temporary attributes
@@ -2164,18 +2171,24 @@ class CatmaidNeuronList:
         x[0].prune_by_longest_neurite(x[1], x[2], inplace=True)
         return x[0]
 
-    def prune_by_volume(self, v, mode='IN', inplace=True):
+    def prune_by_volume(self, v, mode='IN', prevent_fragments=False,
+                        inplace=True):
         """ Prune neurons by intersection with given volume(s).
 
         Parameters
         ----------
-        v :         str | pymaid.Volume | list of either
-                    Volume(s) to check for intersection.
-        mode :      'IN' | 'OUT', optional
-                    If 'IN', part of the neuron inside the volume(s) is kept.
-        inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is
-                    returned.
+        v :                 str | pymaid.Volume | list of either
+                            Volume(s) to check for intersection
+        mode :              'IN' | 'OUT', optional
+                            If 'IN', parts of the neuron inside the volume are
+                            kept.
+        prevent_fragments : bool, optional
+                            If True, will add nodes to ``subset`` required to
+                            keep neuron from fragmenting.
+        inplace :           bool, optional
+                            If True, operation will be performed on itself. If
+                            False, operation is performed on copy which is then
+                            returned.
 
 
         See Also
@@ -2193,7 +2206,8 @@ class CatmaidNeuronList:
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [(n, v, mode) for i, n in enumerate(x.neurons)]
+            combinations = [(n, v, mode, prevent_fragments)
+                                             for i, n in enumerate(x.neurons)]
             x.neurons = list(config.tqdm(pool.imap(x._prune_by_volume_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations), desc='Pruning',
@@ -2205,14 +2219,16 @@ class CatmaidNeuronList:
         else:
             for n in config.tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
                           leave=config.pbar_leave):
-                n.prune_by_volume(v, mode=mode, inplace=True)
+                n.prune_by_volume(v, mode=mode, inplace=True,
+                                  prevent_fragments=prevent_fragments)
 
         if not inplace:
             return x
 
     def _prune_by_volume_helper(self, x):
         """ Helper function to parallelise basic operations."""
-        x[0].prune_by_volume(x[1], mode=x[2], inplace=True)
+        x[0].prune_by_volume(x[1], mode=x[2], inplace=True, 
+                             prevent_fragments=x[3])
         return x[0]
 
     def get_partners(self, remote_instance=None):

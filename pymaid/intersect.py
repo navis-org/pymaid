@@ -37,41 +37,47 @@ except ImportError:
 __all__ = sorted(['in_volume', 'intersection_matrix'])
 
 
-def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
+def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
+              remote_instance=None):
     """ Test if points/neurons are within a given CATMAID volume.
 
     Important
     ---------
     This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_
     which is only an optional dependency of pymaid. If pyoctree is not
-    installed, we will fall back to using scipy ConvexHull instead of ray
-    casting. This is slower and may give wrong positives for concave meshes!
+    installed, we will fall back to using scipy ConvexHull instead. This is
+    slower and may give wrong positives for concave meshes!
 
     Parameters
     ----------
-    x :               list of tuples | numpy.array | pandas.DataFrame | CatmaidNeuron | CatmaidNeuronList
+    x :                 list of tuples | numpy.array | pandas.DataFrame | CatmaidNeuron | CatmaidNeuronList
 
-                      - list/numpy.array is treated as list of x/y/z
-                        coordinates. Needs to be shape (N,3): e.g.
-                        ``[[x1, y1, z1], [x2, y2, z2], ..]``
-                      - ``pandas.DataFrame`` needs to have ``x, y, z`` columns
+                        - list/numpy.array is treated as list of x/y/z
+                          coordinates. Needs to be shape (N,3): e.g.
+                          ``[[x1, y1, z1], [x2, y2, z2], ..]``
+                        - ``pandas.DataFrame`` needs to have ``x, y, z``
+                          columns
 
-    volume :          str | pymaid.Volume | list or dict of either
-                      :class:`pymaid.Volume` or name of a CATMAID volume to
-                      test. Multiple volumes can be given as list
-                      (``[volume1, volume2, ...]``) or dict
-                      (``{'label1': volume1, ...}``) of either str or
-                      :class:`pymaid.Volume`.
-    inplace :         bool, optional
-                      If False, a copy of the original DataFrames/Neuron is
-                      returned. Does only apply to CatmaidNeuron or
-                      CatmaidNeuronList objects. Does apply if multiple
-                      volumes are provided.
-    mode :            'IN' | 'OUT', optional
-                      If 'IN', parts of the neuron that are within the volume
-                      are kept.
-    remote_instance : CATMAID instance, optional
-                      Pass if ``volume`` is a volume name.
+    volume :            str | pymaid.Volume | list or dict of either
+                        :class:`pymaid.Volume` or name of a CATMAID volume to
+                        test. Multiple volumes can be given as list
+                        (``[volume1, volume2, ...]``) or dict
+                        (``{'label1': volume1, ...}``) of either str or
+                        :class:`pymaid.Volume`.
+    inplace :           bool, optional
+                        If False, a copy of the original DataFrames/Neuron is
+                        returned. Does only apply to CatmaidNeuron or
+                        CatmaidNeuronList objects. Does apply if multiple
+                        volumes are provided.
+    mode :              'IN' | 'OUT', optional
+                        If 'IN', parts of the neuron that are within the volume
+                        are kept.
+    prevent_fragments : bool, optional
+                        Only relevant if input is CatmaidNeuron/List: if True,
+                        will add nodes required to keep neuron from
+                        fragmenting.
+    remote_instance :   CATMAID instance, optional
+                        Pass if ``volume`` is a volume name.
 
     Returns
     -------
@@ -153,7 +159,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
             in_v = ~np.array(in_v)
 
         x = graph_utils.subset_neuron(x, x.nodes[in_v].treenode_id.values,
-                                      inplace=True)
+                                      inplace=True,
+                                      prevent_fragments=prevent_fragments)
 
         if inplace is False:
             return x
