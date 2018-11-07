@@ -1338,3 +1338,73 @@ def _igraph_to_sparse(graph, weight_attr=None):
         weights.extend(weights)
     return csr_matrix((weights, zip(*edges)),
                       shape=(len(graph.vs), len(graph.vs)))
+
+
+def connected_subgraph(x, ss):
+    """ Returns set of nodes necessary to connect all nodes in subset ``ss``.
+
+    Parameters
+    ----------
+    x :         pymaid.CatmaidNeuron
+                Neuron to get subgraph for.
+    ss :        list | array-like
+                Treenode IDs of node to subset to.
+
+    Returns
+    -------
+    np.ndarray
+                Treenode IDs of connected subgraph.
+
+    """
+    if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
+        x = x[0]
+    elif not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Input must be a single CatmaidNeuron.')
+
+    missing = set(ss) - set(x.nodes.treenode_id.values)
+    if missing:
+        raise ValueError('Nodes not found: {}'.format(','.join(missing)))
+
+    # Turn neurons into an NetworkX graph
+    g = x.graph
+
+    # Find leaf nodes in subset (real and disconnected slabs)
+    ss_nodes = x.nodes[x.nodes.treenode_id.isin(ss)]
+    leafs = ss_nodes[(ss_nodes.type == 'end')].treenode_id.values
+    disconnected = x.nodes[(~x.nodes.treenode_id.isin(ss)) & (x.nodes.parent_id.isin(ss))]
+    leafs = np.append(leafs, disconnected.parent_id.values)
+
+    # Walk from each node to root and keep track of path
+    paths = []
+    for n in leafs:
+        this_path = []
+        while n:
+            this_path.append(n)
+            n = next(g.successors(n), None)
+        paths.append(this_path)
+
+    # Find the nodes that all paths have in common
+    common = set.intersection(*[set(p) for p in paths])
+
+    # Now find the first (most distal from root) common node
+    longest_path = sorted(paths, key=lambda x: len(x))[-1]
+    first_common = sorted(common, key=lambda x: longest_path.index(x))[0]
+
+    # Now go back to paths and collect all nodes until this first common node
+    include = set()
+    for p in paths:
+        it = iter(p)
+        n = next(it, None)
+        while n:
+            include.add(n)
+            n = next(it, None)
+            if n in include:
+                break
+            if n == first_common:
+                include.add(n)
+                break
+
+    # Make sure to keep nodes that are even more distal to the common ancestor
+    include = set.union(include, ss)
+
+    return np.array(list(include))
