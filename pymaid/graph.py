@@ -18,8 +18,9 @@
 """
 
 import numpy as np
-import pandas as pd
 import networkx as nx
+import pandas as pd
+import random
 
 try:
     import igraph
@@ -322,6 +323,96 @@ def neuron2igraph(x):
     g.es['weight'] = w
 
     return g
+
+
+def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
+    """ Generate neuron object from NetworkX Graph.
+        
+    This function will try to generate a neuron-like tree structure from
+    the Graph. Therefore the graph may not contain loops!
+
+    Treenode attributes (``x``, ``y``, ``z``, ``radius``, ``confidence``) need
+    to be properties of the graph's nodes.
+
+    Parameters
+    ----------
+    g :             networkx.Graph
+    neuron_name :   str, optional
+                    If not provided will be ``"neuron " + (skeleton_ID + 1)``.
+    skeleton_id :   str, optional
+                    If not provided will generate a random ID.
+    root :          str | int, optional
+                    Node in graph to use as root for neuron. If not provided,
+                    will use first node in ``g.nodes``.
+
+    Returns
+    -------
+    core.CatmaidNeuron
+
+    See Also
+    --------
+    pymaid.graph.nx2neuron
+                Base function with more parameters.
+    """
+
+    # First some sanity checks
+    if not isinstance(g, nx.Graph):
+        raise TypeError('g must be NetworkX Graph, not "{}"'.format(type(g)))
+
+    if not nx.is_tree(g.to_undirected(as_view=True)):
+        raise TypeError("g must be tree-like. Please check for loops.")
+
+    # Pick a randon root if not explicitly provided
+    if not root:
+        root = list(g.nodes)[0]
+    elif root not in g.nodes:
+        raise ValueError('Node "{}" not in graph.'.format(root))
+
+    # Generate parent->child dictionary
+    lop = nx.predecessor(g, root)
+
+    # Make sure no node has more than one parent
+    if max([len(v) for v in lop.values()]) > 1:
+        raise ValueError('Nodes with multiple parents found. Please check '
+                         'that graph is tree-like.')
+
+    skeleton_id = skeleton_id if skeleton_id else random.randint(0, 100000)
+    neuron_name = neuron_name if neuron_name else 'neuron ' + str(skeleton_id)
+
+    lop = {k: v[0] if v else None for k, v in lop.items()}
+
+    # Generate treenode table
+    tn_table = pd.DataFrame(index=list(g.nodes))
+    tn_table.index = tn_table.index.set_names('treenode_id')
+
+    # Add parents
+    tn_table['parent_id'] = tn_table.index.map(lop)
+
+    # Add coordinates
+    x = nx.get_node_attributes(g, 'x')
+    tn_table['x'] = tn_table.index.map(lambda a: x.get(a, 0))
+    y = nx.get_node_attributes(g, 'y')
+    tn_table['y'] = tn_table.index.map(lambda a: y.get(a, 0))
+    z = nx.get_node_attributes(g, 'z')
+    tn_table['z'] = tn_table.index.map(lambda a: z.get(a, 0))
+
+    # Add confidence and radii
+    conf = nx.get_node_attributes(g, 'confidence')
+    tn_table['confidence'] = tn_table.index.map(lambda x: conf.get(x, 5))
+    radii = nx.get_node_attributes(g, 'radius')
+    tn_table['radius'] = tn_table.index.map(lambda x: radii.get(x, -1))
+
+    # Turn this into a Series 
+    n = pd.Series({'skeleton_id': skeleton_id,
+                   'neuron_name': neuron_name,
+                   'nodes': tn_table.reset_index(),
+                   'connectors': pd.DataFrame(index=['connector_id',
+                                                     'treenode_id',
+                                                     'relation',
+                                                     'x', 'y', 'z']),
+                   'tags': {}})
+
+    return core.CatmaidNeuron(n)
 
 
 def _find_all_paths(g, start, end, mode='OUT', maxlen=None):

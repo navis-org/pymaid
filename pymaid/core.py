@@ -1276,6 +1276,35 @@ class CatmaidNeuron:
         return utils.to_swc(self, filename, **kwargs)
 
     @classmethod
+    def from_graph(self, g, **kwargs):
+        """ Generate neuron object from NetworkX Graph.
+        
+        This function will try to generate a neuron-like tree structure from
+        the Graph. Therefore the graph may not contain loops!
+
+        Treenode coordinates (``x``, ``y``, ``z``) need to be properties of
+        the graph's nodes.
+
+        Parameters
+        ----------
+        g :         networkx.Graph | networkx.DiGraph
+        **kwargs 
+                    Additional neuron parameters as keyword arguments.
+                    For example, ``skeleton_id``, ``neuron_name``, etc.
+
+        Returns
+        -------
+        core.CatmaidNeuron
+
+        See Also
+        --------
+        pymaid.graph.nx2neuron
+                    Base function with more parameters.
+        """
+
+        return graph.nx2neuron(g, **kwargs)
+
+    @classmethod
     def from_swc(self, filename, neuron_name=None, neuron_id=None):
         """ Generate neuron object from SWC file.
 
