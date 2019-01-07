@@ -1111,7 +1111,7 @@ def plot3d(x, **kwargs):
         if volumes:
             viewer.add(volumes, **kwargs)
         if points:
-            viewer.add(points, **scatter_kws)
+            viewer.add(points, scatter_kws=scatter_kws)
 
         return viewer
 
