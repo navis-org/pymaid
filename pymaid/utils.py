@@ -693,9 +693,6 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # Root node will have parent=-1 -> set this to None
     nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
 
-    # Bring radius from um into nm space
-    nodes[['x', 'y', 'z', 'radius']] *= 1000
-
     connectors = pd.DataFrame([], columns=['treenode_id', 'connector_id',
                                            'relation', 'x', 'y', 'z'],
                               dtype=object)
@@ -788,12 +785,14 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     """
     if isinstance(x, core.CatmaidNeuronList):
-        if isinstance(filename, type(None)):
-            filename = [None] * len(x)
-        else:
-            filename = _make_iterable(filename)
+        if not _is_iterable(filename):
+            filename = [filename] * len(x)
+
         for n, f in zip(x, filename):
-            to_swc(n, f)
+            to_swc(n, f,
+                   export_synapses=export_synapses,
+                   min_radius=min_radius)
+
         return
 
     if not isinstance(x, core.CatmaidNeuron):
@@ -810,7 +809,9 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
                          'got "{}"'.format(type(filename)))
 
     # Make sure file ending is correct
-    if not filename.endswith('.swc'):
+    if os.path.isdir(filename):
+        filename += 'neuron_{}.swc'.format(x.skeleton_id)
+    elif not filename.endswith('.swc'):
         filename += '.swc'
 
     # Make copy of nodes and reorder such that the parent is always before a
@@ -846,7 +847,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
         this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
 
     # Make sure we don't have too small radii
-    if min_radius:
+    if not isinstance(min_radius, type(None)):
         this_tn.loc[this_tn.radius < min_radius, 'radius'] = min_radius
 
     # Generate table consisting of PointNo Label X Y Z Radius Parent
@@ -856,9 +857,6 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     # Adjust column titles
     swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']
-
-    # Coordinates and radius to microns
-    swc.loc[:, ['X', 'Y', 'Z', 'Radius']] /= 1000
 
     with open(filename, 'w') as file:
         # Write header
@@ -876,6 +874,8 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
         writer = csv.writer(file, delimiter=' ')
         writer.writerows(swc.astype(str).values)
+
+    return
 
 
 def __guess_sentiment(x):
