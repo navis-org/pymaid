@@ -124,7 +124,8 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
 
     """
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
 
     # If we are given multiple volumes
     if isinstance(volume, (list, dict, np.ndarray)):
