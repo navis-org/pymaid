@@ -276,10 +276,16 @@ class CatmaidInstance:
         else:
             logger.info('Global CATMAID instance set. Caching is OFF.')
 
-    def fetch(self, url, post=None, desc='Fetching', raw=False,
-              callback=None, disable_pbar=False, leave_pbar=True):
+    def fetch(self, url, post=None, desc='Fetching', callback=None,
+              disable_pbar=False, leave_pbar=True, return_type='json'):
         """ Requires the url to connect to and the variables for POST,
         if any, in a dictionary.
+
+        Parameters
+        ----------
+        return_type :   "json" | "raw" | "request"
+                        Defines returned data.
+
         """
 
         # Keep track of if a single response is expected
@@ -326,11 +332,15 @@ class CatmaidInstance:
                 logger.info('Cached data used. Use `pymaid.clear_cache()` '
                             'to clear.')
 
-        # Convert to json if applicable
-        if not raw:
+        # Return requested data
+        if return_type.lower() == 'json':
             resp = [r.json() for r in resp]
-        else:
+        elif return_type.lower() == 'raw':
             resp = [r.content for r in resp]
+        elif return_type.lower() == 'request':
+            pass
+        else:
+            raise ValueError('Unknown return type "{}"'.format(return_type))
 
         if was_single:
             return resp[0]
