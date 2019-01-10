@@ -76,6 +76,7 @@ Connectivity
     pymaid.get_paths
     pymaid.adjacency_from_connectors
     pymaid.cn_table_from_connectors
+    pymaid.sparseness
 
 User stats
 ----------

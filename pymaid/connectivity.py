@@ -32,7 +32,7 @@ logger = config.logger
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
                   'predict_connectivity', 'adjacency_matrix', 'group_matrix',
                   'adjacency_from_connectors', 'cn_table_from_connectors',
-                  'connection_density'])
+                  'connection_density', 'sparseness'])
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
@@ -1152,3 +1152,90 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
         return None
 
     return dist
+
+
+def sparseness(x, which='LTS'):
+    """ Calculate sparseness.
+
+    Sparseness comes in two flavors:
+
+    **Lifetime kurtosis (LTK)** quantifies the widths of tuning curves
+    (according to Muench & Galizia, 2016):
+    
+    .. math::
+
+        S = \\Bigg\\{ \\frac{1}{M} \\sum^M_{i=1} \\Big[ \\frac{r_i - \\overline{r}}{\\sigma_r} \\Big] ^4  \\Bigg\\} - 3
+    
+    with :math:`M` being the number of observations, :math:`r_i` the response
+    elicited by stimulus :math:`i` and :math:`\\overline{r}` and
+    :math:`\\sigma_r` the mean and the standard deviation of the responses.
+
+    **Lifetime sparseness (LTS)** quantifies selectivity
+    (Bhandawat et al., 2007):
+
+    .. math::
+        
+        S = \\frac{1}{1-1/N} \\Bigg[1- \\frac{\\big(\\sum^N_{j=1} r_j / N\\big)^2}{\\sum^N_{j=1} r_j^2 / N} \\Bigg]
+
+    where :math:`N` is the number of odors, and :math:`r_j` is the analog
+    response intensity of the neuron to odor :math:`j`, minus baseline
+    firing rate.
+
+    Notes
+    -----
+    ``NaN`` values will be ignored. You can use that to e.g. ignore zero
+    values in a large connectivity matrix by changing these values to ``NaN``
+    before passing it to ``pymaid.sparseness``.
+
+
+    Parameters
+    ----------
+    x :         DataFrame | array-like
+                (M, N) dataset with M (rows) observations for N (columns)
+                neurons. One-dimensional data will be converted to two 
+                dimensions (M rows, 1 column).
+    which :     "LTS" | "LTK"
+                Determines whether lifetime sparseness (LTS) or lifetime
+                kurtosis (LTK) is returned.
+
+    Returns
+    -------
+    sparseness
+                ``pandas.Series`` if input was pandas DataFrame, else
+                ``numpy.array``. 
+
+    Examples
+    --------
+    Calculate sparseness of olfactory inputs to group of neurons:
+
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> # Generate adjacency matrix
+    >>> adj = pymaid.adjacency_matrix(s='annotation:WTPN2017_excitatory_uPN_right',
+    ...                               t='annotation:ASB LHN')
+    >>> # Calculate lifetime sparseness
+    >>> S = pymaid.sparseness(adj, which='LTS')
+    >>> # Plot distribution    
+    >>> ax = S.plot.hist(bins=np.arange(0, 1, .1))
+    >>> ax.set_xlabel('LTS')
+    >>> plt.show()
+    
+    """
+
+    if not isinstance(x, (pd.DataFrame, np.ndarray)):
+        x = np.array(x)
+
+    # Make sure we are working with 2 dimensional data
+    if isinstance(x, np.ndarray) and x.ndim == 1:
+        x = x.reshape(x.shape[0], 1)    
+
+    N = np.sum(~np.isnan(x), axis=0)
+
+    if which == 'LTK':
+        return np.nansum(((x - np.nanmean(x, axis=0)) / np.nanstd(x, axis=0)) ** 4, axis=0) / N - 3
+    elif which == 'LTS':
+        return 1 / (1 - (1/N)) * (1 - np.nansum(x/N, axis=0) ** 2 / np.nansum(x**2/N, axis=0))
+    else:
+        raise ValueError('Parameter "which" must be either "LTS" or "LTK"')
+
+
