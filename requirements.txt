@@ -14,7 +14,7 @@ seaborn==0.9.0
 setuptools==40.5.0
 scipy==1.1.0
 six==1.11.0
-tqdm==4.28.1
+tqdm==4.29.1
 vispy==0.5.3
 
 # Below are optional dependencies
