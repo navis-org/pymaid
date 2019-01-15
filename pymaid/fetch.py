@@ -1415,6 +1415,22 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
     if not isinstance(min_confidence, (float, int)) or min_confidence < 0 or min_confidence > 5:
         raise ValueError('min_confidence must be 0-5.')
 
+    # This maps CATMAID JSON relations to more relatable terms (I think)
+    relations = {'incoming': 'upstream',
+                 'outgoing': 'downstream',
+                 'gapjunctions': 'gapjunction',
+                 'attachments': 'attachment'}
+
+    # Catch some easy mistakes regarding relations:
+    repl = {v: k for k, v in relations.items()}
+    directions = [repl.get(d, d) for d in directions]
+
+    wrong_dir = set(directions) - set(relations.keys())
+    if wrong_dir:
+        raise ValueError('Unknown direction "{}". Please use a combination '
+                         'of "{}"'.format(', '.join(wrong_dir),
+                                          ', '.join(relations.keys())))
+
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -1430,8 +1446,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
         tag = 'source_skeleton_ids[{0}]'.format(i)
         connectivity_post[tag] = skid
 
-    logger.info(
-        'Fetching connectivity table for {0} neurons'.format(len(x)))
+    logger.info('Fetching connectivity table for {} neurons'.format(len(x)))
     connectivity_data = remote_instance.fetch(
         remote_connectivity_url, connectivity_post)
 
@@ -1444,14 +1459,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                       d]] + list(x), remote_instance)
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
-                               'num_nodes', 'relation'] + list(x))
-
-    relations = {
-        'incoming': 'upstream',
-        'outgoing': 'downstream',
-        'gapjunctions': 'gapjunction',
-        'attachments': 'attachment'
-    }
+                               'num_nodes', 'relation'] + list(x))    
 
     # Number of synapses is returned as list of links with 0-5 confidence:
     # {'skid': [0, 1, 2, 3, 4, 5]}
