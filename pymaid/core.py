@@ -2952,13 +2952,25 @@ class Volume:
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
 
-    def resize(self, x, inplace=True):
-        """ Resize volume by given factor.
+    def resize(self, x, method='center', inplace=True):
+        """ Resize volume.
+
+        Will resize in respect to the centre of mass.
 
         Parameters
         ----------
-        x :         int
-                    Resizing factor
+        x :         int | float
+                    Resizing factor. For methods "center", "centroid" and
+                    "origin" this shoul be the fraction of original size (e.g. 
+                    ``.5`` for half size). For method "normals", this is 
+                    is the absolute displacement.
+        method :    "center" | "centroid" | "normals" | "origin"
+                    Point in space to use for resizing::
+                      origin: (0, 0, 0)
+                      center: average of all vertices
+                      centroid: average of the triangle centroids weighted
+                      by the area of each triangle. Requires ``trimesh``.
+                      normals: resize using face normals. Requires ``trimesh``.
         inplace :   bool, optional
                     If False, will return resized copy.
 
@@ -2969,22 +2981,43 @@ class Volume:
         Nothing
                     If ``inplace=False``.
         """
+
+        perm_methods = ['center', 'origin', 'normals', 'centroid']
+        if method not in perm_methods:
+            raise ValueError('Unknown method "{}". Allowed '
+                             'methods: {}'.format(method,
+                                                  ', '.join(perm_methods)))
+
+        if method in ['normals', 'centroid'] and isinstance(trimesh, type(None)):
+            raise ImportError('Must have Trimesh installed to use methods '
+                              '"normals" or "centroid"!')
+
         if not inplace:
             v = self.copy()
         else:
             v = self
 
-        # Get the center
-        cn = np.mean(v.vertices, axis=0)
+        if method == 'normals':
+            tm = v.to_trimesh()
+            v.vertices = tm.vertices + (tm.vertex_normals * x)
+            v.faces = tm.faces
+        else:
+            # Get the center
+            if method == 'center':
+                cn = np.mean(v.vertices, axis=0)
+            elif method == 'centroid':
+                cn = v.to_trimesh().centroid
+            elif method == 'origin':
+                cn = np.array([0, 0, 0])
 
-        # Get vector from center to each vertex
-        vec = v.vertices - cn
+            # Get vector from center to each vertex
+            vec = v.vertices - cn
 
-        # Multiply vector by resize factor
-        vec *= x
+            # Multiply vector by resize factor
+            vec *= x
 
-        # Recalculate vertex positions
-        v.vertices = vec + cn
+            # Recalculate vertex positions
+            v.vertices = vec + cn
 
         # Make sure to reset any pyoctree data on this volume
         try:
