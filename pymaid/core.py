@@ -2938,8 +2938,9 @@ class Volume:
 
     def copy(self):
         """Return copy of this volume. Does not maintain generic values."""
-        return Volume(self.vertices, self.faces, self.name,
-                      self.color, self.volume_id)
+        return Volume(self.vertices.copy(), self.faces.copy(),
+                      copy.copy(self.name), copy.copy(self.color),
+                      copy.copy(self.volume_id))
 
     def __str__(self):
         return self.__repr__()
