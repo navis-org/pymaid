@@ -87,6 +87,11 @@ import scipy.cluster.hierarchy
 from . import (graph, morpho, fetch, graph_utils, resample, intersect,
                utils, config)
 
+try:
+    import trimesh
+except ImportError:
+    trimesh = None
+
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
 # Set up logging
@@ -3025,9 +3030,7 @@ class Volume:
                 trimesh GitHub page.
         """
 
-        try:
-            import trimesh
-        except ImportError:
+        if isinstance(trimesh, type(None)):            
             raise ImportError('Unable to import trimesh. Please make sure it '
                               'is installed properly')
 
