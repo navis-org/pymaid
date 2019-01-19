@@ -4626,8 +4626,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                      'reviewed_by': u} for u in reviewed_by]
 
         if from_date and to_date:
-            dates = {'from': ''.join([str(d) for d in from_date]),
-                     'to': ''.join([str(d) for d in to_date])}
+            dates = {'from': ''.join(['{0:02d}'.format(d) for d in from_date]),
+                     'to': ''.join(['{0:02d}'.format(d) for d in to_date])}
             GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
