@@ -1283,7 +1283,7 @@ class CatmaidNeuron:
     @classmethod
     def from_graph(self, g, **kwargs):
         """ Generate neuron object from NetworkX Graph.
-        
+
         This function will try to generate a neuron-like tree structure from
         the Graph. Therefore the graph may not contain loops!
 
@@ -1293,7 +1293,7 @@ class CatmaidNeuron:
         Parameters
         ----------
         g :         networkx.Graph | networkx.DiGraph
-        **kwargs 
+        **kwargs
                     Additional neuron parameters as keyword arguments.
                     For example, ``skeleton_id``, ``neuron_name``, etc.
 
@@ -2758,12 +2758,12 @@ class Dotprops(pd.DataFrame):
 
 
 class Volume:
-    """ Class to hold CATMAID meshes.
+    """ Class representing CATMAID meshes.
 
     Parameters
     ----------
     vertices :  list | array
-                Vertices coordinates. Must be shape (N,3).
+                Vertices coordinates. Must be shape ``(N, 3)``.
     faces :     list | array
                 Indexed faceset.
     name :      str, optional
@@ -2772,12 +2772,6 @@ class Volume:
                 RGB color.
     volume_id : int, optional
                 CATMAID volume ID.
-
-    Attributes
-    ----------
-    bbox :      array
-                Bounding box of the volume.
-
 
     See Also
     --------
@@ -2832,7 +2826,7 @@ class Volume:
         Parameters
         ----------
         filename :      str
-                        Filename to use. Will get a ``_vertices.csv`` and 
+                        Filename to use. Will get a ``_vertices.csv`` and
                         ``_faces.csv`` suffix.
         **kwargs
                         Keyword arguments passed to ``csv.reader``.
@@ -2842,7 +2836,7 @@ class Volume:
                                 ['_faces.csv', '_vertices.csv']):
             with open(filename + suffix, 'w') as csvfile:
                 writer = csv.writer(csvfile)
-                writer.writerows(data)    
+                writer.writerows(data)
 
     @classmethod
     def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
@@ -2960,17 +2954,32 @@ class Volume:
         ----------
         x :         int | float
                     Resizing factor. For methods "center", "centroid" and
-                    "origin" this shoul be the fraction of original size (e.g.
+                    "origin" this is the fraction of original size (e.g.
                     ``.5`` for half size). For method "normals", this is
-                    is the absolute displacement!
+                    is the absolute displacement (e.g. ``-1000`` to shrink
+                    volume by 1um)!
         method :    "center" | "centroid" | "normals" | "origin"
-                    Point in space to use for resizing::
-                      origin:   (0, 0, 0)
-                      center:   average of all vertices
-                      centroid: average of the triangle centroids weighted
-                                by the area of each triangle. Requires
-                                ``trimesh``.
-                      normals:  resize using face normals. Requires ``trimesh``.
+                    Point in space to use for resizing.
+
+                    .. list-table::
+                        :widths: 15 75
+                        :header-rows: 1
+
+                        * - method
+                          - explanation
+                        * - center
+                          - average of all vertices
+                        * - centroid
+                          - average of the triangle centroids weighted by the
+                            area of each triangle. Requires ``trimesh``.
+                        * - origin
+                          - resizes relative to origin of coordinate system
+                            (0, 0, 0)
+                        * - normals
+                          - resize using face normals. Note that this method
+                            uses absolute displacement for parameter ``x``.
+                            Requires ``trimesh``.
+
         inplace :   bool, optional
                     If False, will return resized copy.
 

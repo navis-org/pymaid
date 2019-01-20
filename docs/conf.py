@@ -33,27 +33,26 @@ sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath('../..'))
 
-#This needs to be removed in order to built locally
 import mock
 MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'bpy', 'bmesh',
                 'pyoctree', 'PyQt5', 'pyqt5', 'scipy.sparse', 'scipy.cluster',
-                'scipy.cluster.hierarchy', 'scipy.interpolate',
-                'scipy.spatial.distance',
+                'scipy.cluster.hierarchy', 'scipy.interpolate', 'scipy.spatial.distance',
                 'numpy', 'scipy', 'scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull',
-                'rpy2', 'rpy2.robjects','rpy2.robjects.packages', 'png',
+                'rpy2', 'rpy2.robjects', 'rpy2.robjects.packages', 'png',
                 'rpy2.robjects.packages.importr', 'rpy2.robjects.pandas2ri' ,
                 'plotly', 'plotly.plotly', 'plotly.offline', 'plotly.graph_objs',
                 'matplotlib.pyplot', 'plt', 'matplotlib.externals',
                 'matplotlib.externals.six', 'matplotlib.externals.six.moves',
-                'matplotlib.collections','matplotlib.collections.PolyCollection', 'matplotlib.lines', 'matplotlib.patches', 'matplotlib.colors',
-                'mpl_toolkits.mplot3d','mpl_toolkits.mplot3d.proj3d','matplotlib.colors', 'mpl_toolkits.mplot3d.art3d',
+                'matplotlib.collections', 'matplotlib.collections.PolyCollection', 'matplotlib.lines', 'matplotlib.patches', 'matplotlib.colors',
+                'mpl_toolkits.mplot3d', 'mpl_toolkits.mplot3d.proj3d', 'matplotlib.colors', 'mpl_toolkits.mplot3d.art3d',
                 'mpl_toolkits.mplot3d.art3d.Line3DCollection', 'proj3d', 'pylab',
-                'mlines','mpatches','mcollections', 'mcl','Line3DCollection',
+                'mlines', 'mpatches', 'mcollections', 'mcl', 'Line3DCollection',
                 'mathutils',
                 'networkx', 'nx', 'requests', 'requests-futures', 'requests.exceptions',
                 'imageio', 'py2cytoscape', 'py2cytoscape.data.cyrest_client', 'CyRestClient',
                 'requests_futures.sessions', 'requests_futures.sessions.FuturesSession',
-                'vispy','seaborn','vispy.geometry', 'vispy.gloo.util', 'vispy.gloo.util._screenshot']
+                'trimesh',
+                'vispy', 'seaborn', 'vispy.geometry', 'vispy.gloo.util', 'vispy.gloo.util._screenshot']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 

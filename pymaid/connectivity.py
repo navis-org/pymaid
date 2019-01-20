@@ -1167,7 +1167,7 @@ def sparseness(x, which='LTS'):
         S = \\Bigg\\{ \\frac{1}{N} \\sum^M_{i=1} \\Big[ \\frac{r_i - \\overline{r}}{\\sigma_r} \\Big] ^4  \\Bigg\\} - 3
     
     where :math:`N` is the number of observations, :math:`r_i` the value of
-    observation :math:`i` and :math:`\\overline{r}` and
+    observation :math:`i`, and :math:`\\overline{r}` and
     :math:`\\sigma_r` the mean and the standard deviation of the observations'
     values, respectively. LTK is assuming a normal, or at least symmetric
     distribution.
