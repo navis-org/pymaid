@@ -31,7 +31,7 @@ Annotations
 
     pymaid.add_annotations
     pymaid.add_meta_annotations
-    pymaid.get_annotations    
+    pymaid.get_annotations
     pymaid.get_annotation_details
     pymaid.get_annotated
     pymaid.get_user_annotations
@@ -182,6 +182,21 @@ CatmaidNeuronList-specific
     pymaid.CatmaidNeuronList.sort_values
 
 
+Volumes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.Volume
+    pymaid.Volume.resize
+    pymaid.Volume.combine
+    pymaid.Volume.from_csv
+    pymaid.Volume.to_csv
+    pymaid.Volume.plot3d
+    pymaid.Volume.to_2d
+    pymaid.Volume.to_trimesh
+
+
 .. _api_plot:
 
 Plotting
@@ -198,7 +213,6 @@ Plotting
     pymaid.close3d
     pymaid.get_viewer
     pymaid.screenshot
-    pymaid.Volume
 
 Vispy 3D viewer
 

@@ -2893,6 +2893,7 @@ class Volume:
 
     @property
     def vertices(self):
+        """Array (N, 3) of vertex coordinates. """
         return self.__vertices
 
     @vertices.setter
@@ -2916,7 +2917,7 @@ class Volume:
 
     @property
     def faces(self):
-        """Legacy access to ``.vertices``."""
+        """Array of vertex indices forming faces."""
         return self.__faces
 
     @faces.setter
@@ -2927,7 +2928,7 @@ class Volume:
 
     @property
     def center(self):
-        """ Center of mass."""
+        """ Center of volume as average over all vertices."""
         return np.mean(self.vertices, axis=0)
 
     def __deepcopy__(self):
@@ -2955,22 +2956,21 @@ class Volume:
     def resize(self, x, method='center', inplace=True):
         """ Resize volume.
 
-        Will resize in respect to the centre of mass.
-
         Parameters
         ----------
         x :         int | float
                     Resizing factor. For methods "center", "centroid" and
-                    "origin" this shoul be the fraction of original size (e.g. 
-                    ``.5`` for half size). For method "normals", this is 
-                    is the absolute displacement.
+                    "origin" this shoul be the fraction of original size (e.g.
+                    ``.5`` for half size). For method "normals", this is
+                    is the absolute displacement!
         method :    "center" | "centroid" | "normals" | "origin"
                     Point in space to use for resizing::
-                      origin: (0, 0, 0)
-                      center: average of all vertices
+                      origin:   (0, 0, 0)
+                      center:   average of all vertices
                       centroid: average of the triangle centroids weighted
-                      by the area of each triangle. Requires ``trimesh``.
-                      normals: resize using face normals. Requires ``trimesh``.
+                                by the area of each triangle. Requires
+                                ``trimesh``.
+                      normals:  resize using face normals. Requires ``trimesh``.
         inplace :   bool, optional
                     If False, will return resized copy.
 
@@ -2978,7 +2978,7 @@ class Volume:
         -------
         :class:`pymaid.Volume`
                     Resized copy of original volume. Only if ``inplace=True``.
-        Nothing
+        None
                     If ``inplace=False``.
         """
 
@@ -3064,7 +3064,7 @@ class Volume:
                 trimesh GitHub page.
         """
 
-        if isinstance(trimesh, type(None)):            
+        if isinstance(trimesh, type(None)):
             raise ImportError('Unable to import trimesh. Please make sure it '
                               'is installed properly')
 
@@ -3098,7 +3098,7 @@ class Volume:
         return np.append(co2d, third.reshape(co2d.shape[0], 1), axis=1)
 
     def to_2d(self, alpha=0.00017, view='xy', invert_y=False):
-        """ Computes the 2d alpha shape (concave hull) this volume.
+        """ Computes the 2d alpha shape (concave hull).
 
         Uses Scipy Delaunay and shapely.
 
