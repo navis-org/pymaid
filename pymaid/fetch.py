@@ -45,21 +45,23 @@ dtype: object
 
 """
 
-import urllib
-import json
-import time
 import base64
-import sys
 import datetime
+import json
+import os
 import re
+import sys
+import tempfile
+import time
+import urllib
 import webbrowser
 
 import requests
 from requests_futures.sessions import FuturesSession
 
-import pandas as pd
 import numpy as np
 import networkx as nx
+import pandas as pd
 
 from . import core, graph, utils, config, cache
 from .intersect import in_volume
@@ -86,7 +88,8 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'remove_annotations', 'get_connector_links',
                   'get_nth_partners', 'get_treenodes_by_tag',
                   'get_node_location', 'add_meta_annotations',
-                  'remove_meta_annotations', 'get_annotated'])
+                  'remove_meta_annotations', 'get_annotated',
+                  'import_neuron'])
 
 # Set up logging
 logger = config.logger
@@ -276,7 +279,7 @@ class CatmaidInstance:
         else:
             logger.info('Global CATMAID instance set. Caching is OFF.')
 
-    def fetch(self, url, post=None, desc='Fetching', callback=None,
+    def fetch(self, url, post=None, desc='Fetching', callback=None, files=None,
               disable_pbar=False, leave_pbar=True, return_type='json'):
         """ Requires the url to connect to and the variables for POST,
         if any, in a dictionary.
@@ -303,9 +306,12 @@ class CatmaidInstance:
                 raise ValueError('POST needs to be provided for each url.')
             if self.caching:
                 futures = [self._cache.get_cached_url(u, self._future_session,
-                                                      post=p) for u, p in zip(url, post)]
+                                                      post=p,
+                                                      files=files) for u, p in zip(url, post)]
             else:
-                futures = [self._future_session.post(u, data=p) for u, p in zip(url, post)]
+                futures = [self._future_session.post(u,
+                                                     data=p,
+                                                     files=files) for u, p in zip(url, post)]
         else:
             if self.caching:
                 futures = [self._cache.get_cached_url(u, self._future_session,
@@ -767,6 +773,11 @@ class CatmaidInstance:
     def _get_node_location_url(self, **GET):
         """ Use to get treenode table. Does need postdata."""
         return self.make_url(self.project_id, 'nodes', 'location', **GET)
+
+    def _import_skeleton_url(self, **GET):
+        """ Use to import skeleton into Catmaid Instance. Does need postdata.
+        """
+        return self.make_url(self.project_id, 'skeletons', 'import', **GET)
 
     def _get_skeletons_in_bbox(self, **GET):
         """ Use to get list of skeleton in bounding box. Does need postdata.
@@ -5594,3 +5605,55 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
         d[:16], '%Y-%m-%dT%H:%M') for d in df['execution_time'].values]
 
     return df
+
+
+@cache.never_cache
+def import_neuron(x, remote_instance=None):
+    """ Import neuron(s) to CATMAID instance.
+
+    Does only import node tables, **not** connectors.
+    Skeleton and treenode IDs will change!
+
+    Parameters
+    ----------
+    x :                 CatmaidNeuron/List
+                        Neurons to import.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict 
+                        Response
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if len(x) == 1:
+            x = x[0]
+        else:
+            return {n.skeleton_id : import_neuron(n,
+                                                  remote_instance=remote_instance)
+                    for n in config.tqdm(x,
+                                         desc='Import',
+                                         disable=disable_pbar,
+                                         leave=leave_pbar)}
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))    
+
+    import_url = remote_instance._import_skeleton_url()
+
+    import_post = {'neuron_id': None,
+                   'name': x.neuron_name}
+
+    f = os.path.join(tempfile.gettempdir(), 'temp.swc')
+
+    _ = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
+
+    with open(f, 'rb') as file:
+        resp = rm.fetch(import_url, post=import_post, files={'file': file})
+
+    return resp
