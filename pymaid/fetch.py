@@ -768,6 +768,12 @@ class CatmaidInstance:
         """ Use to get treenode table. Does need postdata."""
         return self.make_url(self.project_id, 'nodes', 'location', **GET)
 
+    def _get_skeletons_in_bbox(self, **GET):
+        """ Use to get list of skeleton in bounding box. Does need postdata.
+        """
+        return self.make_url(self.project_id, 'skeletons', 'in-bounding-box',
+                             **GET)        
+
 
 @cache.undo_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
@@ -4734,7 +4740,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
 
 @cache.undo_on_error
-def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
+def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
                           only_soma=False, remote_instance=None):
     """ Retrieves neurons with processes within CATMAID volumes.
 
@@ -4752,13 +4758,16 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     ----------
     volumes :               str | core.Volume | list of either
                             Single or list of CATMAID volumes.
+    min_nodes :             int, optional
+                            Minimum node count for a neuron within given 
+                            volume(s).
+    min_cable :             int, optional
+                            Minimum cable length [nm] for a neuron within
+                            given volume(s).
     intersect :             bool, optional
                             If multiple volumes are provided, this parameter
                             determines if neurons have to be in all of the
-                            neuropils or just a single.
-    min_nodes :             int, optional
-                            Minimum number of node these neurons need to have
-                            in given volumes.
+                            volumes or just a single.
     only_soma :             bool, optional
                             If True, only neurons with a soma will be returned.
     remote_instance :       CATMAID instance
@@ -4809,6 +4818,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     for v in volumes:
         logger.info('Retrieving nodes in volume {0}'.format(v.name))
         temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
+                                   min_cable=min_cable,
                                    remote_instance=remote_instance)
 
         if not intersect:
@@ -4835,14 +4845,9 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
 
 
 @cache.undo_on_error
-def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
-                        **kwargs):
+def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
+                        remote_instance=None, **kwargs):
     """ Retrieves neurons with processes within a defined box volume.
-
-    Because the API returns only a limited number of neurons at a time, the
-    defined volume has to be chopped into smaller pieces for crowded areas -
-    may thus take some time! This function will retrieve ALL neurons within
-    the box - not just the once entering/exiting.
 
     Parameters
     ----------
@@ -4850,30 +4855,30 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
                             Coordinates of the bounding box. Can be either:
 
                               1. List/np.array: ``[[left, right], [top, bottom], [z1, z2]]``
-                              2. Dictionary with above entries
+                              2. Dictionary ``{'left': int|float, 'right': ..., ...}``
     unit :                  'NM' | 'PIXEL'
                             Unit of your coordinates. Attention:
                             'PIXEL' will also assume that Z1/Z2 is in slices.
                             By default, a X/Y resolution of 3.8nm and a Z
                             resolution of 35nm is assumed. Pass 'xy_res' and
-                            'z_res' as **kwargs to override this.
+                            'z_res' as ``**kwargs`` to override this.
     min_nodes :             int, optional
-                            Minimum node count for a neuron within given box
-                            to be returned.
+                            Minimum node count for a neuron within given 
+                            bounding box.
+    min_cable :             int, optional
+                            Minimum cable length [nm] for a neuron within
+                            given bounding box.
     remote_instance :       CATMAID instance
                             If not passed directly, will try using global.
 
     Returns
-    --------
+    -------
     list
                             ``[skeleton_id, skeleton_id, ...]``
 
     """
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
-
-    x_y_resolution = kwargs.get('xy_res', 3.8)
-    z_resolution = kwargs.get('z_res', 35)
+    remote_instance = utils._eval_remote_instance(remote_instance)    
 
     if isinstance(bbox, dict):
         bbox = np.array([[bbox['left'], bbox['right']],
@@ -4885,110 +4890,19 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
         bbox = np.array(bbox)
 
     if unit == 'PIXEL':
-        bbox *= x_y_resolution
+        bbox[[0, 1]:] *= kwargs.get('xy_res', 3.8)
+        bbox[[2]:] *= kwargs.get('z_res', 35)
 
-    # Subset the volume into boxes of 50**3 um^3
-    boxes = _subset_volume(bbox, max_vol=25**3)
+    url = remote_instance._get_skeletons_in_bbox(minx=min(bbox[0]),
+                                                 maxx=max(bbox[0]),
+                                                 miny=min(bbox[1]),
+                                                 maxy=max(bbox[1]),
+                                                 minz=min(bbox[2]),
+                                                 maxz=max(bbox[2]),
+                                                 min_nodes=min_nodes,
+                                                 min_cable=min_cable)
 
-    node_list = []
-    while boxes.any():
-        # Prepare urls and postdata for each box
-        urls = [remote_instance._get_node_list_url() for u in boxes]
-        postdata = [{
-                    'left': bbox[0][0],
-                    'right': bbox[0][1],
-                    'top': bbox[1][0],
-                    'bottom': bbox[1][1],
-                    'z1': bbox[2][0],
-                    'z2': bbox[2][1],
-                    # Atnid seems to be related to fetching the
-                    # active node too (will be ignored if atnid
-                    # = -1)
-                    'atnid': -1,
-                    'labels': False,
-                    # Maximum number of nodes returned per
-                    # query - default appears to be 3500 (on
-                    # Github) but it appears as if this is
-                    # overriden by server settings anyway!
-                    'limit': 1000000
-                    } for bbox in boxes]
-
-        data = remote_instance.fetch(urls, post=postdata, disable_pbar=False,
-                                     leave_pbar=False, desc='Fetching nodes')
-
-        # Collect data and check if we need more fetching
-        new_boxes = np.empty((0, 3, 2))
-        for nl, bbox in zip(data, boxes):
-            # Subdivide if too many nodes returned
-            if nl[3] is True:
-                # Divided this box into 8 smaller boxes
-                new_boxes = np.append(new_boxes, _subset_volume(bbox), axis=0)
-            else:
-                # If limit not reached, return node list
-                node_list += nl[0]
-        boxes = new_boxes
-
-    # Collapse list into unique skeleton ids
-    unique, counts = np.unique([n[7] for n in node_list], return_counts=True)
-    skeletons = unique[counts >= min_nodes]
-
-    logger.info("Done: %i nodes from %i unique neurons retrieved." % (
-        len(node_list), len(skeletons)))
-
-    return skeletons
-
-
-def _subset_volume(bbox, max_vol=None):
-    """ Subdivide a bounding box into smaller subvolumes. Can provide a max
-    volume size.
-
-    Parameters
-    ----------
-    bbox :      dict
-                Must contain these entries: left, right, top, bottom, z1, z2.
-    max_vol :   int, optional
-                Maximum volume per subvolume in cubic microns [um^3].
-
-    Returns
-    -------
-    subvolumes :    np.ndarray
-
-    """
-
-    # Tile space
-    b_x = zip(np.linspace(bbox[0][0], bbox[0][1], 3)[:-1],
-              np.linspace(bbox[0][0], bbox[0][1], 3)[1:])
-
-    b_y = zip(np.linspace(bbox[1][0], bbox[1][1], 3)[:-1],
-              np.linspace(bbox[1][0], bbox[1][1], 3)[1:])
-
-    b_z = zip(np.linspace(bbox[2][0], bbox[2][1], 3)[:-1],
-              np.linspace(bbox[2][0], bbox[2][1], 3)[1:])
-
-    # For some reason we need to convert list, otherwise coordinates are
-    # dropped
-    b_x = list(b_x)
-    b_y = list(b_y)
-    b_z = list(b_z)
-
-    new_boxes = []
-    for x in b_x:
-        for y in b_y:
-            for z in b_z:
-                new_boxes.append([x, y, z])
-    new_boxes = np.array(new_boxes)
-
-    # Check the volume of the new boxes. If volume is too big, do another
-    # round of subsetting
-    if max_vol:
-        this_volume = (new_boxes[0][:, 1] -
-                       new_boxes[0][:, 0]).prod() / 1000**3
-        if this_volume > max_vol:
-            new_boxes = np.array(
-                [b for box in new_boxes for b in _subset_volume(box,
-                                                                max_vol=max_vol)])
-
-    return new_boxes
+    return remote_instance.fetch(url)
 
 
 @cache.undo_on_error
