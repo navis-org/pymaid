@@ -35,7 +35,7 @@ logger = config.logger
 
 __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
            'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache',
-           'shorten_name']
+           'shorten_name', 'transfer_neuron']
 
 
 def clear_cache():
