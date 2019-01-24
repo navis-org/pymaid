@@ -420,7 +420,6 @@ def predict_connectivity(source, target, method='possible_contacts',
     if kwargs.get('dist', None):
         distances = kwargs.get('dist')
     elif cn_between.shape[0] > 0:
-        logger.warning('No ')
         cn_locs = np.vstack(cn_between.connector_loc.values)
         tn_locs = np.vstack(cn_between.treenode2_loc.values)
 
