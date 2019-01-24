@@ -346,7 +346,7 @@ def predict_connectivity(source, target, method='possible_contacts',
                          remote_instance=None, **kwargs):
     """ Calculates potential synapses from source onto target neurons.
 
-    Based on a concept by Alex Bates.
+    Based on a concept by `Alexander Bates <https://github.com/alexanderbates/catnat>`_.
 
     Parameters
     ----------
@@ -369,6 +369,8 @@ def predict_connectivity(source, target, method='possible_contacts',
            connections between neurons A and neurons B occur.
         2. For all presynapses of neurons A, check if they are within ``stdev``
            (default=2) standard deviations of ``d`` of a neurons B treenode.
+        3. Neurons without cable or presynapses will have a predicted
+           connectivity of 0.
 
 
     Returns
@@ -443,10 +445,20 @@ def predict_connectivity(source, target, method='possible_contacts',
                      disable=config.pbar_hide,
                      leave=config.pbar_leave) as pbar:
         for t in target:
+            # If no nodes, predict 0 connectivity and skip
+            if t.nodes.empty:
+                matrix.loc[t.skeleton_id, source.skeleton_id] = 0
+                continue
+
             # Create cKDTree for target
             tree = scipy.spatial.cKDTree(
                 t.nodes[['x', 'y', 'z']].values, leafsize=10)
             for s in source:
+                # If not synapses, predict 0 connectivity and skip                
+                if s.presynapses.empty:
+                    matrix.at[s.skeleton_id, t.skeleton_id] = 0
+                    continue
+
                 # Query against presynapses
                 dist, ix = tree.query(s.presynapses[['x', 'y', 'z']].values,
                                       k=1,
