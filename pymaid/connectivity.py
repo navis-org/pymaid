@@ -23,6 +23,7 @@ from itertools import combinations
 import pandas as pd
 import numpy as np
 import scipy.spatial
+import scipy.stats
 
 from . import fetch, core, intersect, utils, config, graph_utils
 
@@ -359,18 +360,20 @@ def predict_connectivity(source, target, method='possible_contacts',
                     1. For method 'possible_contacts':
                         - ``dist`` to set distance between connectors and
                           treenodes manually.
-                        - ``stdev`` to set number of standard-deviations of
-                          average distance. Default = 2.
+                        - ``n_irq`` to set number of interquartile ranges of
+                          harmonic mean. Default = 2.
 
     Notes
     -----
     Method ``possible_contacts``:
-        1. Calculating mean distance ``d`` (connector->treenode) at which
-           connections between neurons A and neurons B occur.
-        2. For all presynapses of neurons A, check if they are within ``stdev``
-           (default=2) standard deviations of ``d`` of a neurons B treenode.
-        3. Neurons without cable or presynapses will have a predicted
-           connectivity of 0.
+        1. Calculating harmonic mean of distances ``d`` (connector->treenode)
+            at which onnections between neurons A and neurons B occur.
+        2. For all presynapses of neurons A, check if they are within 
+           ``n_irq`` (default=2) interquartile range  of ``d`` of a
+           neuron B treenode.
+
+    Neurons without cable or presynapses will be assigned a predicted
+    connectivity of 0.
 
 
     Returns
@@ -438,8 +441,10 @@ def predict_connectivity(source, target, method='possible_contacts',
         distances = 1000
 
     # Calculate distances threshold
-    n_std = kwargs.get('n_std', 2)
-    dist_threshold = np.mean(distances) + n_std * np.std(distances)
+    n_irq = kwargs.get('n_irq', 2)
+    # We use the median because some very large connector->treenode
+    # distances can massively skew the average
+    dist_threshold = scipy.stats.hmean(distances) + n_irq * scipy.stats.iqr(distances)
 
     with config.tqdm(total=len(target), desc='Predicting',
                      disable=config.pbar_hide,
