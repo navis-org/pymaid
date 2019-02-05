@@ -17,10 +17,13 @@
 """ Collection of tools to turn CATMAID neurons into Graph representations.
 """
 
+from collections import OrderedDict
+import itertools
+import random
+
 import numpy as np
 import networkx as nx
 import pandas as pd
-import random
 
 try:
     import igraph
