@@ -53,7 +53,8 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
                         Either pass directly to function or define globally
                         as ``remote_instance``.
     threshold :         int, optional
-                        Connections weaker than this will be excluded.
+                        Connections weaker than this will be excluded. Must
+                        not be < 1!
     group_by :          None | dict, optional
                         Provide a dictionary ``{group_name: [skid1, skid2, ...]}``
                         to collapse sets of nodes into groups.
@@ -87,7 +88,6 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
     >>> plt.show()
 
     """
-
     if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str)):
         remote_instance = utils._eval_remote_instance(remote_instance)
         skids = utils.eval_skids(x, remote_instance=remote_instance)
@@ -106,7 +106,7 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
             except BaseException:
                 pass
         # Generate edge list
-        edges = [[str(s), str(t), {'weight': x.loc[s, t]}]
+        edges = [[str(s), str(t), {'weight': float(x.loc[s, t])}]
                  for s in x.index.values for t in x.columns.values if x.loc[s, t] >= threshold]
     else:
         raise ValueError(
@@ -114,7 +114,7 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
 
     # Generate node dictionary
     names = fetch.get_names(skids, remote_instance=remote_instance)
-    nodes = [[str(s), {'neuron_name': names.get(s, s)}] for s in skids]
+    nodes = [[str(s), {'neuron_name': names.get(str(s), s)}] for s in skids]
 
     # Generate graph and assign custom properties
     g = nx.DiGraph()
