@@ -1838,7 +1838,17 @@ class CatmaidNeuronList:
         return self.summary().mean(numeric_only=True)
 
     def sample(self, N=1):
-        """Returns random subset of neurons."""
+        """Returns random subset of neurons.
+
+        Parameters
+        ----------
+        N :     int | float
+                If int >= 1, will return N neurons. If float < 1, will return
+                fraction of total neurons.
+        """
+        if N < 1:
+            N = int(len(self.neurons) * N)
+
         indices = list(range(len(self.neurons)))
         random.shuffle(indices)
         return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]],
