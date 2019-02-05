@@ -2996,9 +2996,9 @@ class Volume:
         Returns
         -------
         :class:`pymaid.Volume`
-                    Resized copy of original volume. Only if ``inplace=True``.
+                    Resized copy of original volume. Only if ``inplace=False``.
         None
-                    If ``inplace=False``.
+                    If ``inplace=True``.
         """
 
         perm_methods = ['center', 'origin', 'normals', 'centroid']
