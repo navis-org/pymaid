@@ -153,7 +153,8 @@ def network2igraph(x, remote_instance=None, threshold=1):
                         Either pass directly to function or define globally
                         as 'remote_instance'.
     threshold :         int, optional
-                        Connections weaker than this will be excluded .
+                        Connections weaker than this will be excluded. Must
+                        not be < 1!
 
     Returns
     -------
@@ -191,16 +192,20 @@ def network2igraph(x, remote_instance=None, threshold=1):
         # Reformat into igraph format
         edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
                           for e in edges[edges.weight >= threshold].itertuples()]
-        weight = edges[edges.weight >= threshold].weight.tolist()
+        weight = edges[edges.weight >= threshold].weight.values
     elif isinstance(x, pd.DataFrame):
-        skids = list(set(x.columns.tolist() + x.index.tolist()))
+        # Map skid to index
+        skids_map = OrderedDict({s: i for i, s in enumerate(set(x.columns) | set(x.index))})
+        skids = list(skids_map.keys())
         # Generate edge list
-        edges = [[i, j] for i in x.index.tolist()
-                 for j in x.columns.tolist() if x.loc[i, j] >= threshold]
-        edges_by_index = [
-            [skids.index(e[0]), skids.index(e[1])] for e in edges]
-        weight = [x.loc[i, j] for i in range(x.shape[0]) for j in range(
-            x.shape[1]) if x.loc[i, j] >= threshold]
+        edges = np.array(list(itertools.product(x.index, x.columns)))
+        # Get edge weights
+        weight = np.ravel(x, order='C')
+        # Filter edges by weight
+        edges = edges[weight >= threshold]
+        weight = weight[weight >= threshold]
+        # Turn edges into indices
+        edges_by_index = [[skids_map[n] for n in e] for e in edges]
     else:
         raise ValueError(
             'Unable to process data of type "{0}"'.format(type(x)))
