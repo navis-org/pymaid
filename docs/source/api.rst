@@ -397,6 +397,7 @@ Selections
 
     pymaid.b3d.handler.select
 
+    pymaid.b3d.object_list.set
     pymaid.b3d.object_list.select
     pymaid.b3d.object_list.color
     pymaid.b3d.object_list.colorize
@@ -406,6 +407,7 @@ Selections
     pymaid.b3d.object_list.bevel
     pymaid.b3d.object_list.hide
     pymaid.b3d.object_list.unhide
+    pymaid.b3d.object_list.render
     pymaid.b3d.object_list.hide_others
     pymaid.b3d.object_list.delete
     pymaid.b3d.object_list.to_json
