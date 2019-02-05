@@ -407,8 +407,8 @@ Selections
     pymaid.b3d.object_list.bevel
     pymaid.b3d.object_list.hide
     pymaid.b3d.object_list.unhide
-    pymaid.b3d.object_list.render
     pymaid.b3d.object_list.hide_others
+    pymaid.b3d.object_list.render
     pymaid.b3d.object_list.delete
     pymaid.b3d.object_list.to_json
 
@@ -476,4 +476,6 @@ Utility
     pymaid.set_loggers
     pymaid.eval_skids
     pymaid.shorten_name
+    pymaid.transfer_neuron
+    pymaid.import_neuron
 
