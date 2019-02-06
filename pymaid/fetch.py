@@ -5429,9 +5429,9 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     if isinstance(new_names, dict):
         # First make sure that dictionary maps strings
-        _ = {str(n): new_names[n] for n in new_names}
+        temp = {str(n): new_names[n] for n in new_names}
         # Generate a list from the dict
-        new_names = [_[n] for n in x if n in _]
+        new_names = [temp[n] for n in x if n in temp]
     elif not isinstance(new_names, (list, np.ndarray)):
         new_names = [new_names]
 
