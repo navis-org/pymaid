@@ -4286,7 +4286,7 @@ def get_history(remote_instance=None,
     data = []
     for r in config.tqdm(rounds, desc='Retrieving history',
                          disable=config.pbar_hide, leave=config.pbar_leave):
-        get_history_GET_data = {'self.project_id': remote_instance.project_id,
+        get_history_GET_data = {'pid': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
                                 }
