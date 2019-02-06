@@ -36,6 +36,9 @@
 #     -> for line visuals, `.pos` contains all points of that visual
 # [x] make ctrl-click display a marker at given position
 # [ ] keyboard shortcut to toggle volumes
+# [ ] add lasso/rectangle selection (complicated)
+# [ ] shortcut to toggle connectors
+# [ ]
 
 import uuid
 import platform
@@ -163,7 +166,7 @@ class Browser:
 
         Parameters
         ----------
-        x :         skeleton IDs | CatmaidNeuron/List | Dotprops | Volumes | Points | vispy Visuals
+        x :         skeleton IDs | CatmaidNeuron/List | Dotprops | Volumes | Points | vispy visuals
                     Object(s) to add to the canvas.
         viewer :    int | slice, optional
                     Index of the viewer to add object to.
@@ -354,10 +357,16 @@ class Viewer:
 
         # Cycle mode can be 'hide' or 'alpha'
         self._cycle_mode = 'alpha'
+        self.active_neuron = []
 
         # Cursors
         self._cursor = None
         self._picking_radius = 20
+
+        # Labels
+        self._labelmap = {}
+        self._labels = {}
+        self.label_mode = False        
 
     def _draw_overlay(self):
         overlay = vp.scene.widgets.ViewBox(parent=self.canvas.scene)
@@ -967,6 +976,8 @@ class Viewer:
                              '"{}". Use "hide" or '
                              '"alpha"!'.format(self._cycle_mode))
 
+        self.active_neuron = to_show
+
     def _draw_fps(self, fps):
         """ Callback for ``canvas.measure_fps``. """
         self._fps_text.text = '{:.2f} FPS'.format(fps)
@@ -1148,6 +1159,54 @@ class Viewer:
         # This is necessary to force a redraw
         self.camera3d.set_range()
 
+    def label_setup(self, labels):
+        """ Quickly label neurons.
+
+        Binds keys to labels. Pressing a label key will add this label
+        as `.label` property to the neuron and cycle to the next neuron.
+
+        Parameters
+        ----------
+        labels :    dict
+                    Dictionary mapping keys to labels. Must not use keys
+                    already in use.
+
+        Examples
+        --------
+        >>> # Add neurons to viewer
+        >>> nl = pymaid.get_neurons('annotation:WTPN2017_mlALT_right')
+        >>> v = pymaid.Viewer()
+        >>> v.add(nl)
+        >>> # Bind keys to labels
+        >>> v.label_setup({'n': 'PN', 'm': 'notPN'})
+        >>> # Now use keys "n" and "m" to assign labels
+        >>> # Subset by applied labels
+        >>> pns = nl.skid[v.labels['PN']]
+        """
+
+        if not isinstance(labels, dict):
+            raise TypeError('Expected dict, got "{}"'.format(type(labels)))
+
+        self._labelmap = labels
+        self.label_mode = True
+        self._labels = {}
+        self._cycle_neurons(0)
+
+    @property
+    def labels(self):
+        """ Manually assigned labels. See :func:`pymaid.Viewer.label_setup`."""
+        return {l : [n for n, k in self._labels.items() if k==l] for l in self._labelmap.values()}    
+
+    def _label(self, key):
+        """ Checks event key against annotations, adds annotation to neuron
+        and cycles to the next neuron.
+        """
+        if self.label_mode:                        
+            if key in self._labelmap:
+                l = self._labelmap[key]
+                self._labels.update({n: l for n in self.active_neuron})
+                self._cycle_neurons(1)
+
 
 def on_mouse_press(event):
     """ Manage picking on canvas. """
@@ -1200,6 +1259,8 @@ def on_key_press(event):
     canvas = event.source
     viewer = canvas._wrapper
 
+    logger.debug('Key pressed: {0}'.format(event.text))
+
     if event.text.lower() == 'o':
         viewer.toggle_overlay()
     elif event.text.lower() == 'l':
@@ -1226,6 +1287,9 @@ def on_key_press(event):
         viewer.set_view('YZ')
     elif event.text.lower() == 'c':
         viewer.url_to_cursor(open_browser=True)
+    # If none of the above, trigger viewer label
+    else:
+        viewer._label(event.text.lower())
 
 
 def on_resize(event):
