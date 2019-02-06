@@ -678,8 +678,8 @@ class CatmaidInstance:
 
     def _delete_neuron_url(self, neuron_id, **GET):
         """ Use to parse url for deleting a single neurons"""
-        return self.make_url(self.project_id, 'label', 'treenode', treenode_id,
-                             'update', **GET)
+        return self.make_url(self.project_id, 'neuron', neuron_id, 'delete',
+                             **GET)
 
     def _delete_treenode_url(self, **GET):
         """ Use to parse url for deleting treenodes"""
