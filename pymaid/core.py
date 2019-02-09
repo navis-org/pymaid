@@ -2790,7 +2790,7 @@ class Volume:
 
     """
 
-    def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def __init__(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         self.name = name
         self.vertices = vertices
@@ -2799,7 +2799,7 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def from_csv(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def from_csv(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         """ Load volume from csv files containing vertices and faces.
 
@@ -2849,7 +2849,7 @@ class Volume:
                 writer.writerows(data)
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
+    def combine(self, x, name='comb_vol', color=(1, 1, 1, .1)):
         """ Merges multiple volumes into a single object.
 
         Parameters
