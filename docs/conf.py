@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.abspath('../..'))
 import mock
 MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'bpy', 'bmesh',
                 'pyoctree', 'PyQt5', 'pyqt5', 'scipy.sparse', 'scipy.cluster',
+                'scipy.stats',
                 'scipy.cluster.hierarchy', 'scipy.interpolate', 'scipy.spatial.distance',
                 'numpy', 'scipy', 'scipy.spatial', 'ConvexHull', 'scipy.spatial.ConvexHull',
                 'rpy2', 'rpy2.robjects', 'rpy2.robjects.packages', 'png',

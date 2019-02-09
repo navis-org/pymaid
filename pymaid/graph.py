@@ -17,10 +17,13 @@
 """ Collection of tools to turn CATMAID neurons into Graph representations.
 """
 
+from collections import OrderedDict
+import itertools
+import random
+
 import numpy as np
 import networkx as nx
 import pandas as pd
-import random
 
 try:
     import igraph
@@ -53,7 +56,8 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
                         Either pass directly to function or define globally
                         as ``remote_instance``.
     threshold :         int, optional
-                        Connections weaker than this will be excluded.
+                        Connections weaker than this will be excluded. Must
+                        not be < 1!
     group_by :          None | dict, optional
                         Provide a dictionary ``{group_name: [skid1, skid2, ...]}``
                         to collapse sets of nodes into groups.
@@ -87,7 +91,6 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
     >>> plt.show()
 
     """
-
     if isinstance(x, (core.CatmaidNeuronList, list, np.ndarray, str)):
         remote_instance = utils._eval_remote_instance(remote_instance)
         skids = utils.eval_skids(x, remote_instance=remote_instance)
@@ -106,7 +109,7 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
             except BaseException:
                 pass
         # Generate edge list
-        edges = [[str(s), str(t), {'weight': x.loc[s, t]}]
+        edges = [[str(s), str(t), {'weight': float(x.loc[s, t])}]
                  for s in x.index.values for t in x.columns.values if x.loc[s, t] >= threshold]
     else:
         raise ValueError(
@@ -114,7 +117,7 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
 
     # Generate node dictionary
     names = fetch.get_names(skids, remote_instance=remote_instance)
-    nodes = [[str(s), {'neuron_name': names.get(s, s)}] for s in skids]
+    nodes = [[str(s), {'neuron_name': names.get(str(s), s)}] for s in skids]
 
     # Generate graph and assign custom properties
     g = nx.DiGraph()
@@ -153,7 +156,8 @@ def network2igraph(x, remote_instance=None, threshold=1):
                         Either pass directly to function or define globally
                         as 'remote_instance'.
     threshold :         int, optional
-                        Connections weaker than this will be excluded .
+                        Connections weaker than this will be excluded. Must
+                        not be < 1!
 
     Returns
     -------
@@ -191,16 +195,20 @@ def network2igraph(x, remote_instance=None, threshold=1):
         # Reformat into igraph format
         edges_by_index = [[indices[e.source_skid], indices[e.target_skid]]
                           for e in edges[edges.weight >= threshold].itertuples()]
-        weight = edges[edges.weight >= threshold].weight.tolist()
+        weight = edges[edges.weight >= threshold].weight.values
     elif isinstance(x, pd.DataFrame):
-        skids = list(set(x.columns.tolist() + x.index.tolist()))
+        # Map skid to index
+        skids_map = OrderedDict({s: i for i, s in enumerate(set(x.columns) | set(x.index))})
+        skids = list(skids_map.keys())
         # Generate edge list
-        edges = [[i, j] for i in x.index.tolist()
-                 for j in x.columns.tolist() if x.loc[i, j] >= threshold]
-        edges_by_index = [
-            [skids.index(e[0]), skids.index(e[1])] for e in edges]
-        weight = [x.loc[i, j] for i in range(x.shape[0]) for j in range(
-            x.shape[1]) if x.loc[i, j] >= threshold]
+        edges = np.array(list(itertools.product(x.index, x.columns)))
+        # Get edge weights
+        weight = np.ravel(x, order='C')
+        # Filter edges by weight
+        edges = edges[weight >= threshold]
+        weight = weight[weight >= threshold]
+        # Turn edges into indices
+        edges_by_index = [[skids_map[n] for n in e] for e in edges]
     else:
         raise ValueError(
             'Unable to process data of type "{0}"'.format(type(x)))

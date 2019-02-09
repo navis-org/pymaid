@@ -1838,7 +1838,17 @@ class CatmaidNeuronList:
         return self.summary().mean(numeric_only=True)
 
     def sample(self, N=1):
-        """Returns random subset of neurons."""
+        """Returns random subset of neurons.
+
+        Parameters
+        ----------
+        N :     int | float
+                If int >= 1, will return N neurons. If float < 1, will return
+                fraction of total neurons.
+        """
+        if N < 1:
+            N = int(len(self.neurons) * N)
+
         indices = list(range(len(self.neurons)))
         random.shuffle(indices)
         return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]],
@@ -2780,7 +2790,7 @@ class Volume:
 
     """
 
-    def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def __init__(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         self.name = name
         self.vertices = vertices
@@ -2789,7 +2799,7 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def from_csv(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def from_csv(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         """ Load volume from csv files containing vertices and faces.
 
@@ -2839,7 +2849,7 @@ class Volume:
                 writer.writerows(data)
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
+    def combine(self, x, name='comb_vol', color=(1, 1, 1, .1)):
         """ Merges multiple volumes into a single object.
 
         Parameters
@@ -2947,6 +2957,24 @@ class Volume:
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
 
+    def __truediv__(self, other):
+        """Implements division for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            return self.__mul__(1/other)
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Implements multiplication for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            v = self.copy()
+            v.vertices *= other
+            return v
+        else:
+            return NotImplemented
+
     def resize(self, x, method='center', inplace=True):
         """ Resize volume.
 
@@ -2986,9 +3014,9 @@ class Volume:
         Returns
         -------
         :class:`pymaid.Volume`
-                    Resized copy of original volume. Only if ``inplace=True``.
+                    Resized copy of original volume. Only if ``inplace=False``.
         None
-                    If ``inplace=False``.
+                    If ``inplace=True``.
         """
 
         perm_methods = ['center', 'origin', 'normals', 'centroid']

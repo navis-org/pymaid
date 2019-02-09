@@ -626,8 +626,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
 
     Important
     ---------
-    This import assumes coordinates in SWC are in microns and will convert to
-    nanometers! Soma is inferred from radius (>0), not the label.
+    Soma is inferred from radius (>0), not the label.
 
     Parameters
     ----------
@@ -636,7 +635,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                         ``.swc`` files.
     neuronname :        str, optional
                         Name to use for the neuron. If not provided, will use
-                        filename.
+                        filename minus extension.
     neuron_id :         int, optional
                         Unique identifier (essentially skeleton ID). If not
                         provided, will generate one from scratch.
@@ -671,7 +670,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
         #neuron_id = uuid.uuid4().int
 
     if not neuron_name:
-        neuron_name = os.path.basename(f)
+        neuron_name = os.path.splitext(os.path.basename(f))[0]
 
     data = []
     with open(f) as file:
@@ -685,13 +684,22 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                 data.append(row)
 
     # Remove empty entries and generate nodes DataFrame
-    nodes = pd.DataFrame([[float(e) for e in row if e != ''] for row in data],
+    nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
                          columns=['treenode_id', 'label', 'x', 'y', 'z',
                                   'radius', 'parent_id'],
                          dtype=object)
 
-    # Root node will have parent=-1 -> set this to None
-    nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
+    # If any invalid nodes are found
+    if any(nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull()):
+        # Remove nodes without coordinates
+        nodes = nodes.loc[~nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull().any(axis=1)]    
+
+        # Because we removed nodes, we'll have to run a more complicated root
+        # detection
+        nodes.loc[~nodes.parent_id.isin(nodes.treenode_id), 'parent_id'] = None
+    else:
+        # Root node will have parent=-1 -> set this to None
+        nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
 
     connectors = pd.DataFrame([], columns=['treenode_id', 'connector_id',
                                            'relation', 'x', 'y', 'z'],
@@ -734,8 +742,8 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # Convert data to respective dtypes
     dtypes = {'treenode_id': int, 'parent_id': object,
               'creator_id': int, 'relation': int,
-              'connector_id': object, 'x': int, 'y': int, 'z': int,
-              'radius': int, 'confidence': int}
+              'connector_id': object, 'x': float, 'y': float, 'z': float,
+              'radius': float, 'confidence': int}
 
     for k, v in dtypes.items():
         for t in ['nodes', 'connectors']:
@@ -1057,3 +1065,11 @@ def transfer_neuron(x, source_instance, target_instance):
 
     return fetch.import_neuron(n, remote_instance=target_instance)
 
+
+def to_float(x):
+    """ Helper to try to convert to float.
+    """
+    try: 
+        return float(x)
+    except:
+        return None

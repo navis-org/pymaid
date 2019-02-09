@@ -23,6 +23,7 @@ from itertools import combinations
 import pandas as pd
 import numpy as np
 import scipy.spatial
+import scipy.stats
 
 from . import fetch, core, intersect, utils, config, graph_utils
 
@@ -359,18 +360,20 @@ def predict_connectivity(source, target, method='possible_contacts',
                     1. For method 'possible_contacts':
                         - ``dist`` to set distance between connectors and
                           treenodes manually.
-                        - ``stdev`` to set number of standard-deviations of
-                          average distance. Default = 2.
+                        - ``n_irq`` to set number of interquartile ranges of
+                          harmonic mean. Default = 2.
 
     Notes
     -----
     Method ``possible_contacts``:
-        1. Calculating mean distance ``d`` (connector->treenode) at which
-           connections between neurons A and neurons B occur.
-        2. For all presynapses of neurons A, check if they are within ``stdev``
-           (default=2) standard deviations of ``d`` of a neurons B treenode.
-        3. Neurons without cable or presynapses will have a predicted
-           connectivity of 0.
+        1. Calculating harmonic mean of distances ``d`` (connector->treenode)
+            at which onnections between neurons A and neurons B occur.
+        2. For all presynapses of neurons A, check if they are within
+           ``n_irq`` (default=2) interquartile range  of ``d`` of a
+           neuron B treenode.
+
+    Neurons without cable or presynapses will be assigned a predicted
+    connectivity of 0.
 
 
     Returns
@@ -435,11 +438,13 @@ def predict_connectivity(source, target, method='possible_contacts',
                        'connector->treenode distance found. Falling'
                        'back to default of 1um. Use <stdev> argument'
                        'to set manually.')
-        distances = 1000
+        distances = [1000]
 
     # Calculate distances threshold
-    n_std = kwargs.get('n_std', 2)
-    dist_threshold = np.mean(distances) + n_std * np.std(distances)
+    n_irq = kwargs.get('n_irq', 2)
+    # We use the median because some very large connector->treenode
+    # distances can massively skew the average
+    dist_threshold = scipy.stats.hmean(distances) + n_irq * scipy.stats.iqr(distances)
 
     with config.tqdm(total=len(target), desc='Predicting',
                      disable=config.pbar_hide,
@@ -454,7 +459,7 @@ def predict_connectivity(source, target, method='possible_contacts',
             tree = scipy.spatial.cKDTree(
                 t.nodes[['x', 'y', 'z']].values, leafsize=10)
             for s in source:
-                # If not synapses, predict 0 connectivity and skip                
+                # If not synapses, predict 0 connectivity and skip
                 if s.presynapses.empty:
                     matrix.at[s.skeleton_id, t.skeleton_id] = 0
                     continue
@@ -1172,11 +1177,11 @@ def sparseness(x, which='LTS'):
 
     **Lifetime kurtosis (LTK)** quantifies the widths of tuning curves
     (according to Muench & Galizia, 2016):
-    
+
     .. math::
 
         S = \\Bigg\\{ \\frac{1}{N} \\sum^M_{i=1} \\Big[ \\frac{r_i - \\overline{r}}{\\sigma_r} \\Big] ^4  \\Bigg\\} - 3
-    
+
     where :math:`N` is the number of observations, :math:`r_i` the value of
     observation :math:`i`, and :math:`\\overline{r}` and
     :math:`\\sigma_r` the mean and the standard deviation of the observations'
@@ -1187,10 +1192,10 @@ def sparseness(x, which='LTS'):
     (Bhandawat et al., 2007):
 
     .. math::
-        
+
         S = \\frac{1}{1-1/N} \\Bigg[1- \\frac{\\big(\\sum^N_{j=1} r_j / N\\big)^2}{\\sum^N_{j=1} r_j^2 / N} \\Bigg]
 
-    where :math:`N` is the number of observations, and :math:`r_j` is the 
+    where :math:`N` is the number of observations, and :math:`r_j` is the
     value of an observation.
 
     Notes
@@ -1204,7 +1209,7 @@ def sparseness(x, which='LTS'):
     ----------
     x :         DataFrame | array-like
                 (N, M) dataset with N (rows) observations for M (columns)
-                neurons. One-dimensional data will be converted to two 
+                neurons. One-dimensional data will be converted to two
                 dimensions (N rows, 1 column).
     which :     "LTS" | "LTK"
                 Determines whether lifetime sparseness (LTS) or lifetime
@@ -1214,7 +1219,7 @@ def sparseness(x, which='LTS'):
     -------
     sparseness
                 ``pandas.Series`` if input was pandas DataFrame, else
-                ``numpy.array``. 
+                ``numpy.array``.
 
     Examples
     --------
@@ -1227,11 +1232,11 @@ def sparseness(x, which='LTS'):
     ...                               t='annotation:ASB LHN')
     >>> # Calculate lifetime sparseness
     >>> S = pymaid.sparseness(adj, which='LTS')
-    >>> # Plot distribution    
+    >>> # Plot distribution
     >>> ax = S.plot.hist(bins=np.arange(0, 1, .1))
     >>> ax.set_xlabel('LTS')
     >>> plt.show()
-    
+
     """
 
     if not isinstance(x, (pd.DataFrame, np.ndarray)):
@@ -1239,7 +1244,7 @@ def sparseness(x, which='LTS'):
 
     # Make sure we are working with 2 dimensional data
     if isinstance(x, np.ndarray) and x.ndim == 1:
-        x = x.reshape(x.shape[0], 1)    
+        x = x.reshape(x.shape[0], 1)
 
     N = np.sum(~np.isnan(x), axis=0)
 
