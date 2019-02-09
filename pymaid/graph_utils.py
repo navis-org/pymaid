@@ -848,8 +848,12 @@ def reroot_neuron(x, new_root, inplace=False):
     else:
         # If this NetworkX graph is just an (immutable) view, turn it into a
         # full, independent graph
-        if isinstance(x.graph, nx.classes.graphviews.ReadOnlyGraph):
+        if float(nx.__version__) < 2.2:
+            if isinstance(x.graph, nx.classes.graphviews.ReadOnlyGraph):
+                x.graph = nx.DiGraph(x.graph)
+        elif hasattr(x.graph, '_NODE_OK'):
             x.graph = nx.DiGraph(x.graph)
+
         g = x.graph
 
         # Walk from new root to old root and remove edges along the way
@@ -1372,7 +1376,7 @@ def connected_subgraph(x, ss):
     np.ndarray
                 Treenode IDs of connected subgraph.
     root ID
-                ID of the treenode most proximal to the old root in the 
+                ID of the treenode most proximal to the old root in the
                 connected subgraph.
 
     """
@@ -1431,6 +1435,6 @@ def connected_subgraph(x, ss):
         # Add those nodes to be included
         include = set.union(include, ss)
     else:
-        new_root = first_common    
+        new_root = first_common
 
     return np.array(list(include)), new_root
