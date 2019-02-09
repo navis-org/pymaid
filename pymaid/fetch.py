@@ -5638,8 +5638,8 @@ def import_neuron(x, remote_instance=None):
                                                   remote_instance=remote_instance)
                     for n in config.tqdm(x,
                                          desc='Import',
-                                         disable=disable_pbar,
-                                         leave=leave_pbar)}
+                                         disable=config.pbar_hide,
+                                         leave=config.pbar_leave)}
 
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))    
