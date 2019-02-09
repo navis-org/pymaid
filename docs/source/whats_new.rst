@@ -10,6 +10,13 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.93
+     - 05/02/19
+     - - various improvements to the Blender interface ``pymaid.b3d``
+       - improved :func:`~pymaid.predict_connectivity`
+       - new functions to import/transfer neurons to/between Catmaid instances: :func:`pymaid.import_neuron` and :func:`pymaid.transfer_neuron`
+       - new function :func:`pymaid.sparseness` to calculate lifetime sparseness
+       - tons of bug fixes
    * - 0.92
      - 06/11/18
      - - new pymaid.Volume methods: ``to_csv`` and ``from_csv``

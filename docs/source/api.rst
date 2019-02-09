@@ -31,7 +31,7 @@ Annotations
 
     pymaid.add_annotations
     pymaid.add_meta_annotations
-    pymaid.get_annotations    
+    pymaid.get_annotations
     pymaid.get_annotation_details
     pymaid.get_annotated
     pymaid.get_user_annotations
@@ -76,6 +76,7 @@ Connectivity
     pymaid.get_paths
     pymaid.adjacency_from_connectors
     pymaid.cn_table_from_connectors
+    pymaid.sparseness
 
 User stats
 ----------
@@ -181,6 +182,21 @@ CatmaidNeuronList-specific
     pymaid.CatmaidNeuronList.sort_values
 
 
+Volumes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.Volume
+    pymaid.Volume.resize
+    pymaid.Volume.combine
+    pymaid.Volume.from_csv
+    pymaid.Volume.to_csv
+    pymaid.Volume.plot3d
+    pymaid.Volume.to_2d
+    pymaid.Volume.to_trimesh
+
+
 .. _api_plot:
 
 Plotting
@@ -197,7 +213,6 @@ Plotting
     pymaid.close3d
     pymaid.get_viewer
     pymaid.screenshot
-    pymaid.Volume
 
 Vispy 3D viewer
 
@@ -382,6 +397,7 @@ Selections
 
     pymaid.b3d.handler.select
 
+    pymaid.b3d.object_list.set
     pymaid.b3d.object_list.select
     pymaid.b3d.object_list.color
     pymaid.b3d.object_list.colorize
@@ -392,6 +408,7 @@ Selections
     pymaid.b3d.object_list.hide
     pymaid.b3d.object_list.unhide
     pymaid.b3d.object_list.hide_others
+    pymaid.b3d.object_list.render
     pymaid.b3d.object_list.delete
     pymaid.b3d.object_list.to_json
 
@@ -459,4 +476,6 @@ Utility
     pymaid.set_loggers
     pymaid.eval_skids
     pymaid.shorten_name
+    pymaid.transfer_neuron
+    pymaid.import_neuron
 

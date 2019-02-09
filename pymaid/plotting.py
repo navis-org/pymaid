@@ -1032,6 +1032,8 @@ def plot3d(x, **kwargs):
     plotly_inline :   bool, default=True
                       If True and you are in an Jupyter environment, will
                       render plotly plots inline.
+    soma :            bool, default=True
+                      If True, will try plotting soma (if exists).
 
     Returns
     --------
@@ -1111,7 +1113,7 @@ def plot3d(x, **kwargs):
         if volumes:
             viewer.add(volumes, **kwargs)
         if points:
-            viewer.add(points, **scatter_kws)
+            viewer.add(points, scatter_kws=scatter_kws)
 
         return viewer
 
@@ -1140,8 +1142,6 @@ def plot3d(x, **kwargs):
             if not connectors_only:
                 if by_strahler:
                     s_index = morpho.strahler_index(neuron, return_dict=True)
-
-                soma = neuron.nodes[neuron.nodes.radius > 1]
 
                 coords = _segments_to_coords(
                     neuron, neuron.segments, modifier=(-1, -1, -1))
@@ -1181,23 +1181,24 @@ def plot3d(x, **kwargs):
                                                ))
 
                 # Add soma(s):
-                for n in soma.itertuples():
-                    try:
-                        c = 'rgb{}'.format(neuron_cmap[i])
-                    except BaseException:
-                        c = 'rgb(10,10,10)'
-                    trace_data.append(go.Mesh3d(
-                        x=[(v[0] * n.radius / 2) - n.x for v in fib_points],
-                        # y and z are switched
-                        y=[(v[1] * n.radius / 2) - n.z for v in fib_points],
-                        z=[(v[2] * n.radius / 2) - n.y for v in fib_points],
+                if kwargs.get('soma', True):                
+                    for n in neuron.nodes[neuron.nodes.treenode_id == neuron.soma].itertuples():
+                        try:
+                            c = 'rgb{}'.format(neuron_cmap[i])
+                        except BaseException:
+                            c = 'rgb(10,10,10)'
+                        trace_data.append(go.Mesh3d(
+                            x=[(v[0] * n.radius / 2) - n.x for v in fib_points],
+                            # y and z are switched
+                            y=[(v[1] * n.radius / 2) - n.z for v in fib_points],
+                            z=[(v[2] * n.radius / 2) - n.y for v in fib_points],
 
-                        alphahull=.5,
-                        color=c,
-                        name=neuron_name,
-                        legendgroup=neuron_name,
-                        showlegend=False,
-                        hoverinfo='name'))
+                            alphahull=.5,
+                            color=c,
+                            name=neuron_name,
+                            legendgroup=neuron_name,
+                            showlegend=False,
+                            hoverinfo='name'))
 
             if connectors or connectors_only:
                 for j in [0, 1, 2]:
@@ -2150,7 +2151,7 @@ def _neuron2vispy(x, **kwargs):
                                            # Can only be used with method 'agg'
                                            width=kwargs.get('linewidth', 1),
                                            connect='segments',
-                                           antialias=False,
+                                           antialias=True,
                                            method='gl')
                     # method can also be 'agg' -> has to use connect='strip'
                     # Make visual discoverable
@@ -2196,31 +2197,32 @@ def _neuron2vispy(x, **kwargs):
                 # Convert array back to a single color without alpha
                 neuron_color = neuron_color[0][:3]
 
-            # Extract and plot soma
-            soma = neuron.nodes[neuron.nodes.radius > 1]
-            if soma.shape[0] >= 1:
-                radius = soma.ix[soma.index[0]].radius
-                sp = create_sphere(7, 7, radius=radius)
-                verts = sp.get_vertices() + soma.ix[soma.index[0]][['x', 'y', 'z']].values
-                s = scene.visuals.Mesh(vertices=verts,
-                                       shading='smooth',
-                                       faces=sp.get_faces(),
-                                       color=neuron_color)
-                s.ambient_light_color = vispy.color.Color('white')
+            if kwargs.get('soma', True):
+                # Extract and plot soma
+                soma = neuron.nodes[neuron.nodes.radius > 1]
+                if soma.shape[0] >= 1:
+                    radius = soma.ix[soma.index[0]].radius
+                    sp = create_sphere(7, 7, radius=radius)
+                    verts = sp.get_vertices() + soma.ix[soma.index[0]][['x', 'y', 'z']].values
+                    s = scene.visuals.Mesh(vertices=verts,
+                                           shading='smooth',
+                                           faces=sp.get_faces(),
+                                           color=neuron_color)
+                    s.ambient_light_color = vispy.color.Color('white')
 
-                # Make visual discoverable
-                s.interactive = True
+                    # Make visual discoverable
+                    s.interactive = True
 
-                # Add custom attributes
-                s.unfreeze()
-                s._object_type = 'neuron'
-                s._neuron_part = 'soma'
-                s._skeleton_id = neuron.skeleton_id
-                s._neuron_name = neuron.neuron_name
-                s._object_id = object_id
-                s.freeze()
+                    # Add custom attributes
+                    s.unfreeze()
+                    s._object_type = 'neuron'
+                    s._neuron_part = 'soma'
+                    s._skeleton_id = neuron.skeleton_id
+                    s._neuron_name = neuron.neuron_name
+                    s._object_id = object_id
+                    s.freeze()
 
-                visuals.append(s)
+                    visuals.append(s)
 
         if kwargs.get('connectors', False) or kwargs.get('connectors_only',
                                                          False):

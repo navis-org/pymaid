@@ -748,7 +748,8 @@ class TestConnectivity(unittest.TestCase):
         self.cn_table = pymaid.get_partners(config_test.test_skids[0],
                                             remote_instance=self.rm)
 
-        self.nB = pymaid.get_neuron(self.cn_table.iloc[0].skeleton_id,
+        # Must be downstream for predict_connectivity
+        self.nB = pymaid.get_neuron(self.cn_table[self.cn_table.relation=='downstream'].iloc[0].skeleton_id,
                                     remote_instance=self.rm)
 
         self.adj = pymaid.adjacency_matrix(

@@ -124,7 +124,8 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
 
     """
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
 
     # If we are given multiple volumes
     if isinstance(volume, (list, dict, np.ndarray)):
@@ -195,8 +196,8 @@ def _in_volume_ray(points, volume):
 
     if not tree:
         # Create octree from scratch
-        tree = pyoctree.PyOctree(np.array(volume.vertices, dtype=float),
-                                 np.array(volume.faces, dtype=np.int32)
+        tree = pyoctree.PyOctree(np.array(volume.vertices, dtype=float, order='C'),
+                                 np.array(volume.faces, dtype=np.int32, order='C')
                                  )
         volume.pyoctree = tree
 

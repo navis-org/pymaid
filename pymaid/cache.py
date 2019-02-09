@@ -79,7 +79,7 @@ class Cache(OrderedDict):
 
         return resp
 
-    def get_cached_url(self, url, future, post=None):
+    def get_cached_url(self, url, future, post=None, files=None):
         """ Looks for cached url.
 
         If not cached, will return request futures for fetching the data from
@@ -90,9 +90,9 @@ class Cache(OrderedDict):
             return _mock_future(self.__getitem__((url, str(post))))
         except KeyError:
             if post:
-                return future.post(url, data=post)
+                return future.post(url, data=post, files=files)
             else:
-                return future.get(url, params=None)
+                return future.get(url, params=None, files=files)
 
     def clear_cached_url(self, url, post=None):
         """ Clears cached url for given url. """
@@ -196,11 +196,11 @@ def wipe_and_retry(function):
             # Execute function the first time (make sure no new data is added
             # if exception is raised)
             res = undo_on_error(function)(*args, **kwargs)
-        except BaseException:
+        except BaseException:            
             # If caching is on, try the function without caching
-            if rm.caching:
+            if rm.caching:                
                 # If function failed without even using cached data, raise
-                if not set(rm._cache.request_log[n_queries:]) & old_cache:
+                if not set(rm._cache.request_log[n_queries:]) & old_cache:                                        
                     raise
 
                 # Remove requested data before retrying
@@ -208,7 +208,7 @@ def wipe_and_retry(function):
                     if q in rm._cache:
                         rm._cache.pop(q)
 
-                logger.info('Failed using cached data. Cleaning cache and '
+                logger.info('Failed using cached data. Clearing cache and '
                             'retrying...')
 
                 # Retry function
