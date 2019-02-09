@@ -442,7 +442,7 @@ def neuron2r(neuron, convert_to_um=False):
         nlist.rownames = neuron.skeleton_id.tolist()
 
         df = robjects.DataFrame({'pid': robjects.IntVector([1] * neuron.shape[0]),
-                                 'skid': robjects.IntVector(neuron.skeleton_id.tolist()),
+                                 'skid': robjects.StrVector(neuron.skeleton_id.tolist()),
                                  'name': robjects.StrVector(neuron.neuron_name.tolist())
                                  })
         df.rownames = neuron.skeleton_id.tolist()
