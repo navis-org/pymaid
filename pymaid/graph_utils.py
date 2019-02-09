@@ -853,6 +853,8 @@ def reroot_neuron(x, new_root, inplace=False):
                 x.graph = nx.DiGraph(x.graph)
         elif hasattr(x.graph, '_NODE_OK'):
             x.graph = nx.DiGraph(x.graph)
+        elif nx.is_frozen(x.graph):
+            x.graph = nx.DiGraph(x.graph)
 
         g = x.graph
 
