@@ -1165,7 +1165,8 @@ def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
                           have "lost" their parent treenode.
     prevent_fragments :   bool, optional
                           If True, will add nodes to ``subset`` required to
-                          keep neuron from fragmenting.
+                          keep neuron from fragmenting. The new root will be
+                          the node closest to the original root.
     inplace :             bool, optional
                           If False, a copy of the neuron is returned.
 
@@ -1211,7 +1212,9 @@ def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
                          networkx.Graph, not "{0}"'.format(type(subset)))
 
     if prevent_fragments:
-        subset = connected_subgraph(x, subset)
+        subset, new_root = connected_subgraph(x, subset)
+    else:
+        new_root = None
 
     # Make a copy of the neuron
     if not inplace:
@@ -1252,6 +1255,9 @@ def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
     # Reset indices of data tables
     x.nodes.reset_index(inplace=True, drop=True)
     x.connectors.reset_index(inplace=True, drop=True)
+
+    if new_root:
+        x.reroot(new_root, inplace=True)
 
     # Clear temporary attributes
     if clear_temp:
@@ -1365,6 +1371,9 @@ def connected_subgraph(x, ss):
     -------
     np.ndarray
                 Treenode IDs of connected subgraph.
+    root ID
+                ID of the treenode most proximal to the old root in the 
+                connected subgraph.
 
     """
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
@@ -1376,16 +1385,14 @@ def connected_subgraph(x, ss):
     if missing:
         raise ValueError('Nodes not found: {}'.format(','.join(missing)))
 
-    # Turn neurons into an NetworkX graph
-    g = x.graph
-
-    # Find leaf nodes in subset (real and disconnected slabs)
+    # Find leaf nodes in subset (real leafs and simply disconnected slabs)
     ss_nodes = x.nodes[x.nodes.treenode_id.isin(ss)]
     leafs = ss_nodes[(ss_nodes.type == 'end')].treenode_id.values
     disconnected = x.nodes[(~x.nodes.treenode_id.isin(ss)) & (x.nodes.parent_id.isin(ss))]
     leafs = np.append(leafs, disconnected.parent_id.values)
 
     # Walk from each node to root and keep track of path
+    g = x.graph
     paths = []
     for n in leafs:
         this_path = []
@@ -1413,9 +1420,17 @@ def connected_subgraph(x, ss):
                 include.add(n)
                 break
             include.add(n)
-            n = next(it, None)            
+            n = next(it, None)
 
-    # Make sure to keep nodes that are even more distal to the common ancestor
-    include = set.union(include, ss)
+    # In cases where there are even more distal common ancestors
+    # (first common will typically be a branch point)
+    if set(ss) - set(include):
+        # Make sure the new root is set correctly
+        new_root = sorted(set(ss) - set(include),
+                          key=lambda x: longest_path.index(x))[-1]
+        # Add those nodes to be included
+        include = set.union(include, ss)
+    else:
+        new_root = first_common    
 
-    return np.array(list(include))
+    return np.array(list(include)), new_root

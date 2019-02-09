@@ -87,6 +87,11 @@ import scipy.cluster.hierarchy
 from . import (graph, morpho, fetch, graph_utils, resample, intersect,
                utils, config)
 
+try:
+    import trimesh
+except ImportError:
+    trimesh = None
+
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
 # Set up logging
@@ -1278,7 +1283,7 @@ class CatmaidNeuron:
     @classmethod
     def from_graph(self, g, **kwargs):
         """ Generate neuron object from NetworkX Graph.
-        
+
         This function will try to generate a neuron-like tree structure from
         the Graph. Therefore the graph may not contain loops!
 
@@ -1288,7 +1293,7 @@ class CatmaidNeuron:
         Parameters
         ----------
         g :         networkx.Graph | networkx.DiGraph
-        **kwargs 
+        **kwargs
                     Additional neuron parameters as keyword arguments.
                     For example, ``skeleton_id``, ``neuron_name``, etc.
 
@@ -1833,7 +1838,17 @@ class CatmaidNeuronList:
         return self.summary().mean(numeric_only=True)
 
     def sample(self, N=1):
-        """Returns random subset of neurons."""
+        """Returns random subset of neurons.
+
+        Parameters
+        ----------
+        N :     int | float
+                If int >= 1, will return N neurons. If float < 1, will return
+                fraction of total neurons.
+        """
+        if N < 1:
+            N = int(len(self.neurons) * N)
+
         indices = list(range(len(self.neurons)))
         random.shuffle(indices)
         return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]],
@@ -2753,12 +2768,12 @@ class Dotprops(pd.DataFrame):
 
 
 class Volume:
-    """ Class to hold CATMAID meshes.
+    """ Class representing CATMAID meshes.
 
     Parameters
     ----------
     vertices :  list | array
-                Vertices coordinates. Must be shape (N,3).
+                Vertices coordinates. Must be shape ``(N, 3)``.
     faces :     list | array
                 Indexed faceset.
     name :      str, optional
@@ -2768,12 +2783,6 @@ class Volume:
     volume_id : int, optional
                 CATMAID volume ID.
 
-    Attributes
-    ----------
-    bbox :      array
-                Bounding box of the volume.
-
-
     See Also
     --------
     :func:`~pymaid.get_volume`
@@ -2781,7 +2790,7 @@ class Volume:
 
     """
 
-    def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def __init__(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         self.name = name
         self.vertices = vertices
@@ -2790,7 +2799,7 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def from_csv(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def from_csv(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         """ Load volume from csv files containing vertices and faces.
 
@@ -2827,7 +2836,7 @@ class Volume:
         Parameters
         ----------
         filename :      str
-                        Filename to use. Will get a ``_vertices.csv`` and 
+                        Filename to use. Will get a ``_vertices.csv`` and
                         ``_faces.csv`` suffix.
         **kwargs
                         Keyword arguments passed to ``csv.reader``.
@@ -2837,10 +2846,10 @@ class Volume:
                                 ['_faces.csv', '_vertices.csv']):
             with open(filename + suffix, 'w') as csvfile:
                 writer = csv.writer(csvfile)
-                writer.writerows(data)    
+                writer.writerows(data)
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
+    def combine(self, x, name='comb_vol', color=(1, 1, 1, .1)):
         """ Merges multiple volumes into a single object.
 
         Parameters
@@ -2888,6 +2897,7 @@ class Volume:
 
     @property
     def vertices(self):
+        """Array (N, 3) of vertex coordinates. """
         return self.__vertices
 
     @vertices.setter
@@ -2911,7 +2921,7 @@ class Volume:
 
     @property
     def faces(self):
-        """Legacy access to ``.vertices``."""
+        """Array of vertex indices forming faces."""
         return self.__faces
 
     @faces.setter
@@ -2922,7 +2932,7 @@ class Volume:
 
     @property
     def center(self):
-        """ Center of mass."""
+        """ Center of volume as average over all vertices."""
         return np.mean(self.vertices, axis=0)
 
     def __deepcopy__(self):
@@ -2933,8 +2943,9 @@ class Volume:
 
     def copy(self):
         """Return copy of this volume. Does not maintain generic values."""
-        return Volume(self.vertices, self.faces, self.name,
-                      self.color, self.volume_id)
+        return Volume(self.vertices.copy(), self.faces.copy(),
+                      copy.copy(self.name), copy.copy(self.color),
+                      copy.copy(self.volume_id))
 
     def __str__(self):
         return self.__repr__()
@@ -2946,39 +2957,104 @@ class Volume:
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
 
-    def resize(self, x, inplace=True):
-        """ Resize volume by given factor.
+    def __truediv__(self, other):
+        """Implements division for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            return self.__mul__(1/other)
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Implements multiplication for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            v = self.copy()
+            v.vertices *= other
+            return v
+        else:
+            return NotImplemented
+
+    def resize(self, x, method='center', inplace=True):
+        """ Resize volume.
 
         Parameters
         ----------
-        x :         int
-                    Resizing factor
+        x :         int | float
+                    Resizing factor. For methods "center", "centroid" and
+                    "origin" this is the fraction of original size (e.g.
+                    ``.5`` for half size). For method "normals", this is
+                    is the absolute displacement (e.g. ``-1000`` to shrink
+                    volume by 1um)!
+        method :    "center" | "centroid" | "normals" | "origin"
+                    Point in space to use for resizing.
+
+                    .. list-table::
+                        :widths: 15 75
+                        :header-rows: 1
+
+                        * - method
+                          - explanation
+                        * - center
+                          - average of all vertices
+                        * - centroid
+                          - average of the triangle centroids weighted by the
+                            area of each triangle. Requires ``trimesh``.
+                        * - origin
+                          - resizes relative to origin of coordinate system
+                            (0, 0, 0)
+                        * - normals
+                          - resize using face normals. Note that this method
+                            uses absolute displacement for parameter ``x``.
+                            Requires ``trimesh``.
+
         inplace :   bool, optional
                     If False, will return resized copy.
 
         Returns
         -------
         :class:`pymaid.Volume`
-                    Resized copy of original volume. Only if ``inplace=True``.
-        Nothing
-                    If ``inplace=False``.
+                    Resized copy of original volume. Only if ``inplace=False``.
+        None
+                    If ``inplace=True``.
         """
+
+        perm_methods = ['center', 'origin', 'normals', 'centroid']
+        if method not in perm_methods:
+            raise ValueError('Unknown method "{}". Allowed '
+                             'methods: {}'.format(method,
+                                                  ', '.join(perm_methods)))
+
+        if method in ['normals', 'centroid'] and isinstance(trimesh, type(None)):
+            raise ImportError('Must have Trimesh installed to use methods '
+                              '"normals" or "centroid"!')
+
         if not inplace:
             v = self.copy()
         else:
             v = self
 
-        # Get the center
-        cn = np.mean(v.vertices, axis=0)
+        if method == 'normals':
+            tm = v.to_trimesh()
+            v.vertices = tm.vertices + (tm.vertex_normals * x)
+            v.faces = tm.faces
+        else:
+            # Get the center
+            if method == 'center':
+                cn = np.mean(v.vertices, axis=0)
+            elif method == 'centroid':
+                cn = v.to_trimesh().centroid
+            elif method == 'origin':
+                cn = np.array([0, 0, 0])
 
-        # Get vector from center to each vertex
-        vec = v.vertices - cn
+            # Get vector from center to each vertex
+            vec = v.vertices - cn
 
-        # Multiply vector by resize factor
-        vec *= x
+            # Multiply vector by resize factor
+            vec *= x
 
-        # Recalculate vertex positions
-        v.vertices = vec + cn
+            # Recalculate vertex positions
+            v.vertices = vec + cn
 
         # Make sure to reset any pyoctree data on this volume
         try:
@@ -3025,9 +3101,7 @@ class Volume:
                 trimesh GitHub page.
         """
 
-        try:
-            import trimesh
-        except ImportError:
+        if isinstance(trimesh, type(None)):
             raise ImportError('Unable to import trimesh. Please make sure it '
                               'is installed properly')
 
@@ -3061,7 +3135,7 @@ class Volume:
         return np.append(co2d, third.reshape(co2d.shape[0], 1), axis=1)
 
     def to_2d(self, alpha=0.00017, view='xy', invert_y=False):
-        """ Computes the 2d alpha shape (concave hull) this volume.
+        """ Computes the 2d alpha shape (concave hull).
 
         Uses Scipy Delaunay and shapely.
 
