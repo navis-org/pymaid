@@ -1140,18 +1140,24 @@ class Viewer:
 
         Parameters
         ----------
-        view :      XY | XZ | YZ
-
+        view :      "XY" | "XZ" | "YZ" | 
+                    Use e.g. "-XY" to invert rotation
         """
 
         if isinstance(view, vp.util.quaternion.Quaternion):
             q = view
         elif view == 'XY':
-            q = vp.util.quaternion.Quaternion(w=1, x=.4, y=0, z=0)
+            q = vp.util.quaternion.Quaternion(w=1, x=0, y=0, z=0)
+        elif view == '-XY':
+            q = vp.util.quaternion.Quaternion(w=0, x=1, y=0, z=0)    
         elif view == 'XZ':
+            q = vp.util.quaternion.Quaternion(w=-.65, x=-.75, y=0, z=0)
+        elif view == '-XZ':
             q = vp.util.quaternion.Quaternion(w=1, x=-.4, y=0, z=0)
         elif view == 'YZ':
             q = vp.util.quaternion.Quaternion(w=.6, x=0.5, y=0.5, z=-.4)
+        elif view == '-YZ':
+            q = vp.util.quaternion.Quaternion(w=-.5, x=-0.5, y=0.5, z=-.5)
         else:
             raise TypeError('Unable to set view from {}'.format(type(view)))
 
@@ -1261,6 +1267,8 @@ def on_key_press(event):
 
     logger.debug('Key pressed: {0}'.format(event.text))
 
+    modifiers = [key.name for key in event.modifiers]
+
     if event.text.lower() == 'o':
         viewer.toggle_overlay()
     elif event.text.lower() == 'l':
@@ -1279,12 +1287,10 @@ def on_key_press(event):
         viewer._toggle_fps()
     elif event.text.lower() == 'p':
         viewer.toggle_picking()
-    elif event.text.lower() == '1':
-        viewer.set_view('XY')
-    elif event.text.lower() == '2':
-        viewer.set_view('XZ')
-    elif event.text.lower() == '3':
-        viewer.set_view('YZ')
+    elif event.text.lower() in ['1', '2', '3', '!', '@', '£']:
+        v = {'1': 'XY', '2': 'XZ', '3': 'YZ',
+             '!': '-XY', '@': '-XZ', '£': '-YZ'}[event.text.lower()]        
+        viewer.set_view(v)
     elif event.text.lower() == 'c':
         viewer.url_to_cursor(open_browser=True)
     # If none of the above, trigger viewer label
