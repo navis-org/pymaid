@@ -1,6 +1,6 @@
 decorator>=4.1.0
+matplotlib==3.0.2
 imageio==2.5.0
-matplotlib==3.0.1
 numpy==1.16.1
 networkx==2.1
 pandas==0.24.1
