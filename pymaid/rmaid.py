@@ -54,18 +54,17 @@ import os
 import sys
 import time
 from datetime import datetime
+from colorsys import hsv_to_rgb
 
 import pandas as pd
 import numpy as np
 
-from colorsys import hsv_to_rgb
-
-import pymaid.cluster as pyclust
-from pymaid import core, fetch, plotting, config, utils
-
 import rpy2.robjects as robjects
 from rpy2.robjects.packages import importr
 from rpy2.robjects import pandas2ri
+
+from . import cluster as pyclust
+from . import core, fetch, plotting, config, utils
 
 cl = robjects.r('class')
 names = robjects.r('names')
@@ -625,7 +624,14 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     doParallel = importr('doParallel')
     doParallel.registerDoParallel(cores=n_cores)
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
+
+    if isinstance(x, core.CatmaidNeuronList):
+        # Test if resolution is higher than 1 micron per node.
+        if max(x.sampling_resolution) < 1:
+            logger.info('Consider resampling your neurons to a lower ' 
+                        'resolution (e.g. 1 micron) to speed up blasting.')
 
     if 'rpy2' in str(type(x)):
         rn = x

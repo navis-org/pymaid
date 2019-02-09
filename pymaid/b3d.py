@@ -39,9 +39,6 @@ Examples
 # Avoid operators ("bpy.ops.") as much as possible:
 # They cause scene updates which will exponentially slow down processing
 
-import pandas as pd
-import numpy as np
-from pymaid import core, utils, config
 import colorsys
 import json
 import os
@@ -49,16 +46,22 @@ import time
 import math
 import mathutils
 
+import pandas as pd
+import numpy as np
+
+from . import core, utils, config
+
 logger = config.logger
 
 try:
     import bpy
     import bmesh
 except ImportError:
-
     logger.error(
         'Unable to load Blender API - this module only works from within Blender!')
 
+# Set pbars to off b/c Blender's console can't render them anyway
+config.pbar_hide = True
 
 class handler:
     """ Class that interfaces with scene in Blender.
@@ -148,9 +151,12 @@ class handler:
         elif key == 'abutting':
             return object_list(self._cn_selection_helper(3))
         elif key == 'all':
-            return self.neurons + self.connectors + self.soma
+            return self.neurons + self.connectors + self.soma        
         else:
-            raise AttributeError('Unknown attribute ' + key)
+            try:                
+                return getattr(self.all, key)
+            except:
+                raise AttributeError('Unknown attribute ' + key)
 
     def add(self, x, neurites=True, soma=True, connectors=True, redraw=False,
             use_radii=False, skip_existing=False, **kwargs):
@@ -310,7 +316,7 @@ class handler:
         if neurites:
             self._create_neurites(x, mat, use_radii=use_radii)
         if soma and x.soma:
-            if isinstance(x.soma, int):
+            if isinstance(x.soma, (int, np.int64, np.int32)):
                 self._create_soma(x, mat)
         if connectors:
             self._create_connectors(x)
@@ -597,76 +603,6 @@ class handler:
                     names.append(ob.name)
         return object_list(names, handler=self)
 
-    def color(self, r, g, b):
-        """ Assign color to all neurons.
-
-        Parameters
-        ----------
-        r :     float
-                Red value, range 0-1
-        g :     float
-                Green value, range 0-1
-        b :     float
-                Blue value, range 0-1
-
-        Notes
-        -----
-        This will only change color of neurons, if you want to change
-        color of e.g. connectors, use:
-
-        >>> handler.connectors.color(r, g, b)
-        """
-        self.neurons.color(r, g, b)
-
-    def colorize(self):
-        """ Randomly colorize ALL neurons.
-
-        Notes
-        -----
-        This will only change color of neurons, if you want to change
-        color of e.g. connectors, use:
-
-        >>> handler.connectors.colorize()
-        """
-        self.neurons.colorize()
-
-    def emit(self, v):
-        """Change emit value."""
-        self.neurons.emit(v)
-
-    def use_transparency(self, v):
-        """ Change transparency (True/False)"""
-        self.neurons.use_transparency(v)
-
-    def alpha(self, v):
-        """Change alpha (0-1)."""
-        self.neurons.alpha(v)
-
-    def bevel(self, r):
-        """Change bevel of ALL neurons.
-
-        Parameters
-        ----------
-        r :         float
-                    New bevel radius
-
-        Notes
-        -----
-        This will only change bevel of neurons, if you want to change
-        bevel of e.g. connectors, use:
-
-        >>> handler.connectors.bevel(.02)
-        """
-        self.neurons.bevel_depth(r)
-
-    def hide(self):
-        """ Hide all neuron-related objects"""
-        self.all.hide()
-
-    def unhide(self):
-        """ Unide all neuron-related objects"""
-        self.all.unhide()
-
 
 class object_list:
     """ Collection of Blender objects.
@@ -774,7 +710,7 @@ class object_list:
             elif unselect_others:
                 ob.select = False
 
-    def color(self, r, g, b):
+    def color(self, r, g, b, vary=None):
         """ Assign color to all objects in the list
 
         Parameters
@@ -785,9 +721,13 @@ class object_list:
                 Green value, range 0-1
         b :     float
                 Blue value, range 0-1
+        vary :  float
+                Range by which to randomly vary r, g and b.
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
+                if vary:
+                    r += np.random.randint(0, 100)/(100/vary) - (vary/2)
                 ob.active_material.diffuse_color = (r, g, b)
 
     def colorize(self):
@@ -832,6 +772,26 @@ class object_list:
                 if bpy.data.objects[n].type == 'CURVE':
                     bpy.data.objects[n].data.bevel_depth = r
 
+    def set(self, attribute, value):
+        """Change arbitratry attributes of objects.
+
+        Parameters
+        ----------
+        attritubte :    str
+                        Attribute to set. You can use nested attributes,
+                        e.g. "data"
+        value :         float | int | str
+                        Value to set attribute to.
+        """
+        attribute = attribute.split('.')
+        for n in self.object_names:
+            if n in bpy.data.objects:
+                ob = bpy.data.objects[n]
+                for a in attribute[:-1]:
+                    ob = getattr(ob, a, None)
+                if getattr(ob, attribute[-1], None):
+                    setattr(ob, attribute[-1], value)
+
     def hide(self):
         """Hide objects"""
         for i, n in enumerate(self.object_names):
@@ -843,6 +803,15 @@ class object_list:
         for i, n in enumerate(self.object_names):
             if n in bpy.data.objects:
                 bpy.data.objects[n].hide = False
+
+    def render(self, render):
+        """Set whether objects should be rendered or not."""
+        if not isinstance(render, bool):
+            raise TypeError('Need bool, got "{}"'.format(type(render)))
+
+        for i, n in enumerate(self.object_names):
+            if n in bpy.data.objects:
+                bpy.data.objects[n].hide_render = render == False
 
     def hide_others(self):
         """Hide everything BUT these objects"""

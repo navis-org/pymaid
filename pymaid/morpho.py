@@ -19,15 +19,14 @@
 """
 
 import math
-import time
-import logging
-import pandas as pd
-import numpy as np
-import scipy
-import networkx as nx
 import itertools
 
-from pymaid import fetch, core, graph_utils, graph, utils, config, resample
+import pandas as pd
+import numpy as np
+import scipy.spatial.distance
+import networkx as nx
+
+from . import fetch, core, graph_utils, graph, utils, config, resample
 
 # Set up logging
 logger = config.logger
@@ -341,20 +340,13 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
 
     """
 
-    logger.debug('Calculating Strahler indices...')
-
-    start_time = time.time()
-
-    if isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
-        x = x
-    elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
+    if isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] == 1:
-            x = x.loc[0]
+            x = x[0]
         else:
             res = []
-            for i in config.trange(0, x.shape[0]):
-                res.append(strahler_index(
-                    x.loc[i], inplace=inplace, method=method))
+            for n in config.tqdm(x):
+                res.append(strahler_index(n, inplace=inplace, method=method))
 
             if not inplace:
                 return core.CatmaidNeuronList(res)
@@ -389,7 +381,8 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
     # Reindex according to treenode_id
     this_tn = x.nodes.set_index('treenode_id')
 
-    strahler_index = {n: None for n in list_of_childs if n is not None}
+    # Do NOT name anything strahler_index - this overwrites the function!
+    SI = {}
 
     starting_points = end_nodes
 
@@ -407,8 +400,8 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             # Calculate index for this branch
             previous_indices = []
             for child in list_of_childs[this_node]:
-                if strahler_index[child]:
-                    previous_indices.append(strahler_index[child])
+                if SI.get(child, None):
+                    previous_indices.append(SI[child])
 
             # If this is a not-a-branch branch
             if this_node in nab_branch:
@@ -450,7 +443,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
                     # Will fail if at root (no parent)
                     break
 
-            strahler_index.update({n: this_branch_index for n in spine})
+            SI.update({n: this_branch_index for n in spine})
 
             # The last this_node is either a branch node or the root
             # If a branch point: check, if all its childs have already been
@@ -472,7 +465,9 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
         # Add new starting points
         starting_points = starting_points | set(new_starting_points)
 
-    x.nodes['strahler_index'] = [strahler_index.get(n, None)
+    # Disconnected single nodes (e.g. after pruning) will end up w/o an entry
+    # --> we will give them an SI of 1
+    x.nodes['strahler_index'] = [SI.get(n, 1)
                                  for n in x.nodes.treenode_id.values]
 
     # Fix not-a-branch branches
@@ -488,29 +483,31 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             x.nodes.loc[x.nodes.treenode_id.isin(
                 this_seg), 'strahler_index'] = new_SI
 
-    logger.debug('Done in %is' % round(time.time() - start_time))
-
     if not inplace:
         return x
 
 
-def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
+def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
                       force_strahler_update=False, relocate_connectors=False):
-    """ Prune neuron based on strahler order.
+    """ Prune neuron based on `Strahler order
+    <https://en.wikipedia.org/wiki/Strahler_number>`_.
 
     Parameters
     ----------
     x :             CatmaidNeuron | CatmaidNeuronList
-    to_prune :      int | list | range, optional
-                    Strahler indices to prune:
+    to_prune :      int | list | range | slice
+                    Strahler indices (SI) to prune. For example:
 
-                      (1) ``to_prune=1`` removes all leaf branches
-                      (2) ``to_prune=[1, 2]`` removes indices 1 and 2
-                      (3) ``to_prune=range(1, 4)`` removes indices 1, 2 and 3
-                      (4) ``to_prune=-1`` removes everything but the highest
-                          index
+                    1. ``to_prune=1`` removes all leaf branches
+                    2. ``to_prune=[1, 2]`` removes SI 1 and 2
+                    3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
+                    4. ``to_prune=slice(0, -1)`` removes everything but the
+                       highest SI
+                    5. ``to_prune=slice(-1, None)`` removes only the highest
+                       SI
+
     reroot_soma :   bool, optional
-                    If True, neuron will be rerooted to its soma
+                    If True, neuron will be rerooted to its soma.
     inplace :       bool, optional
                     If False, pruning is performed on copy of original neuron
                     which is then returned.
@@ -549,10 +546,17 @@ def prune_by_strahler(x, to_prune=range(1, 2), reroot_soma=True, inplace=False,
     # Prepare indices
     if isinstance(to_prune, int) and to_prune < 0:
         to_prune = range(1, neuron.nodes.strahler_index.max() + (to_prune + 1))
-    elif isinstance(to_prune, int):
+
+    if isinstance(to_prune, int):
+        if to_prune < 1:
+            raise ValueError('SI to prune must be positive. Please see help'
+                             'for additional options.')
         to_prune = [to_prune]
     elif isinstance(to_prune, range):
         to_prune = list(to_prune)
+    elif isinstance(to_prune, slice):
+        SI_range = range(1, neuron.nodes.strahler_index.max() + 1)
+        to_prune = list(SI_range)[to_prune]
 
     # Prepare parent dict if needed later
     if relocate_connectors:
@@ -897,7 +901,6 @@ def bending_flow(x, polypre=False):
     Adds a new column ``'flow_centrality'`` to ``x.nodes``. Branch points only!
 
     """
-    start_time = time.time()
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
@@ -976,9 +979,6 @@ def bending_flow(x, polypre=False):
     x.centrality_method = 'bending'
 
     x.nodes.reset_index(inplace=True)
-
-    logger.debug('Total time for bending flow calculation: {0}s'.format(
-        round(time.time() - start_time)))
 
     return
 
@@ -1135,8 +1135,8 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
 
     Parameters
     ----------
-    x :                 CatmaidNeuron | CatmaidNeuronList
-                        Neurons to stitch.
+    x :                 CatmaidNeuron | CatmaidNeuronList | list of either
+                        Neurons to stitch (see examples).
     method :            'LEAFS' | 'ALL' | 'NONE', optional
                         Set stitching method:
                             (1) 'LEAFS': Only leaf (including root) nodes will
@@ -1158,23 +1158,31 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     core.CatmaidNeuron
                         Stitched neuron.
 
+    Examples
+    --------
+    Stitching using a neuron list:
+
+    >>> nl = pymaid.get_neuron('annotation:glomerulus DA1 right')
+    >>> stitched = pymaid.stitch_neurons(nl, method='NONE')
+
+    Stitching using individual neurons:
+
+    >>> a = pymaid.get_neuron(16)
+    >>> b = pymaid.get_neuron(2863104)
+    >>> stitched = pymaid.stitch_neurons(a, b, method='NONE')
+    >>> # Or alternatively:
+    >>> stitched = pymaid.stitch_neurons([a, b], method='NONE')
+
     """
 
     if method not in ['LEAFS', 'ALL', 'NONE', None]:
         raise ValueError('Unknown method: %s' % str(method))
 
     # Compile list of individual neurons
-    neurons = []
-    for n in x:
-        if not isinstance(n, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-            raise TypeError('Unable to stitch non-CatmaidNeuron objects')
-        elif isinstance(n, core.CatmaidNeuronList):
-            neurons += n.neurons
-        else:
-            neurons.append(n)
+    neurons = utils._unpack_neurons(x)
 
     # Use copies of the original neurons!
-    neurons = [n.copy() for n in neurons if isinstance(n, core.CatmaidNeuron)]
+    neurons = [n.copy() for n in neurons]
 
     if len(neurons) < 2:
         logger.warning(
@@ -1590,7 +1598,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         graph_utils.subset_neuron(x,
                                   subset=x.nodes[~x.nodes.treenode_id.isin(
                                       to_remove)].treenode_id.values,
-                                  remove_disconnected=preserve_connectors == False,
+                                  keep_disc_cn=preserve_connectors,
                                   inplace=True)
 
         if not inplace:
@@ -1630,7 +1638,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
             graph_utils.subset_neuron(x,
                                       subset=x.nodes[~x.nodes.treenode_id.isin(
                                           to_remove)].treenode_id.values,
-                                      remove_disconnected=preserve_connectors == False,
+                                      keep_disc_cn=preserve_connectors,
                                       inplace=True)
 
         if not inplace:

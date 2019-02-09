@@ -64,26 +64,33 @@ also allow quick access to other PyMaid functions:
 
 """
 
-import datetime
-import pandas as pd
-
-import numpy as np
-import math
-import random
-import json
-import os
-import sys
-import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor
-import scipy
-import networkx as nx
-import io
 import copy
-import six
+import csv
+import datetime
+import io
+import json
+import math
+import multiprocessing as mp
 import numbers
+import os
+import random
+import sys
+import six
+
+import networkx as nx
+import numpy as np
+import pandas as pd
+import scipy.spatial
+import scipy.cluster.hierarchy
 
 from . import (graph, morpho, fetch, graph_utils, resample, intersect,
                utils, config)
+
+try:
+    import trimesh
+except ImportError:
+    trimesh = None
 
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
@@ -263,7 +270,7 @@ class CatmaidNeuron:
                 setattr(self, at, getattr(x, at))
 
         # Classify nodes if applicable
-        if 'nodes' in self.__dict__ and 'type' not in self.nodes:
+        if self.node_data and 'type' not in self.nodes:
             graph_utils.classify_nodes(self)
 
         # If a CatmaidNeuron is used to initialize, we need to make this
@@ -292,9 +299,8 @@ class CatmaidNeuron:
 
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
-        if 'nodes' in self.__dict__ and \
-            self.nodes.empty and key in ['n_open_ends', 'n_branch_nodes',
-                                         'n_end_nodes', 'cable_length']:
+        if key in ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
+                  'cable_length'] and self.node_data and self.nodes.empty:
             return 0
 
         if key == 'igraph':
@@ -347,7 +353,7 @@ class CatmaidNeuron:
         elif key == 'sampling_resolution':
             return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 closed = set(self.tags.get('ends', []) +
                              self.tags.get('uncertain end', []) +
                              self.tags.get('uncertain continuation', []) +
@@ -359,49 +365,49 @@ class CatmaidNeuron:
                             'to fetch.')
                 return 'NA'
         elif key == 'n_branch_nodes':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes[self.nodes.type == 'branch'].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_end_nodes':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes[self.nodes.type == 'end'].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_nodes':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes.shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_connectors':
-            if 'connectors' in self.__dict__:
+            if self.cn_data:
                 return self.connectors.shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_presynapses':
-            if 'connectors' in self.__dict__:
+            if self.cn_data:
                 return self.connectors[self.connectors.relation == 0].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'n_postsynapses':
-            if 'connectors' in self.__dict__:
+            if self.cn_data:
                 return self.connectors[self.connectors.relation == 1].shape[0]
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
         elif key == 'cable_length':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 # Simply sum up edge weight of all graph edges
                 if self.igraph and config.use_igraph:
                     w = self.igraph.es.get_attribute_values('weight')
@@ -413,13 +419,17 @@ class CatmaidNeuron:
                             'to fetch.')
                 return 'NA'
         elif key == 'bbox':
-            if 'nodes' in self.__dict__:
+            if self.node_data:
                 return self.nodes.describe().loc[['min', 'max'],
                                                  ['x', 'y', 'z']].values.T
             else:
                 logger.info('No skeleton data available. Use .get_skeleton() '
                             'to fetch.')
                 return 'NA'
+        elif key == 'node_data':
+            return 'nodes' in self.__dict__
+        elif key == 'cn_data':
+            return 'connectors' in self.__dict__
         else:
             raise AttributeError('Attribute "%s" not found' % key)
 
@@ -573,8 +583,6 @@ class CatmaidNeuron:
 
     def _get_segments(self, how='length'):
         """Generate segments for neuron."""
-        logger.debug(
-            'Generating segments for neuron {}'.format(self.skeleton_id))
         if how == 'length':
             self.segments = graph_utils._generate_segments(self)
         elif how == 'break':
@@ -601,7 +609,7 @@ class CatmaidNeuron:
 
         """
         tn = self.nodes[self.nodes.radius >
-                        self.soma_detection_radius].treenode_id.tolist()
+                        self.soma_detection_radius].treenode_id.values
 
         if self.soma_detection_tag:
             if self.soma_detection_tag not in self.tags:
@@ -660,7 +668,7 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
 
         self.annotations = fetch.get_annotations(
-            self.skeleton_id, remote_instance)[str(self.skeleton_id)]
+            self.skeleton_id, remote_instance).get(str(self.skeleton_id), [])
         return self.annotations
 
     def plot2d(self, **kwargs):
@@ -729,7 +737,7 @@ class CatmaidNeuron:
 
         Returns
         -------
-        scipy.hierarchy.dendrogram
+        scipy.cluster.hierarchy.dendrogram
         """
 
         # First get the all by all distances
@@ -937,19 +945,25 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
-        """ Prune neuron based on strahler order.
+    def prune_by_strahler(self, to_prune, inplace=True):
+        """ Prune neuron based on `Strahler order
+        <https://en.wikipedia.org/wiki/Strahler_number>`_.
 
         Will reroot neuron to soma if possible.
 
         Parameters
         ----------
-        to_prune :  int | list | range, optional
-                    Strahler indices to prune.
-                    1. ``to_prune = 1`` removes all leaf branches
-                    2. ``to_prune = [1,2]`` removes indices 1 and 2
-                    3. ``to_prune = range(1,4)`` removes indices 1, 2 and 3
-                    4. ``to_prune = -1`` keep only the highest index
+        to_prune :  int | list | range | slice
+                    Strahler indices to prune. For example:
+
+                    1. ``to_prune=1`` removes all leaf branches
+                    2. ``to_prune=[1, 2]`` removes SI 1 and 2
+                    3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
+                    4. ``to_prune=slice(1, -1)`` removes everything but the
+                       highest SI
+                    5. ``to_prune=slice(-1, None)`` removes only the highest
+                       SI
+
         inplace :   bool, optional
                     If True, operation will be performed on itself. If False,
                     operation is performed on copy which is then returned.
@@ -1011,18 +1025,24 @@ class CatmaidNeuron:
         if not inplace:
             return x
 
-    def prune_by_volume(self, v, mode='IN', inplace=True):
+    def prune_by_volume(self, v, mode='IN', prevent_fragments=False,
+                        inplace=True):
         """ Prune neuron by intersection with given volume(s).
 
         Parameters
         ----------
-        v :         str | pymaid.Volume | list of either
-                    Volume(s) to check for intersection
-        mode :      'IN' | 'OUT', optional
-                    If 'IN', parts of the neuron inside the volume are kept.
-        inplace :   bool, optional
-                    If True, operation will be performed on itself. If False,
-                    operation is performed on copy which is then returned.
+        v :                 str | pymaid.Volume | list of either
+                            Volume(s) to check for intersection
+        mode :              'IN' | 'OUT', optional
+                            If 'IN', parts of the neuron inside the volume are
+                            kept.
+        prevent_fragments : bool, optional
+                            If True, will add nodes to ``subset`` required to
+                            keep neuron from fragmenting.
+        inplace :           bool, optional
+                            If True, operation will be performed on itself. If
+                            False, operation is performed on copy which is then
+                            returned.
 
         See Also
         --------
@@ -1040,6 +1060,7 @@ class CatmaidNeuron:
             x = self.copy()
 
         intersect.in_volume(x, v, inplace=True,
+                            prevent_fragments=prevent_fragments,
                             remote_instance=self._remote_instance, mode=mode)
 
         # Clear temporary attributes
@@ -1142,7 +1163,7 @@ class CatmaidNeuron:
             to_comp = ['skeleton_id', 'neuron_name']
 
             # Make some morphological comparisons if we have node data
-            if 'nodes' in self.__dict__ and 'nodes' in other.__dict__:
+            if self.node_data and other.node_data:
                 # Make sure to go from simple to computationally expensive
                 to_comp += ['n_nodes', 'n_connectors', 'soma', 'root',
                             'n_branch_nodes', 'n_end_nodes', 'n_open_ends',
@@ -1195,7 +1216,7 @@ class CatmaidNeuron:
     def summary(self):
         """Get a summary of this neuron."""
 
-        # Set logger to warning only - otherwise you miht get tons of
+        # Set logger to warning only - otherwise you might get tons of
         # "skeleton data not available" messages
         l = logger.level
         logger.setLevel('WARNING')
@@ -1203,17 +1224,13 @@ class CatmaidNeuron:
         # Look up these values without requesting them
         neuron_name = self.__dict__.get('neuron_name', 'NA')
         review_status = self.__dict__.get('review_status', 'NA')
-
-        if 'nodes' in self.__dict__:
-            soma_temp = self.soma
-        else:
-            soma_temp = 'NA'
+        soma = self.soma if self.node_data else 'NA'
 
         s = pd.Series([type(self), neuron_name, self.skeleton_id,
                        self.n_nodes, self.n_connectors,
                        self.n_branch_nodes, self.n_end_nodes,
                        self.n_open_ends, self.cable_length,
-                       review_status, soma_temp],
+                       review_status, soma],
                       index=['type', 'neuron_name', 'skeleton_id',
                              'n_nodes', 'n_connectors', 'n_branch_nodes',
                              'n_end_nodes', 'n_open_ends', 'cable_length',
@@ -1223,8 +1240,8 @@ class CatmaidNeuron:
         return s
 
     def to_dataframe(self):
-        """ Turn this Catmaidneuron into a pandas DataFrame containing
-        only the original Catmaid data.
+        """ Turn this CatmaidNeuron into a pandas DataFrame containing
+        only the original CATMAID data.
 
         Returns
         -------
@@ -1238,7 +1255,7 @@ class CatmaidNeuron:
                             columns=['neuron_name', 'skeleton_id', 'nodes',
                                      'connectors', 'tags'])
 
-    def to_swc(self, filename=None):
+    def to_swc(self, filename=None, **kwargs):
         """ Generate SWC file from this neuron.
 
         This converts CATMAID nanometer coordinates into microns.
@@ -1247,6 +1264,8 @@ class CatmaidNeuron:
         ----------
         filename :      str | None, optional
                         If ``None``, will use "neuron_{skeletonID}.swc".
+        kwargs
+                        Additional arguments passed to :func:`~pymaid.to_swc`.
 
         Returns
         -------
@@ -1259,7 +1278,36 @@ class CatmaidNeuron:
 
         """
 
-        return utils.to_swc(self, filename)
+        return utils.to_swc(self, filename, **kwargs)
+
+    @classmethod
+    def from_graph(self, g, **kwargs):
+        """ Generate neuron object from NetworkX Graph.
+
+        This function will try to generate a neuron-like tree structure from
+        the Graph. Therefore the graph may not contain loops!
+
+        Treenode coordinates (``x``, ``y``, ``z``) need to be properties of
+        the graph's nodes.
+
+        Parameters
+        ----------
+        g :         networkx.Graph | networkx.DiGraph
+        **kwargs
+                    Additional neuron parameters as keyword arguments.
+                    For example, ``skeleton_id``, ``neuron_name``, etc.
+
+        Returns
+        -------
+        core.CatmaidNeuron
+
+        See Also
+        --------
+        pymaid.graph.nx2neuron
+                    Base function with more parameters.
+        """
+
+        return graph.nx2neuron(g, **kwargs)
 
     @classmethod
     def from_swc(self, filename, neuron_name=None, neuron_id=None):
@@ -1612,8 +1660,7 @@ class CatmaidNeuronList:
                 raise Exception('No remote_instance found. Use '
                                  '.set_remote_instance() to assign one to all '
                                  'neurons.')
-            else:
-                return all_instances[0]
+            return all_instances[0]
         elif key == 'review_status':
             self.get_review(skip_existing=True)
             return np.array([n.review_status for n in self.neurons])
@@ -1628,6 +1675,8 @@ class CatmaidNeuronList:
             return np.array([n.annotations for n in self.neurons])
         elif key == 'empty':
             return len(self.neurons) == 0
+        elif key == 'skeletons_missing':
+            return any([not n.node_data for n in self.neurons])
         else:
             if False not in [key in n.__dict__ for n in self.neurons]:
                 return np.array([getattr(n, key) for n in self.neurons])
@@ -1789,7 +1838,17 @@ class CatmaidNeuronList:
         return self.summary().mean(numeric_only=True)
 
     def sample(self, N=1):
-        """Returns random subset of neurons."""
+        """Returns random subset of neurons.
+
+        Parameters
+        ----------
+        N :     int | float
+                If int >= 1, will return N neurons. If float < 1, will return
+                fraction of total neurons.
+        """
+        if N < 1:
+            N = int(len(self.neurons) * N)
+
         indices = list(range(len(self.neurons)))
         random.shuffle(indices)
         return CatmaidNeuronList([n for i, n in enumerate(self.neurons) if i in indices[:N]],
@@ -2045,19 +2104,25 @@ class CatmaidNeuronList:
         x[0].prune_proximal_to(x[1], inplace=True)
         return x[0]
 
-    def prune_by_strahler(self, to_prune=range(1, 2), inplace=True):
-        """ Prune neurons based on strahler order.
+    def prune_by_strahler(self, to_prune, inplace=True):
+        """ Prune neurons based on `Strahler order
+        <https://en.wikipedia.org/wiki/Strahler_number>`_.
 
         Will reroot neurons to soma if possible.
 
         Parameters
         ----------
-        to_prune :  int | list | range, optional
-                    Strahler indices to prune.
-                    1. ``to_prune = 1`` remove all leaf branches
-                    2. ``to_prune = [1,2]`` remove indices 1 and 2
-                    3. ``to_prune = range(1,4)`` remove indices 1, 2 and 3
-                    4. ``to_prune = -1`` keep only the highest index
+        to_prune :  int | list | range | slice
+                    Strahler indices to prune. For example:
+
+                    1. ``to_prune=1`` removes all leaf branches
+                    2. ``to_prune=[1, 2]`` removes SI 1 and 2
+                    3. ``to_prune=range(1, 4)`` removes SI 1, 2 and 3
+                    4. ``to_prune=slice(1, -1)`` removes everything but the
+                       highest SI
+                    5. ``to_prune=slice(-1, None)`` removes only the highest
+                       SI
+
         inplace :   bool, optional
                     If False, pruning is done on a copy of this
                     CatmaidNeuronList which is then returned.
@@ -2150,18 +2215,24 @@ class CatmaidNeuronList:
         x[0].prune_by_longest_neurite(x[1], x[2], inplace=True)
         return x[0]
 
-    def prune_by_volume(self, v, mode='IN', inplace=True):
+    def prune_by_volume(self, v, mode='IN', prevent_fragments=False,
+                        inplace=True):
         """ Prune neurons by intersection with given volume(s).
 
         Parameters
         ----------
-        v :         str | pymaid.Volume | list of either
-                    Volume(s) to check for intersection.
-        mode :      'IN' | 'OUT', optional
-                    If 'IN', part of the neuron inside the volume(s) is kept.
-        inplace :   bool, optional
-                    If False, a pruned COPY of this CatmaidNeuronList is
-                    returned.
+        v :                 str | pymaid.Volume | list of either
+                            Volume(s) to check for intersection
+        mode :              'IN' | 'OUT', optional
+                            If 'IN', parts of the neuron inside the volume are
+                            kept.
+        prevent_fragments : bool, optional
+                            If True, will add nodes to ``subset`` required to
+                            keep neuron from fragmenting.
+        inplace :           bool, optional
+                            If True, operation will be performed on itself. If
+                            False, operation is performed on copy which is then
+                            returned.
 
 
         See Also
@@ -2179,7 +2250,8 @@ class CatmaidNeuronList:
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
-            combinations = [(n, v, mode) for i, n in enumerate(x.neurons)]
+            combinations = [(n, v, mode, prevent_fragments)
+                                             for i, n in enumerate(x.neurons)]
             x.neurons = list(config.tqdm(pool.imap(x._prune_by_volume_helper,
                                             combinations, chunksize=10),
                                   total=len(combinations), desc='Pruning',
@@ -2191,14 +2263,16 @@ class CatmaidNeuronList:
         else:
             for n in config.tqdm(x.neurons, desc='Pruning', disable=config.pbar_hide,
                           leave=config.pbar_leave):
-                n.prune_by_volume(v, mode=mode, inplace=True)
+                n.prune_by_volume(v, mode=mode, inplace=True,
+                                  prevent_fragments=prevent_fragments)
 
         if not inplace:
             return x
 
     def _prune_by_volume_helper(self, x):
         """ Helper function to parallelise basic operations."""
-        x[0].prune_by_volume(x[1], mode=x[2], inplace=True)
+        x[0].prune_by_volume(x[1], mode=x[2], inplace=True, 
+                             prevent_fragments=x[3])
         return x[0]
 
     def get_partners(self, remote_instance=None):
@@ -2249,8 +2323,7 @@ class CatmaidNeuronList:
             annotations = fetch.get_annotations(
                 to_update, remote_instance=self._remote_instance)
             for n in self.neurons:
-                if str(n.skeleton_id) in annotations:
-                    n.annotations = annotations.get(str(n.skeleton_id), [])
+                n.annotations = annotations.get(str(n.skeleton_id), [])
 
     def get_names(self, skip_existing=False):
         """ Use to get/update neuron names."""
@@ -2695,12 +2768,12 @@ class Dotprops(pd.DataFrame):
 
 
 class Volume:
-    """ Class to hold CATMAID meshes.
+    """ Class representing CATMAID meshes.
 
     Parameters
     ----------
     vertices :  list | array
-                Vertices coordinates. Must be shape (N,3).
+                Vertices coordinates. Must be shape ``(N, 3)``.
     faces :     list | array
                 Indexed faceset.
     name :      str, optional
@@ -2710,12 +2783,6 @@ class Volume:
     volume_id : int, optional
                 CATMAID volume ID.
 
-    Attributes
-    ----------
-    bbox :      array
-                Bounding box of the volume.
-
-
     See Also
     --------
     :func:`~pymaid.get_volume`
@@ -2723,7 +2790,7 @@ class Volume:
 
     """
 
-    def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def __init__(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         self.name = name
         self.vertices = vertices
@@ -2732,7 +2799,57 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
+    def from_csv(self, vertices, faces, name=None, color=(1, 1, 1, .1),
+                 volume_id=None, **kwargs):
+        """ Load volume from csv files containing vertices and faces.
+
+        Parameters
+        ----------
+        vertices :      filepath | file-like
+                        CSV file containing vertices.
+        faces :         filepath | file-like
+                        CSV file containing faces.
+        **kwargs
+                        Keyword arguments passed to ``csv.reader``.
+
+        Returns
+        -------
+        pymaid.Volume
+
+        """
+
+        with open(vertices, 'r') as f:
+            reader = csv.reader(f, **kwargs)
+            vertices = np.array([r for r in reader]).astype(float)
+
+        with open(faces, 'r') as f:
+            reader = csv.reader(f, **kwargs)
+            faces = np.array([r for r in reader]).astype(int)
+
+        return Volume(faces=faces, vertices=vertices, name=name, color=color,
+                      volume_id=volume_id)
+
+    def to_csv(self, filename, **kwargs):
+        """ Save volume as two separated csv files containing vertices and
+        faces.
+
+        Parameters
+        ----------
+        filename :      str
+                        Filename to use. Will get a ``_vertices.csv`` and
+                        ``_faces.csv`` suffix.
+        **kwargs
+                        Keyword arguments passed to ``csv.reader``.
+        """
+
+        for data, suffix in zip([self.faces, self.vertices],
+                                ['_faces.csv', '_vertices.csv']):
+            with open(filename + suffix, 'w') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerows(data)
+
+    @classmethod
+    def combine(self, x, name='comb_vol', color=(1, 1, 1, .1)):
         """ Merges multiple volumes into a single object.
 
         Parameters
@@ -2780,6 +2897,7 @@ class Volume:
 
     @property
     def vertices(self):
+        """Array (N, 3) of vertex coordinates. """
         return self.__vertices
 
     @vertices.setter
@@ -2803,7 +2921,7 @@ class Volume:
 
     @property
     def faces(self):
-        """Legacy access to ``.vertices``."""
+        """Array of vertex indices forming faces."""
         return self.__faces
 
     @faces.setter
@@ -2814,7 +2932,7 @@ class Volume:
 
     @property
     def center(self):
-        """ Center of mass."""
+        """ Center of volume as average over all vertices."""
         return np.mean(self.vertices, axis=0)
 
     def __deepcopy__(self):
@@ -2825,8 +2943,9 @@ class Volume:
 
     def copy(self):
         """Return copy of this volume. Does not maintain generic values."""
-        return Volume(self.vertices, self.faces, self.name,
-                      self.color, self.volume_id)
+        return Volume(self.vertices.copy(), self.faces.copy(),
+                      copy.copy(self.name), copy.copy(self.color),
+                      copy.copy(self.volume_id))
 
     def __str__(self):
         return self.__repr__()
@@ -2838,39 +2957,110 @@ class Volume:
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
 
-    def resize(self, x, inplace=True):
-        """ Resize volume by given factor.
+    def __truediv__(self, other):
+        """Implements division for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            return self.__mul__(1/other)
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Implements multiplication for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            v = self.copy()
+            v.vertices *= other
+            return v
+        else:
+            return NotImplemented
+
+    def resize(self, x, method='center', inplace=True):
+        """ Resize volume.
 
         Parameters
         ----------
-        x :         int
-                    Resizing factor
+        x :         int | float
+                    Resizing factor. For methods "center", "centroid" and
+                    "origin" this is the fraction of original size (e.g.
+                    ``.5`` for half size). For method "normals", this is
+                    is the absolute displacement (e.g. ``-1000`` to shrink
+                    volume by 1um)!
+        method :    "center" | "centroid" | "normals" | "origin"
+                    Point in space to use for resizing.
+
+                    .. list-table::
+                        :widths: 15 75
+                        :header-rows: 1
+
+                        * - method
+                          - explanation
+                        * - center
+                          - average of all vertices
+                        * - centroid
+                          - average of the triangle centroids weighted by the
+                            area of each triangle. Requires ``trimesh``.
+                        * - origin
+                          - resizes relative to origin of coordinate system
+                            (0, 0, 0)
+                        * - normals
+                          - resize using face normals. Note that this method
+                            uses absolute displacement for parameter ``x``.
+                            Requires ``trimesh``.
+
         inplace :   bool, optional
                     If False, will return resized copy.
 
         Returns
         -------
         :class:`pymaid.Volume`
-                    Resized copy of original volume. Only if ``inplace=True``.
-        Nothing
-                    If ``inplace=False``.
+                    Resized copy of original volume. Only if ``inplace=False``.
+        None
+                    If ``inplace=True``.
         """
+
+        perm_methods = ['center', 'origin', 'normals', 'centroid']
+        if method not in perm_methods:
+            raise ValueError('Unknown method "{}". Allowed '
+                             'methods: {}'.format(method,
+                                                  ', '.join(perm_methods)))
+
+        if method in ['normals', 'centroid'] and isinstance(trimesh, type(None)):
+            raise ImportError('Must have Trimesh installed to use methods '
+                              '"normals" or "centroid"!')
+
         if not inplace:
             v = self.copy()
         else:
             v = self
 
-        # Get the center
-        cn = np.mean(v.vertices, axis=0)
+        if method == 'normals':
+            tm = v.to_trimesh()
+            v.vertices = tm.vertices + (tm.vertex_normals * x)
+            v.faces = tm.faces
+        else:
+            # Get the center
+            if method == 'center':
+                cn = np.mean(v.vertices, axis=0)
+            elif method == 'centroid':
+                cn = v.to_trimesh().centroid
+            elif method == 'origin':
+                cn = np.array([0, 0, 0])
 
-        # Get vector from center to each vertex
-        vec = v.vertices - cn
+            # Get vector from center to each vertex
+            vec = v.vertices - cn
 
-        # Multiply vector by resize factor
-        vec *= x
+            # Multiply vector by resize factor
+            vec *= x
 
-        # Recalculate vertex positions
-        v.vertices = vec + cn
+            # Recalculate vertex positions
+            v.vertices = vec + cn
+
+        # Make sure to reset any pyoctree data on this volume
+        try:
+            delattr(v, 'pyoctree')
+        except BaseException:
+            pass
 
         if not inplace:
             return v
@@ -2911,9 +3101,7 @@ class Volume:
                 trimesh GitHub page.
         """
 
-        try:
-            import trimesh
-        except ImportError:
+        if isinstance(trimesh, type(None)):
             raise ImportError('Unable to import trimesh. Please make sure it '
                               'is installed properly')
 
@@ -2947,7 +3135,7 @@ class Volume:
         return np.append(co2d, third.reshape(co2d.shape[0], 1), axis=1)
 
     def to_2d(self, alpha=0.00017, view='xy', invert_y=False):
-        """ Computes the 2d alpha shape (concave hull) this volume.
+        """ Computes the 2d alpha shape (concave hull).
 
         Uses Scipy Delaunay and shapely.
 

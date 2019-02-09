@@ -14,19 +14,19 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
+import os
+import json
+import colorsys
+import math
+
 import numpy as np
 import pandas as pd
-import math
-import scipy.cluster
+import scipy.cluster.hierarchy
 import scipy.spatial
-import colorsys
 
 from concurrent.futures import ThreadPoolExecutor
 
-import os
-import json
-
-from pymaid import fetch, core, plotting, utils, config
+from . import fetch, core, plotting, utils, config
 
 # Set up logging
 logger = config.logger
@@ -40,7 +40,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                             threshold=1, include_skids=None,
                             exclude_skids=None, min_nodes=2,
                             connectivity_table=None, cluster_kws={},
-                            remote_instance=None):
+                            skip_missing=True, remote_instance=None):
     """ Calculate connectivity similarity.
 
     This functions offers a selection of metrics to compare connectivity:
@@ -124,6 +124,11 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                          :func:`~pymaid.get_partners`. If provided, will use
                          this instead of querying CATMAID server. Filters
                          still apply!
+    skip_missing :       bool, optional
+                         If True, neurons that don't have connectivity data
+                         (i.e. no up-/ and/or downstream partners after
+                         filtering) will be skipped. If False, will keep them
+                         but they will have similarity ``nan``.
     remote_instance :    CATMAID instance, optional
 
     Returns
@@ -139,8 +144,8 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
     >>> res = pymaid.cluster_by_connectivity('annotation:PBG6 P-EN right',
     ...                                      upstream=True, downstream=False,
     ...                                      threshold=1, min_nodes=500)
-    >>> # Get the adjacency matrix
-    >>> print(res.mat)
+    >>> # Get the similarity matrix
+    >>> print(res.sim_mat)
     >>> # Plot a dendrogram
     >>> fig = res.plot_dendrogram()
     >>> plt.show()
@@ -162,8 +167,11 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
 
     if isinstance(connectivity_table, type(None)):
         # Retrieve connectivity and apply filters
-        connectivity = fetch.get_partners(
-            neurons, remote_instance, min_size=min_nodes, threshold=threshold)
+        connectivity = fetch.get_partners(neurons,
+                                          directions=directions,
+                                          remote_instance=remote_instance,
+                                          min_size=min_nodes,
+                                          threshold=threshold)
     else:
         connectivity = connectivity_table[(connectivity_table.num_nodes >= min_nodes) &
                                           (connectivity_table.total >= threshold)]
@@ -185,15 +193,26 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
 
     # Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)!
     # This is AFTER filtering! Total number of partners can be altered!
-    number_of_partners = {n: {'upstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'upstream')].shape[0],
-                              'downstream': connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == 'downstream')].shape[0]
-                              }
-                          for n in neurons}
+    n_partners = {n: {r: connectivity[(connectivity[str(n)] > 0) & (connectivity.relation == r)].shape[0]
+                      for r in directions}
+                  for n in neurons}
+
+    # Make sure all neurons have connectivity data to calculate similarity
+    no_data = [n for n in neurons if sum(n_partners[n].values()) == 0]
+
+    if no_data:
+        w = '{} neuron(s) without connectivity data found.'.format(len(no_data))
+        if skip_missing:
+            w+= ' Skipped: {}'.format(', '.join(no_data))
+            neurons = list(set(neurons) - set(no_data))
+        else:
+            w+= ' These neurons might have "NaN" similarities.'
+        logger.warning(w)
 
     # Retrieve names
     logger.debug('Retrieving neuron names')
-    neuron_names = fetch.get_names(
-        list(set(neurons + connectivity.skeleton_id.tolist())), remote_instance)
+    neuron_names = fetch.get_names(list(set(neurons + connectivity.skeleton_id.tolist())),
+                                   remote_instance=remote_instance)
 
     matching_scores = {}
 
@@ -209,11 +228,11 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
         # Prepare connectivity subsets:
         cn_subsets = {n: this_cn[n] > 0 for n in neurons}
 
-        logger.info('Calculating %s similarity scores' % d)
-        matching_scores[d] = pd.DataFrame(
-            np.zeros((len(neurons), len(neurons))), index=neurons, columns=neurons)
+        logger.info('Calculating {} similarity scores'.format(d))
+        matching_scores[d] = pd.DataFrame(np.zeros((len(neurons), len(neurons))),
+                                          index=neurons, columns=neurons)
         if this_cn.shape[0] == 0:
-            logger.warning('No %s partners found: filtered?' % d)
+            logger.warning('No {} partners found: filtered?'.format(d))
 
         combinations = [(nA, nB, this_cn, vertex_score, cn_subsets[nA],
                          cn_subsets[nB], cluster_kws) for nA in neurons for nB in neurons]
@@ -221,17 +240,18 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
         with ThreadPoolExecutor(max_workers=max(1, os.cpu_count())) as e:
             futures = e.map(_unpack_connectivity_helper, combinations)
 
-            matching_indices = [n for n in config.tqdm(futures, total=len(combinations),
-                                                desc=d,
-                                                disable=config.pbar_hide,
-                                                leave=config.pbar_leave)]
+            matching_indices = [n for n in config.tqdm(futures,
+                                                       total=len(combinations),
+                                                       desc=d,
+                                                       disable=config.pbar_hide,
+                                                       leave=config.pbar_leave)]
 
         for i, v in enumerate(combinations):
             matching_scores[d].loc[v[0], v[1]
                                    ] = matching_indices[i][similarity]
 
     # Attention! Averaging over incoming and outgoing pairing scores will
-    # give weird results with - for example -  sensory/motor neurons
+    # give weird results with - for example - sensory/motor neurons
     # that have predominantly either only up- or downstream partners!
     # To compensate, the ratio of upstream to downstream partners (after
     # applying filters!) is considered!
@@ -247,12 +267,13 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                     directions[0]][neuronA][neuronB]
             else:
                 try:
-                    r_inputs = number_of_partners[neuronA][
-                        'upstream'] / (number_of_partners[neuronA]['upstream'] + number_of_partners[neuronA]['downstream'])
+                    r_inputs = n_partners[neuronA][
+                        'upstream'] / (n_partners[neuronA]['upstream'] + n_partners[neuronA]['downstream'])
                     r_outputs = 1 - r_inputs
                 except:
-                    logger.warning(
-                        'Failed to calculate input/output ratio for %s assuming 50/50 (probably division by 0 error)' % str(neuronA))
+                    logger.warning('Failed to calculate input/output ratio '
+                                   'for skeleton ID #{} assuming 50/50 '
+                                   '(probably "division-by-0" error)'.format(neuronA))
                     r_inputs = 0.5
                     r_outputs = 0.5
 
@@ -309,8 +330,8 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
 
     Notes
     -----
-    |matching_index =           Number of shared partners divided by total number
-    |                           of partners
+    |matching_index =           Number of shared partners divided by total
+    |                           number of partners
 
     |matching_index_synapses =  Number of shared synapses divided by total number
     |                           of synapses. Attention! matching_index_synapses
@@ -790,8 +811,7 @@ class ClustResults:
                          'obs1', 'obs2', 'dist', 'n_org'])
 
         # Get all distances at which an original observation is merged
-        all_dist = Z[(Z.obs1.isin(self.leafs)) | (
-            Z.obs2.isin(self.leafs))].dist.values
+        all_dist = Z[(Z.obs1.isin(self.leafs)) | (Z.obs2.isin(self.leafs))].dist.values
 
         # Divide all distances by last merger
         all_dist /= self.linkage[-1][2]

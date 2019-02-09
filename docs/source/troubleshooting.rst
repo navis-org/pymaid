@@ -33,6 +33,20 @@ on Github.
 
          fig = pymaid.plot3d(neurons, backend='plotly', width=1200)
 
+   * - Opening a vispy 3D viewer, throws a long list of errors ending with something like this::
+
+         RuntimeError: Error while fetching file http://github.com/vispy/demo-data/raw/master/fonts/OpenSans-Regular.ttf.
+         Dataset fetching aborted (<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:847)>)
+
+     - For reasons beyond me, vispy does not include the font to render text so it has to download it on first use. If this fails with an ``SSL`` error, do the following once::
+
+         import pymaid
+         import ssl
+         ssl._create_default_https_context = ssl._create_unverified_context
+         v = pymaid.Viewer()
+
+       This temporarily disables SSL verification to allow download of the font. I recommend restarting the Python session afterwards!
+
    * - **Jupyter**
      -
    * - Instead of a progress bar, I get some odd message (e.g. ``Hbox(children=...``) when using pymaid in a Jupyter notebook.

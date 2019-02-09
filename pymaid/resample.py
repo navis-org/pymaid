@@ -20,9 +20,10 @@
 
 import pandas as pd
 import numpy as np
-import scipy
+import scipy.spatial
 import scipy.interpolate
-from pymaid import core, graph_utils, config
+
+from . import core, graph_utils, config
 
 # Set up logging
 logger = config.logger

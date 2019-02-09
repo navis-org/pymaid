@@ -45,26 +45,26 @@ dtype: object
 
 """
 
-import urllib
-import json
-import time
 import base64
+import datetime
+import json
+import os
+import re
 import sys
+import tempfile
+import time
+import urllib
+import webbrowser
 
 import requests
 from requests_futures.sessions import FuturesSession
 
-import datetime
-import re
-import pandas as pd
 import numpy as np
-import sys
 import networkx as nx
+import pandas as pd
 
-from pymaid import core, graph, utils, config, cache
-from pymaid.intersect import in_volume
-
-import webbrowser
+from . import core, graph, utils, config, cache
+from .intersect import in_volume
 
 __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_3D_skeleton', 'get_3D_skeletons',
@@ -86,7 +86,10 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'rename_neurons', 'get_label_list', 'find_neurons',
                   'get_skid_from_treenode', 'get_transactions',
                   'remove_annotations', 'get_connector_links',
-                  'get_nth_partners', 'get_treenodes_by_tag'])
+                  'get_nth_partners', 'get_treenodes_by_tag',
+                  'get_node_location', 'add_meta_annotations',
+                  'remove_meta_annotations', 'get_annotated',
+                  'import_neuron'])
 
 # Set up logging
 logger = config.logger
@@ -101,11 +104,11 @@ class CatmaidInstance:
     ----------
     server :        str
                     The url for a CATMAID server.
-    authname :      str
+    authname :      str | None
                     The http user.
-    authpassword :  str
+    authpassword :  str | None
                     The http password.
-    authtoken :     str
+    authtoken :     str | None
                     User token - see CATMAID documentation on how to get it.
     project_id :    int, optional
                     ID of your project. Default = 1.
@@ -276,10 +279,16 @@ class CatmaidInstance:
         else:
             logger.info('Global CATMAID instance set. Caching is OFF.')
 
-    def fetch(self, url, post=None, desc='Fetching', raw=False,
-              callback=None, disable_pbar=False, leave_pbar=True):
+    def fetch(self, url, post=None, desc='Fetching', callback=None, files=None,
+              disable_pbar=False, leave_pbar=True, return_type='json'):
         """ Requires the url to connect to and the variables for POST,
         if any, in a dictionary.
+
+        Parameters
+        ----------
+        return_type :   "json" | "raw" | "request"
+                        Defines returned data.
+
         """
 
         # Keep track of if a single response is expected
@@ -297,9 +306,12 @@ class CatmaidInstance:
                 raise ValueError('POST needs to be provided for each url.')
             if self.caching:
                 futures = [self._cache.get_cached_url(u, self._future_session,
-                                                      post=p) for u, p in zip(url, post)]
+                                                      post=p,
+                                                      files=files) for u, p in zip(url, post)]
             else:
-                futures = [self._future_session.post(u, data=p) for u, p in zip(url, post)]
+                futures = [self._future_session.post(u,
+                                                     data=p,
+                                                     files=files) for u, p in zip(url, post)]
         else:
             if self.caching:
                 futures = [self._cache.get_cached_url(u, self._future_session,
@@ -326,11 +338,15 @@ class CatmaidInstance:
                 logger.info('Cached data used. Use `pymaid.clear_cache()` '
                             'to clear.')
 
-        # Convert to json if applicable
-        if not raw:
+        # Return requested data
+        if return_type.lower() == 'json':
             resp = [r.json() for r in resp]
-        else:
+        elif return_type.lower() == 'raw':
             resp = [r.content for r in resp]
+        elif return_type.lower() == 'request':
+            pass
+        else:
+            raise ValueError('Unknown return type "{}"'.format(return_type))
 
         if was_single:
             return resp[0]
@@ -395,6 +411,32 @@ class CatmaidInstance:
             s += 'Cache size: {}'.format(self.cache_size)
 
         return s
+
+    @property
+    def catmaid_version(self):
+        """ Version of CATMAID your server is running. """        
+
+        return self.fetch(self._get_catmaid_version())['SERVER_VERSION']        
+
+    @property
+    def available_projects(self):
+        """ List of projects hosted on your server. Depends on your user's
+        permission! """        
+
+        return pd.DataFrame(self.fetch(self._get_projects_url())).sort_values('id')
+
+    @property
+    def image_stacks(self):
+        """ Image stacks available under this project id. """
+        stacks = self.fetch(self._get_stacks_url())
+        details = self.fetch([self._get_stack_info_url(s['id']) for s in stacks])
+
+        # Add details to stacks
+        for s, d in zip(stacks, details):
+            s.update(d)
+
+        # Return as DataFrame
+        return pd.DataFrame(stacks).set_index('id')    
 
     def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
@@ -636,8 +678,8 @@ class CatmaidInstance:
 
     def _delete_neuron_url(self, neuron_id, **GET):
         """ Use to parse url for deleting a single neurons"""
-        return self.make_url(self.project_id, 'label', 'treenode', treenode_id,
-                             'update', **GET)
+        return self.make_url(self.project_id, 'neuron', neuron_id, 'delete',
+                             **GET)
 
     def _delete_treenode_url(self, **GET):
         """ Use to parse url for deleting treenodes"""
@@ -727,6 +769,21 @@ class CatmaidInstance:
         """ Use to get treenode table. Does need postdata."""
         return self.make_url(self.project_id, 'treenodes', 'compact-detail',
                              **GET)
+
+    def _get_node_location_url(self, **GET):
+        """ Use to get treenode table. Does need postdata."""
+        return self.make_url(self.project_id, 'nodes', 'location', **GET)
+
+    def _import_skeleton_url(self, **GET):
+        """ Use to import skeleton into Catmaid Instance. Does need postdata.
+        """
+        return self.make_url(self.project_id, 'skeletons', 'import', **GET)
+
+    def _get_skeletons_in_bbox(self, **GET):
+        """ Use to get list of skeleton in bounding box. Does need postdata.
+        """
+        return self.make_url(self.project_id, 'skeletons', 'in-bounding-box',
+                             **GET)        
 
 
 @cache.undo_on_error
@@ -1375,6 +1432,22 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
     if not isinstance(min_confidence, (float, int)) or min_confidence < 0 or min_confidence > 5:
         raise ValueError('min_confidence must be 0-5.')
 
+    # This maps CATMAID JSON relations to more relatable terms (I think)
+    relations = {'incoming': 'upstream',
+                 'outgoing': 'downstream',
+                 'gapjunctions': 'gapjunction',
+                 'attachments': 'attachment'}
+
+    # Catch some easy mistakes regarding relations:
+    repl = {v: k for k, v in relations.items()}
+    directions = [repl.get(d, d) for d in directions]
+
+    wrong_dir = set(directions) - set(relations.keys())
+    if wrong_dir:
+        raise ValueError('Unknown direction "{}". Please use a combination '
+                         'of "{}"'.format(', '.join(wrong_dir),
+                                          ', '.join(relations.keys())))
+
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -1390,8 +1463,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
         tag = 'source_skeleton_ids[{0}]'.format(i)
         connectivity_post[tag] = skid
 
-    logger.info(
-        'Fetching connectivity table for {0} neurons'.format(len(x)))
+    logger.info('Fetching connectivity table for {} neurons'.format(len(x)))
     connectivity_data = remote_instance.fetch(
         remote_connectivity_url, connectivity_post)
 
@@ -1404,19 +1476,14 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                       d]] + list(x), remote_instance)
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
-                               'num_nodes', 'relation'] + list(x))
-
-    relations = {
-        'incoming': 'upstream',
-        'outgoing': 'downstream',
-        'gapjunctions': 'gapjunction',
-        'attachments': 'attachment'
-    }
+                               'num_nodes', 'relation'] + list(x))    
 
     # Number of synapses is returned as list of links with 0-5 confidence:
     # {'skid': [0, 1, 2, 3, 4, 5]}
     # This is being collapsed into a single value before returning it.
     for d in relations:
+        if d not in connectivity_data:
+            continue
         df_temp = pd.DataFrame([[
             names[str(n)],
             str(n),
@@ -2425,6 +2492,127 @@ def add_annotations(x, annotations, remote_instance=None):
     return
 
 
+@cache.never_cache
+def add_meta_annotations(to_annotate, to_add, remote_instance=None):
+    """ Add meta-annotation(s) to annotation(s).
+
+    Parameters
+    ----------
+    to_annotate :       str | list of str
+                        Annotation(s) to meta-annotate.
+    to_add :            str | list of str
+                        Meta-annotation(s) to add to annotations.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Nothing
+
+    See Also
+    --------
+    :func:`~pymaid.remove_meta_annotations`
+                        Delete given annotations from neurons.
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    # Get annotation IDs
+    to_annotate = utils._make_iterable(to_annotate)
+    an = get_annotation_list(remote_instance=remote_instance)
+    an = an[an.annotation.isin(to_annotate)]
+
+    if an.shape[0] != len(to_annotate):
+        missing = set(to_annotate).difference(an.annotation.values)
+        raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
+
+    an_ids = an.annotation_id.values
+
+    to_add = utils._make_iterable(to_add)
+
+    add_annotations_url = remote_instance._get_add_annotations_url()
+
+    add_annotations_postdata = {}
+
+    for i, x in enumerate(an_ids):
+        key = 'entity_ids[%i]' % i
+        add_annotations_postdata[key] = str(x)
+
+    for i, x in enumerate(to_add):
+        key = 'annotations[%i]' % i
+        add_annotations_postdata[key] = str(x)
+
+    logger.info(remote_instance.fetch(
+        add_annotations_url, add_annotations_postdata))
+
+    return
+
+
+@cache.never_cache
+def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
+    """ Remove meta-annotation(s) from annotation(s).
+
+    Parameters
+    ----------
+    remove_from :       str | list of str
+                        Annotation(s) to de-meta-annotate.
+    to_remove :         str | list of str
+                        Meta-annotation(s) to remove from annotations.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Nothing
+
+    See Also
+    --------
+    :func:`~pymaid.add_meta_annotations`
+                        Delete given annotations from neurons.
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    an = get_annotation_list(remote_instance=remote_instance)
+
+    # Get annotation IDs
+    remove_from = utils._make_iterable(remove_from)    
+    rm = an[an.annotation.isin(remove_from)]
+    if rm.shape[0] != len(remove_from):
+        missing = set(remove_from).difference(rm.annotation.values)
+        raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
+    an_ids = rm.annotation_id.values
+
+    # Get meta-annotation IDs
+    to_remove = utils._make_iterable(to_remove)
+    rm = an[an.annotation.isin(to_remove)]
+    if rm.shape[0] != len(to_remove):
+        missing = set(to_remove).difference(rm.annotation.values)
+        raise ValueError('Meta-annotation(s) not found: {}'.format(','.join(missing)))
+    rm_ids = rm.annotation_id.values
+
+    add_annotations_url = remote_instance._get_remove_annotations_url()
+
+    remove_annotations_postdata = {}
+
+    for i, x in enumerate(an_ids):
+        key = 'entity_ids[%i]' % i
+        remove_annotations_postdata[key] = str(x)
+
+    for i, x in enumerate(rm_ids):
+        key = 'annotation_ids[%i]' % i
+        remove_annotations_postdata[key] = str(x)
+
+    print(remove_annotations_postdata)
+
+    logger.info(remote_instance.fetch(
+        add_annotations_url, remove_annotations_postdata))
+
+    return
+
+
 @cache.undo_on_error
 def get_user_annotations(x, remote_instance=None):
     """ Retrieve annotations used by given user(s).
@@ -2875,6 +3063,82 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
                 by_skid[e[7]].append(e[0])
 
     return by_skid
+
+
+@cache.undo_on_error
+def get_annotated(x, remote_instance=None, include_sub_annotations=False,
+                  allow_partial=True):
+    """ Retrieve entities (neurons and annotations) with given
+    (meta-)annotation(s).
+
+    This works similar to CATMAID's neuron search widget: multiple annotations
+    are intersected!
+
+    Parameters
+    ----------
+    x :                       str | list of str
+                              (Meta-)annotations(s) to search for. Like
+                              CATMAID's search widget, you can use regex to
+                              search for names by starting the query with a
+                              leading ``/``. Use a leading ``~`` (tilde) to
+                              indicate ``NOT`` condition.
+    include_sub_annotations : bool, optional
+                              If True, will include entities that have
+                              annotations meta-annotated with ``x``. Does not
+                              work on `NOT` search conditions.
+    allow_partial :           bool, optional
+                              If True, partially matching annotations are
+                              searched to.
+    remote_instance :         CATMAID instance, optional
+                              If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame in which each row represents an entity::
+
+           id  name  skeleton_ids type
+         0
+         1
+         2
+         ...
+
+    See Also
+    --------
+    :func:`pymaid.find_neurons`
+                            Use to retrieve neurons by combining various
+                            search criteria. For example names, reviewers,
+                            annotations, etc.
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    pos, neg = utils._eval_conditions(x)
+
+    post = {'with_annotations': False}
+    if pos:
+        pos_ids = get_annotation_id(pos, allow_partial=allow_partial,
+                                    remote_instance=remote_instance)
+        post.update({'annotated_with[{}]'.format(i): n for
+                                    i, n in enumerate(pos_ids.values())})
+        if include_sub_annotations:
+            post.update({'sub_annotated_with[{}]'.format(i): n for
+                                    i, n in enumerate(pos_ids.values())})
+    if neg:
+        neg_ids = get_annotation_id(neg, allow_partial=allow_partial,
+                                    remote_instance=remote_instance)
+        post.update({'not_annotated_with[{}]'.format(i): n for
+                                    i, n in enumerate(neg_ids.values())})
+
+    logger.info('Searching for: {}'.format(','.join([str(s) for s in pos_ids])))
+    if neg:
+        logger.info('..... and NOT: {}'.format(','.join([str(s) for s in neg_ids])))
+
+    urls = remote_instance._get_annotated_url()
+    
+    resp = remote_instance.fetch(urls, post=post, desc='Fetching')
+
+    return pd.DataFrame(resp['entities'])
 
 
 @cache.undo_on_error
@@ -3963,6 +4227,11 @@ def get_history(remote_instance=None,
     >>> # Get number of active (non-zero) users
     >>> active_users = hist.cable.astype(bool).sum(axis=0)
 
+    See Also
+    -------
+    :func:`~pymaid.get_user_stats`
+            Returns a summary of user stats as table.
+
     """
 
     def _constructor_helper(data, key, days):
@@ -4017,7 +4286,7 @@ def get_history(remote_instance=None,
     data = []
     for r in config.tqdm(rounds, desc='Retrieving history',
                          disable=config.pbar_hide, leave=config.pbar_leave):
-        get_history_GET_data = {'self.project_id': remote_instance.project_id,
+        get_history_GET_data = {'pid': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
                                 }
@@ -4294,8 +4563,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     sets_of_skids = []
 
     if not isinstance(skids, type(None)):
-        skids = utils.eval_skids(skids)
-        sets_of_skids.append(set(skids))
+        skids = utils.eval_skids(skids, remote_instance=remote_instance)
+        sets_of_skids.append(set(skids, remote_instance=remote_instance))
 
     # Get skids by name
     if names:
@@ -4354,8 +4623,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                      'created_by': u} for u in users]
 
         if from_date and to_date:
-            dates = {'from': ''.join([str(d) for d in from_date]),
-                     'to': ''.join([str(d) for d in to_date])}
+            dates = {'from': ''.join(['{0:02d}'.format(d) for d in from_date]),
+                     'to': ''.join(['{0:02d}'.format(d) for d in to_date])}
             GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
@@ -4374,8 +4643,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                      'reviewed_by': u} for u in reviewed_by]
 
         if from_date and to_date:
-            dates = {'from': ''.join([str(d) for d in from_date]),
-                     'to': ''.join([str(d) for d in to_date])}
+            dates = {'from': ''.join(['{0:02d}'.format(d) for d in from_date]),
+                     'to': ''.join(['{0:02d}'.format(d) for d in to_date])}
             GET_data = [{**d, **dates} for d in GET_data]
         urls = [u + '?%s' % urllib.parse.urlencode(g) for u, g in zip(urls, GET_data)]
 
@@ -4482,7 +4751,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
 
 @cache.undo_on_error
-def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
+def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
                           only_soma=False, remote_instance=None):
     """ Retrieves neurons with processes within CATMAID volumes.
 
@@ -4500,13 +4769,16 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     ----------
     volumes :               str | core.Volume | list of either
                             Single or list of CATMAID volumes.
+    min_nodes :             int, optional
+                            Minimum node count for a neuron within given 
+                            volume(s).
+    min_cable :             int, optional
+                            Minimum cable length [nm] for a neuron within
+                            given volume(s).
     intersect :             bool, optional
                             If multiple volumes are provided, this parameter
                             determines if neurons have to be in all of the
-                            neuropils or just a single.
-    min_nodes :             int, optional
-                            Minimum number of node these neurons need to have
-                            in given volumes.
+                            volumes or just a single.
     only_soma :             bool, optional
                             If True, only neurons with a soma will be returned.
     remote_instance :       CATMAID instance
@@ -4557,6 +4829,7 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
     for v in volumes:
         logger.info('Retrieving nodes in volume {0}'.format(v.name))
         temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
+                                   min_cable=min_cable,
                                    remote_instance=remote_instance)
 
         if not intersect:
@@ -4583,14 +4856,9 @@ def get_neurons_in_volume(volumes, intersect=False, min_nodes=2,
 
 
 @cache.undo_on_error
-def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
-                        **kwargs):
+def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
+                        remote_instance=None, **kwargs):
     """ Retrieves neurons with processes within a defined box volume.
-
-    Because the API returns only a limited number of neurons at a time, the
-    defined volume has to be chopped into smaller pieces for crowded areas -
-    may thus take some time! This function will retrieve ALL neurons within
-    the box - not just the once entering/exiting.
 
     Parameters
     ----------
@@ -4598,30 +4866,30 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
                             Coordinates of the bounding box. Can be either:
 
                               1. List/np.array: ``[[left, right], [top, bottom], [z1, z2]]``
-                              2. Dictionary with above entries
+                              2. Dictionary ``{'left': int|float, 'right': ..., ...}``
     unit :                  'NM' | 'PIXEL'
                             Unit of your coordinates. Attention:
                             'PIXEL' will also assume that Z1/Z2 is in slices.
                             By default, a X/Y resolution of 3.8nm and a Z
                             resolution of 35nm is assumed. Pass 'xy_res' and
-                            'z_res' as **kwargs to override this.
+                            'z_res' as ``**kwargs`` to override this.
     min_nodes :             int, optional
-                            Minimum node count for a neuron within given box
-                            to be returned.
+                            Minimum node count for a neuron within given 
+                            bounding box.
+    min_cable :             int, optional
+                            Minimum cable length [nm] for a neuron within
+                            given bounding box.
     remote_instance :       CATMAID instance
                             If not passed directly, will try using global.
 
     Returns
-    --------
+    -------
     list
                             ``[skeleton_id, skeleton_id, ...]``
 
     """
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
-
-    x_y_resolution = kwargs.get('xy_res', 3.8)
-    z_resolution = kwargs.get('z_res', 35)
+    remote_instance = utils._eval_remote_instance(remote_instance)    
 
     if isinstance(bbox, dict):
         bbox = np.array([[bbox['left'], bbox['right']],
@@ -4633,110 +4901,19 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, remote_instance=None,
         bbox = np.array(bbox)
 
     if unit == 'PIXEL':
-        bbox *= x_y_resolution
+        bbox[[0, 1]:] *= kwargs.get('xy_res', 3.8)
+        bbox[[2]:] *= kwargs.get('z_res', 35)
 
-    # Subset the volume into boxes of 50**3 um^3
-    boxes = _subset_volume(bbox, max_vol=25**3)
+    url = remote_instance._get_skeletons_in_bbox(minx=min(bbox[0]),
+                                                 maxx=max(bbox[0]),
+                                                 miny=min(bbox[1]),
+                                                 maxy=max(bbox[1]),
+                                                 minz=min(bbox[2]),
+                                                 maxz=max(bbox[2]),
+                                                 min_nodes=min_nodes,
+                                                 min_cable=min_cable)
 
-    node_list = []
-    while boxes.any():
-        # Prepare urls and postdata for each box
-        urls = [remote_instance._get_node_list_url() for u in boxes]
-        postdata = [{
-                    'left': bbox[0][0],
-                    'right': bbox[0][1],
-                    'top': bbox[1][0],
-                    'bottom': bbox[1][1],
-                    'z1': bbox[2][0],
-                    'z2': bbox[2][1],
-                    # Atnid seems to be related to fetching the
-                    # active node too (will be ignored if atnid
-                    # = -1)
-                    'atnid': -1,
-                    'labels': False,
-                    # Maximum number of nodes returned per
-                    # query - default appears to be 3500 (on
-                    # Github) but it appears as if this is
-                    # overriden by server settings anyway!
-                    'limit': 1000000
-                    } for bbox in boxes]
-
-        data = remote_instance.fetch(urls, post=postdata, disable_pbar=False,
-                                     leave_pbar=False, desc='Fetching nodes')
-
-        # Collect data and check if we need more fetching
-        new_boxes = np.empty((0, 3, 2))
-        for nl, bbox in zip(data, boxes):
-            # Subdivide if too many nodes returned
-            if nl[3] is True:
-                # Divided this box into 8 smaller boxes
-                new_boxes = np.append(new_boxes, _subset_volume(bbox), axis=0)
-            else:
-                # If limit not reached, return node list
-                node_list += nl[0]
-        boxes = new_boxes
-
-    # Collapse list into unique skeleton ids
-    unique, counts = np.unique([n[7] for n in node_list], return_counts=True)
-    skeletons = unique[counts >= min_nodes]
-
-    logger.info("Done: %i nodes from %i unique neurons retrieved." % (
-        len(node_list), len(skeletons)))
-
-    return skeletons
-
-
-def _subset_volume(bbox, max_vol=None):
-    """ Subdivide a bounding box into smaller subvolumes. Can provide a max
-    volume size.
-
-    Parameters
-    ----------
-    bbox :      dict
-                Must contain these entries: left, right, top, bottom, z1, z2.
-    max_vol :   int, optional
-                Maximum volume per subvolume in cubic microns [um^3].
-
-    Returns
-    -------
-    subvolumes :    np.ndarray
-
-    """
-
-    # Tile space
-    b_x = zip(np.linspace(bbox[0][0], bbox[0][1], 3)[:-1],
-              np.linspace(bbox[0][0], bbox[0][1], 3)[1:])
-
-    b_y = zip(np.linspace(bbox[1][0], bbox[1][1], 3)[:-1],
-              np.linspace(bbox[1][0], bbox[1][1], 3)[1:])
-
-    b_z = zip(np.linspace(bbox[2][0], bbox[2][1], 3)[:-1],
-              np.linspace(bbox[2][0], bbox[2][1], 3)[1:])
-
-    # For some reason we need to convert list, otherwise coordinates are
-    # dropped
-    b_x = list(b_x)
-    b_y = list(b_y)
-    b_z = list(b_z)
-
-    new_boxes = []
-    for x in b_x:
-        for y in b_y:
-            for z in b_z:
-                new_boxes.append([x, y, z])
-    new_boxes = np.array(new_boxes)
-
-    # Check the volume of the new boxes. If volume is too big, do another
-    # round of subsetting
-    if max_vol:
-        this_volume = (new_boxes[0][:, 1] -
-                       new_boxes[0][:, 0]).prod() / 1000**3
-        if this_volume > max_vol:
-            new_boxes = np.array(
-                [b for box in new_boxes for b in _subset_volume(box,
-                                                                max_vol=max_vol)])
-
-    return new_boxes
+    return remote_instance.fetch(url)
 
 
 @cache.undo_on_error
@@ -4929,8 +5106,9 @@ def get_volume(volume_name=None, remote_instance=None,
 
     Parameters
     ----------
-    volume_name :       str | list of str
-                        Name(s) of the volume to import - must be EXACT!
+    volume_name :       int | str | list of str or int
+                        Name(s) (as ``str``) or ID (as ``int``) of the volume
+                        to import. Names must be EXACT!
                         If ``volume_name=None``, will return list of all
                         available CATMAID volumes. If list of volume names,
                         will return a dictionary ``{name: Volume, ... }``
@@ -4963,7 +5141,7 @@ def get_volume(volume_name=None, remote_instance=None,
 
     if isinstance(volume_name, type(None)):
         logger.info('Retrieving list of available volumes.')
-    elif not isinstance(volume_name, (str, list, np.ndarray)):
+    elif not isinstance(volume_name, (int, str, list, np.ndarray)):
         raise TypeError('Volume name must be str or list of str.')
 
     volume_names = utils._make_iterable(volume_name)
@@ -4972,15 +5150,20 @@ def get_volume(volume_name=None, remote_instance=None,
     get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
 
+    all_vols = pd.DataFrame(response['data'], columns=response['columns'])
+
     if not volume_name:
-        return pd.DataFrame.from_dict(response)
+        return all_vols
 
-    volume_ids = [e['id'] for e in response if e['name'] in volume_names]
+    req_vols = all_vols[(all_vols.name.isin(volume_names)) |
+                        (all_vols.id.isin(volume_names))]
+    volume_ids = req_vols.id.values
 
-    if len(volume_ids) != len(volume_names):
-        not_found = [v for v in volume_names if v not in response.name.values]
+    if len(volume_ids) < len(volume_names):
+        not_found = set(volume_names).difference(set(all_vols.name) |
+                                                 set(all_vols.id))
         raise Exception(
-            'No volume(s) found for: {}'.format(not_found.split(',')))
+            'No volume(s) found for: {}'.format(','.join(not_found)))
 
     url_list = [remote_instance._get_volume_details(v) for v in volume_ids]
 
@@ -5194,8 +5377,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
         url = gen_url(coords, stack_id, active_node_id, active_skeleton_id)
 
         if open_browser:
-            for u in url:
-                webbrowser.open_new_tab(u)
+            webbrowser.open_new_tab(url)
 
         return url
 
@@ -5247,9 +5429,9 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     if isinstance(new_names, dict):
         # First make sure that dictionary maps strings
-        _ = {str(n): new_names[n] for n in new_names}
+        temp = {str(n): new_names[n] for n in new_names}
         # Generate a list from the dict
-        new_names = [_[n] for n in x if n in _]
+        new_names = [temp[n] for n in x if n in temp]
     elif not isinstance(new_names, (list, np.ndarray)):
         new_names = [new_names]
 
@@ -5294,6 +5476,40 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     return
 
+@cache.undo_on_error
+def get_node_location(x, remote_instance=None):
+    """ Retrieves location for a set of tree- or connector nodes.
+
+    Parameters
+    ----------
+    x :                 int | list of int
+                        Node ID(s).
+    remote_instance :   CatmaidInstance, optional
+                        If not provided, will search for globally defined
+                        remote instance.
+
+    Returns
+    -------
+    pandas.DataFrame
+            DataFrame in which each row represents a node::
+
+                node_id  x  y  z
+             0
+             1
+             ...
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    x = utils.eval_node_ids(x, connectors=True, treenodes=True)
+
+    url = remote_instance._get_node_location_url()
+    post = {'node_ids[{}]'.format(i): n for i, n in enumerate(x)}
+
+    data = remote_instance.fetch(url, post)
+    df = pd.DataFrame(data, columns=['node_id', 'x', 'y', 'z'])
+
+    return df
 
 @cache.undo_on_error
 def get_label_list(remote_instance=None):
@@ -5389,3 +5605,55 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
         d[:16], '%Y-%m-%dT%H:%M') for d in df['execution_time'].values]
 
     return df
+
+
+@cache.never_cache
+def import_neuron(x, remote_instance=None):
+    """ Import neuron(s) to CATMAID instance.
+
+    Does only import node tables, **not** connectors.
+    Skeleton and treenode IDs will change!
+
+    Parameters
+    ----------
+    x :                 CatmaidNeuron/List
+                        Neurons to import.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict 
+                        Response
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if len(x) == 1:
+            x = x[0]
+        else:
+            return {n.skeleton_id : import_neuron(n,
+                                                  remote_instance=remote_instance)
+                    for n in config.tqdm(x,
+                                         desc='Import',
+                                         disable=config.pbar_hide,
+                                         leave=config.pbar_leave)}
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))    
+
+    import_url = remote_instance._import_skeleton_url()
+
+    import_post = {'neuron_id': None,
+                   'name': x.neuron_name}
+
+    f = os.path.join(tempfile.gettempdir(), 'temp.swc')
+
+    _ = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
+
+    with open(f, 'rb') as file:
+        resp = rm.fetch(import_url, post=import_post, files={'file': file})
+
+    return resp

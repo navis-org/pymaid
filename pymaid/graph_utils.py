@@ -18,15 +18,16 @@
 representations.
 """
 
+import itertools
+import numbers
+
 import pandas as pd
 import numpy as np
 import networkx as nx
 
-import numbers
-
 from scipy.sparse import csgraph, csr_matrix
 
-from pymaid import graph, core, utils, config
+from . import graph, core, utils, config
 
 # Set up logging
 logger = config.logger
@@ -81,7 +82,7 @@ def _generate_segments(x, weight=None):
     else:
         raise ValueError('Unable to use weight "{}"'.format(weight))
 
-    if x.igraph and config.use_igraph:
+    if config.use_igraph and x.igraph:
         g = x.igraph
         # Convert endNodeIDs to indices
         id2ix = {n: ix for ix, n in zip(g.vs.indices,
@@ -109,7 +110,7 @@ def _generate_segments(x, weight=None):
             sequences.append(sequence)
 
     # If igraph, turn indices back to node IDs
-    if x.igraph and config.use_igraph:
+    if config.use_igraph and x.igraph:
         ix2id = {v: k for k, v in id2ix.items()}
         sequences = [[ix2id[ix] for ix in s] for s in sequences]
 
@@ -264,7 +265,11 @@ def classify_nodes(x, inplace=True):
                 # [ n for n in g.nodes if g.degree(n) > 2 ]
                 branches = deg[deg.iloc[:, 0] > 2].index.values
 
-            x.nodes['type'] = 'slab'
+            if 'type' not in x.nodes:
+                x.nodes['type'] = 'slab'
+            else:
+                x.nodes.loc[:, 'type'] = 'slab'
+
             x.nodes.loc[x.nodes.treenode_id.isin(ends), 'type'] = 'end'
             x.nodes.loc[x.nodes.treenode_id.isin(branches), 'type'] = 'branch'
             x.nodes.loc[x.nodes.parent_id.isnull(), 'type'] = 'root'
@@ -683,7 +688,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     Parameters
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
-                        May contain only a single neuron.
+                        Must be a single neuron.
     n :                 int | slice, optional
                         Number of longest neurites to preserve. For example:
                          - ``n=1`` keeps the longest neurites
@@ -698,7 +703,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     Returns
     -------
     CatmaidNeuron
-                        Pruned neuron. Only if ``inplace==False``.
+                        Pruned neuron. Only if ``inplace=False``.
 
     See Also
     --------
@@ -1142,8 +1147,8 @@ def _cut_networkx(x, cut_node, ret):
         return prox
 
 
-def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
-                  inplace=False):
+def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
+                  prevent_fragments=False, inplace=False):
     """ Subsets a neuron to a set of treenodes.
 
     Parameters
@@ -1155,9 +1160,13 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
                           If True, will reset temporary attributes (graph,
                           node classification, etc. ). In general, you should
                           leave this at ``True``.
-    remove_disconnected : bool, optional
-                          If True, will remove disconnected connectors that
+    keep_disc_cn :        bool, optional
+                          If False, will remove disconnected connectors that
                           have "lost" their parent treenode.
+    prevent_fragments :   bool, optional
+                          If True, will add nodes to ``subset`` required to
+                          keep neuron from fragmenting. The new root will be
+                          the node closest to the original root.
     inplace :             bool, optional
                           If False, a copy of the neuron is returned.
 
@@ -1202,6 +1211,11 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
         raise TypeError('Can only subset to list, set, numpy.ndarray or \
                          networkx.Graph, not "{0}"'.format(type(subset)))
 
+    if prevent_fragments:
+        subset, new_root = connected_subgraph(x, subset)
+    else:
+        new_root = None
+
     # Make a copy of the neuron
     if not inplace:
         x = x.copy(deepcopy=False)
@@ -1218,7 +1232,7 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
                         axis=1)
 
     # Filter connectors
-    if remove_disconnected:
+    if not keep_disc_cn:
         x.connectors = x.connectors[x.connectors.treenode_id.isin(subset)]
 
     # Filter tags
@@ -1241,6 +1255,9 @@ def subset_neuron(x, subset, clear_temp=True, remove_disconnected=True,
     # Reset indices of data tables
     x.nodes.reset_index(inplace=True, drop=True)
     x.connectors.reset_index(inplace=True, drop=True)
+
+    if new_root:
+        x.reroot(new_root, inplace=True)
 
     # Clear temporary attributes
     if clear_temp:
@@ -1338,3 +1355,82 @@ def _igraph_to_sparse(graph, weight_attr=None):
         weights.extend(weights)
     return csr_matrix((weights, zip(*edges)),
                       shape=(len(graph.vs), len(graph.vs)))
+
+
+def connected_subgraph(x, ss):
+    """ Returns set of nodes necessary to connect all nodes in subset ``ss``.
+
+    Parameters
+    ----------
+    x :         pymaid.CatmaidNeuron
+                Neuron to get subgraph for.
+    ss :        list | array-like
+                Treenode IDs of node to subset to.
+
+    Returns
+    -------
+    np.ndarray
+                Treenode IDs of connected subgraph.
+    root ID
+                ID of the treenode most proximal to the old root in the 
+                connected subgraph.
+
+    """
+    if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
+        x = x[0]
+    elif not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Input must be a single CatmaidNeuron.')
+
+    missing = set(ss) - set(x.nodes.treenode_id.values)
+    if missing:
+        raise ValueError('Nodes not found: {}'.format(','.join(missing)))
+
+    # Find leaf nodes in subset (real leafs and simply disconnected slabs)
+    ss_nodes = x.nodes[x.nodes.treenode_id.isin(ss)]
+    leafs = ss_nodes[(ss_nodes.type == 'end')].treenode_id.values
+    disconnected = x.nodes[(~x.nodes.treenode_id.isin(ss)) & (x.nodes.parent_id.isin(ss))]
+    leafs = np.append(leafs, disconnected.parent_id.values)
+
+    # Walk from each node to root and keep track of path
+    g = x.graph
+    paths = []
+    for n in leafs:
+        this_path = []
+        while n:
+            this_path.append(n)
+            n = next(g.successors(n), None)
+        paths.append(this_path)
+
+    # Find the nodes that all paths have in common
+    common = set.intersection(*[set(p) for p in paths])
+
+    # Now find the first (most distal from root) common node
+    longest_path = sorted(paths, key=lambda x: len(x))[-1]
+    first_common = sorted(common, key=lambda x: longest_path.index(x))[0]
+
+    # Now go back to paths and collect all nodes until this first common node
+    include = set()
+    for p in paths:
+        it = iter(p)
+        n = next(it, None)
+        while n:
+            if n in include:
+                break
+            if n == first_common:
+                include.add(n)
+                break
+            include.add(n)
+            n = next(it, None)
+
+    # In cases where there are even more distal common ancestors
+    # (first common will typically be a branch point)
+    if set(ss) - set(include):
+        # Make sure the new root is set correctly
+        new_root = sorted(set(ss) - set(include),
+                          key=lambda x: longest_path.index(x))[-1]
+        # Add those nodes to be included
+        include = set.union(include, ss)
+    else:
+        new_root = first_common    
+
+    return np.array(list(include)), new_root

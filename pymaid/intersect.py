@@ -22,7 +22,7 @@ import pandas as pd
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from pymaid import fetch, core, utils, graph_utils, config
+from . import fetch, core, utils, graph_utils, config
 
 # Set up logging -> has to be before try statement!
 logger = config.logger
@@ -34,44 +34,50 @@ except ImportError:
     logger.warning("Module pyoctree not found. Falling back to scipy's \
                             ConvexHull for intersection calculations.")
 
-__all__ = sorted(['in_volume'])
+__all__ = sorted(['in_volume', 'intersection_matrix'])
 
 
-def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
+def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
+              remote_instance=None):
     """ Test if points/neurons are within a given CATMAID volume.
 
     Important
     ---------
     This function requires `pyoctree <https://github.com/mhogg/pyoctree>`_
     which is only an optional dependency of pymaid. If pyoctree is not
-    installed, we will fall back to using scipy ConvexHull instead of ray
-    casting. This is slower and may give wrong positives for concave meshes!
+    installed, we will fall back to using scipy ConvexHull instead. This is
+    slower and may give wrong positives for concave meshes!
 
     Parameters
     ----------
-    x :               list of tuples | numpy.array | pandas.DataFrame | CatmaidNeuron | CatmaidNeuronList
+    x :                 list of tuples | numpy.array | pandas.DataFrame | CatmaidNeuron | CatmaidNeuronList
 
-                      - list/numpy.array is treated as list of x/y/z
-                        coordinates. Needs to be shape (N,3): e.g.
-                        ``[[x1, y1, z1], [x2, y2, z2], ..]``
-                      - ``pandas.DataFrame`` needs to have ``x, y, z`` columns
+                        - list/numpy.array is treated as list of x/y/z
+                          coordinates. Needs to be shape (N,3): e.g.
+                          ``[[x1, y1, z1], [x2, y2, z2], ..]``
+                        - ``pandas.DataFrame`` needs to have ``x, y, z``
+                          columns
 
-    volume :          str | pymaid.Volume | list or dict of either
-                      :class:`pymaid.Volume` or name of a CATMAID volume to
-                      test. Multiple volumes can be given as list
-                      (``[volume1, volume2, ...]``) or dict
-                      (``{'label1': volume1, ...}``) of either str or
-                      :class:`pymaid.Volume`.
-    inplace :         bool, optional
-                      If False, a copy of the original DataFrames/Neuron is
-                      returned. Does only apply to CatmaidNeuron or
-                      CatmaidNeuronList objects. Does apply if multiple
-                      volumes are provided.
-    mode :            'IN' | 'OUT', optional
-                      If 'IN', parts of the neuron that are within the volume
-                      are kept.
-    remote_instance : CATMAID instance, optional
-                      Pass if ``volume`` is a volume name.
+    volume :            str | pymaid.Volume | list or dict of either
+                        :class:`pymaid.Volume` or name of a CATMAID volume to
+                        test. Multiple volumes can be given as list
+                        (``[volume1, volume2, ...]``) or dict
+                        (``{'label1': volume1, ...}``) of either str or
+                        :class:`pymaid.Volume`.
+    inplace :           bool, optional
+                        If False, a copy of the original DataFrames/Neuron is
+                        returned. Does only apply to CatmaidNeuron or
+                        CatmaidNeuronList objects. Does apply if multiple
+                        volumes are provided.
+    mode :              'IN' | 'OUT', optional
+                        If 'IN', parts of the neuron that are within the volume
+                        are kept.
+    prevent_fragments : bool, optional
+                        Only relevant if input is CatmaidNeuron/List: if True,
+                        will add nodes required to keep neuron from
+                        fragmenting.
+    remote_instance :   CATMAID instance, optional
+                        Pass if ``volume`` is a volume name.
 
     Returns
     -------
@@ -118,7 +124,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
 
     """
 
-    remote_instance = utils._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
 
     # If we are given multiple volumes
     if isinstance(volume, (list, dict, np.ndarray)):
@@ -153,7 +160,8 @@ def in_volume(x, volume, inplace=False, mode='IN', remote_instance=None):
             in_v = ~np.array(in_v)
 
         x = graph_utils.subset_neuron(x, x.nodes[in_v].treenode_id.values,
-                                      inplace=True)
+                                      inplace=True,
+                                      prevent_fragments=prevent_fragments)
 
         if inplace is False:
             return x
@@ -188,8 +196,8 @@ def _in_volume_ray(points, volume):
 
     if not tree:
         # Create octree from scratch
-        tree = pyoctree.PyOctree(np.array(volume.vertices, dtype=float),
-                                 np.array(volume.faces, dtype=np.int32)
+        tree = pyoctree.PyOctree(np.array(volume.vertices, dtype=float, order='C'),
+                                 np.array(volume.faces, dtype=np.int32, order='C')
                                  )
         volume.pyoctree = tree
 
@@ -251,3 +259,58 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
             bbox[a] = (float('-inf'), float('inf'))
 
         return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
+
+
+def intersection_matrix(x, volumes, attr=None, remote_instance=None):
+    """ Computes intersection matrix between a set of neurons and a set of
+    volumes.
+
+    Parameters
+    ----------
+    x :               pymaid.CatmaidNeuronList | pymaid.CatmaidNeuron
+                      Neurons to intersect.
+    volume :          list or dict of pymaid.Volume
+    attr :            str | None, optional
+                      Attribute to return for intersected neurons (e.g.
+                      'cable_length'). If None, will return CatmaidNeuron.
+    remote_instance : CATMAID instance, optional
+                      Pass if ``volume`` is a volume name.
+
+    Returns
+    -------
+    pandas DataFrame
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = core.CatmaidNeuronList(x)
+
+    if not isinstance(x, core.CatmaidNeuronList):
+        raise TypeError('x must be CatmaidNeuron/List, not "{}"'.format(type(x)))
+
+    if isinstance(volumes, list):
+        volumes = {v.name: v for v in volumes}
+
+    if not isinstance(volumes, (list, dict)):
+        raise TypeError('volumes must be given as list or dict, not "{}"'.format(type(volumes)))
+
+    for v in volumes.values():
+        if not isinstance(v, core.Volume):
+            raise TypeError('Wrong data type found in volumes: "{}"'.format(type(v)))
+
+
+    data = in_volume(x, volumes, inplace=False, mode='IN',
+                     remote_instance=remote_instance)
+
+    if not attr:
+        df = pd.DataFrame([[n for n in data[v]] for v in data],
+                          index=list(data.keys()),
+                          columns=x.skeleton_id)
+    else:
+        df = pd.DataFrame([[getattr(n, attr) for n in data[v]] for v in data],
+                          index=list(data.keys()),
+                          columns=x.skeleton_id)
+
+    return df
+
+
+

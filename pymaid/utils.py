@@ -15,23 +15,27 @@
 #    along
 
 import collections
+import csv
+import itertools
+import json
+import os
+import random
+import re
 import six
 import sys
-import os
-import numpy as np
-import json
-import pandas as pd
 import uuid
-import random
-import csv
 
-from pymaid import core, fetch, config
+import pandas as pd
+import numpy as np
+
+from . import core, fetch, config
 
 # Set up logging
 logger = config.logger
 
 __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
-           'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache']
+           'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache',
+           'shorten_name', 'transfer_neuron']
 
 
 def clear_cache():
@@ -525,6 +529,25 @@ def eval_node_ids(x, connectors=True, treenodes=True):
             'Unable to extract node IDs from type %s' % str(type(x)))
 
 
+def _unpack_neurons(x, raise_on_error=True):
+    """ Unpacks neurons and returns a list of individual neurons.
+    """
+
+    neurons = []
+
+    if isinstance(x, (list, np.ndarray, tuple)):
+        for l in x:
+            neurons += _unpack_neurons(l)
+    elif isinstance(x, core.CatmaidNeuron):
+        neurons.append(x)
+    elif isinstance(x, core.CatmaidNeuronList):
+        neurons += x.neurons
+    elif raise_on_error:
+        raise TypeError('Unknown neuron format: "{}"'.format(type(x)))
+
+    return neurons
+
+
 def _parse_objects(x, remote_instance=None):
     """ Helper class to extract objects for plotting.
 
@@ -603,8 +626,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
 
     Important
     ---------
-    This import assumes coordinates in SWC are in microns and will convert to
-    nanometers! Soma is inferred from radius (>0), not the label.
+    Soma is inferred from radius (>0), not the label.
 
     Parameters
     ----------
@@ -613,7 +635,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                         ``.swc`` files.
     neuronname :        str, optional
                         Name to use for the neuron. If not provided, will use
-                        filename.
+                        filename minus extension.
     neuron_id :         int, optional
                         Unique identifier (essentially skeleton ID). If not
                         provided, will generate one from scratch.
@@ -648,7 +670,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
         #neuron_id = uuid.uuid4().int
 
     if not neuron_name:
-        neuron_name = os.path.basename(f)
+        neuron_name = os.path.splitext(os.path.basename(f))[0]
 
     data = []
     with open(f) as file:
@@ -662,16 +684,22 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                 data.append(row)
 
     # Remove empty entries and generate nodes DataFrame
-    nodes = pd.DataFrame([[float(e) for e in row if e != ''] for row in data],
+    nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
                          columns=['treenode_id', 'label', 'x', 'y', 'z',
                                   'radius', 'parent_id'],
                          dtype=object)
 
-    # Root node will have parent=-1 -> set this to None
-    nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
+    # If any invalid nodes are found
+    if any(nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull()):
+        # Remove nodes without coordinates
+        nodes = nodes.loc[~nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull().any(axis=1)]    
 
-    # Bring radius from um into nm space
-    nodes[['x', 'y', 'z', 'radius']] *= 1000
+        # Because we removed nodes, we'll have to run a more complicated root
+        # detection
+        nodes.loc[~nodes.parent_id.isin(nodes.treenode_id), 'parent_id'] = None
+    else:
+        # Root node will have parent=-1 -> set this to None
+        nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
 
     connectors = pd.DataFrame([], columns=['treenode_id', 'connector_id',
                                            'relation', 'x', 'y', 'z'],
@@ -714,8 +742,8 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # Convert data to respective dtypes
     dtypes = {'treenode_id': int, 'parent_id': object,
               'creator_id': int, 'relation': int,
-              'connector_id': object, 'x': int, 'y': int, 'z': int,
-              'radius': int, 'confidence': int}
+              'connector_id': object, 'x': float, 'y': float, 'z': float,
+              'radius': float, 'confidence': int}
 
     for k, v in dtypes.items():
         for t in ['nodes', 'connectors']:
@@ -765,12 +793,14 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     """
     if isinstance(x, core.CatmaidNeuronList):
-        if isinstance(filename, type(None)):
-            filename = [None] * len(x)
-        else:
-            filename = _make_iterable(filename)
+        if not _is_iterable(filename):
+            filename = [filename] * len(x)
+
         for n, f in zip(x, filename):
-            to_swc(n, f)
+            to_swc(n, f,
+                   export_synapses=export_synapses,
+                   min_radius=min_radius)
+
         return
 
     if not isinstance(x, core.CatmaidNeuron):
@@ -787,7 +817,9 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
                          'got "{}"'.format(type(filename)))
 
     # Make sure file ending is correct
-    if not filename.endswith('.swc'):
+    if os.path.isdir(filename):
+        filename += 'neuron_{}.swc'.format(x.skeleton_id)
+    elif not filename.endswith('.swc'):
         filename += '.swc'
 
     # Make copy of nodes and reorder such that the parent is always before a
@@ -823,7 +855,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
         this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
 
     # Make sure we don't have too small radii
-    if min_radius:
+    if not isinstance(min_radius, type(None)):
         this_tn.loc[this_tn.radius < min_radius, 'radius'] = min_radius
 
     # Generate table consisting of PointNo Label X Y Z Radius Parent
@@ -833,9 +865,6 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     # Adjust column titles
     swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']
-
-    # Coordinates and radius to microns
-    swc.loc[:, ['X', 'Y', 'Z', 'Radius']] /= 1000
 
     with open(filename, 'w') as file:
         # Write header
@@ -853,3 +882,194 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
         writer = csv.writer(file, delimiter=' ')
         writer.writerows(swc.astype(str).values)
+
+    return
+
+
+def __guess_sentiment(x):
+    """ Tries to classify a list of words into either <type>, <nickname>,
+    <tracer> or <generic> annotations.
+    """
+
+    sent = []
+    for i, w in enumerate(x):
+        # If word is a number, it's most likely something generic
+        if w.isdigit():
+            sent.append('generic')
+        elif w == 'neuron':
+            # If there is a lonely "neuron" followed by a number, it's generic
+            if i != len(x) and x[i + 1].isdigit():
+                sent.append('generic')
+            # If not, it's probably type
+            else:
+                sent.append('type')
+        # If there is a short, all upper case word after the generic information
+        elif w.isupper() and len(w) > 1 and w.isalpha() and 'generic' in sent:
+            # If there is no number in that word, it's probably tracer initials
+            sent.append('tracer')
+        else:
+            # If the word is AFTER the generic number, it's probably a nickname
+            if 'generic' in sent:
+                sent.append('nickname')
+            # If not, it's likely type information
+            else:
+                sent.append('type')
+
+    return sent
+
+
+def parse_neuronname(x):
+    """ Tries parsing neuron names into type, nickname, tracer and generic
+    information.
+
+    This works best if neuron name follows this convention::
+
+    '{type} {generic} {nickname} {tracer initials}'
+
+    Parameters
+    ----------
+    x :     str | CatmaidNeuron
+            Neuron name.
+
+    Returns
+    -------
+    type :          str
+    nickname :      str
+    tracer :        str
+    generic :       str
+
+    Examples
+    --------
+    >>> pymaid.utils.parse_neuronname('AD1b2#7 3080184 Dust World JJ PS')
+    ('AD1b2#7', 'Dust World', 'JJ PS', '3080184')
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = x.neuron_name
+
+    if not isinstance(x, str):
+        raise TypeError('Unable to parse name: must be str, not {}'.format(type(x)))
+
+    # Split name into single words
+    words = x.split(' ')
+    sentiments = __guess_sentiment(words)
+
+    type_str = [w for w, s in zip(words, sentiments) if s == 'type']
+    nick_str = [w for w, s in zip(words, sentiments) if s == 'nickname']
+    tracer_str = [w for w, s in zip(words, sentiments) if s == 'tracer']
+    gen_str = [w for w, s in zip(words, sentiments) if s == 'generic']
+
+    return ' '.join(type_str), ' '.join(nick_str), ' '.join(tracer_str), ' '.join(gen_str)
+
+
+def shorten_name(x, max_len=30):
+    """ Shorten a neuron name by iteratively removing non-essential
+    information.
+
+    Prioritises generic -> tracer -> nickname -> type information when removing
+    until target length is reached. This works best if neuron name follows
+    this convention::
+
+    '{type} {generic} {nickname} {tracers}'
+
+    Parameters
+    ----------
+    x :         str | CatmaidNeuron
+                Neuron name.
+    max_len :   int, optional
+                Max length of shortened name.
+
+    Returns
+    -------
+    shortened name :    str
+
+    Examples
+    --------
+    >>> pymaid.shorten_name('AD1b2#7 3080184 Dust World JJ PS', 30)
+    'AD1b2#7 Dust World [..]'
+    """
+
+    if isinstance(x, core.CatmaidNeuron):
+        x = x.neuron_name
+
+    # Split into individual words and guess their type
+    words = x.split(' ')
+    sentiments = __guess_sentiment(words)
+
+    # Make sure we're working on a copy of the original neuron name
+    short = str(x)
+
+    ty = ['generic', 'tracer', 'nickname', 'type']
+    # Iteratively remove generic -> tracer -> nickname -> type information
+    for t, (w, sent) in itertools.product(ty, zip(words[::-1], sentiments[::-1])):
+        # Stop if we are below max length
+        if len(short) <= max_len:
+            break
+        # Stop if there is only a single word left
+        elif len(short.replace('[..]', '').strip().split(' ')) == 1:
+            break
+        # Skip if this word is not of the right sentiment
+        elif t != sent:
+            continue
+        # Remove this word
+        short = short.replace(w, '[..]').strip()
+        # Make sure to merge consecutive '[..]'
+        while '[..] [..]' in short:
+            short = short.replace('[..] [..]', '[..]')
+
+    return short
+
+
+def transfer_neuron(x, source_instance, target_instance):
+    """ Copy neuron from one CatmaidInstance to another.
+
+    Only transfers nodeS, **not** connectors. Skeleton and treenode IDs
+    will change!
+
+    Parameters
+    ----------
+    x :                 list | array-like
+                        Skeleton IDs of neurons to copy over.
+    source_instance :   CATMAIDInstance
+                        Source instance to take neuron from.
+    target_instance :   CatmaidInstance
+                        Target instance to copy neuron to.
+
+    Returns
+    -------
+    dict 
+                        Response
+    """    
+
+    if not isinstance(source_instance, fetch.CatmaidInstance):
+        raise TypeError('Expected CatmaidInstance, got "{}"'.format(type(source_instance)))
+
+    if not isinstance(target_instance, fetch.CatmaidInstance):
+        raise TypeError('Expected CatmaidInstance, got "{}"'.format(type(target_instance)))
+
+    if source_instance == target_instance:
+        raise ValueError('Source must not be the same as target instance.')
+
+    x = eval_skids(x, remote_instance=source_instance)
+    
+    if len(x) > 1:
+        return {n : transfer_neuron(n,
+                                    source_instance=source_instance,
+                                    target_instance=target_instance)
+                for n in config.tqdm(x,
+                                     desc='Copying',
+                                     disable=config.pbar_hide,
+                                     leave=config.pbar_leave)}
+
+    n = fetch.get_neuron(x, remote_instance=source_instance)
+
+    return fetch.import_neuron(n, remote_instance=target_instance)
+
+
+def to_float(x):
+    """ Helper to try to convert to float.
+    """
+    try: 
+        return float(x)
+    except:
+        return None

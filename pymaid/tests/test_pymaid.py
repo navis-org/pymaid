@@ -44,9 +44,11 @@ From shell:
 import warnings
 import os
 import matplotlib as mpl
-if os.environ.get('DISPLAY', '') == '':
-    warnings.warn('No display found. Using non-interactive Agg backend.')
-    mpl.use('Agg')
+#if os.environ.get('DISPLAY', '') == '':
+#    warnings.warn('No display found. Using template backend (nothing '
+#                  'will show).')
+#    mpl.use('template')
+mpl.use('template')
 import matplotlib.pyplot as plt
 
 import unittest
@@ -536,7 +538,7 @@ class TestMorpho(unittest.TestCase):
 
     @try_conditions
     def test_prune_by_strahler(self):
-        nl2 = self.nl.prune_by_strahler(inplace=False)
+        nl2 = self.nl.prune_by_strahler(inplace=False, to_prune=1)
         self.assertLess(nl2.n_nodes.sum(), self.nl.n_nodes.sum())
 
     @try_conditions
@@ -746,7 +748,8 @@ class TestConnectivity(unittest.TestCase):
         self.cn_table = pymaid.get_partners(config_test.test_skids[0],
                                             remote_instance=self.rm)
 
-        self.nB = pymaid.get_neuron(self.cn_table.iloc[0].skeleton_id,
+        # Must be downstream for predict_connectivity
+        self.nB = pymaid.get_neuron(self.cn_table[self.cn_table.relation=='downstream'].iloc[0].skeleton_id,
                                     remote_instance=self.rm)
 
         self.adj = pymaid.adjacency_matrix(
@@ -941,9 +944,10 @@ class TestTiles(unittest.TestCase):
         from pymaid import tiles
         # Generate the job
         job = tiles.LoadTiles([119000, 119500, 36000, 36500, 4050],
+                              stack_id=5,
                               coords='PIXEL')
         # Load, stich and crop the required EM image tiles
-        job.generate_img()
+        job.load_in_memory()
         # Render image
         ax = job.render_im(slider=False, figsize=(12, 12))
         # Add treenodes

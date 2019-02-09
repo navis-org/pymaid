@@ -14,23 +14,21 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-import urllib.request
-
+import requests
 import gc
-
-from pymaid import fetch, core, utils, config
+import math
+import time
+import urllib
+import os
+import warnings
 
 import pandas as pd
 import numpy as np
-import math
-
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from requests_futures.sessions import FuturesSession
 
-import time
-import urllib
-
-import threading
+from . import fetch, core, utils, config
 
 # Set up logging
 logger = config.logger
@@ -129,9 +127,44 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
                     coords='NM',
                     remote_instance=remote_instance)
 
-    # job.generate_img()
+    # job.load_in_memory()
 
     return job
+
+
+def _bbox_helper(coords, dimensions=(500, 500)):
+    """ Helper function to turn coordinates into bounding box(es).
+
+    Parameters
+    ----------
+    coords :        list | numpy.array
+                    Coordinates to turn into bounding boxes.
+    dimensions :    int | tuple, optional
+                    X and Y dimensions of bbox. If single ``int``, ``X = Y``.
+
+    Returns
+    -------
+    bbox :          numpy.array
+                    Bounding box(es): ``left, right, top, bottom, z``
+    """
+
+    if isinstance(dimensions, int):
+        dimensions = (dimensions, dimensions)
+
+    if isinstance(coords, list):
+        coords = np.array(coords)
+
+    if isinstance(coords, np.ndarray) and coords.ndim == 2:
+        return np.array([_bbox_helper(c, dimensions) for c in coords])
+
+    # Turn into bounding boxes: left, right, top, bottom, z
+    bbox = np.array([coords[0] - dimensions[0] / 2,
+                     coords[0] + dimensions[0] / 2,
+                     coords[1] - dimensions[1] / 2,
+                     coords[1] + dimensions[1] / 2,
+                     coords[2]]).astype(int)
+
+    return bbox
 
 
 class LoadTiles:
@@ -144,33 +177,40 @@ class LoadTiles:
 
     Parameters
     ----------
-    bbox :        list | np.ndarray
-                  Window to crop: [left, right, top, bottom, z1, z2]
-                  If z2 is ommitted, z2 = z1.
-    stack_id :    str, optional
-                  Image stack to use. If not provided, will try finding the
-                  fastest server on the project.
-    zoom_level :  int, optional
-                  Zoom level
-    coords :      'NM' | 'PIXEL', optional
-                  Dimension of bbox.
-    mem_lim :     int, optional
-                  Memory limit in megabytes for loading tiles. This restricts
-                  the number of tiles that can be simultaneously loaded into
-                  memory.
+    bbox :          list | numpy.array
+                    Window to crop: ``left, right, top, bottom, z1, z2``. Can
+                    be single or list/array of bounding boxes. ``z2`` can be
+                    omitted, in which case ``z2 = z1``.
+    stack_id :      int
+                    ID of EM image stack to use.
+    zoom_level :    int, optional
+                    Zoom level
+    coords :        'NM' | 'PIXEL', optional
+                    Dimension of bbox.
+    image_mirror :  int | str | 'auto', optional
+                    Image mirror to use:
+
+                    - ``int`` is interpreted as mirror ID
+                    - ``str`` must be URL
+                    - ``'auto'`` will automatically pick fastest
+
+    mem_lim :       int, optional
+                    Memory limit in megabytes for loading tiles. This restricts
+                    the number of tiles that can be simultaneously loaded into
+                    memory.
 
     Examples
     --------
     >>> # Generate the job
-    >>> job = pymaid.tiles.LoadTiles( [ 119000, 124000,
-    ...                                 36000, 42000,
-    ...                                 4050 ],
-    ...                               coords = 'PIXEL',
-    ...                               remote_instance=rm)
+    >>> job = pymaid.tiles.LoadTiles([119000, 124000,
+    ...                               36000, 42000,
+    ...                               4050],
+    ...                               stack_id=5,
+    ...                               coords='PIXEL')
     >>> # Load, stich and crop the required EM image tiles
-    >>> job.generate_img()
+    >>> job.load_in_memory()
     >>> # Render image
-    >>> ax = job.render_im(slider=False, figsize=(12,12))
+    >>> ax = job.render_im(slider=False, figsize=(12, 12))
     >>> # Add treenodes
     >>> job.render_nodes(ax, treenodes=True, connectors=False)
     >>> # Add scalebar
@@ -187,7 +227,8 @@ class LoadTiles:
     # 3. Code clean up
     # 4. Add second mode that loads sections sequentially, saves them and discards tiles: slower but memory efficient
 
-    def __init__(self, bbox, zoom_level=0, coords='NM', mem_lim=4000, remote_instance=None):
+    def __init__(self, bbox, stack_id, zoom_level=0, coords='NM',
+                 image_mirror='auto', mem_lim=4000, remote_instance=None):
         """ Initialise class.
         """
         if coords not in ['PIXEL', 'NM']:
@@ -200,29 +241,31 @@ class LoadTiles:
             elif bbox.ndim == 2:
                 self.bboxes = bbox
             else:
-                raise ValueError(
-                    'Unable to interpret bounding box with {0} dimensions'.format(bbox.ndim))
+                raise ValueError('Unable to interpret bounding box with {0} '
+                                 'dimensions'.format(bbox.ndim))
         elif isinstance(bbox, list):
             if any(isinstance(el, (list, np.ndarray)) for el in bbox):
                 self.bboxes = bbox
             else:
                 self.bboxes = [bbox]
         else:
-            raise TypeError(
-                'Bounding box must be list or array, not {0}'.format(type(bbox)))
+            raise TypeError('Bounding box must be list or array, not '
+                            '{0}'.format(type(bbox)))
 
         self.remote_instance = utils._eval_remote_instance(remote_instance)
         self.zoom_level = zoom_level
         self.coords = coords
+        self.stack_id = int(stack_id)
         self.mem_lim = mem_lim
 
-        self.get_stack_info()
+        self.get_stack_info(image_mirror=image_mirror)
 
         self.bboxes2imgcoords()
 
         memory_est = self.estimate_memory()
 
-        logger.info('Estimated memory usage: {0:.2f} Mb'.format(memory_est))
+        logger.info('Estimated memory usage for loading all images: '
+                    '{0:.2f} Mb'.format(memory_est))
 
     def estimate_memory(self):
         """ Estimates memory [Mb] consumption of loading all tiles."""
@@ -237,7 +280,7 @@ class LoadTiles:
 
         return (n_tiles * self.bytes_per_tile) / 10 ** 6
 
-    def get_stack_info(self):
+    def get_stack_info(self, image_mirror='auto'):
         """ Retrieves basic info about image stack and mirrors.
         """
 
@@ -245,11 +288,16 @@ class LoadTiles:
         available_stacks = self.remote_instance.fetch(
             self.remote_instance._get_stacks_url()
         )
-        stack_id = available_stacks[0]['id']
+
+        if self.stack_id not in [e['id'] for e in available_stacks]:
+            raise ValueError('Stack ID {} not found on server. Available '
+                             'stacks:\n{}'.format(self.stack_id,
+                                                  '\n'.join(available_stacks)
+                                                  ))
 
         # Fetch and store stack info
         info = self.remote_instance.fetch(
-            self.remote_instance._get_stack_info_url(stack_id))
+            self.remote_instance._get_stack_info_url(self.stack_id))
 
         self.stack_dimension_x = info['dimension']['x']
         self.stack_dimension_y = info['dimension']['y']
@@ -259,10 +307,27 @@ class LoadTiles:
         self.resolution_y = info['resolution']['y']
         self.resolution_z = info['resolution']['z']
 
-        # Get fastest img mirror
-        self.img_mirror = sorted(
-            info['mirrors'], key=lambda x: test_response_time(x['image_base'],
-                                                              calls=2))[0]
+        if image_mirror == 'auto':
+            # Get fastest image mirror
+            match = sorted(info['mirrors'],
+                          key=lambda x: test_response_time(x['image_base'],
+                                                           calls=2))
+        elif isinstance(image_mirror, int):
+            match = [m for m in info['mirrors'] if m['id'] == image_mirror]
+        elif isinstance(image_mirror, str):
+            match = [m for m in info['mirrors'] if m['image_base'] == image_mirror]
+        else:
+            raise ValueError('`image_mirror` must be int, str or "auto".')
+
+        if not match:
+            raise ValueError('No mirror matching "{}" found. Available '
+                             'mirrors: {}'.format(image_mirror,
+                                                 '\n'.join([m['image_base']
+                                                    for m in info['mirrors']]))
+                             )
+
+        self.img_mirror = match[0]
+
         self.tile_width = self.img_mirror['tile_width']
         self.mirror_url = self.img_mirror['image_base']
         self.file_ext = self.img_mirror['file_extension']
@@ -270,7 +335,7 @@ class LoadTiles:
         # Memory size per tile in byte
         self.bytes_per_tile = self.tile_width ** 2 * 8
 
-        logger.info('Fastest image mirror: {0}'.format(self.mirror_url))
+        logger.info('Image mirror: {0}'.format(self.mirror_url))
 
     def bboxes2imgcoords(self):
         """ Converts bounding box(es) to coordinates for individual images.
@@ -383,61 +448,95 @@ class LoadTiles:
         tiles :     list | np.ndarray
                     Triplets of x/y/z tile indices. E.g. [ (20,10,400 ), (...) ]
         """
+
         tiles = list(set(tiles))
 
-        data = {co: None for co in tiles}
-        threads = {}
-        threads_closed = []
-        for i, coords in enumerate(tiles):
-            url = self._get_tile_url(*coords)
-            t = _retrieveTileThreaded(url)
-            t.start()
-            threads[coords] = t
+        if self.remote_instance:
+            future_session = self.remote_instance._future_session
+        else:
+            future_session = FuturesSession(max_workers=30)
 
-        # Initialise progress bar
-        pbar = config.tqdm(total=len(threads),
-                    desc='Loading tiles',
-                    disable=config.pbar_hide,
-                    leave=config.pbar_leave)
+        urls = [self._get_tile_url(*c) for c in tiles]
+        futures = [future_session.get(u, params=None) for u in urls]
+        resp = [f.result() for f in config.tqdm(futures,
+                                                desc='Loading tiles',
+                                                disable=config.pbar_hide or len(futures) == 1,
+                                                leave=False)]
 
-        # Save start value of pbar (in case we have an external pbar)
-        # If pbar_hide is True, there is no pbar.n
-        pbar_start = getattr(pbar, 'n', 0)
+        # Make sure all responses returned data
+        for r in resp:
+            r.raise_for_status()
 
-        while len(threads_closed) != len(threads):
-            for t in threads:
-                if t in threads_closed:
-                    continue
-                if not threads[t].is_alive():
-                    # Make sure we keep the order
-                    data[t] = threads[t].join()
-                    threads_closed.append(t)
-            time.sleep(1)
-
-            # Update progress bar
-            p_delta = len(threads_closed) - (getattr(pbar, 'n', 0) - pbar_start)
-            pbar.update(p_delta)
-
-        # Close and clear pbar
-        pbar.close()
-
-        # Check if we got all tiles
-        for t in threads:
-            if t not in threads_closed:
-                logger.warning(
-                    'Did not close thread for tile {0}'.format(t))
+        data = {co: imageio.imread(r.content) for co, r in zip(tiles, resp)}
 
         return data
 
-    def generate_img(self):
-        """ Download and stitch tiles."""
+    def _stich_tiles(self, im, tiles):
+        """ Stitch tiles into final image.
+        """
+
+        # Generate empty array
+        im_dim = np.array([
+            math.fabs((im['tile_bot'] - im['tile_top']) * self.tile_width),
+            math.fabs((im['tile_right'] - im['tile_left']) * self.tile_width)]).astype(int)
+        img = np.zeros(im_dim, dtype=int)
+
+        # Fill array
+        for i, ix_x in enumerate(range(im['tile_left'], im['tile_right'])):
+            for k, ix_y in enumerate(range(im['tile_top'], im['tile_bot'])):
+                # Paste this tile onto our canvas
+                img[k * self.tile_width: (k + 1) * self.tile_width, i * self.tile_width: (
+                    i + 1) * self.tile_width] = tiles[(ix_x, ix_y, im['tile_z'])]
+
+        # Remove borders and create a copy (otherwise we will not be able
+        # to clear the original tile)
+        cropped_img = np.array(img[im['px_border_top']: -im['px_border_bot'],
+                                   im['px_border_left']: -im['px_border_right']],
+                               dtype=int)
+
+        # Delete image to free memory (not sure if this does much though)
+        del img
+
+        return cropped_img
+
+    def load_and_save(self, filepath, filename=None):
+        """ Download and stitch tiles, and save as images right away (memory
+        efficient).
+
+        Parameters
+        ----------
+        filepath :  str
+                    Path to which to store tiles.
+        filename :  str | list | None, optional
+                    Filename(s).
+
+                    - single ``str`` filename will be added a number as suffix
+                    - list of ``str`` must match length of images
+                    - ``None`` will result in simple numbered files
+        """
+
+        if not os.path.isdir(filepath):
+            raise ValueError('Invalid filepath: {}'.format(filepath))
+
+        if isinstance(filename, type(None)):
+            filename = ['{}.jpg'.format(i) for i in range(len(self.image_coords))]
+        elif isinstance(filename, str):
+            filename = [filename] * len(self.image_coords)
+        elif isinstance(filename, (list, np.ndarray)):
+            if len(filename) != len(self.image_coords):
+                raise ValueError('Number of filenames must match number of '
+                                 'images ({})'.format(len(self.image_coords)))
+
+
         tiles = {}
         max_safe_tiles = int((self.mem_lim * 10**6) / self.bytes_per_tile)
-
-        # Assemble tiles into the requested images
-        images = []
-        for l, im in enumerate(config.tqdm(self.image_coords, 'Stitching', leave=config.pbar_leave, disable=config.pbar_hide)):
-            # Get a list of all tiles that remain to be used and are not currently part of the tiles
+        for l, f, im in zip(range(len(self.image_coords)),
+                            filename,
+                            config.tqdm(self.image_coords, 'Stitching',
+                                        leave=config.pbar_leave,
+                                        disable=config.pbar_hide)):
+            # Get a list of all tiles that remain to be used and are not
+            # currently part of the tiles
             remaining_tiles = [t for img in self.image_coords[l:]
                                for t in img['tiles_to_load']]
 
@@ -460,28 +559,58 @@ class LoadTiles:
                 # Get missing tiles
                 tiles.update(self._get_tiles(tiles_to_get))
 
-            # Generate empty array
-            im_dim = np.array([
-                math.fabs((im['tile_bot'] - im['tile_top']) * self.tile_width),
-                math.fabs((im['tile_right'] - im['tile_left']) * self.tile_width)]).astype(int)
-            img = np.zeros(im_dim)
+            cropped_img = self._stich_tiles(im, tiles)
 
-            # Fill array
-            for i, ix_x in enumerate(range(im['tile_left'], im['tile_right'])):
-                for k, ix_y in enumerate(range(im['tile_top'], im['tile_bot'])):
-                    # Paste this tile onto our canvas
-                    img[k * self.tile_width: (k + 1) * self.tile_width, i * self.tile_width: (
-                        i + 1) * self.tile_width] = tiles[(ix_x, ix_y, im['tile_z'])]
+            # Save image
+            fp = os.path.join(filepath, f)
 
-            # Remove borders and create a copy (otherwise we will not be able to clear the original tile)
-            cropped_img = np.array(img[im['px_border_top']: -im['px_border_bot'],
-                                       im['px_border_left']: -im['px_border_right']])
+            # This prevents a User Warning regarding conversion from int64
+            # to uint8
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                imageio.imwrite(fp ,cropped_img)
+
+            del cropped_img
+
+    def load_in_memory(self):
+        """ Download and stitch tiles, and keep images in memory. Accessible
+        via ``.img`` attribute. """
+        tiles = {}
+        max_safe_tiles = int((self.mem_lim * 10**6) / self.bytes_per_tile)
+
+        # Assemble tiles into the requested images
+        images = []
+        for l, im in enumerate(config.tqdm(self.image_coords, 'Stitching',
+                                           leave=config.pbar_leave,
+                                           disable=config.pbar_hide)):
+            # Get a list of all tiles that remain to be used and are not
+            # currently part of the tiles
+            remaining_tiles = [t for img in self.image_coords[l:]
+                               for t in img['tiles_to_load']]
+
+            # Clear tiles that we don't need anymore and force garbage collection
+            to_delete = [t for t in tiles if t not in remaining_tiles]
+            for t in to_delete:
+                del tiles[t]
+            gc.collect()
+
+            # Check if we're still missing tiles
+            missing_tiles = [t for t in im['tiles_to_load'] if t not in tiles]
+
+            if len(tiles) == 0 or len(missing_tiles) > 0:
+                tiles_to_get = [
+                    t for t in remaining_tiles if t not in tiles][: max_safe_tiles] + missing_tiles
+            else:
+                tiles_to_get = []
+
+            if tiles_to_get:
+                # Get missing tiles
+                tiles.update(self._get_tiles(tiles_to_get))
+
+            cropped_img = self._stich_tiles(im, tiles)
 
             # Add slice
             images.append(cropped_img)
-
-            # Delete image to free memory (not sure if this does much though)
-            del img
 
         # Clear tile data
         del tiles
@@ -822,34 +951,3 @@ def test_response_time(url, calls=5):
             return float('inf')
 
     return np.mean(resp_times)
-
-
-class _retrieveTileThreaded(threading.Thread):
-    """ Class to retrieve a URL by threading
-    """
-
-    def __init__(self, url):
-        try:
-            self.url = url
-            threading.Thread.__init__(self)
-        except BaseException:
-            logger.error(
-                'Failed to initiate thread for ' + self.url)
-
-    def run(self):
-        """
-        Retrieve data from single url
-        """
-        with urllib.request.urlopen(self.url) as req:
-            self.tile = imageio.imread(req.read())
-
-        return
-
-    def join(self):
-        try:
-            threading.Thread.join(self)
-            return self.tile
-        except BaseException:
-            logger.error(
-                'Failed to join thread for ' + self.url)
-            return None

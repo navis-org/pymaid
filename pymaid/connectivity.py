@@ -18,14 +18,14 @@
 """ This module contains functions to analyse connectivity.
 """
 
-import pandas as pd
-import numpy as np
-import scipy
-import scipy.spatial
-
 from itertools import combinations
 
-from pymaid import fetch, core, intersect, utils, config, graph_utils
+import pandas as pd
+import numpy as np
+import scipy.spatial
+import scipy.stats
+
+from . import fetch, core, intersect, utils, config, graph_utils
 
 # Set up logging
 logger = config.logger
@@ -33,7 +33,7 @@ logger = config.logger
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
                   'predict_connectivity', 'adjacency_matrix', 'group_matrix',
                   'adjacency_from_connectors', 'cn_table_from_connectors',
-                  'connection_density'])
+                  'connection_density', 'sparseness'])
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
@@ -184,24 +184,16 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
                            columns=unique_skids, index=unique_skids)
 
     # Fill in values
-    for i, e in enumerate(config.tqdm(unique_edges, disable=config.pbar_hide,
+    for i, e in enumerate(config.tqdm(unique_edges,
+                                      disable=config.pbar_hide,
                                       desc='Regenerating',
                                       leave=config.pbar_leave)):
         # using df.at here speeds things up tremendously!
         adj_mat.at[str(e[0]), str(e[1])] = counts[i]
 
     if datatype == 'adjacency_matrix':
-        # Make a copy of original adjaceny matrix
-        x = x.copy()
-        x.datatype = 'adjacency_matrix'
-
-        # Set everything to 0
-        x[:] = 0
-
-        # Update from filtered connectivity
-        x.update(adj_mat)
-
-        return x
+        return adj_mat.reindex(index=x.index.astype(str),
+                               columns=x.columns.astype(str)).fillna(0)
 
     # Generate connectivity table by subsetting adjacency matrix to our
     # neurons of interest
@@ -355,7 +347,7 @@ def predict_connectivity(source, target, method='possible_contacts',
                          remote_instance=None, **kwargs):
     """ Calculates potential synapses from source onto target neurons.
 
-    Based on a concept by Alex Bates.
+    Based on a concept by `Alexander Bates <https://github.com/alexanderbates/catnat>`_.
 
     Parameters
     ----------
@@ -368,16 +360,20 @@ def predict_connectivity(source, target, method='possible_contacts',
                     1. For method 'possible_contacts':
                         - ``dist`` to set distance between connectors and
                           treenodes manually.
-                        - ``stdev`` to set number of standard-deviations of
-                          average distance. Default = 2.
+                        - ``n_irq`` to set number of interquartile ranges of
+                          harmonic mean. Default = 2.
 
     Notes
     -----
     Method ``possible_contacts``:
-        1. Calculating mean distance ``d`` (connector->treenode) at which
-           connections between neurons A and neurons B occur.
-        2. For all presynapses of neurons A, check if they are within ``stdev``
-           (default=2) standard deviations of ``d`` of a neurons B treenode.
+        1. Calculating harmonic mean of distances ``d`` (connector->treenode)
+            at which onnections between neurons A and neurons B occur.
+        2. For all presynapses of neurons A, check if they are within
+           ``n_irq`` (default=2) interquartile range  of ``d`` of a
+           neuron B treenode.
+
+    Neurons without cable or presynapses will be assigned a predicted
+    connectivity of 0.
 
 
     Returns
@@ -429,7 +425,6 @@ def predict_connectivity(source, target, method='possible_contacts',
     if kwargs.get('dist', None):
         distances = kwargs.get('dist')
     elif cn_between.shape[0] > 0:
-        logger.warning('No ')
         cn_locs = np.vstack(cn_between.connector_loc.values)
         tn_locs = np.vstack(cn_between.treenode2_loc.values)
 
@@ -443,20 +438,32 @@ def predict_connectivity(source, target, method='possible_contacts',
                        'connector->treenode distance found. Falling'
                        'back to default of 1um. Use <stdev> argument'
                        'to set manually.')
-        distances = 1000
+        distances = [1000]
 
     # Calculate distances threshold
-    n_std = kwargs.get('n_std', 2)
-    dist_threshold = np.mean(distances) + n_std * np.std(distances)
+    n_irq = kwargs.get('n_irq', 2)
+    # We use the median because some very large connector->treenode
+    # distances can massively skew the average
+    dist_threshold = scipy.stats.hmean(distances) + n_irq * scipy.stats.iqr(distances)
 
     with config.tqdm(total=len(target), desc='Predicting',
                      disable=config.pbar_hide,
                      leave=config.pbar_leave) as pbar:
         for t in target:
+            # If no nodes, predict 0 connectivity and skip
+            if t.nodes.empty:
+                matrix.loc[t.skeleton_id, source.skeleton_id] = 0
+                continue
+
             # Create cKDTree for target
             tree = scipy.spatial.cKDTree(
                 t.nodes[['x', 'y', 'z']].values, leafsize=10)
             for s in source:
+                # If not synapses, predict 0 connectivity and skip
+                if s.presynapses.empty:
+                    matrix.at[s.skeleton_id, t.skeleton_id] = 0
+                    continue
+
                 # Query against presynapses
                 dist, ix = tree.query(s.presynapses[['x', 'y', 'z']].values,
                                       k=1,
@@ -688,13 +695,13 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(source, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        skids = utils.eval_skids(source)
+        skids = utils.eval_skids(source, remote_instance=remote_instance)
         source = fetch.get_neuron(skids, remote_instance=remote_instance)
 
     if isinstance(target, type(None)):
         target = source
     elif not isinstance(target, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        skids = utils.eval_skids(target)
+        skids = utils.eval_skids(target, remote_instance=remote_instance)
         target = fetch.get_neuron(skids, remote_instance=remote_instance)
 
     if isinstance(source, core.CatmaidNeuron):
@@ -934,7 +941,7 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
 
 
 def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
-                 method='SUM'):
+                 method='SUM', remote_instance=None):
     """ Groups adjacency matrix into neuron groups.
 
     Parameters
@@ -959,6 +966,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
     pandas.DataFrame
     """
 
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
+
     PERMISSIBLE_METHODS = ['AVERAGE', 'MIN', 'MAX', 'SUM']
     if method not in PERMISSIBLE_METHODS:
         raise ValueError('Unknown method "{0}". Please use either {1}'.format(
@@ -980,9 +990,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
 
     # Convert to neuron->group format if necessary
     if col_groups and utils._is_iterable(list(col_groups.values())[0]):
-        col_groups = {n: g for g in col_groups for n in col_groups[g]}
+        col_groups = {n: g for g in col_groups for n in utils.eval_skids(col_groups[g], remote_instance=remote_instance)}
     if row_groups and utils._is_iterable(list(row_groups.values())[0]):
-        row_groups = {n: g for g in row_groups for n in row_groups[g]}
+        row_groups = {n: g for g in row_groups for n in utils.eval_skids(row_groups[g], remote_instance=remote_instance)}
 
     # Make sure everything is string
     mat.index = mat.index.astype(str)
@@ -1081,8 +1091,10 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
                          single connection between source and target.
     """
 
-    source_skid = utils.eval_skids(s)
-    target_skid = utils.eval_skids(t)
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    source_skid = utils.eval_skids(s, remote_instance=remote_instance)
+    target_skid = utils.eval_skids(t, remote_instance=remote_instance)
 
     if len(target_skid) != 1:
         raise ValueError('Must provide a single target neuron.')
@@ -1156,3 +1168,91 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
         return None
 
     return dist
+
+
+def sparseness(x, which='LTS'):
+    """ Calculate sparseness.
+
+    Sparseness comes in two flavors:
+
+    **Lifetime kurtosis (LTK)** quantifies the widths of tuning curves
+    (according to Muench & Galizia, 2016):
+
+    .. math::
+
+        S = \\Bigg\\{ \\frac{1}{N} \\sum^M_{i=1} \\Big[ \\frac{r_i - \\overline{r}}{\\sigma_r} \\Big] ^4  \\Bigg\\} - 3
+
+    where :math:`N` is the number of observations, :math:`r_i` the value of
+    observation :math:`i`, and :math:`\\overline{r}` and
+    :math:`\\sigma_r` the mean and the standard deviation of the observations'
+    values, respectively. LTK is assuming a normal, or at least symmetric
+    distribution.
+
+    **Lifetime sparseness (LTS)** quantifies selectivity
+    (Bhandawat et al., 2007):
+
+    .. math::
+
+        S = \\frac{1}{1-1/N} \\Bigg[1- \\frac{\\big(\\sum^N_{j=1} r_j / N\\big)^2}{\\sum^N_{j=1} r_j^2 / N} \\Bigg]
+
+    where :math:`N` is the number of observations, and :math:`r_j` is the
+    value of an observation.
+
+    Notes
+    -----
+    ``NaN`` values will be ignored. You can use that to e.g. ignore zero
+    values in a large connectivity matrix by changing these values to ``NaN``
+    before passing it to ``pymaid.sparseness``.
+
+
+    Parameters
+    ----------
+    x :         DataFrame | array-like
+                (N, M) dataset with N (rows) observations for M (columns)
+                neurons. One-dimensional data will be converted to two
+                dimensions (N rows, 1 column).
+    which :     "LTS" | "LTK"
+                Determines whether lifetime sparseness (LTS) or lifetime
+                kurtosis (LTK) is returned.
+
+    Returns
+    -------
+    sparseness
+                ``pandas.Series`` if input was pandas DataFrame, else
+                ``numpy.array``.
+
+    Examples
+    --------
+    Calculate sparseness of olfactory inputs to group of neurons:
+
+    >>> import numpy as np
+    >>> import matplotlib.pyplot as plt
+    >>> # Generate adjacency matrix
+    >>> adj = pymaid.adjacency_matrix(s='annotation:WTPN2017_excitatory_uPN_right',
+    ...                               t='annotation:ASB LHN')
+    >>> # Calculate lifetime sparseness
+    >>> S = pymaid.sparseness(adj, which='LTS')
+    >>> # Plot distribution
+    >>> ax = S.plot.hist(bins=np.arange(0, 1, .1))
+    >>> ax.set_xlabel('LTS')
+    >>> plt.show()
+
+    """
+
+    if not isinstance(x, (pd.DataFrame, np.ndarray)):
+        x = np.array(x)
+
+    # Make sure we are working with 2 dimensional data
+    if isinstance(x, np.ndarray) and x.ndim == 1:
+        x = x.reshape(x.shape[0], 1)
+
+    N = np.sum(~np.isnan(x), axis=0)
+
+    if which == 'LTK':
+        return np.nansum(((x - np.nanmean(x, axis=0)) / np.nanstd(x, axis=0)) ** 4, axis=0) / N - 3
+    elif which == 'LTS':
+        return 1 / (1 - (1/N)) * (1 - np.nansum(x/N, axis=0) ** 2 / np.nansum(x**2/N, axis=0))
+    else:
+        raise ValueError('Parameter "which" must be either "LTS" or "LTK"')
+
+

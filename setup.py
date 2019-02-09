@@ -23,7 +23,7 @@ with open('requirements.txt') as f:
 setup(
     name='pymaid',
     version=verstr,
-    packages=['pymaid', ],
+    packages=['pymaid'],
     license='GNU GPL V3',
     description='Python interface with CATMAID',
     long_description=open('README.md').read(),
@@ -40,11 +40,13 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
 
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
     install_requires=requirements,
-    python_requires='>=3.4',
+    extras_require={'extras': ['fuzzywuzzy[speedup]==0.17.0',
+                               'pyoctree==0.2.10',
+                               'trimesh==2.35.2']},
+    python_requires='>=3.5',
     zip_safe=False
 )

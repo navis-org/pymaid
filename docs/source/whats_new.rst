@@ -10,8 +10,40 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.93
+     - 05/02/19
+     - - various improvements to the Blender interface ``pymaid.b3d``
+       - improved :func:`~pymaid.predict_connectivity`
+       - new functions to import/transfer neurons to/between Catmaid instances: :func:`pymaid.import_neuron` and :func:`pymaid.transfer_neuron`
+       - new function :func:`pymaid.sparseness` to calculate lifetime sparseness
+       - tons of bug fixes
+   * - 0.92
+     - 06/11/18
+     - - new pymaid.Volume methods: ``to_csv`` and ``from_csv``
+       - new functions: :func:`~pymaid.add_meta_annotations`, :func:`~pymaid.remove_meta_annotations`, :func:`~pymaid.get_annotated`
+       - some under-the-hood changes following change in CATMAID's API
+       - general bug fixes and improvements
+   * - 0.91
+     - 31/10/18
+     - - new CatmaidInstance attributes to get info on your server: ``catmaid_version``, ``available_projects`` and ``image_stacks``
+       - new functions: :func:`~pymaid.shorten_name`, :func:`~pymaid.get_user_stats`, :func:`~pymaid.intersection_matrix`, :func:`~pymaid.get_node_location`
+       - various improvements and bugfixes
+   * - 0.90
+     - 20/09/18
+     - - vispy 3d viewer overhaul: prettier, better picking, new shortcuts
+       - indexing of :class:`~pymaid.CatmaidNeuronList` via ``.skid[]`` now returns results in order of query
+       - new function: :func:`~pymaid.get_treenodes_by_tag`
+       - new function: :func:`~pymaid.connection_density`
+       - improved :func:`~pymaid.split_axon_dendrite`
+       - improved :func:`~pymaid.to_swc` and :func:`~pymaid.from_swc`
+       - improved :ref:`neuronlist math and comparisons <neuronlist_math>`
+       - :func:`~pymaid.plot2d` and :func:`~pymaid.plot3d` now accept lists of colors
+       - :func:`~pymaid.has_soma` is now much faster
+       - faster neuron import in :ref:`blender_3d`
+       - improved docstrings
+       - various bugfixes
    * - 0.89
-     - 14/09/18
+     - 14/08/18
      - - new function: :func:`~pymaid.cytoscape.watch_network` constantly pushes updates Cytoscape
        - new function: :func:`~pymaid.get_nth_partners` returns neurons connected via n hops
        - by default, :func:`~pymaid.plot3d` now chooses the backend automatically: vispy for terminal sessions, plotly for Jupyter notebook/lab
