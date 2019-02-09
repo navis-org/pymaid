@@ -2790,7 +2790,7 @@ class Volume:
 
     """
 
-    def __init__(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def __init__(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         self.name = name
         self.vertices = vertices
@@ -2799,7 +2799,7 @@ class Volume:
         self.volume_id = volume_id
 
     @classmethod
-    def from_csv(self, vertices, faces, name=None, color=(220, 220, 220, .6),
+    def from_csv(self, vertices, faces, name=None, color=(1, 1, 1, .1),
                  volume_id=None, **kwargs):
         """ Load volume from csv files containing vertices and faces.
 
@@ -2849,7 +2849,7 @@ class Volume:
                 writer.writerows(data)
 
     @classmethod
-    def combine(self, x, name='comb_vol', color=(220, 220, 220, .6)):
+    def combine(self, x, name='comb_vol', color=(1, 1, 1, .1)):
         """ Merges multiple volumes into a single object.
 
         Parameters
@@ -2956,6 +2956,24 @@ class Volume:
                                                                   hex(id(self)),
                                                                   self.vertices.shape[0],
                                                                   self.faces.shape[0])
+
+    def __truediv__(self, other):
+        """Implements division for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            return self.__mul__(1/other)
+        else:
+            return NotImplemented
+
+    def __mul__(self, other):
+        """Implements multiplication for vertex coordinates."""
+        if isinstance(other, numbers.Number):
+            # If a number, consider this an offset for coordinates
+            v = self.copy()
+            v.vertices *= other
+            return v
+        else:
+            return NotImplemented
 
     def resize(self, x, method='center', inplace=True):
         """ Resize volume.

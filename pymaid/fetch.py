@@ -678,8 +678,8 @@ class CatmaidInstance:
 
     def _delete_neuron_url(self, neuron_id, **GET):
         """ Use to parse url for deleting a single neurons"""
-        return self.make_url(self.project_id, 'label', 'treenode', treenode_id,
-                             'update', **GET)
+        return self.make_url(self.project_id, 'neuron', neuron_id, 'delete',
+                             **GET)
 
     def _delete_treenode_url(self, **GET):
         """ Use to parse url for deleting treenodes"""
@@ -4286,7 +4286,7 @@ def get_history(remote_instance=None,
     data = []
     for r in config.tqdm(rounds, desc='Retrieving history',
                          disable=config.pbar_hide, leave=config.pbar_leave):
-        get_history_GET_data = {'self.project_id': remote_instance.project_id,
+        get_history_GET_data = {'pid': remote_instance.project_id,
                                 'start_date': r[0],
                                 'end_date': r[1]
                                 }
@@ -5429,9 +5429,9 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     if isinstance(new_names, dict):
         # First make sure that dictionary maps strings
-        _ = {str(n): new_names[n] for n in new_names}
+        temp = {str(n): new_names[n] for n in new_names}
         # Generate a list from the dict
-        new_names = [_[n] for n in x if n in _]
+        new_names = [temp[n] for n in x if n in temp]
     elif not isinstance(new_names, (list, np.ndarray)):
         new_names = [new_names]
 
@@ -5638,8 +5638,8 @@ def import_neuron(x, remote_instance=None):
                                                   remote_instance=remote_instance)
                     for n in config.tqdm(x,
                                          desc='Import',
-                                         disable=disable_pbar,
-                                         leave=leave_pbar)}
+                                         disable=config.pbar_hide,
+                                         leave=config.pbar_leave)}
 
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))    
