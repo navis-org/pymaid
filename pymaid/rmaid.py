@@ -574,7 +574,7 @@ def dotprops2py(dp, subset=None):
 
 
 def nblast_allbyall(x, normalize=True, remote_instance=None,
-                    n_cores=os.cpu_count(), UseAlpha=False):
+                    n_cores=os.cpu_count(), resample=1, use_alpha=False):
     """ Wrapper to use R's ``nat:nblast_allbyall``
     (https://github.com/jefferislab/nat.nblast/).
 
@@ -591,7 +591,10 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     n_cores :           int, optional
                         Number of cores to use for nblasting. Default is
                         ``os.cpu_count()``.
-    UseAlpha :          bool, optional
+    resample :          int, optional
+                        Resolution in microns [um] the neurons will be
+                        resampled to before nblasting.
+    use_alpha :         bool, optional
                         Emphasises neurons' straight parts (backbone) over
                         parts that have lots of branches.
 
@@ -653,12 +656,12 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
                          'help(rmaid.nblast) for details.')
 
     # Make dotprops and resample
-    xdp = nat.dotprops(rn, k=5, resample=1)
+    xdp = nat.dotprops(rn, k=5, resample=resample)
 
     # Calculate scores
     scores = r_nblast.nblast(xdp, xdp, **{'normalised': False,
                                           '.parallel': True,
-                                          'UseAlpha': UseAlpha})
+                                          'UseAlpha': use_alpha})
 
     # Generate matrix with skeleton IDs as indices/columns
     matrix = pd.DataFrame(np.array(scores),
