@@ -678,10 +678,7 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True,
         x.reroot(x.soma)
 
     # Calculate flow centrality if necessary
-    try:
-        last_method = x.centrality_method
-    except BaseException:
-        last_method = None
+    last_method = getattr(x, 'centrality_method', None)
 
     if last_method != method:
         if method == 'bending':
@@ -721,11 +718,11 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True,
         # Subset to those that are branches (exclude mere synapses)
         flows = flows[flows.type == 'branch']
 
-        # Find the first branch point from the soma with no flow (fillna is
-        # important!)
+        # Find the first branch point from the soma with no flow
+        # (fillna is important!)
         last_with_flow = np.where(flows.flow_centrality.fillna(0).values > 0)[0][-1]
 
-        if method != 'bending':
+        if method != 'bending' and last_with_flow < (flows.shape[0]-1):
             last_with_flow += 1
 
         to_cut = flows.iloc[last_with_flow].name
