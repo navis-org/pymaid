@@ -933,9 +933,9 @@ def bending_flow(x, polypre=False):
     # Get list of branch_points
     bp_node_ids = y.nodes[y.nodes.type == 'branch'].treenode_id.values.tolist()
     # Add root if it is also a branch point
-    for root in y.root:
-        if y.graph.degree(root) > 1:
-            bp_node_ids += list(root)
+    for r in y.root:
+        if y.graph.degree(r) > 1:
+            bp_node_ids += [r]
 
     # Get list of childs of each branch point
     bp_childs = {t: [e[0] for e in y.graph.in_edges(t)] for t in bp_node_ids}
