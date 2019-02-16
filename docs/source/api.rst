@@ -23,6 +23,7 @@ Neurons
     pymaid.get_skids_by_name
     pymaid.rename_neurons
     pymaid.get_names
+    pymaid.get_neuron_id
 
 Annotations
 -----------
@@ -256,6 +257,8 @@ Manipulation
     pymaid.guess_radius
     pymaid.time_machine
     pymaid.tortuosity
+    pymaid.break_fragments
+    pymaid.heal_fragmented_neurons
 
 Resampling
 ----------
@@ -478,4 +481,5 @@ Utility
     pymaid.shorten_name
     pymaid.transfer_neuron
     pymaid.import_neuron
+    pymaid.update_radii
 
