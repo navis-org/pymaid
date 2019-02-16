@@ -1703,6 +1703,10 @@ class CatmaidNeuronList:
             else:
                 subset = [n for n in self.neurons if key in n.neuron_name or key in n.skeleton_id]
         elif isinstance(key, np.ndarray) and key.dtype == 'bool':
+            if len(self.neurons) != len(key):
+                raise IndexError('Length of key ({}) must match number of '
+                                 'neurons ({})'.format(len(key),
+                                                       len(self.neurons)))
             subset = [n for i, n in enumerate(self.neurons) if key[i]]
         elif utils._is_iterable(key):
             if True in [isinstance(k, str) for k in key]:
