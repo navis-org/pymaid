@@ -2203,3 +2203,48 @@ def time_machine(x, target, inplace=False, remote_instance=None):
         return x
 
     return
+
+
+def break_fragments(x):
+    """ Break neuron into continuous fragments.
+
+    Neurons can consists of several disconnected fragments. This function
+    breaks neuron(s) into disconnected components.
+
+    Parameters
+    ----------
+    x :         CatmaidNeuron
+                Fragmented neuron.
+
+    Returns
+    -------
+    CatmaidNeuronList
+
+    See Also
+    --------
+    :func:`pymaid.heal_fragmented_neurons`
+                Use to heal fragmentation instead of breaking it up.
+
+    """
+    if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
+        x = x[0]
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron/List, got "{}"'.format(type(x)))
+
+
+    # Don't do anything if not actually fragmented
+    if x.n_skeletons > 1:
+        # Get connected components
+        comp = list(nx.connected_components(x.graph.to_undirected()))
+        # Sort so that the first component is the largest
+        comp = sorted(comp, key=len, reverse=True)
+
+        return core.CatmaidNeuronList([graph_utils.subset_neuron(x,
+                                                                 list(ss),
+                                                                 inplace=False)
+                                                               for ss in comp])
+    else:
+        return core.CatmaidNeuronList(x.copy())
+
+
