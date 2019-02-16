@@ -2014,8 +2014,8 @@ def smooth_neuron(x, window=5, inplace=False):
 def time_machine(x, target, inplace=False, remote_instance=None):
     """ Reverses time and make neurons young again!
 
-    Prunes a neuron back to it's state before a given date. Here is what we
-    can reverse:
+    Prunes a neuron back to it's state at a given date. Here is what we can
+    reverse:
 
     1. Creation and deletion of nodes
     2. Creation and deletion of connectors (and links)
@@ -2053,10 +2053,13 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(x, core.CatmaidNeuronList):
-        return CatmaidNeuronList([time_machine(n, target,
-                                               inplace=inplace,
-                                               remote_instance=remote_instance)
-                                  for n in x])
+        return core.CatmaidNeuronList([time_machine(n, target,
+                                                    inplace=inplace,
+                                                    remote_instance=remote_instance)
+                                  for n in config.tqdm(x,
+                                                       'Rejuvenating',
+                                                       disable=config.pbar_hide,
+                                                       leave=config.pbar_leave)])
 
     if not isinstance(x, core.CatmaidNeuron):
         x = fetch.get_neuron(x)
