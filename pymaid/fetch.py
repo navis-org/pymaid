@@ -1582,7 +1582,8 @@ def get_names(x, remote_instance=None):
 
 
 @cache.undo_on_error
-def get_node_details(x, remote_instance=None, chunk_size=10000):
+def get_node_details(x, remote_instance=None, chunk_size=10000,
+                     convert_ts=True):
     """ Retrieve detailed info for treenodes and/or connectors.
 
     Parameters
@@ -1596,7 +1597,9 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     chunk_size :        int, optional
                         Querying large number of nodes will result in server
                         errors. We will thus query them in amenable bouts.
-
+    convert_ts :        bool, optional
+                        If True, will convert timestamps from strings to
+                        datetime objects.
 
     Returns
     -------
@@ -1648,12 +1651,13 @@ def get_node_details(x, remote_instance=None, chunk_size=10000):
     # Rename column 'user' to 'creator'
     df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
-    df['creation_time'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
-    df['edition_time'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
-    df['review_times'] = [[datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in lst] for lst in df['review_times'].values]
+    if convert_ts:
+        df['creation_time'] = [datetime.datetime.strptime(
+            d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
+        df['edition_time'] = [datetime.datetime.strptime(
+            d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
+        df['review_times'] = [[datetime.datetime.strptime(
+            d[:16], '%Y-%m-%dT%H:%M') for d in lst] for lst in df['review_times'].values]
 
     return df
 
