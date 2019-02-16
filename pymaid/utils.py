@@ -16,14 +16,13 @@
 
 import collections
 import csv
+from glob import glob
 import itertools
 import json
 import os
 import random
-import re
 import six
 import sys
-import uuid
 
 import pandas as pd
 import numpy as np
@@ -275,7 +274,7 @@ def json2neuron(s, **kwargs):
 
 def _eval_remote_instance(remote_instance, raise_error=True):
     """ Evaluates remote instance and checks for globally defined remote
-    instances as fall back
+    instances as fall back.
     """
 
     if remote_instance is None:
@@ -618,7 +617,7 @@ def _parse_objects(x, remote_instance=None):
 
 
 def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
-             post_label=None):
+             post_label=None, include_subdirs=False):
     """ Generate neuron object from SWC file.
 
     This import is following format specified
@@ -630,18 +629,22 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
 
     Parameters
     ----------
-    f :                 str
-                        SWC filename or folder. If folder, will import all
-                        ``.swc`` files.
+    f :                 str | iterable
+                        SWC filename(s) or folder(s). If folder, will import
+                        all ``.swc`` files.
     neuronname :        str, optional
                         Name to use for the neuron. If not provided, will use
                         filename minus extension.
-    neuron_id :         int, optional
+    neuron_id :         int | func, optional
                         Unique identifier (essentially skeleton ID). If not
-                        provided, will generate one from scratch.
+                        provided, will generate one from scratch. If function,
+                        must accept filename and return ``str``.
     pre/post_label :    bool | int, optional
                         If not ``None``, will try to extract pre-/postsynapses
                         from label column.
+    include_subdirs :   bool, optional
+                        If True and ``f`` is a folder, will also search
+                        subdirectories for ``.swc`` files.
 
     Returns
     -------
@@ -653,24 +656,49 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                         Export neurons as SWC files.
 
     """
+    if _is_iterable(f):
+        return core.CatmaidNeuronList([from_swc(x,
+                                                neuron_name=neuron_name,
+                                                neuron_id=neuron_id,
+                                                pre_label=pre_label,
+                                                post_label=post_label,
+                                                include_subdirs=include_subdirs,
+                                                )
+                                       for x in config.tqdm(f, desc='Importing',
+                                                            disable=config.pbar_hide,
+                                                            leave=config.pbar_leave)])
+
     if os.path.isdir(f):
-        swc = [os.path.join(f, x) for x in os.listdir(f) if os.path.isfile(os.path.join(f, x)) and x.endswith('.swc')]
+        if not include_subdirs:
+            swc = [os.path.join(f, x) for x in os.listdir(f) if
+                   os.path.isfile(os.path.join(f, x)) and x.endswith('.swc')]
+        else:
+            swc = [y for x in os.walk(f) for y in glob(os.path.join(x[0], '*.swc'))]
+
+        if not swc:
+            raise ValueError('No .swc files found in folder "{}"'.format(f))
+
         return core.CatmaidNeuronList([from_swc(x,
                                                 neuron_name=neuron_name,
                                                 neuron_id=neuron_id,
                                                 pre_label=pre_label,
                                                 post_label=post_label)
-                                       for x in config.tqdm(swc, desc='Importing',
-                                                            disable=config.pbar_hide,
-                                                            leave=config.pbar_leave)])
+            for x in config.tqdm(swc,
+                                 desc='Reading {}'.format(f.split('/')[-1]),
+                                 disable=config.pbar_hide,
+                                 leave=config.pbar_leave)])
+
+    filename = os.path.splitext(os.path.basename(f))[0]
 
     if not neuron_id:
         # Use 30 bit - 32bit raises error when converting to R StrVector
         neuron_id = random.getrandbits(30)
         #neuron_id = uuid.uuid4().int
+    elif callable(neuron_id):
+        neuron_id = neuron_id(filename)
 
     if not neuron_name:
-        neuron_name = os.path.splitext(os.path.basename(f))[0]
+        neuron_name = filename
 
     data = []
     with open(f) as file:
@@ -692,7 +720,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # If any invalid nodes are found
     if any(nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull()):
         # Remove nodes without coordinates
-        nodes = nodes.loc[~nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull().any(axis=1)]    
+        nodes = nodes.loc[~nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull().any(axis=1)]
 
         # Because we removed nodes, we'll have to run a more complicated root
         # detection
@@ -751,7 +779,14 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                 if k in df.loc[i, t]:
                     df.loc[i, t][k] = df.loc[i, t][k].astype(v)
 
-    return core.CatmaidNeuron(df)
+    # Generate neuron
+    n = core.CatmaidNeuron(df)
+
+    # Add folder and filename to the neuron
+    n.filename = os.path.basename(f)
+    n.filepath = os.path.dirname(f)
+
+    return n
 
 
 def to_swc(x, filename=None, export_synapses=False, min_radius=0):
