@@ -5608,23 +5608,37 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 
 
 @cache.never_cache
-def import_neuron(x, remote_instance=None):
+def import_neuron(x, import_tags=True, import_annotations=False,
+                  neuron_id=None,  remote_instance=None):
     """ Import neuron(s) to CATMAID instance.
 
-    Does only import node tables, **not** connectors.
-    Skeleton and treenode IDs will change!
+    Currently only imports node tables, **not** connectors or tags. Also note
+    that skeleton and treenode IDs will change - see server response for
+    old->new mapping. Neuron to import must not have more than one skeleton
+    (i.e. disconnected components = more than one root node).
 
     Parameters
     ----------
-    x :                 CatmaidNeuron/List
-                        Neurons to import.
-    remote_instance :   CATMAID instance, optional
-                        If not passed directly, will try using global.
+    x :                  CatmaidNeuron/List
+                         Neurons to import.    
+    import_tags :        bool, optional
+                         If True, will import treenode tags from ``x.tags``.
+    import_annotations : bool, optional
+                         If True will import annotations from ``x.annotations``.
+    neuron_id :          int, optional
+                         Use this to associate the new skeleton with an 
+                         existing neuron. THIS IS CURRENTLY BROKEN AND WILL BE
+                         IGNORED.
+    remote_instance :    CATMAID instance, optional
+                         If not passed directly, will try using global.
 
     Returns
     -------
     dict 
-                        Response
+                         Server response with new skeleton/treenode IDs::
+                            {'neuron_id': new neuron ID,
+                             'skeleton_id': new skeleton ID,
+                             'node_id_map': {'old_node_id': new_node_id, .. }}
 
     """
 
@@ -5634,27 +5648,88 @@ def import_neuron(x, remote_instance=None):
         if len(x) == 1:
             x = x[0]
         else:
-            return {n.skeleton_id : import_neuron(n,
+            # Check if any neurons has multiple skeletons
+            many = [n.skeleton_id for n in x if n.n_skeletons > 1]
+            if many:
+                logger.warning('Neurons with multiple disconnected skeletons'
+                               'found: {}'.format(','.join(many)))
+
+                answer = ""
+                while answer not in ["y", "n"]:
+                    answer = input("Fragments will be joined before import. "
+                                   "Continue? [Y/N] ").lower()
+
+                if answer != 'y':
+                    logger.warning('Import cancelled.')
+                    return
+
+                x = morpho.heal_fragmented_neuron(x, min_size=0, inplace=False)
+
+            resp = {n.skeleton_id : import_neuron(n,
+                                                  neuron_id=neuron_id,
+                                                  import_tags=import_tags,
                                                   remote_instance=remote_instance)
                     for n in config.tqdm(x,
                                          desc='Import',
                                          disable=config.pbar_hide,
                                          leave=config.pbar_leave)}
 
+            errors = {n: r for n, r in response.items() if 'error' in r}
+            if errors:
+                logger.error('{} error(s) during upload. Check neuron(s): '
+                             '{}'.format(len(errors), ','.join(errors.keys())))
+
+            return resp
+
     if not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))    
+        raise TypeError('Expected CatmaidNeuron/List, got "{}"'.format(type(x)))
+
+    if x.n_skeletons > 1:
+        logger.warning('Neuron has multiple disconnected skeletons. Will heal'
+                       ' fragments before import!')
+        x = morpho.heal_fragmented_neuron(x, min_size=0, inplace=False)
 
     import_url = remote_instance._import_skeleton_url()
 
-    import_post = {'neuron_id': None,
+    import_post = {'neuron_id': None, #providing neuron_id breaks backend
                    'name': x.neuron_name}
 
     f = os.path.join(tempfile.gettempdir(), 'temp.swc')
 
-    _ = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
+    # Keep SWC node map
+    swc_map = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
 
     with open(f, 'rb') as file:
-        resp = rm.fetch(import_url, post=import_post, files={'file': file})
+        resp = remote_instance.fetch(import_url,
+                                     post=import_post,
+                                     files={'file': file})
+
+    # Exporting to SWC changes the node IDs -> we will revert this in the
+    # response of the server
+    nmap = {n: resp['node_id_map'].get(str(swc_map[n]), None) for n in swc_map}
+    resp['node_id_map'] =  nmap
+
+    if import_tags and getattr(x, 'tags', {}):        
+        # Map old to new nodes
+        tags = {t: [nmap[n] for n in v] for t, v in x.tags.items()}
+        # Invert tag dictionary: map node ID -> list of tags
+        ntags = {}
+        for t in tags:            
+            ntags.update({n: ntags.get(n, []) + [t] for n in tags[t]})
+
+        tags_resp = add_tags(list(ntags.keys()),
+                             ntags,
+                             'TREENODE',
+                             remote_instance=remote_instance)
+
+    # Make sure not not access `.annotations` directly to not trigger
+    # fetching annotations
+    if import_annotations and 'annotations' in x.__dict__:
+        an = x.__dict__.get('annotations', [])
+        an_resp = add_annotations(resp['skeleton_id'], an,
+                                  remote_instance=remote_instance)
+
+    return resp
 
 
 @cache.never_cache
