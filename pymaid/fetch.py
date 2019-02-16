@@ -5726,4 +5726,31 @@ def update_radii(radii, remote_instance=None):
 
     return remote_instance.fetch(update_radii_url, update_post)
 
-    return resp
+
+@cache.undo_on_error
+def get_neuron_id(x, remote_instance=None):
+    """ Get neuron ID(s) for given skeleton(s).
+
+    Parameters
+    ----------
+    x :                 list-like | CatmaidNeuron/List
+                        Skeleton IDs for which to get neuron IDs.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict 
+                        ``{skeleton_id: neuron_id, ... }``
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    urls = [remote_instance._get_single_neuronname_url(s) for s in skids]
+
+    resp = remote_instance.fetch(urls)
+
+    return {s: n['neuronid'] for s, n in zip(skids, resp)}
