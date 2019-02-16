@@ -797,7 +797,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     Important
     ---------
-    Converts CATMAID nanometer coordinates into microns!
+    Node IDs will be remapped to be continuous 1 -> ``len(x.nodes)``.
 
     Parameters
     ----------
@@ -819,7 +819,8 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     Returns
     -------
-    Nothing
+    dict
+                        Mapping of old -> new node IDs.
 
     See Also
     --------
@@ -863,7 +864,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
     this_tn = x.nodes.set_index('treenode_id').loc[nodes_ordered]
 
     # Because the last treenode ID of each segment is a duplicate
-    # (except for the first segment ), we have to remove these
+    # (except for the first segment ), we have to remove them
     this_tn = this_tn[~this_tn.index.duplicated(keep='first')]
 
     # Add an index column (must start with "1", not "0")
@@ -918,7 +919,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
         writer = csv.writer(file, delimiter=' ')
         writer.writerows(swc.astype(str).values)
 
-    return
+    return tn2ix
 
 
 def __guess_sentiment(x):
@@ -1058,7 +1059,7 @@ def shorten_name(x, max_len=30):
 def transfer_neuron(x, source_instance, target_instance):
     """ Copy neuron from one CatmaidInstance to another.
 
-    Only transfers nodeS, **not** connectors. Skeleton and treenode IDs
+    Only transfers nodes, **not** connectors. Skeleton and treenode IDs
     will change!
 
     Parameters
@@ -1072,9 +1073,9 @@ def transfer_neuron(x, source_instance, target_instance):
 
     Returns
     -------
-    dict 
-                        Response
-    """    
+    dict
+                        Server response.
+    """
 
     if not isinstance(source_instance, fetch.CatmaidInstance):
         raise TypeError('Expected CatmaidInstance, got "{}"'.format(type(source_instance)))
@@ -1086,7 +1087,7 @@ def transfer_neuron(x, source_instance, target_instance):
         raise ValueError('Source must not be the same as target instance.')
 
     x = eval_skids(x, remote_instance=source_instance)
-    
+
     if len(x) > 1:
         return {n : transfer_neuron(n,
                                     source_instance=source_instance,
@@ -1104,7 +1105,7 @@ def transfer_neuron(x, source_instance, target_instance):
 def to_float(x):
     """ Helper to try to convert to float.
     """
-    try: 
+    try:
         return float(x)
     except:
         return None
