@@ -462,6 +462,10 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'treenodes', tn_id, 'info',
                              **GET)
 
+    def _update_treenode_radii(self, **GET):
+        """ Use to parse url for updating treenode radii. Needs POST."""
+        return self.make_url(self.project_id, 'treenodes', 'radius', **GET)
+
     def _get_node_labels_url(self, **GET):
         """ Use to parse url for retrieving treenode infos. Needs postdata!"""
         return self.make_url(self.project_id, 'labels-for-nodes', **GET)
