@@ -730,9 +730,8 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True,
         # Cut off primary neurite
         rest, primary_neurite = graph_utils.cut_neuron(x, to_cut)
 
-        if method == 'bending':
-            # The new cut node has to be a child of the original cut node
-            cut = next(x.graph.predecessors(cut))
+        # The new cut node has to be a child of the original cut node
+        cut = next(x.graph.predecessors(cut))
 
         # Change name and color
         primary_neurite.neuron_name = x.neuron_name + '_primary_neurite'
