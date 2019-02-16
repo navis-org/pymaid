@@ -5656,4 +5656,74 @@ def import_neuron(x, remote_instance=None):
     with open(f, 'rb') as file:
         resp = rm.fetch(import_url, post=import_post, files={'file': file})
 
+
+@cache.never_cache
+def update_radii(radii, remote_instance=None):
+    """ Change radii [nm] of given treenodes.
+
+    Parameters
+    ----------
+    radii :             dict, CatmaidNeuron/List
+                        Dictionary mapping treenode IDs to new radii or a
+                        CatmaidNeuron.
+    remote_instance :   CATMAID instance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict 
+                        Server response with::
+
+                            {
+                             'success': True/False,
+                             'update_nodes': {
+                                        node_id: {'old': old_radius,
+                                                  'new': new_radius
+                                                  'edition_time': new_edition_time,
+                                                  'skeleton_id': skeleton_id,
+                                                 },
+                                             }
+                            }
+
+
+    Examples
+    --------
+    >>> radii = {41500568: 50, 41500567: 100, 41500564: 200}
+    >>> pymaid.update_radii(radii)
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(radii, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        radii = radii.nodes.set_index('treenode_id').radius.to_dict()
+
+    if not isinstance(radii, dict):
+        raise TypeError('Expected dictionary, got "{}"'.format(type(radii)))
+
+    if any([not isinstance(v, numbers.Number) for v in radii.keys()]):
+        raise ValueError('Expecting only numerical treenode IDs.')
+
+    if any([not isinstance(v, numbers.Number) for v in radii.values()]):
+        raise ValueError('New radii must be numerical.')
+
+    update_radii_url = remote_instance._update_treenode_radii()
+
+    update_post = {"treenode_ids[{}]".format(i): k for i, k in enumerate(radii.keys())}
+    update_post.update({"treenode_radii[{}]".format(i): k for i, k in enumerate(radii.values())})
+
+    # We need to provide a state for each node
+    details = get_node_details(list(radii.keys()), convert_ts=False,
+                               remote_instance=remote_instance)
+    edition_times = details.set_index('node_id').edition_time.to_dict()
+
+    # State has to be provided as {'state': [(node_id, edition_time), ..]}
+    update_post.update({"state": [(str(k), edition_times[str(k)]) for k in radii]})
+
+    # We have to explicitly convert the state in a json string because passing
+    # it to requests as "post" will fuck this up otherwise
+    update_post['state'] = json.dumps(update_post['state'])    
+
+    return remote_instance.fetch(update_radii_url, update_post)
+
     return resp
