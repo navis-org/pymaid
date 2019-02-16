@@ -48,6 +48,7 @@ dtype: object
 import base64
 import datetime
 import json
+import numbers
 import os
 import re
 import sys
@@ -63,7 +64,7 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 
-from . import core, graph, utils, config, cache
+from . import core, graph, utils, morpho, graph_utils, config, cache
 from .intersect import in_volume
 
 __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
@@ -89,7 +90,7 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_nth_partners', 'get_treenodes_by_tag',
                   'get_node_location', 'add_meta_annotations',
                   'remove_meta_annotations', 'get_annotated',
-                  'import_neuron'])
+                  'import_neuron', 'update_radii', 'get_neuron_id'])
 
 # Set up logging
 logger = config.logger
