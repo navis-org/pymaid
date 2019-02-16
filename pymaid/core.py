@@ -1664,9 +1664,10 @@ class CatmaidNeuronList:
                 logger.debug('Neurons are using multiple remote_instances! '
                              'Returning first entry.')
             elif len(set(all_instances)) == 0:
-                raise Exception('No remote_instance found. Use '
-                                 '.set_remote_instance() to assign one to all '
-                                 'neurons.')
+                logger.warning('No remote_instance found. Use '
+                               '.set_remote_instance() to assign one to all '
+                               'neurons.')
+                return None
             return all_instances[0]
         elif key == 'review_status':
             self.get_review(skip_existing=True)
