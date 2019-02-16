@@ -2248,3 +2248,78 @@ def break_fragments(x):
         return core.CatmaidNeuronList(x.copy())
 
 
+def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
+    """ Heal fragmented neuron(s).
+
+    Tries to heal a fragmented neuron (i.e. a neuron with multiple roots) by
+    iteratively stitching together the closest nodes. Starts with the
+    largest fragment and then reattaches the 2nd largest, then the 3rd largest
+    and so on.
+
+    Parameters
+    ----------
+    x :         CatmaidNeuron/List
+                Fragmented neuron(s).
+    min_size :  int, optional
+                Minimum size in nodes for fragments to be reattached.
+    method :    'LEAFS' | 'ALL', optional
+                Method used to heal fragments:
+                        (1) 'LEAFS': Only leaf (including root) nodes will
+                            be used to heal gaps.
+                        (2) 'ALL': All treenodes can be used to reconnect
+                            fragments.
+    inplace :   bool, optional
+                If False, will perform healing on and return a copy.
+
+    Returns
+    -------
+    None
+                If ``inplace=True``
+    CatmaidNeuron/List
+                If ``inplace=False``
+
+
+    See Also
+    --------
+    :func:`pymaid.stitch_neurons`
+                Function used by ``heal_fragmented_neurons`` to stitch
+                fragments.
+    :func:`pymaid.break_fragments`
+                Use to break a fragmented neuron into disconnected pieces.
+    """
+
+    method = str(method).upper()
+
+    if method not in ['LEAFS', 'ALL']:
+        raise ValueError('Unknown method "{}"'.format(method))
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if not inplace:
+            x = x.copy()
+        healed = [heal_fragmented_neuron(n, min_size=min_size, method=method,
+                                         inplace=True)
+                                for n in config.tqdm(x,
+                                                     desc='Healing',
+                                                     disable=config.pbar_hide,
+                                                     leave=config.pbar_leave)]
+        if not inplace:
+            return x
+        return
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron/List, got "{}"'.format(type(x)))
+
+    # Don't do anything if not actually fragmented
+    if x.n_skeletons > 1:
+        frags = break_fragments(x)
+        healed = stitch_neurons(*[f for f in frags if f.n_nodes > min_size],
+                                method=method)
+        if not inplace:
+            return healed
+        else:
+            x.nodes = healed.nodes #update nodes
+            x.tags = healed.tags #update tags
+            x._clear_temp_attr()
+    elif not inplace:
+        return x
+
