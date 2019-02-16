@@ -1122,12 +1122,17 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
     return
 
 
-def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
+def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
     """ Stitch multiple neurons together.
 
-    The first neuron provided will be the master neuron. Unless treenode IDs
-    are provided via ``tn_to_stitch``, neurons will be stitched at the
-    closest point.
+    Uses minimum spanning tree to determine a way to connect all fragments
+    while minimizing length (eucledian distance) of the new edges. Nodes 
+    that have been stitched will be get a "stitched" tag.
+
+    Important
+    ---------
+    If duplicate node IDs are found across the fragments to stitch they will
+    be remapped to new, unique values!
 
     Parameters
     ----------
@@ -1136,18 +1141,24 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     method :            'LEAFS' | 'ALL' | 'NONE', optional
                         Set stitching method:
                             (1) 'LEAFS': Only leaf (including root) nodes will
-                                be considered for stitching.
+                                be allowed to make new edges.
                             (2) 'ALL': All treenodes are considered.
                             (3) 'NONE': Node and connector tables will simply
-                                be combined. Use this if your neurons consist
-                                of fragments with multiple roots. Overrides
-                                ``tn_to_stitch``.
+                                be combined without generating any new edges.
+                                The resulting neuron will have multiple roots.                                
+    master :            'SOMA' | 'LARGEST' | 'FIRST', optional
+                        Sets the master neuron:
+                            (1) 'SOMA': The largest fragment with a soma 
+                                becomes the master neuron. If no neuron with 
+                                soma, will pick the largest.
+                            (2) 'LARGEST': The largest fragment becomes the
+                                master neuron.
+                            (3) 'FIRST': The first fragment provided becomes
+                                the master neuron.
     tn_to_stitch :      List of treenode IDs, optional
                         If provided, these treenodes will be preferentially
                         used to stitch neurons together. Overrides methods
-                        ``'ALL'`` or ``'LEAFS'``. If there are more
-                        than two possible treenodes for a single stitching
-                        operation, the two closest are used.
+                        ``'ALL'`` or ``'LEAFS'``. 
 
     Returns
     -------
@@ -1170,39 +1181,91 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
     >>> stitched = pymaid.stitch_neurons([a, b], method='NONE')
 
     """
+    method = str(method).upper()
+    master = str(master).upper()    
 
-    if method not in ['LEAFS', 'ALL', 'NONE', None]:
+    if method not in ['LEAFS', 'ALL', 'NONE']:
         raise ValueError('Unknown method: %s' % str(method))
 
+    if master not in ['SOMA', 'LARGEST', 'FIRST']:
+        raise ValueError('Unknown master: %s' % str(master))          
+
     # Compile list of individual neurons
-    neurons = utils._unpack_neurons(x)
+    x = utils._unpack_neurons(x)
 
     # Use copies of the original neurons!
-    neurons = [n.copy() for n in neurons]
+    x = core.CatmaidNeuronList(x).copy()
 
-    if len(neurons) < 2:
-        logger.warning(
-            'Need at least 2 neurons to stitch, found %i' % len(neurons))
-        return neurons[0]
+    if len(x) < 2:
+        logger.warning('Need at least 2 neurons to stitch, '
+                       'found %i' % len(x))
+        return x[0]
 
-    logger.debug('Stitching %i neurons...' % len(neurons))
+    # First find master
+    if master == 'SOMA':
+        has_soma = [n for n in x if not isinstance(n.soma, type(None))]
+        if len(has_soma) > 0:
+            master = has_soma[0]
+        else:
+            master = sorted(x.neurons,
+                            key=lambda x: x.cable_length,
+                            reverse=True)[0]
+    elif master == 'LARGEST':
+        master = sorted(x.neurons,
+                        key=lambda x: x.cable_length,
+                        reverse=True)[0]
+    else:
+        # Simply pick the first neuron
+        master = x[0]
 
-    stitched_n = neurons[0]
+    # Check if we need to make any node IDs unique
+    seen_tn = set(master.nodes.treenode_id)
+    for n in [n for n in x if n != master]:
+        this_tn = set(n.nodes.treenode_id)
+
+        # Get duplicate node IDs
+        non_unique = seen_tn & this_tn
+
+        # Add this neuron's existing nodes to seen
+        seen_tn = seen_tn | this_tn
+        if non_unique:
+            # Generate new, unique node IDs
+            new_tn = np.arange(0, len(non_unique)) + max(seen_tn) + 1
+
+            # Generate new map
+            new_map = dict(zip(non_unique, new_tn))
+
+            # Remap node IDs - if no new value, keep the old
+            n.nodes.treenode_id = n.nodes.treenode_id.map(lambda x: new_map.get(x, x))
+            n.connectors.treenode_id = n.connectors.treenode_id.map(lambda x: new_map.get(x, x))
+            n.tags = {new_map.get(k, k): v for k, v in n.tags.items()}
+
+            # Remapping parent IDs requires the root to be temporarily set to
+            # -1. Otherwise the node IDs will become floats
+            new_map[None] = -1
+            n.nodes.parent_id = n.nodes.parent_id.map(lambda x: new_map.get(x, x)).astype(object)
+            n.nodes.loc[n.nodes.parent_id == -1, 'parent_id'] = None
+
+            # Add new nodes to seen
+            seen_tn = seen_tn | set(new_tn)
+
+            # Make sure the graph is updated
+            n._clear_temp_attr()
 
     # If method is none, we can just merge the data tables
     if method == 'NONE' or method is None:
-        stitched_n.nodes = pd.concat(
-            [n.nodes for n in neurons], ignore_index=True)
-        stitched_n.connectors = pd.concat(
-            [n.connectors for n in neurons], ignore_index=True)
-        stitched_n.tags = {}
-        for n in neurons:
-            stitched_n.tags.update(n.tags)
+        master.nodes = pd.concat([n.nodes for n in x],
+                                 ignore_index=True)
+        master.connectors = pd.concat([n.connectors for n in x],
+                                      ignore_index=True)
+        master.tags = {}
+        for n in x:
+            master.tags.update(n.tags)
 
         # Reset temporary attributes of our final neuron
-        stitched_n._clear_temp_attr()
+        master._clear_temp_attr()
 
-        return stitched_n
+        return master
 
     # Fix potential problems with tn_to_stitch
     if not isinstance(tn_to_stitch, type(None)):
@@ -1212,63 +1275,83 @@ def stitch_neurons(*x, method='ALL', tn_to_stitch=None):
         # Make sure we're working with integers
         tn_to_stitch = [int(tn) for tn in tn_to_stitch]
 
-    for i, nB in enumerate(neurons[1:]):
-        # First find treenodes to connect
+    # Generate a union of all graphs
+    g = nx.union_all([n.graph for n in x]).to_undirected()
+
+    # Set existing edges to zero weight to make sure they remain when
+    # calculating the minimum spanning tree
+    nx.set_edge_attributes(g, 0, 'weight')
+
+    # If two nodes occupy the same position (e.g. after if fragments are the
+    # result of cutting), they will have a distance of 0. Hence, we won't be 
+    # able to simply filter by distance
+    nx.set_edge_attributes(g, False, 'new')
+
+    # Now iterate over every possible combination of fragments
+    for a, b in itertools.combinations(x, 2):
+        # Collect relevant treenodes
         if not isinstance(tn_to_stitch, type(None)):
-            if set(tn_to_stitch) & set(stitched_n.nodes.treenode_id):
-                treenodesA = stitched_n.nodes.set_index(
-                    'treenode_id').loc[tn_to_stitch].reset_index()
-            else:
-                logger.warning('None of the nodes in tn_to_stitch were found '
-                               'in the first {0} stitched neurons. Falling '
-                               'back to all nodes!'.format(i + 1))
-                treenodesA = stitched_n.nodes
-
-            if set(tn_to_stitch) & set(nB.nodes.treenode_id):
-                treenodesB = nB.nodes.set_index(
-                    'treenode_id').loc[tn_to_stitch].reset_index()
-            else:
-                logger.warning('None of the nodes in tn_to_stitch were found '
-                               'in neuron #{0}. Falling back to all nodes!'.format(nB.skeleton_id))
-                treenodesB = nB.nodes
-        elif method == 'LEAFS':
-            treenodesA = stitched_n.nodes[stitched_n.nodes.type.isin(
-                ['end', 'root'])].reset_index()
-            treenodesB = nB.nodes[nB.nodes.type.isin(
-                ['end', 'root'])].reset_index()
+            tnA = a.nodes.loc[a.nodes.treenode_id.isin(tn_to_stitch)]
+            tnB = b.nodes.loc[a.nodes.treenode_id.isin(tn_to_stitch)]
         else:
-            treenodesA = stitched_n.nodes
-            treenodesB = nB.nodes
+            tnA = pd.DataFrame([])
+            tnB = pd.DataFrame([])
 
-        # Calculate pairwise distances
-        dist = scipy.spatial.distance.cdist(treenodesA[['x', 'y', 'z']].values,
-                                            treenodesB[['x', 'y', 'z']].values,
-                                            metric='euclidean')
+        if tnA.empty:
+            if method == 'LEAFS':
+                tnA = a.nodes.loc[a.nodes['type'].isin(['end', 'root'])]
+            else:
+                tnA = a.nodes
+        if tnB.empty:
+            if method == 'LEAFS':
+                tnB = b.nodes.loc[b.nodes['type'].isin(['end', 'root'])]
+            else:
+                tnB = b.nodes
 
-        # Get the closest treenodes
-        tnA = treenodesA.iloc[dist.argmin(axis=0)[0]].treenode_id
-        tnB = treenodesB.iloc[dist.argmin(axis=1)[0]].treenode_id
+        # Get distance between treenodes in A and B
+        d = scipy.spatial.distance.cdist(tnA[['x', 'y', 'z']].values,
+                                         tnB[['x', 'y', 'z']].values,
+                                         metric='euclidean')
 
-        logger.debug('Stitching treenodes {} and {}'.format(tnA, tnB))
+        # List of edges
+        tn_comb = itertools.product(tnA.treenode_id.values, tnB.treenode_id.values)
 
-        # Reroot neuronB onto the node that will be stitched
-        nB.reroot(tnB)
+        # Add edges to union graph
+        g.add_edges_from([(a, b, {'weight': w, 'new': True}) for (a, b), w in zip(tn_comb, d.ravel())])
 
-        # Change neuronA root node's parent to treenode of neuron B
-        nB.nodes.loc[nB.nodes.parent_id.isnull(), 'parent_id'] = tnA
+    # Get minimum spanning tree
+    edges = nx.minimum_spanning_edges(g)
 
-        # Add nodes, connectors and tags onto the stitched neuron
-        stitched_n.nodes = pd.concat(
-            [stitched_n.nodes, nB.nodes], ignore_index=True)
-        stitched_n.connectors = pd.concat(
-            [stitched_n.connectors, nB.connectors], ignore_index=True)
-        stitched_n.tags.update(nB.tags)
+    # Edges that need adding are those with weight > 0
+    to_add = [e for e in edges if e[2]['new']]
 
-    # Reset temporary attributes of our final neuron
-    stitched_n._clear_temp_attr()
+    # Keep track of original master root
+    master_root = master.root[0]
 
-    return stitched_n
+    # Generate one big neuron        
+    master.nodes = x.nodes
+    master.connectors = x.connectors
+    for n in x:
+        master.tags.update(n.tags)
+    master._clear_temp_attr()
 
+    for e in to_add:
+        # Reroot to one of the nodes in the edge
+        master.reroot(e[0], inplace=True)
+
+        # Connect the nodes
+        master.nodes.loc[master.nodes.treenode_id == e[0], 'parent_id'] = e[1]
+
+        # Add node tags
+        master.tags['stitched'] = master.tags.get('stitched', []) + list(e[0:2])
+
+        # We need to regenerate the graph
+        master._clear_temp_attr()
+
+    # Reroot to original root
+    master.reroot(master_root, inplace=True)
+
+    return master
 
 def average_neurons(x, limit=10, base_neuron=None):
     """ Computes an average from a list of neurons.
