@@ -36,7 +36,8 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'bending_flow', 'flow_centrality', 'segregation_index',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron', 'guess_radius',
-                  'smooth_neuron', 'time_machine'])
+                  'smooth_neuron', 'time_machine', 'heal_fragmented_neuron',
+                  'break_fragments', 'heal_fragmented_neuron'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
