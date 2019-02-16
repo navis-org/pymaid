@@ -1173,7 +1173,10 @@ class CatmaidNeuron:
                             'cable_length']
 
             for at in to_comp:
-                if getattr(self, at) != getattr(other, at):
+                comp = getattr(self, at) == getattr(other, at)
+                if isinstance(comp, np.ndarray) and not all(comp):
+                    return False
+                elif comp is False:
                     return False
             # If all comparisons have passed, return True
             return True
