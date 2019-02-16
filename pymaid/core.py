@@ -430,6 +430,9 @@ class CatmaidNeuron:
             return 'nodes' in self.__dict__
         elif key == 'cn_data':
             return 'connectors' in self.__dict__
+        elif key == 'n_skeletons':
+            #len(list(nx.connected_components(self.graph.to_undirected())))
+            return self.nodes[self.nodes.parent_id.isnull()].shape[0]
         else:
             raise AttributeError('Attribute "%s" not found' % key)
 
