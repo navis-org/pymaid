@@ -20,6 +20,7 @@ representations.
 
 import itertools
 import numbers
+import warnings
 
 import pandas as pd
 import numpy as np
@@ -808,19 +809,29 @@ def reroot_neuron(x, new_root, inplace=False):
     if not inplace:
         x = x.copy()
 
-    # Skip if new root is old root
-    if x.root == new_root:
+    # Skip if new root is among the existing roots
+    if any(x.root == new_root):
         if not inplace:
             return x
         else:
             return
 
     if x.igraph and config.use_igraph:
-        path = x.igraph.get_shortest_paths(x.igraph.vs.find(node_id=new_root),
-                                           x.igraph.vs.find(node_id=x.root))[0]
-        epath = x.igraph.get_shortest_paths(x.igraph.vs.find(node_id=new_root),
-                                            x.igraph.vs.find(node_id=x.root),
-                                            output='epath')[0]
+        # Prevent warnings in the following code - querying paths between 
+        # unreachable nodes will otherwise generate a runtime warning
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            
+            # Find paths to all roots
+            path = x.igraph.get_shortest_paths(x.igraph.vs.find(node_id=new_root),
+                                               [x.igraph.vs.find(node_id=r) for r in x.root])
+            epath = x.igraph.get_shortest_paths(x.igraph.vs.find(node_id=new_root),
+                                                [x.igraph.vs.find(node_id=r) for r in x.root],
+                                                output='epath')
+
+        # Extract paths that actually worked (i.e. within a continuous fragment)
+        path = [p for p in path if p][0]
+        epath = [p for p in epath if p][0]
 
         edges = [(s, t) for s, t in zip(path[:-1], path[1:])]
 
