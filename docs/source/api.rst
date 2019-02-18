@@ -260,7 +260,7 @@ Manipulation
     pymaid.time_machine
     pymaid.tortuosity
     pymaid.break_fragments
-    pymaid.heal_fragmented_neurons
+    pymaid.heal_fragmented_neuron
 
 Resampling
 ----------
