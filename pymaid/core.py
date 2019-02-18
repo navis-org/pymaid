@@ -226,10 +226,11 @@ class CatmaidNeuron:
                             'type %s' % str(type(x)))
 
         if remote_instance is None:
-            if 'remote_instance' in sys.modules:
-                remote_instance = sys.modules['remote_instance']
-            elif 'remote_instance' in globals():
-                remote_instance = globals()['remote_instance']
+            if hasattr(x, 'remote_instance'):
+                remote_instance = x.remote_instance
+            else:
+                remote_instance = utils._eval_remote_instance(None,
+                                                              raise_error=False)
 
         # These will be overriden if x is a CatmaidNeuron
         self._remote_instance = remote_instance
@@ -1461,10 +1462,8 @@ class CatmaidNeuronList:
             try:
                 remote_instance = x.remote_instance
             except BaseException:
-                if 'remote_instance' in sys.modules:
-                    remote_instance = sys.modules['remote_instance']
-                elif 'remote_instance' in globals():
-                    remote_instance = globals()['remote_instance']
+                remote_instance = utils._eval_remote_instance(None,
+                                                              raise_error=False)
 
         if not isinstance(x, (list, pd.DataFrame, CatmaidNeuronList,
                               np.ndarray)):
