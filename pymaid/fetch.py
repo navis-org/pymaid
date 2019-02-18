@@ -2468,7 +2468,8 @@ def add_annotations(x, annotations, remote_instance=None):
 
     Returns
     -------
-    Nothing
+    dict
+                        Server response.
 
     See Also
     --------
@@ -2495,10 +2496,8 @@ def add_annotations(x, annotations, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(annotations[i])
 
-    logger.info(remote_instance.fetch(
-        add_annotations_url, add_annotations_postdata))
-
-    return
+    return remote_instance.fetch(add_annotations_url,
+                                 add_annotations_postdata)
 
 
 @cache.never_cache
