@@ -329,7 +329,8 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
 
     """
 
-    remote_instance = _eval_remote_instance(remote_instance)
+    remote_instance = _eval_remote_instance(remote_instance,
+                                            raise_error=False)
 
     if isinstance(x, (int, np.int64, np.int32, np.int)):
         return [str(x)]
