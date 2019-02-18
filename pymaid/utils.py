@@ -1099,7 +1099,7 @@ def transfer_neuron(x, source_instance, target_instance):
 
     n = fetch.get_neuron(x, remote_instance=source_instance)
 
-    return fetch.import_neuron(n, remote_instance=target_instance)
+    return fetch.upload_neuron(n, remote_instance=target_instance)
 
 
 def to_float(x):

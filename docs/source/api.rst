@@ -24,6 +24,8 @@ Neurons
     pymaid.rename_neurons
     pymaid.get_names
     pymaid.get_neuron_id
+    pymaid.upload_neuron
+    pymaid.transfer_neuron
 
 Annotations
 -----------
@@ -479,7 +481,5 @@ Utility
     pymaid.set_loggers
     pymaid.eval_skids
     pymaid.shorten_name
-    pymaid.transfer_neuron
-    pymaid.import_neuron
     pymaid.update_radii
 

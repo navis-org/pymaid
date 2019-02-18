@@ -90,7 +90,7 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_nth_partners', 'get_treenodes_by_tag',
                   'get_node_location', 'add_meta_annotations',
                   'remove_meta_annotations', 'get_annotated',
-                  'import_neuron', 'update_radii', 'get_neuron_id'])
+                  'upload_neuron', 'update_radii', 'get_neuron_id'])
 
 # Set up logging
 logger = config.logger
@@ -5617,19 +5617,19 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 
 
 @cache.never_cache
-def import_neuron(x, import_tags=True, import_annotations=False,
+def upload_neuron(x, import_tags=True, import_annotations=False,
                   neuron_id=None,  remote_instance=None):
     """ Import neuron(s) to CATMAID instance.
 
-    Currently only imports node tables, **not** connectors or tags. Also note
-    that skeleton and treenode IDs will change - see server response for
-    old->new mapping. Neuron to import must not have more than one skeleton
-    (i.e. disconnected components = more than one root node).
+    Currently only imports node tables and (optionally) tags and annotations.
+    Also note that skeleton and treenode IDs will change - see server response
+    for old->new mapping. Neuron to import must not have more than one
+    skeleton (i.e. disconnected components = more than one root node).
 
     Parameters
     ----------
     x :                  CatmaidNeuron/List
-                         Neurons to import.    
+                         Neurons to import.
     import_tags :        bool, optional
                          If True, will import treenode tags from ``x.tags``.
     import_annotations : bool, optional
@@ -5674,7 +5674,7 @@ def import_neuron(x, import_tags=True, import_annotations=False,
 
                 x = morpho.heal_fragmented_neuron(x, min_size=0, inplace=False)
 
-            resp = {n.skeleton_id : import_neuron(n,
+            resp = {n.skeleton_id : upload_neuron(n,
                                                   neuron_id=neuron_id,
                                                   import_tags=import_tags,
                                                   remote_instance=remote_instance)
@@ -5718,12 +5718,12 @@ def import_neuron(x, import_tags=True, import_annotations=False,
     nmap = {n: resp['node_id_map'].get(str(swc_map[n]), None) for n in swc_map}
     resp['node_id_map'] =  nmap
 
-    if import_tags and getattr(x, 'tags', {}):        
+    if import_tags and getattr(x, 'tags', {}):
         # Map old to new nodes
         tags = {t: [nmap[n] for n in v] for t, v in x.tags.items()}
         # Invert tag dictionary: map node ID -> list of tags
         ntags = {}
-        for t in tags:            
+        for t in tags:
             ntags.update({n: ntags.get(n, []) + [t] for n in tags[t]})
 
         tags_resp = add_tags(list(ntags.keys()),
@@ -5755,7 +5755,7 @@ def update_radii(radii, remote_instance=None):
 
     Returns
     -------
-    dict 
+    dict
                         Server response with::
 
                             {
@@ -5806,7 +5806,7 @@ def update_radii(radii, remote_instance=None):
 
     # We have to explicitly convert the state in a json string because passing
     # it to requests as "post" will fuck this up otherwise
-    update_post['state'] = json.dumps(update_post['state'])    
+    update_post['state'] = json.dumps(update_post['state'])
 
     return remote_instance.fetch(update_radii_url, update_post)
 
@@ -5824,7 +5824,7 @@ def get_neuron_id(x, remote_instance=None):
 
     Returns
     -------
-    dict 
+    dict
                         ``{skeleton_id: neuron_id, ... }``
 
     """
