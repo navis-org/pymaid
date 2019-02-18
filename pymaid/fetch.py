@@ -5620,9 +5620,9 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
                   neuron_id=None,  remote_instance=None):
     """ Import neuron(s) to CATMAID instance.
 
-    Currently only imports node tables and (optionally) tags and annotations.
-    Also note that skeleton and treenode IDs will change - see server response
-    for old->new mapping. Neuron to import must not have more than one
+    Currently only imports treenodes and (optionally) tags and annotations.
+    Also note that skeleton and treenode IDs will change (see server response
+    for old->new mapping). Neuron to import must not have more than one
     skeleton (i.e. disconnected components = more than one root node).
 
     Parameters
@@ -5634,7 +5634,7 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
     import_annotations : bool, optional
                          If True will import annotations from ``x.annotations``.
     neuron_id :          int, optional
-                         Use this to associate the new skeleton with an 
+                         Use this to associate the new skeleton with an
                          existing neuron. THIS IS CURRENTLY BROKEN AND WILL BE
                          IGNORED.
     remote_instance :    CATMAID instance, optional
@@ -5642,11 +5642,16 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
 
     Returns
     -------
-    dict 
+    dict
                          Server response with new skeleton/treenode IDs::
-                            {'neuron_id': new neuron ID,
+
+                            {
+                             'neuron_id': new neuron ID,
                              'skeleton_id': new skeleton ID,
-                             'node_id_map': {'old_node_id': new_node_id, .. }}
+                             'node_id_map': {'old_node_id': new_node_id, ...},
+                             'annotations': if import_annotations=True,
+                             'tags': if tags=True
+                            }
 
     """
 
@@ -5676,13 +5681,14 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
             resp = {n.skeleton_id : upload_neuron(n,
                                                   neuron_id=neuron_id,
                                                   import_tags=import_tags,
+                                                  import_annotations=import_annotations,
                                                   remote_instance=remote_instance)
                     for n in config.tqdm(x,
                                          desc='Import',
                                          disable=config.pbar_hide,
                                          leave=config.pbar_leave)}
 
-            errors = {n: r for n, r in response.items() if 'error' in r}
+            errors = {n: r for n, r in resp.items() if 'error' in r}
             if errors:
                 logger.error('{} error(s) during upload. Check neuron(s): '
                              '{}'.format(len(errors), ','.join(errors.keys())))
@@ -5708,9 +5714,21 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
     swc_map = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
 
     with open(f, 'rb') as file:
-        resp = remote_instance.fetch(import_url,
-                                     post=import_post,
-                                     files={'file': file})
+        # Large files can cause a 504 Gateway timeout. In that case, we want
+        # to have a log of it without interupting potential subsequent uploads.
+        try:
+            resp = remote_instance.fetch(import_url,
+                                         post=import_post,
+                                         files={'file': file})
+        except requests.exceptions.HTTPError as err:
+            if 'gateway time-out' in err.lower():
+                logger.error('Timeout uploading neuron "{}"'.format(x.neuron_name))
+                return {'error': err}
+            else:
+                # Any other error should just raise
+                raise
+        except:
+            raise
 
     # Exporting to SWC changes the node IDs -> we will revert this in the
     # response of the server
@@ -5725,17 +5743,17 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
         for t in tags:
             ntags.update({n: ntags.get(n, []) + [t] for n in tags[t]})
 
-        tags_resp = add_tags(list(ntags.keys()),
-                             ntags,
-                             'TREENODE',
-                             remote_instance=remote_instance)
+        resp['tags'] = add_tags(list(ntags.keys()),
+                                ntags,
+                                'TREENODE',
+                                remote_instance=remote_instance)
 
     # Make sure not not access `.annotations` directly to not trigger
     # fetching annotations
     if import_annotations and 'annotations' in x.__dict__:
         an = x.__dict__.get('annotations', [])
-        an_resp = add_annotations(resp['skeleton_id'], an,
-                                  remote_instance=remote_instance)
+        resp['annotations'] = add_annotations(resp['skeleton_id'], an,
+                                              remote_instance=remote_instance)
 
     return resp
 
