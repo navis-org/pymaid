@@ -1498,8 +1498,8 @@ class CatmaidNeuronList:
         if to_convert:
             if self._use_threading:
                 with ThreadPoolExecutor(max_workers=self.n_cores) as e:
-                    futures = e.map(CatmaidNeuron,
-                                    [n[0] for n in to_convert])
+                    futures = e.map(_convert_helper,
+                                    to_convert)
 
                     converted = [n for n in config.tqdm(futures,
                                                         total=len(to_convert),
@@ -1520,11 +1520,7 @@ class CatmaidNeuronList:
         self.ix = _IXIndexer(self.neurons)
 
         # Add skeleton ID indexer class
-        self.skid = _SkidIndexer(self.neurons)
-
-    def _convert_helper(self, x):
-        """ Helper function to convert x to CatmaidNeuron."""
-        return CatmaidNeuron(x[0], remote_instance=x[1])
+        self.skid = _SkidIndexer(self.neurons)        
 
     def summary(self, n=None, add_cols=[]):
         """ Get summary over all neurons in this NeuronList.
@@ -3231,3 +3227,7 @@ class Volume:
         concave_hull = cascaded_union(triangles)
 
         return list(concave_hull.exterior.coords)
+
+def _convert_helper(x):
+    """ Helper function to convert x to CatmaidNeuron."""
+    return CatmaidNeuron(x[0], remote_instance=x[1])            
