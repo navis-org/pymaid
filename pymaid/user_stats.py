@@ -533,11 +533,36 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     return stats.groupby('team').sum()
 
 
-def get_time_invested(x, remote_instance=None, minimum_actions=10,
-                      treenodes=True, connectors=True, mode='SUM',
-                      max_inactive_time=3, start_date=None, end_date=None):
+def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
+                      treenodes=True, connectors=True, start_date=None,
+                      end_date=None, remote_instance=None):
     """ Calculates the time individual users have spent working on a set of
     neurons.
+
+    Use ``minimum_actions`` and ``max_inactive_time`` to fine tune how time
+    invested is calculated: by default, time is binned over 3 minutes in
+    which a given user has to perform 3x10 actions for that interval to be
+    counted as active.
+
+    Important
+    ---------
+    Creation/Edition/Review times can overlap! This is why total time spent
+    is not just creation + edition + review.
+
+    Please note that this does currently not take placement of
+    pre-/postsynaptic nodes into account!
+
+    Be aware of the ``minimum_actions`` parameter: at low values even
+    a single action (e.g. connecting a node) will add considerably to time
+    invested. To keep total reconstruction time comparable to what Catmaid
+    calculates, you should consider about 10 actions/minute (= a click every
+    6 seconds) and ``max_inactive_time`` of 3 mins.
+
+    CATMAID gives reconstruction time across all users. Here, we calculate
+    the time spent tracing for individuals. This may lead to a discrepancy
+    between sum of time invested over of all users from this function vs.
+    CATMAID's reconstruction time.
+
 
     Parameters
     ----------
@@ -549,20 +574,11 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
 
-                        If you pass a CatmaidNeuron/List, its data is used
-                        calculate time invested. You can exploit this to get
-                        time invested into a given compartment of a neurons,
-                        e.g. by pruning it to a volume.
-    remote_instance :   CatmaidInstance, optional
-                        Either pass explicitly or define globally.
-    minimum_actions :   int, optional
-                        Minimum number of actions per minute to be counted as
-                        active.
-    treenodes :         bool, optional
-                        If False, treenodes will not be taken into account.
-    connectors :        bool, optional
-                        If False, connectors and connector links will not be
-                        taken into account.
+                        If you pass a CatmaidNeuron/List, its node/connectors
+                        are used to calculate time invested. You can exploit
+                        this to get time spent reconstructing in given
+                        compartment of a neurons, e.g. by pruning it to a
+                        volume before passing it to ``get_time_invested``.
     mode :              'SUM' | 'OVER_TIME' | 'ACTIONS', optional
                         (1) 'SUM' will return total time invested (in minutes)
                             per user.
@@ -570,12 +586,26 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
                             time.
                         (3) 'ACTIONS' will return actions
                             (node/connectors placed/edited) per day.
+    minimum_actions :   int, optional
+                        Minimum number of actions per minute to be counted as
+                        active.
     max_inactive_time : int, optional
-                        Maximal time inactive in minutes.
-    start_date :        None | tuple | datetime.date, optional
-    end_date :          None | tuple | datetime.date, optional
+                        Interval in minutes over which time invested is
+                        binned. Essentially determines how much time can be
+                        between bouts of activity.
+    treenodes :         bool, optional
+                        If False, treenodes will not be taken into account.
+    connectors :        bool, optional
+                        If False, connectors and connector links will not be
+                        taken into account.
+    start_date :        iterable | datetime.date | numpy.datetime64, optional
                         Restricts time invested to window. Applies to creation
-                        but not edition time!
+                        but not edition time! If iterable, must be year, month
+                        day, e.g. ``[2018, 1, 1]``.
+    end_date :          iterable | datetime.date | numpy.datetime64, optional
+                        See ``start_date``.
+    remote_instance :   CatmaidInstance, optional
+                        Either pass explicitly or define globally.
 
     Returns
     -------
@@ -601,29 +631,26 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
         day.
 
 
-    Important
-    ---------
-    Creation/Edition/Review times can overlap! This is why total time spent
-    is not just creation + edition + review.
-
-    Please note that this does currently not take placement of
-    pre-/postsynaptic nodes into account!
-
-    Be aware of the ``minimum_actions`` parameter: at low settings even
-    a single actions (e.g. connecting a node) will add considerably to time
-    invested. To keep total reconstruction time comparable to what Catmaid
-    calculates, you should consider about 10 actions/minute (= a click every
-    6 seconds) and ``max_inactive_time`` of 3 mins.
-
-    CATMAID gives reconstruction time across all users. Here, we calculate
-    the time spent tracing for individuals. This may lead to a discrepancy
-    between sum of time invested over of all users from this function vs.
-    CATMAID's reconstruction time.
-
     Examples
     --------
-    Plot pie chart of contributions per user using Plotly. This example
-    assumes that you have already imported and set up pymaid.
+    Get time invested for a set of neurons:
+
+    >>> da1 = pymaid.get_neurons('annotation:glomerulus DA1')
+    >>> time = pymaid.get_time_invested(da1)
+
+    Get time spent tracing in a specific compartment:
+
+    >>> da1_lh = pymaid.prune_by_volume('LH_R', inplace=False)
+    >>> time_lh = pymaid.get_time_invested(da1_lh)
+
+    Get contributions within a given time window:
+
+    >>> time_jan = pymaid.get_time_invested(da1,
+    ...                                     start_date=[2018, 1, 1],
+    ...                                     end_date=[2018, 1, 31])
+
+
+    Plot pie chart of contributions per user using Plotly:
 
     >>> import plotly
     >>> stats = pymaid.get_time_invested(skids, remote_instance)
@@ -682,10 +709,10 @@ def get_time_invested(x, remote_instance=None, minimum_actions=10,
     elif isinstance(x, core.CatmaidNeuronList):
         skdata = x
 
-    if not isinstance(end_date, (datetime.date, type(None))):
+    if not isinstance(end_date, (datetime.date, np.datetime64, type(None))):
         end_date = datetime.date(*end_date)
 
-    if not isinstance(start_date, (datetime.date, type(None))):
+    if not isinstance(start_date, (datetime.date, np.datetime64, type(None))):
         start_date = datetime.date(*start_date)
 
     # Extract connector and node IDs
