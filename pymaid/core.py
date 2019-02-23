@@ -2587,14 +2587,15 @@ class CatmaidNeuronList:
 
         return nl
 
-    def to_selection(self, fname='selection.json'):
-        """Saves neuron selection as json file which can be loaded
+    def to_selection(self, save_to='selection.json'):
+        """Generate neuron selection as json file which can be loaded
         in CATMAID selection tables. Uses neuron's ``.color`` attribute.
 
         Parameters
         ----------
-        fname :     str, optional
-                    Filename to save selection to
+        save_to :   str | None, optional
+                    Filename to save selection to. If not provided, will
+                    return the json data.
         """
 
         data = [dict(skeleton_id=int(n.skeleton_id),
@@ -2603,10 +2604,13 @@ class CatmaidNeuronList:
                      opacity=1
                      ) for n in self.neurons]
 
-        with open(fname, 'w') as outfile:
-            json.dump(data, outfile)
+        if save_to:
+            with open(save_to, 'w') as outfile:
+                json.dump(data, outfile)
 
-        logger.info('Selection saved as {}.'.format(fname))
+            logger.info('Selection saved as {}.'.format(fname))
+        else:
+            return data
 
     def to_dataframe(self):
         """ Turn this CatmaidneuronList into a pandas DataFrame containing
