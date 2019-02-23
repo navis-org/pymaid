@@ -676,9 +676,9 @@ def nblast_allbyall(x, target=None, normalize=True, n_cores=os.cpu_count(),
         return pyclust.ClustResults(matrix, mat_type='similarity')
 
 
-def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
+def nblast(query, db=None, n_cores=os.cpu_count(),
            reverse=False, normalised=True, UseAlpha=False, mirror=True,
-           reference='nat.flybrains::FCWB'):
+           reference='nat.flybrains::FCWB', remote_instance=None):
     """ Wrapper to use R's nblast (https://github.com/jefferis/nat).
 
     Provide neuron to nblast either as skeleton ID or neuron object. This
@@ -692,40 +692,40 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
     Parameters
     ----------
     x
-                    Neuron to nblast. This can be either:
-                    1. A single skeleton ID
-                    2. PyMaid neuron from e.g. pymaid.get_neuron()
-                    3. RCatmaid neuron object
+                        Neuron to nblast. This can be either:
+                        1. A single skeleton ID
+                        2. Pymaid neuron from e.g. :func:`pymaid.get_neuron`
+                        3. RCatmaid neuron object
+    db :                database, optional
+                        File containing dotproducts to blast against. This can be
+                        either:
+
+                        1. the name of a file in ``'flycircuit.datadir'``,
+                        2. a path (e.g. ``'.../gmrdps.rds'``),
+                        3. an R file object (e.g. ``robjects.r("load('.../gmrdps.rds')")``)
+                        4. a URL to load the list from (e.g. ``'http://.../gmrdps.rds'``)
+
+                        If not provided, will search for a 'dpscanon.rds' file in
+                        'flycircuit.datadir'.
+    n_cores :           int, optional
+                        Number of cores to use for nblasting. Default is
+                        ``os.cpu_count()``.
+    reverse :           bool, optional
+                        If True, treats the neuron as NBLAST target rather than
+                        neurons of database. Makes sense for partial
+                        reconstructions.
+    UseAlpha :          bool, optional
+                        Emphasises neurons' straight parts (backbone) over parts
+                        that have lots of branches.
+    mirror :            bool, optional
+                        Whether to mirror the neuron or not b/c FlyCircuit neurons
+                        are on fly's right.
+    normalised :        bool, optional
+                        Whether to return normalised NBLAST scores.
+    reference :         string | R file object, optional
+                        Default = 'nat.flybrains::FCWB'
     remote_instance :   Catmaid Instance, optional
                         Only neccessary if only a SKID is provided
-    db :            database, optional
-                    File containing dotproducts to blast against. This can be
-                    either:
-
-                    1. the name of a file in ``'flycircuit.datadir'``,
-                    2. a path (e.g. ``'.../gmrdps.rds'``),
-                    3. an R file object (e.g. ``robjects.r("load('.../gmrdps.rds')")``)
-                    4. a URL to load the list from (e.g. ``'http://.../gmrdps.rds'``)
-
-                    If not provided, will search for a 'dpscanon.rds' file in
-                    'flycircuit.datadir'.
-    n_cores :       int, optional
-                    Number of cores to use for nblasting. Default is
-                    ``os.cpu_count()``.
-    reverse :       bool, optional
-                    If True, treats the neuron as NBLAST target rather than
-                    neurons of database. Makes sense for partial
-                    reconstructions.
-    UseAlpha :      bool, optional
-                    Emphasises neurons' straight parts (backbone) over parts
-                    that have lots of branches.
-    mirror :        bool, optional
-                    Whether to mirror the neuron or not b/c FlyCircuit neurons
-                    are on fly's right.
-    normalised :    bool, optional
-                    Whether to return normalised NBLAST scores.
-    reference :     string | R file object, optional
-                    Default = 'nat.flybrains::FCWB'
 
     Returns
     -------
@@ -750,6 +750,11 @@ def nblast(neuron, remote_instance=None, db=None, n_cores=os.cpu_count(),
     >>> # Sort and plot the first hits
     >>> nbl.sort('mu_score')
     >>> nbl.plot(hits = 4)
+
+    See Also
+    --------
+    :func:`pymaid.rmaid.nblast_allbyall`
+                Nblast neurons against one another.
     """
 
     start_time = time.time()
