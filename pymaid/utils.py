@@ -1067,7 +1067,7 @@ def transfer_neuron(x, source_instance, target_instance):
     ----------
     x :                 list | array-like
                         Skeleton IDs of neurons to copy over.
-    source_instance :   CATMAIDInstance
+    source_instance :   CatmaidInstance
                         Source instance to take neuron from.
     target_instance :   CatmaidInstance
                         Target instance to copy neuron to.

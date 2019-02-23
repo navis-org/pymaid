@@ -1179,8 +1179,9 @@ class Viewer:
 
         Examples
         --------
-        >>> # Add neurons to viewer
+        >>> # Get some neurons
         >>> nl = pymaid.get_neurons('annotation:WTPN2017_mlALT_right')
+        >>> # Create viewer and add neurons
         >>> v = pymaid.Viewer()
         >>> v.add(nl)
         >>> # Bind keys to labels

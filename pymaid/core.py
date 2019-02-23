@@ -20,7 +20,7 @@ also provided quick access to many other PyMaid functions.
 Examples
 --------
 >>> # Get a bunch of neurons from CATMAID server as CatmaidNeuronList
->>> nl = pymaid.get_neuron( 'annotation:uPN right' )
+>>> nl = pymaid.get_neuron('annotation:uPN right')
 >>> # CatmaidNeuronLists work in, many ways, like pandas DataFrames
 >>> nl.head()
                             neuron_name skeleton_id  n_nodes  n_connectors  \
@@ -43,9 +43,9 @@ Examples
 >>> # ... by skeleton ID, ...
 >>> nl.skid[16]
 >>> # ... or by attributes
->>> nl[ nl.cable_length > 2000 ]
+>>> nl[nl.cable_length > 2000]
 >>> # Each neuron has a bunch of useful attributes
->>> print( nl[0].skeleton_id, nl[0].soma, nl[0].n_open_ends )
+>>> print(nl[0].skeleton_id, nl[0].soma, nl[0].n_open_ends)
 >>> # Attributes can also be accessed for the entire neuronslist
 >>> nl.skeleton_id
 
@@ -53,12 +53,12 @@ Examples
 also allow quick access to other PyMaid functions:
 
 >>> # This ...
->>> pymaid.reroot_neuron( nl[0], nl[0].soma, inplace=True )
+>>> pymaid.reroot_neuron(nl[0], nl[0].soma, inplace=True)
 >>> # ... is essentially equivalent to this
->>> nl[0].reroot( nl[0].soma )
+>>> nl[0].reroot(nl[0].soma)
 >>> # Similarly, CatmaidNeurons do on-demand data fetching for you:
 >>> # So instead of this ...
->>> an = pymaid.get_annotations( nl[0] )
+>>> an = pymaid.get_annotations(nl[0])
 >>> # ..., you can do just this:
 >>> an = nl[0].annotations
 
@@ -170,11 +170,11 @@ class CatmaidNeuron:
     small_segments :    list of lists
                         Treenode IDs making up linear segments between
                         end/branch points.
-    soma :              treenode_id of soma
+    soma :              treenode ID of soma
                         Returns ``None`` if no soma or 'NA' if data not
                         available.
     root :              numpy.array
-                        Treenode_id(s) of root.
+                        Treenode ID(s) of root.
     color :             tuple
                         Color of neuron. Used for e.g. export to json.
     partners :          pd.DataFrame
@@ -183,7 +183,7 @@ class CatmaidNeuron:
     Examples
     --------
     >>> # Initialize a new neuron
-    >>> n = pymaid.CatmaidNeuron( 123456 )
+    >>> n = pymaid.CatmaidNeuron(123456)
     >>> # Retrieve node data from server on-demand
     >>> n.nodes
     CatmaidNeuron - INFO - Retrieving skeleton data...
@@ -193,7 +193,7 @@ class CatmaidNeuron:
     >>> n = pymaid.get_neuron(123456)
     >>> # Get annotations from server
     >>> n.annotations
-    [ 'annotation1', 'annotation2' ]
+    ['annotation1', 'annotation2']
     >>> # Force update of annotations
     >>> n.get_annotations()
 

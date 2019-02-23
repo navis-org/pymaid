@@ -608,6 +608,13 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
     >>> # Cut into fragments of >10 um size
     >>> cut2 = pymaid.split_into_fragments(x, n=float('inf'), min_size=10)
 
+    See Also
+    --------
+    :func:`pymaid.longest_neurite`:
+                        Extracts the N longest neurites from the neuron. Use
+                        this to e.g. simplify a neuron to a given number of
+                        branch points.
+
     """
 
     if isinstance(x, core.CatmaidNeuron):
