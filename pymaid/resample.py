@@ -106,9 +106,10 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     errors = 0
 
     # Iterate over segments
+    # This progress bar is only interesting for debugging really
     for i, seg in enumerate(config.tqdm(x.small_segments,
                                         desc='Proc. segments',
-                                        disable=config.pbar_hide,
+                                        disable=config.logger.level > 10,
                                         leave=False)):
         # Get coordinates
         coords = locs.loc[seg].values.astype(float)
