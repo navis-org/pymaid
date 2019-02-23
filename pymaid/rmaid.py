@@ -573,30 +573,38 @@ def dotprops2py(dp, subset=None):
     return core.Dotprops(df)
 
 
-def nblast_allbyall(x, normalize=True, remote_instance=None,
-                    n_cores=os.cpu_count(), resample=1, use_alpha=False):
+def nblast_allbyall(x, target=None, normalize=True, n_cores=os.cpu_count(),
+                    resample=1, convert_um=True, use_alpha=False,
+                    remote_instance=None):
     """ Wrapper to use R's ``nat:nblast_allbyall``
     (https://github.com/jefferislab/nat.nblast/).
 
-    Neurons are automatically resampled to 1 micron.
 
     Parameters
     ----------
     x :                 skeleton IDs | CatmaidNeuronList | RCatmaid neurons
                         Neurons to blast.
-    remote_instance :   Catmaid Instance, optional
-                        Only neccessary if only skeleton IDs are provided
+    target :            None | skeleton IDs | CatmaidNeuronList | RCatmaid neurons, optional
+                        Neurons to nblast ``x`` against. If not specified,
+                        will nblast ``x`` against ``x``.
     normalize :         bool, optional
-                        If True, matrix is normalized using z-score.
+                        If True, will use nblast's built-in normalisation:
+                        "whether to divide scores by the self-match score of
+                        the query"
     n_cores :           int, optional
                         Number of cores to use for nblasting. Default is
                         ``os.cpu_count()``.
     resample :          int, optional
                         Resolution in microns [um] the neurons will be
                         resampled to before nblasting.
+    convert_um :        bool, optional
+                        NBlast is optimised for microns! If your neurons
+                        aren't already in microns, leave this parameter True.
     use_alpha :         bool, optional
                         Emphasises neurons' straight parts (backbone) over
                         parts that have lots of branches.
+    remote_instance :   Catmaid Instance, optional
+                        Only neccessary if only skeleton IDs are provided.
 
     Returns
     -------
@@ -610,11 +618,11 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     >>> import pymaid
     >>> import matplotlib.pyplot as plt
     >>> # Initialize connection to Catmaid server
-    >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
+    >>> rm = pymaid.CatmaidInstance(url, http_user, http_pw, token)
     >>> # Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
-    >>> # Blast against each other
-    >>> res = pymaid.nblast_allbyall( nl )
+    >>> # NBlast against each other
+    >>> res = pymaid.nblast_allbyall(nl)
     >>> # Cluster and create simple dendrogram
     >>> res.cluster(method='ward')
     >>> res.plot_matrix()
@@ -633,45 +641,26 @@ def nblast_allbyall(x, normalize=True, remote_instance=None,
     if isinstance(x, core.CatmaidNeuronList):
         # Test if resolution is higher than 1 micron per node.
         if max(x.sampling_resolution) < 1:
-            logger.info('Consider resampling your neurons to a lower ' 
+            logger.info('Consider resampling your neurons to a lower '
                         'resolution (e.g. 1 micron) to speed up blasting.')
 
-    if 'rpy2' in str(type(x)):
-        rn = x
-    elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
-        if x.shape[0] < 2:
-            raise ValueError('You have to provide more than a single neuron.')
-        rn = neuron2r(x, convert_to_um=True)
-    elif isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
-        raise ValueError('You have to provide more than a single neuron.')
-    elif isinstance(x, list):
-        if not remote_instance:
-            raise Valueerror('You have to provide a CATMAID instance using '
-                             ' the <remote_instance> parameter. See '
-                             'help(rmaid.nblast) for details.')
-        x = fetch.get_neuron(x, remote_instance)
-        rn = neuron2r(x, convert_to_um=True)
-    else:
-        raise ValueError('Unable to intepret <neuron> parameter provided. See'
-                         'help(rmaid.nblast) for details.')
+    xdp = neuron2dps(x, resample=resample, convert_to_um=convert_um)
 
-    # Make dotprops and resample
-    xdp = nat.dotprops(rn, k=5, resample=resample)
+    if isinstance(target, type(None)):
+        tdp = xdp
+    else:
+        tdp = neuron2dps(target, resample=resample, convert_to_um=convert_um)
 
     # Calculate scores
-    scores = r_nblast.nblast(xdp, xdp, **{'normalised': False,
+    scores = r_nblast.nblast(xdp, tdp, **{'normalised': normalize,
                                           '.parallel': True,
                                           'UseAlpha': use_alpha})
 
     # Generate matrix with skeleton IDs as indices/columns
     matrix = pd.DataFrame(np.array(scores),
                           columns=names(xdp),
-                          index=names(xdp)
+                          index=names(tdp)
                           )
-
-    if normalize:
-        # Perform z-score normalization
-        matrix = (matrix - matrix.mean()) / matrix.std()
 
     logger.info('Done! Use results.plot_dendrogram() and '
                 'matplotlib.pyplot.show() to plot dendrogram.')
