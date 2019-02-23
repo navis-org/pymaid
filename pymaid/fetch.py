@@ -5854,4 +5854,4 @@ def get_neuron_id(x, remote_instance=None):
 
     resp = remote_instance.fetch(urls)
 
-    return {s: n['neuronid'] for s, n in zip(skids, resp)}
+    return {s: n.get('neuronid', n) for s, n in zip(skids, resp)}
