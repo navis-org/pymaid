@@ -1072,3 +1072,38 @@ class NBLASTresults:
             logger.error('Unable to intepret entries provided. See '
                          'help(NBLASTresults.plot3d) for details.')
             return None
+
+
+def neuron2dps(x, resample=1, convert_to_um=True):
+    """ Converts neuron(s) into R dotprops.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron/List | rcatmaid neuron(s)
+                    Neurons to convert to DPS.
+    resample :      int, optional
+                    Convert neuron to this resolution [um].
+    convert_to_um : bool, optional
+                    If True, will convert neurons to microns. This assumes
+                    input neurons are in nanometers!
+
+    Returns
+    -------
+    ``nat.dotprops``
+    """
+
+    # First convert x to R neurons
+    if 'rpy2' in str(type(x)):
+        rn = x
+    elif isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
+        if x.shape[0] < 2:
+            raise ValueError('You have to provide more than a single neuron.')
+        rn = neuron2r(x, convert_to_um=convert_to_um)
+    elif isinstance(x, pd.Series) or isinstance(x, core.CatmaidNeuron):
+        raise ValueError('You have to provide more than a single neuron.')
+    else:
+        raise ValueError('Unable to intepret <neuron> parameter provided. See'
+                         'help(rmaid.nblast) for details.')
+
+    # Make dotprops and resample
+    return nat.dotprops(rn, k=5, resample=resample)
