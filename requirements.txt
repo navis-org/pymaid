@@ -1,5 +1,5 @@
 decorator>=4.1.0
-matplotlib==3.0.2
+matplotlib==3.0.3
 imageio==2.5.0
 numpy==1.16.1
 networkx==2.2
