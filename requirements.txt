@@ -4,7 +4,7 @@ imageio==2.5.0
 numpy==1.16.1
 networkx==2.2
 pandas==0.24.1
-plotly==3.6.1
+plotly==3.7.0
 pypng==0.0.18
 pyqt5==5.11.3
 requests_futures==0.9.9
