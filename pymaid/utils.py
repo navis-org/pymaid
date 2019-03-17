@@ -23,9 +23,14 @@ import os
 import random
 import six
 import sys
+import warnings
 
 import pandas as pd
 import numpy as np
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import vispy.visuals
 
 from . import core, fetch, config
 
@@ -580,7 +585,7 @@ def _parse_objects(x, remote_instance=None):
     skdata = core.CatmaidNeuronList(neuron_obj, make_copy=False)
 
     # Collect visuals
-    visuals = [ob for ob in x if 'vispy' in str(type(ob))]
+    visuals = [ob for ob in x if isinstance(ob, vispy.visuals.Visual)]
 
     # Collect dotprops
     dotprops = [ob for ob in x if isinstance(ob, core.Dotprops)]
