@@ -52,6 +52,7 @@ with warnings.catch_warnings():
     from vispy.gloo.util import _screenshot
 
 from . import morpho, graph, core, fetch, graph_utils, utils, scene3d, config
+from .external.visuals import MeshNeuron
 
 try:
     # Try setting vispy backend to PyQt5
@@ -281,6 +282,9 @@ def plot2d(x, method='2d', **kwargs):
     ``scatter_kws`` (dict, default = {})
       Parameters to be used when plotting points. Accepted keywords are:
       ``size`` and ``color``.
+
+    ``figsize`` (tuple, default = (8, 8))
+      Sets figure size.
 
     See Also
     --------
@@ -1181,7 +1185,7 @@ def plot3d(x, **kwargs):
                                                ))
 
                 # Add soma(s):
-                if kwargs.get('soma', True):                
+                if kwargs.get('soma', True):
                     for n in neuron.nodes[neuron.nodes.treenode_id == neuron.soma].itertuples():
                         try:
                             c = 'rgb{}'.format(neuron_cmap[i])
@@ -1984,7 +1988,11 @@ def _volume2vispy(x, **kwargs):
 
         s = scene.visuals.Mesh(vertices=v.vertices,
                                faces=v.faces, color=color,
-                               shading=kwargs.get('shading', None))
+                               shading=kwargs.get('shading', 'smooth'))
+
+        # Set some aesthetic parameters
+        s.shininess = 0
+        s.set_gl_state('translucent', cull_face=True, depth_test=False)
 
         # Make sure volumes are always drawn after neurons
         s.order = 10
@@ -2154,6 +2162,8 @@ def _neuron2vispy(x, **kwargs):
                                            antialias=True,
                                            method='gl')
                     # method can also be 'agg' -> has to use connect='strip'
+                    # I don't think this works with 3D lines though
+
                     # Make visual discoverable
                     t.interactive = True
 
@@ -2168,36 +2178,37 @@ def _neuron2vispy(x, **kwargs):
 
                     visuals.append(t)
                 else:
-                    from pymaid import tube
                     coords = _segments_to_coords(neuron,
                                                  neuron.segments,
                                                  modifier=(1, 1, 1))
                     nodes = neuron.nodes.set_index('treenode_id')
-                    for s, c in zip(neuron.segments, coords):
-                        radii = nodes.loc[s, 'radius'].values.astype(float)
-                        radii[radii <= 100] = 100
-                        t = tube.Tube(c.astype(float),
-                                      radius=radii,
-                                      color=neuron_color,
-                                      tube_points=5,)
+                    radii = [nodes.loc[s, 'radius'].values.astype(float) for s in neuron.segments]
 
-                        # Add custom attributes
-                        t.unfreeze()
-                        t._object_type = 'neuron'
-                        t._neuron_part = 'neurites'
-                        t._skeleton_id = neuron.skeleton_id
-                        t._neuron_name = neuron.neuron_name
-                        t._object_id = object_id
-                        t.freeze()
+                    t = MeshNeuron(coords,
+                                   radii=radii,
+                                   color=neuron_color,
+                                   use_normals=kwargs.get('use_normals', True),
+                                   tube_points=kwargs.get('tube_points', 5))
 
-                        visuals.append(t)
+                    # Add custom attributes
+                    t.unfreeze()
+                    t._object_type = 'neuron'
+                    t._neuron_part = 'neurites'
+                    t._skeleton_id = neuron.skeleton_id
+                    t._neuron_name = neuron.neuron_name
+                    t._object_id = object_id
+                    t.freeze()
+
+                    visuals.append(t)
 
             if kwargs.get('by_strahler', False) or \
                kwargs.get('by_confidence', False):
                 # Convert array back to a single color without alpha
                 neuron_color = neuron_color[0][:3]
 
-            if kwargs.get('soma', True):
+            # Add soma by default. If use_radii=True, add soma only if
+            # explicitly requested
+            if kwargs.get('soma', kwargs.get('use_radii', False) is False):
                 # Extract and plot soma
                 soma = neuron.nodes[neuron.nodes.radius > 1]
                 if soma.shape[0] >= 1:

@@ -118,7 +118,8 @@ class Browser:
         # Update some defaults as necessary
         defaults = dict(keys=None,
                         show=True,
-                        bgcolor='white')
+                        bgcolor='white',
+                        config={'depth_size': 32})
         defaults.update(kwargs)
 
         # Generate canvas
@@ -803,6 +804,8 @@ class Viewer:
                     self.set_colors({s: c})
 
         self.update_legend()
+        self._data_text.text = ''
+        self.active_neuron = []
 
     def toggle_neurons(self, n):
         """ Toggle neuron(s) visibility. """
@@ -977,6 +980,9 @@ class Viewer:
                              '"alpha"!'.format(self._cycle_mode))
 
         self.active_neuron = to_show
+        self._data_text.text = '{} [{}/{}]'.format('|'.join(to_show),
+                                                   self._cycle_index,
+                                                   len(self.neurons))
 
     def _draw_fps(self, fps):
         """ Callback for ``canvas.measure_fps``. """
