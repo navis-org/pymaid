@@ -335,7 +335,7 @@ def neuron2igraph(x):
 
 def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
     """ Generate neuron object from NetworkX Graph.
-        
+
     This function will try to generate a neuron-like tree structure from
     the Graph. Therefore the graph may not contain loops!
 
@@ -410,7 +410,7 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
     radii = nx.get_node_attributes(g, 'radius')
     tn_table['radius'] = tn_table.index.map(lambda x: radii.get(x, -1))
 
-    # Turn this into a Series 
+    # Turn this into a Series
     n = pd.Series({'skeleton_id': skeleton_id,
                    'neuron_name': neuron_name,
                    'nodes': tn_table.reset_index(),

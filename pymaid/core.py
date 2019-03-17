@@ -2594,8 +2594,8 @@ class CatmaidNeuronList:
         Parameters
         ----------
         save_to :   str | None, optional
-                    Filename to save selection to. If not provided, will
-                    return the json data.
+                    Filename to save selection to. If ``None``, will
+                    return the json data instead.
         """
 
         data = [dict(skeleton_id=int(n.skeleton_id),
@@ -2608,7 +2608,7 @@ class CatmaidNeuronList:
             with open(save_to, 'w') as outfile:
                 json.dump(data, outfile)
 
-            logger.info('Selection saved as {}.'.format(fname))
+            logger.info('Selection saved as {}.'.format(save_to))
         else:
             return data
 
@@ -2768,10 +2768,11 @@ class _SkidIndexer():
         sel = [n for n in self.obj if str(n.skeleton_id) in skid]
 
         # Reorder to keep in the order requested
-        sel = sorted(sel, key=lambda x : np.where(skid == str(x.skeleton_id))[0][0])
+        sel = sorted(sel, key=lambda x: np.where(skid == str(x.skeleton_id))[0][0])
 
         if len(sel) == 0:
-            raise ValueError('No neuron with skeleton ID(s) {0}'.format(skid))
+            raise ValueError('No neuron(s) with given skeleton ID(s):'
+                             ' {0}'.format(skid))
         elif len(sel) == 1:
             return sel[0]
         else:
@@ -3251,4 +3252,4 @@ class Volume:
 
 def _convert_helper(x):
     """ Helper function to convert x to CatmaidNeuron."""
-    return CatmaidNeuron(x[0], remote_instance=x[1])            
+    return CatmaidNeuron(x[0], remote_instance=x[1])

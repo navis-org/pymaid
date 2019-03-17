@@ -281,7 +281,7 @@ class CatmaidInstance:
             logger.info('Global CATMAID instance set. Caching is OFF.')
 
     def fetch(self, url, post=None, desc='Fetching', callback=None, files=None,
-              disable_pbar=False, leave_pbar=True, return_type='json'):
+             disable_pbar=False, leave_pbar=True, return_type='json'):
         """ Requires the url to connect to and the variables for POST,
         if any, in a dictionary.
 
@@ -415,14 +415,14 @@ class CatmaidInstance:
 
     @property
     def catmaid_version(self):
-        """ Version of CATMAID your server is running. """        
+        """ Version of CATMAID your server is running. """
 
-        return self.fetch(self._get_catmaid_version())['SERVER_VERSION']        
+        return self.fetch(self._get_catmaid_version())['SERVER_VERSION']
 
     @property
     def available_projects(self):
         """ List of projects hosted on your server. Depends on your user's
-        permission! """        
+        permission! """
 
         return pd.DataFrame(self.fetch(self._get_projects_url())).sort_values('id')
 
@@ -437,7 +437,7 @@ class CatmaidInstance:
             s.update(d)
 
         # Return as DataFrame
-        return pd.DataFrame(stacks).set_index('id')    
+        return pd.DataFrame(stacks).set_index('id')
 
     def _get_catmaid_version(self, **GET):
         """ Use to parse url for retrieving CATMAID server version"""
@@ -1012,9 +1012,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
         return df
 
     if df.shape[0] > 1:
-        return core.CatmaidNeuronList(df, remote_instance=remote_instance,)
+        return core.CatmaidNeuronList(df, remote_instance=remote_instance)
     else:
-        return core.CatmaidNeuron(df.loc[0], remote_instance=remote_instance,)
+        return core.CatmaidNeuron(df.loc[0], remote_instance=remote_instance)
 
 
 # This is for legacy reasons -> will remove eventually
@@ -1481,7 +1481,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                       d]] + list(x), remote_instance)
 
     df = pd.DataFrame(columns=['neuron_name', 'skeleton_id',
-                               'num_nodes', 'relation'] + list(x))    
+                               'num_nodes', 'relation'] + list(x))
 
     # Number of synapses is returned as list of links with 0-5 confidence:
     # {'skid': [0, 1, 2, 3, 4, 5]}
@@ -2586,7 +2586,7 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
     an = get_annotation_list(remote_instance=remote_instance)
 
     # Get annotation IDs
-    remove_from = utils._make_iterable(remove_from)    
+    remove_from = utils._make_iterable(remove_from)
     rm = an[an.annotation.isin(remove_from)]
     if rm.shape[0] != len(remove_from):
         missing = set(remove_from).difference(rm.annotation.values)
@@ -3143,7 +3143,7 @@ def get_annotated(x, remote_instance=None, include_sub_annotations=False,
         logger.info('..... and NOT: {}'.format(','.join([str(s) for s in neg_ids])))
 
     urls = remote_instance._get_annotated_url()
-    
+
     resp = remote_instance.fetch(urls, post=post, desc='Fetching')
 
     return pd.DataFrame(resp['entities'])
@@ -3238,6 +3238,8 @@ def get_skids_by_annotation(annotations, remote_instance=None,
                             Use to retrieve neurons by combining various
                             search criteria. For example names, reviewers,
                             annotations, etc.
+    :func:`pymaid.get_annotated`
+                            Use to retrieve entities (neurons and annotations).
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -3896,7 +3898,7 @@ def get_contributor_statistics(x, remote_instance=None, separate=False,
     remote_instance :   CATMAID instance, optional
                         If not passed directly, will try using global.
     separate :          bool, optional
-                        If true, stats are given per neuron.
+                        If True, stats are given per neuron.
     max_threads :       int, optional
                         Maximum parallel data requests. Overrides
                         ``CatmaidInstance.max_threads``.
@@ -4347,7 +4349,7 @@ def get_history(remote_instance=None,
 @cache.undo_on_error
 def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
                         coord_format='NM', resolution=(4, 4, 50)):
-    """ Retrieve treenodes in given bounding box.
+    """ Retrieve treenodes and connectors in given bounding box.
 
     Parameters
     ----------
@@ -4706,7 +4708,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                 return
 
         logger.info(
-            'Get all neurons with at least {0} nodes'.format(min_size))
+            'Get all neurons with > {0} nodes'.format(min_size))
         get_skeleton_list_GET_data = {'nodecount_gt': min_size}
         remote_get_list_url = remote_instance._get_list_skeletons_url()
         remote_get_list_url += '?%s' % urllib.parse.urlencode(
@@ -4778,7 +4780,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
     volumes :               str | core.Volume | list of either
                             Single or list of CATMAID volumes.
     min_nodes :             int, optional
-                            Minimum node count for a neuron within given 
+                            Minimum node count for a neuron within given
                             volume(s).
     min_cable :             int, optional
                             Minimum cable length [nm] for a neuron within
@@ -4882,7 +4884,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
                             resolution of 35nm is assumed. Pass 'xy_res' and
                             'z_res' as ``**kwargs`` to override this.
     min_nodes :             int, optional
-                            Minimum node count for a neuron within given 
+                            Minimum node count for a neuron within given
                             bounding box.
     min_cable :             int, optional
                             Minimum cable length [nm] for a neuron within
@@ -4897,7 +4899,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
 
     """
 
-    remote_instance = utils._eval_remote_instance(remote_instance)    
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(bbox, dict):
         bbox = np.array([[bbox['left'], bbox['right']],
@@ -5089,7 +5091,9 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
         response, remote_instance=remote_instance, threshold=min_synapses)
 
     # Get all paths between sources and targets
-    all_paths = [p for s in sources for t in targets for p in nx.all_simple_paths(g, s, t, cutoff=max(n_hops)) if len(p) - 1 in n_hops]
+    all_paths = [p for s in sources for t in targets for p in
+                 nx.all_simple_paths(g, s, t,
+                                     cutoff=max(n_hops)) if len(p) - 1 in n_hops]
 
     if not return_graph:
         return all_paths
@@ -5150,7 +5154,7 @@ def get_volume(volume_name=None, remote_instance=None,
     if isinstance(volume_name, type(None)):
         logger.info('Retrieving list of available volumes.')
     elif not isinstance(volume_name, (int, str, list, np.ndarray)):
-        raise TypeError('Volume name must be str or list of str.')
+        raise TypeError('Volume name must be id (int), str or list of either, not {}.'.format(type(volume_name)))
 
     volume_names = utils._make_iterable(volume_name)
 
@@ -5484,6 +5488,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     return
 
+
 @cache.undo_on_error
 def get_node_location(x, remote_instance=None):
     """ Retrieves location for a set of tree- or connector nodes.
@@ -5518,6 +5523,7 @@ def get_node_location(x, remote_instance=None):
     df = pd.DataFrame(data, columns=['node_id', 'x', 'y', 'z'])
 
     return df
+
 
 @cache.undo_on_error
 def get_label_list(remote_instance=None):

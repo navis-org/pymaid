@@ -151,9 +151,9 @@ class handler:
         elif key == 'abutting':
             return object_list(self._cn_selection_helper(3))
         elif key == 'all':
-            return self.neurons + self.connectors + self.soma        
+            return self.neurons + self.connectors + self.soma
         else:
-            try:                
+            try:
                 return getattr(self.all, key)
             except:
                 raise AttributeError('Unknown attribute ' + key)

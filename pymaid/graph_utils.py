@@ -561,13 +561,13 @@ def find_main_branchpoint(x, reroot_to_soma=False):
     g = graph.neuron2nx(x)
 
     # First, find longest path
-    longest = nx.dag_longest_path(g)
+    longest = nx.dag_longest_path(g, weight='weight')
 
     # Remove longest path
     g.remove_nodes_from(longest)
 
     # Find second longst path
-    sc_longest = nx.dag_longest_path(g)
+    sc_longest = nx.dag_longest_path(g, weight='weight')
 
     # Parent of the last node in sc_longest is the common branch point
     bp = list(x.graph.successors(sc_longest[-1]))[0]
@@ -824,11 +824,11 @@ def reroot_neuron(x, new_root, inplace=False):
             return
 
     if x.igraph and config.use_igraph:
-        # Prevent warnings in the following code - querying paths between 
+        # Prevent warnings in the following code - querying paths between
         # unreachable nodes will otherwise generate a runtime warning
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            
+
             # Find paths to all roots
             path = x.igraph.get_shortest_paths(x.igraph.vs.find(node_id=new_root),
                                                [x.igraph.vs.find(node_id=r) for r in x.root])

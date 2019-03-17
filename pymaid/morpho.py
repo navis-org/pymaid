@@ -1127,7 +1127,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
     """ Stitch multiple neurons together.
 
     Uses minimum spanning tree to determine a way to connect all fragments
-    while minimizing length (eucledian distance) of the new edges. Nodes 
+    while minimizing length (eucledian distance) of the new edges. Nodes
     that have been stitched will be get a "stitched" tag.
 
     Important
@@ -1146,11 +1146,11 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
                             (2) 'ALL': All treenodes are considered.
                             (3) 'NONE': Node and connector tables will simply
                                 be combined without generating any new edges.
-                                The resulting neuron will have multiple roots.                                
+                                The resulting neuron will have multiple roots.
     master :            'SOMA' | 'LARGEST' | 'FIRST', optional
                         Sets the master neuron:
-                            (1) 'SOMA': The largest fragment with a soma 
-                                becomes the master neuron. If no neuron with 
+                            (1) 'SOMA': The largest fragment with a soma
+                                becomes the master neuron. If no neuron with
                                 soma, will pick the largest.
                             (2) 'LARGEST': The largest fragment becomes the
                                 master neuron.
@@ -1159,7 +1159,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
     tn_to_stitch :      List of treenode IDs, optional
                         If provided, these treenodes will be preferentially
                         used to stitch neurons together. Overrides methods
-                        ``'ALL'`` or ``'LEAFS'``. 
+                        ``'ALL'`` or ``'LEAFS'``.
 
     Returns
     -------
@@ -1183,13 +1183,13 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
 
     """
     method = str(method).upper()
-    master = str(master).upper()    
+    master = str(master).upper()
 
     if method not in ['LEAFS', 'ALL', 'NONE']:
         raise ValueError('Unknown method: %s' % str(method))
 
     if master not in ['SOMA', 'LARGEST', 'FIRST']:
-        raise ValueError('Unknown master: %s' % str(master))          
+        raise ValueError('Unknown master: %s' % str(master))
 
     # Compile list of individual neurons
     x = utils._unpack_neurons(x)
@@ -1283,8 +1283,8 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
     # calculating the minimum spanning tree
     nx.set_edge_attributes(g, 0, 'weight')
 
-    # If two nodes occupy the same position (e.g. after if fragments are the
-    # result of cutting), they will have a distance of 0. Hence, we won't be 
+    # If two nodes occupy the same position (e.g. if fragments are the
+    # result of cutting), they will have a distance of 0. Hence, we won't be
     # able to simply filter by distance
     nx.set_edge_attributes(g, False, 'new')
 
@@ -1329,7 +1329,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
     # Keep track of original master root
     master_root = master.root[0]
 
-    # Generate one big neuron        
+    # Generate one big neuron
     master.nodes = x.nodes
     master.connectors = x.connectors
     for n in x:
@@ -2091,8 +2091,8 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     nodes = pd.DataFrame(data[0], columns=['treenode_id', 'parent_id',
                                            'user_id', 'x', 'y', 'z', 'radius',
                                            'confidence', 'creation_timestamp',
-                                           'modified_timestamp'])
-    nodes.parent_id = nodes.parent_id.astype(object)
+                                           'modified_timestamp', 'ordering_by'])
+    nodes.loc[:, 'parent_id'] = nodes.parent_id.values.astype(object)
     nodes.loc[~nodes.parent_id.isnull(), 'parent_id'] = nodes.loc[~nodes.parent_id.isnull(), 'parent_id'].map(int)
     nodes.loc[nodes.parent_id.isnull(), 'parent_id'] = None
 
