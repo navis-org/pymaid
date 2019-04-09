@@ -623,7 +623,7 @@ def _parse_objects(x, remote_instance=None):
 
 
 def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
-             post_label=None, include_subdirs=False):
+             post_label=None, soma_label=1, include_subdirs=False):
     """ Generate neuron object from SWC file.
 
     This import is following format specified
@@ -648,6 +648,9 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     pre/post_label :    bool | int, optional
                         If not ``None``, will try to extract pre-/postsynapses
                         from label column.
+    soma_label :        bool | int, optional
+                        If not ``None``, will try to extract soma and place
+                        appropriate tags on the neuron.
     include_subdirs :   bool, optional
                         If True and ``f`` is a folder, will also search
                         subdirectories for ``.swc`` files.
@@ -668,6 +671,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                                                 neuron_id=neuron_id,
                                                 pre_label=pre_label,
                                                 post_label=post_label,
+                                                soma_label=soma_label,
                                                 include_subdirs=include_subdirs,
                                                 )
                                        for x in config.tqdm(f, desc='Importing',
@@ -688,6 +692,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                                                 neuron_name=neuron_name,
                                                 neuron_id=neuron_id,
                                                 pre_label=pre_label,
+                                                soma_label=soma_label,
                                                 post_label=post_label)
             for x in config.tqdm(swc,
                                  desc='Reading {}'.format(f.split('/')[-1]),
@@ -787,6 +792,10 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
 
     # Generate neuron
     n = core.CatmaidNeuron(df)
+
+    # Make sure soma is correctly tagged
+    if soma_label:
+        n.tags['soma'] = n.nodes[n.nodes.label==soma_label].treenode_id.tolist()
 
     # Add folder and filename to the neuron
     n.filename = os.path.basename(f)
