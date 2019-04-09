@@ -467,6 +467,7 @@ R interface (rMAID)
     pymaid.rmaid.nblast
     pymaid.rmaid.nblast_allbyall
     pymaid.rmaid.neuron2py
+    pymaid.rmaid.neuron2dps
     pymaid.rmaid.dotprops2py
     pymaid.rmaid.neuron2r
     pymaid.rmaid.NBLASTresults

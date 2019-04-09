@@ -13,7 +13,7 @@ What's new?
    * - 0.94
      - 09/04/19
      - - started reworking vispy plot3d: in brief, will try reducing the number of shader programs running
-       - new functions: :func:`~pymaid.break_fragments`, :func:`~pymaid.heal_fragmented_neurons`, :func:`~pymaid.update_radii`, :func:`~pymaid.get_neuron_id`, :func:`~pymaid.rmaid.neuron2dps`
+       - new functions: :func:`~pymaid.break_fragments`, :func:`~pymaid.heal_fragmented_neuron`, :func:`~pymaid.update_radii`, :func:`~pymaid.get_neuron_id`, :func:`~pymaid.rmaid.neuron2dps`
        - :class:`~pymaid.Volumes` now allow multiplication and division - will apply to vertex coordinates
        - improved: :func:`~pymaid.from_swc`, :func:`~pymaid.to_swc`, :func:`~pymaid.predict_connectivity`, :func:`~pymaid.stitch_neurons`, :func:`~pymaid.reroot_neuron`, :func:`~pymaid.upload_neuron`
        - fixes in :func:`~pymaid.delete_neuron`, :func:`~pymaid.rename_neurons`, :func:`~pymaid.fetch_history`, :func:`~pymaid.split_axon_dendrite`, :func:`~pymaid.CatmaidNeuronList.remove_duplicates`

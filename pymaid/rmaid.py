@@ -86,7 +86,7 @@ except BaseException:
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
                   'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall',
-                  'get_neuropil'])
+                  'get_neuropil', 'neuron2dps'])
 
 
 def init_rcatmaid(**kwargs):
