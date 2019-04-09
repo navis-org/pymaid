@@ -2,5 +2,5 @@
 ipykernel==5.1.0
 nbsphinx==0.4.2
 numpydoc
-sphinx_bootstrap_theme
+sphinx_bootstrap_theme==0.7.1
 

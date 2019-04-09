@@ -4,14 +4,14 @@ imageio==2.5.0
 numpy==1.16.1
 networkx==2.2
 pandas==0.24.1
-plotly==3.6.1
+plotly==3.7.1
 pypng==0.0.18
-pyqt5==5.11.3
+pyqt5==5.12.1
 requests_futures==0.9.9
 requests==2.21.0
 Shapely==1.6.4.post2
 seaborn==0.9.0
-setuptools==40.8.0
+setuptools==41.0.0
 scipy==1.2.1
 six==1.11.0
 tqdm==4.31.0
