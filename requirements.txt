@@ -6,7 +6,7 @@ networkx==2.2
 pandas==0.24.1
 plotly==3.7.1
 pypng==0.0.18
-pyqt5==5.11.3
+pyqt5==5.12.1
 requests_futures==0.9.9
 requests==2.21.0
 Shapely==1.6.4.post2

@@ -788,7 +788,19 @@ class CatmaidInstance:
         """ Use to get list of skeleton in bounding box. Does need postdata.
         """
         return self.make_url(self.project_id, 'skeletons', 'in-bounding-box',
-                             **GET)        
+                             **GET)
+
+    def _get_connector_in_bbox_url(self, **GET):
+        """ Use to parse url for retrieving list of connectors in bounding
+        box (can use GET or POST).
+        """
+        return self.make_url(self.project_id, 'connectors', 'in-bounding-box', **GET)
+
+    def _get_neuron_ids_url(self, **GET):
+        """ Use to parse url for retrieving neuron IDs for a bunch of skeleton
+        IDs.
+        """
+        return self.make_url(self.project_id, 'neurons', 'from-models', **GET)
 
 
 @cache.undo_on_error
@@ -2416,10 +2428,12 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     remove_annotations_postdata = {}
 
-    for i in range(len(x)):
-        # This requires neuron IDs (skeleton ID + 1)
+    neuron_ids = get_neuron_id(x, remote_instance=remote_instance)
+
+    for i, s in enumerate(len(x)):
+        # This requires neuron IDs
         key = 'entity_ids[%i]' % i
-        remove_annotations_postdata[key] = str(int(x[i]) + 1)
+        remove_annotations_postdata[key] = neuron_ids[str(s)]
 
     for i in range(len(an_ids)):
         key = 'annotation_ids[%i]' % i
@@ -2488,9 +2502,11 @@ def add_annotations(x, annotations, remote_instance=None):
 
     add_annotations_postdata = {}
 
-    for i in range(len(x)):
+    neuron_ids = get_neuron_id(x, remote_instance=remote_instance)
+
+    for i, s in enumerate(len(x)):
         key = 'entity_ids[%i]' % i
-        add_annotations_postdata[key] = str(int(x[i]) + 1)
+        add_annotations_postdata[key] = neuron_ids[str(s)]
 
     for i in range(len(annotations)):
         key = 'annotations[%i]' % i
@@ -2753,13 +2769,14 @@ def get_annotation_details(x, remote_instance=None):
     # neuron_id can be requested via neuron_names
     url_list = list()
     postdata = list()
+    neuron_ids = get_neuron_id(skids, remote_instance=remote_instance)
 
     for s in skids:
         remote_get_neuron_name = remote_instance._get_single_neuronname_url(s)
-        neuronid = remote_instance.fetch(remote_get_neuron_name)['neuronid']
+        nid = neuron_ids.get(str(s))
 
         url_list.append(remote_instance._get_annotation_table_url())
-        postdata.append(dict(neuron_id=int(neuronid)))
+        postdata.append(dict(neuron_id=int(nid)))
 
     # Get data
     annotations = [e['aaData'] for e in remote_instance.fetch(
@@ -5465,12 +5482,11 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     url_list = []
     postdata = []
+    neuron_ids = get_neuron_id(x, remote_instance=remote_instance)
     for skid, name in zip(x, new_names):
         # Renaming works with neuron ID, which we can get via this API endpoint
-        remote_get_neuron_name = remote_instance._get_single_neuronname_url(
-            skid)
-        neuron_id = remote_instance.fetch(remote_get_neuron_name)['neuronid']
-        url_list.append(remote_instance._rename_neuron_url(neuron_id))
+        nid = neuron_ids[str(skid)]
+        url_list.append(remote_instance._rename_neuron_url(nid))
         postdata.append({'name': name})
 
     # Get data
@@ -5848,7 +5864,7 @@ def get_neuron_id(x, remote_instance=None):
     Returns
     -------
     dict
-                        ``{skeleton_id: neuron_id, ... }``
+                        ``{skeleton_id (str): neuron_id (int), ... }``
 
     """
 
@@ -5856,8 +5872,12 @@ def get_neuron_id(x, remote_instance=None):
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)
 
-    urls = [remote_instance._get_single_neuronname_url(s) for s in skids]
+    url = remote_instance._get_neuron_ids_url()
+    post = {'model_ids[{}]'.format(i): s for i, s in enumerate(skids)}
 
-    resp = remote_instance.fetch(urls)
+    resp = remote_instance.fetch(url, post=post)
 
-    return {s: n.get('neuronid', n) for s, n in zip(skids, resp)}
+    return resp
+
+
+
