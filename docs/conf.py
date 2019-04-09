@@ -54,7 +54,7 @@ MOCK_MODULES = ['sklearn', 'igraph' , 'tqdm', 'pandas', 'bpy', 'bmesh',
                 'requests_futures.sessions', 'requests_futures.sessions.FuturesSession',
                 'trimesh',
                 'vispy', 'seaborn',
-                'vispy.geometry', 'vispy.gloo.util', 'vispy.visuals'
+                'vispy.geometry', 'vispy.gloo.util', 'vispy.visuals',
                 'vispy.gloo.util._screenshot']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
