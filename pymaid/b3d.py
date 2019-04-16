@@ -715,7 +715,7 @@ class object_list:
                 ob.select = False
 
     def color(self, r, g, b, vary=None):
-        """ Assign color to all objects in the list
+        """ Assign color to all objects in the list.
 
         Parameters
         ----------
@@ -728,11 +728,18 @@ class object_list:
         vary :  float
                 Range by which to randomly vary r, g and b.
         """
+        rgb = np.array([r, g, b])
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 if vary:
-                    r += np.random.randint(0, 100)/(100/vary) - (vary/2)
-                ob.active_material.diffuse_color = (r, g, b)
+                    v =  np.array([np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
+                                   np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
+                                   np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
+                                  ])
+
+                    ob.active_material.diffuse_color = np.clip(rgb + v, 0, 1)
+                else:
+                    ob.active_material.diffuse_color = np.clip(rgb, 0, 1)
 
     def colorize(self):
         """ Assign colors across the color spectrum
