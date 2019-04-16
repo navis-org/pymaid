@@ -2504,7 +2504,7 @@ def add_annotations(x, annotations, remote_instance=None):
 
     neuron_ids = get_neuron_id(x, remote_instance=remote_instance)
 
-    for i, s in enumerate(len(x)):
+    for i, s in enumerate(x):
         key = 'entity_ids[%i]' % i
         add_annotations_postdata[key] = neuron_ids[str(s)]
 
@@ -4854,7 +4854,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
     neurons = []
 
     for v in volumes:
-        logger.info('Retrieving nodes in volume {0}'.format(v.name))
+        logger.info('Retrieving neurons in volume {0}'.format(v.name))
         temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
                                    min_cable=min_cable,
                                    remote_instance=remote_instance)
