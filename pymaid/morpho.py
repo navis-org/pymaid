@@ -1137,7 +1137,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
 
     Parameters
     ----------
-    x :                 CatmaidNeuron | CatmaidNeuronList | list of either
+    x :                 CatmaidNeurons | CatmaidNeuronList | list of either
                         Neurons to stitch (see examples).
     method :            'LEAFS' | 'ALL' | 'NONE', optional
                         Set stitching method:
@@ -1220,38 +1220,39 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
         master = x[0]
 
     # Check if we need to make any node IDs unique
-    seen_tn = set(master.nodes.treenode_id)
-    for n in [n for n in x if n != master]:
-        this_tn = set(n.nodes.treenode_id)
+    if x.nodes.duplicated(subset='treenode_id').sum() > 0:
+        seen_tn = set(master.nodes.treenode_id)
+        for n in [n for n in x if n != master]:
+            this_tn = set(n.nodes.treenode_id)
 
-        # Get duplicate node IDs
-        non_unique = seen_tn & this_tn
+            # Get duplicate node IDs
+            non_unique = seen_tn & this_tn
 
-        # Add this neuron's existing nodes to seen
-        seen_tn = seen_tn | this_tn
-        if non_unique:
-            # Generate new, unique node IDs
-            new_tn = np.arange(0, len(non_unique)) + max(seen_tn) + 1
+            # Add this neuron's existing nodes to seen
+            seen_tn = seen_tn | this_tn
+            if non_unique:
+                # Generate new, unique node IDs
+                new_tn = np.arange(0, len(non_unique)) + max(seen_tn) + 1
 
-            # Generate new map
-            new_map = dict(zip(non_unique, new_tn))
+                # Generate new map
+                new_map = dict(zip(non_unique, new_tn))
 
-            # Remap node IDs - if no new value, keep the old
-            n.nodes.treenode_id = n.nodes.treenode_id.map(lambda x: new_map.get(x, x))
-            n.connectors.treenode_id = n.connectors.treenode_id.map(lambda x: new_map.get(x, x))
-            n.tags = {new_map.get(k, k): v for k, v in n.tags.items()}
+                # Remap node IDs - if no new value, keep the old
+                n.nodes.treenode_id = n.nodes.treenode_id.map(lambda x: new_map.get(x, x))
+                n.connectors.treenode_id = n.connectors.treenode_id.map(lambda x: new_map.get(x, x))
+                n.tags = {new_map.get(k, k): v for k, v in n.tags.items()}
 
-            # Remapping parent IDs requires the root to be temporarily set to
-            # -1. Otherwise the node IDs will become floats
-            new_map[None] = -1
-            n.nodes.parent_id = n.nodes.parent_id.map(lambda x: new_map.get(x, x)).astype(object)
-            n.nodes.loc[n.nodes.parent_id == -1, 'parent_id'] = None
+                # Remapping parent IDs requires the root to be temporarily set
+                # to -1. Otherwise the node IDs will become floats
+                new_map[None] = -1
+                n.nodes.parent_id = n.nodes.parent_id.map(lambda x: new_map.get(x, x)).astype(object)
+                n.nodes.loc[n.nodes.parent_id == -1, 'parent_id'] = None
 
-            # Add new nodes to seen
-            seen_tn = seen_tn | set(new_tn)
+                # Add new nodes to seen
+                seen_tn = seen_tn | set(new_tn)
 
-            # Make sure the graph is updated
-            n._clear_temp_attr()
+                # Make sure the graph is updated
+                n._clear_temp_attr()
 
     # If method is none, we can just merge the data tables
     if method == 'NONE' or method is None:
@@ -1353,6 +1354,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
     master.reroot(master_root, inplace=True)
 
     return master
+
 
 def average_neurons(x, limit=10, base_neuron=None):
     """ Computes an average from a list of neurons.
@@ -2223,7 +2225,7 @@ def break_fragments(x):
 
     See Also
     --------
-    :func:`pymaid.heal_fragmented_neurons`
+    :func:`pymaid.heal_fragmented_neuron`
                 Use to heal fragmentation instead of breaking it up.
 
     """
@@ -2252,10 +2254,8 @@ def break_fragments(x):
 def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
     """ Heal fragmented neuron(s).
 
-    Tries to heal a fragmented neuron (i.e. a neuron with multiple roots) by
-    iteratively stitching together the closest nodes. Starts with the
-    largest fragment and then reattaches the 2nd largest, then the 3rd largest
-    and so on.
+    Tries to heal a fragmented neuron (i.e. a neuron with multiple roots)
+    using a minimum spanning tree.
 
     Parameters
     ----------
@@ -2283,7 +2283,7 @@ def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
     See Also
     --------
     :func:`pymaid.stitch_neurons`
-                Function used by ``heal_fragmented_neurons`` to stitch
+                Function used by ``heal_fragmented_neuron`` to stitch
                 fragments.
     :func:`pymaid.break_fragments`
                 Use to break a fragmented neuron into disconnected pieces.
