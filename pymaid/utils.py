@@ -702,8 +702,13 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     filename = os.path.splitext(os.path.basename(f))[0]
 
     if not neuron_id:
-        # Use 30 bit - 32bit raises error when converting to R StrVector
-        neuron_id = random.getrandbits(30)
+        # If filename is numeric use it as skeleton ID
+        fname = os.path.splitext(os.path.basename(f))[0]
+        if fname.isnumeric():
+            neuron_id = int(fname)
+        else:
+            # Use 30 bit - 32bit raises error when converting to R StrVector
+            neuron_id = random.getrandbits(30)
         #neuron_id = uuid.uuid4().int
     elif callable(neuron_id):
         neuron_id = neuron_id(filename)
