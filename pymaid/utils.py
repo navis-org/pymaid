@@ -622,8 +622,9 @@ def _parse_objects(x, remote_instance=None):
     return skids, skdata, dotprops, volumes, points, visuals
 
 
-def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
-             post_label=None, soma_label=1, include_subdirs=False):
+def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
+             pre_label=None, post_label=None, soma_label=1,
+             include_subdirs=False):
     """ Generate neuron object from SWC file.
 
     This import is following format specified
@@ -643,8 +644,12 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
                         filename minus extension.
     neuron_id :         int | func, optional
                         Unique identifier (essentially skeleton ID). If not
-                        provided, will generate one from scratch. If function,
-                        must accept filename and return ``str``.
+                        provided, will use filename (if numeric) or generate
+                        one from scratch. If function, must accept filename
+                        and return ``str``.
+    import_labels :     bool, optional
+                        If True, will import label column as ``.tags``
+                        property of neuron.
     pre/post_label :    bool | int, optional
                         If not ``None``, will try to extract pre-/postsynapses
                         from label column.
@@ -784,7 +789,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     df['graph'] = None
 
     # Convert data to respective dtypes
-    dtypes = {'treenode_id': int, 'parent_id': object,
+    dtypes = {'treenode_id': int, 'parent_id': object, 'label': str,
               'creator_id': int, 'relation': int,
               'connector_id': object, 'x': float, 'y': float, 'z': float,
               'radius': float, 'confidence': int}
@@ -798,9 +803,15 @@ def from_swc(f, neuron_name=None, neuron_id=None, pre_label=None,
     # Generate neuron
     n = core.CatmaidNeuron(df)
 
+    # Import labels as tags
+    if import_labels:
+        n.tags = n.nodes.groupby('label').treenode_id.apply(list).to_dict()
+
     # Make sure soma is correctly tagged
     if soma_label:
         n.tags['soma'] = n.nodes[n.nodes.label==soma_label].treenode_id.tolist()
+
+    n.nodes.drop('label', axis=1, inplace=True)
 
     # Add folder and filename to the neuron
     n.filename = os.path.basename(f)
