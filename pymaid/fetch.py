@@ -4890,7 +4890,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
 
     Parameters
     ----------
-    bbox :                  np.ndarray | list, dict
+    bbox :                  list-like | dict | pymaid.Volume
                             Coordinates of the bounding box. Can be either:
 
                               1. List/np.array: ``[[left, right], [top, bottom], [z1, z2]]``
@@ -4918,6 +4918,9 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(bbox, core.Volume):
+        bbox = bbox.bbox
 
     if isinstance(bbox, dict):
         bbox = np.array([[bbox['left'], bbox['right']],
