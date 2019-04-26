@@ -90,7 +90,8 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_nth_partners', 'get_treenodes_by_tag',
                   'get_node_location', 'add_meta_annotations',
                   'remove_meta_annotations', 'get_annotated',
-                  'upload_neuron', 'update_radii', 'get_neuron_id'])
+                  'upload_neuron', 'update_radii', 'get_neuron_id',
+                  'get_connectors_in_bbox'])
 
 # Set up logging
 logger = config.logger
@@ -5880,4 +5881,121 @@ def get_neuron_id(x, remote_instance=None):
     return resp
 
 
+@cache.undo_on_error
+def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
+                           remote_instance=None, ret='COORDS', **kwargs):
+    """ Retrieves connectors within given bounding box.
+
+    Parameters
+    ----------
+    bbox :                  list-like | dict | pymaid.Volume
+                            Coordinates of the bounding box. Can be either:
+
+                              1. List/np.array: ``[[left, right], [top, bottom], [z1, z2]]``
+                              2. Dictionary ``{'left': int|float, 'right': ..., ...}``
+    unit :                  'NM' | 'PIXEL'
+                            Unit of your coordinates. Attention:
+                            'PIXEL' will also assume that Z1/Z2 is in slices.
+                            By default, a X/Y resolution of 3.8nm and a Z
+                            resolution of 35nm is assumed. Pass 'xy_res' and
+                            'z_res' as ``**kwargs`` to override this.
+    limit :                 int, optional
+                            Limit the number of connectors returned.
+    restrict_to :           list, optional
+                            List of skeleton IDs to return connectors for.
+    ret :                   'IDS' |'COORDS' | 'LINKS'
+                            Connector data to be returned. See below for
+                            explanation.
+    remote_instance :       CATMAID instance
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+            If ``ret="COORDS"`` (default): DataFrame in which each row
+            represents a connector:
+
+                connector_id  x  y  z
+             0
+             1
+             ..
+
+    list
+            If ``ret="IDS"``: list of connector IDs.
+
+    pandas.DataFrame
+            If ``ret="LINKS"``: DataFrame in which each row represents a
+            connector. Please note that connectors can show up multiple times
+            - once for each link.
+
+                connector_id  x  y  z skeleton confidence creator_id ..
+             0
+             1
+             ..
+
+               .. connected_treenode creation_time edition_time relation_id
+             0
+             1
+             ..
+
+    """
+
+    if ret.upper() not in ['IDS', 'COORDS', 'LINKS']:
+        raise ValueError('"ret" must be "IDS", "COORDS" or "LINKS"')
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(bbox, core.Volume):
+        bbox = bbox.bbox
+
+    if isinstance(bbox, dict):
+        bbox = np.array([[bbox['left'], bbox['right']],
+                         [bbox['top'], bbox['bottom']],
+                         [bbox['z1'], bbox['z2']]
+                         ])
+
+    if not isinstance(bbox, np.ndarray):
+        bbox = np.array(bbox)
+
+    if unit == 'PIXEL':
+        bbox[[0, 1]:] *= kwargs.get('xy_res', 3.8)
+        bbox[[2]:] *= kwargs.get('z_res', 35)
+
+    url = remote_instance._get_connector_in_bbox_url()
+
+    post = dict(minx=min(bbox[0]),
+                maxx=max(bbox[0]),
+                miny=min(bbox[1]),
+                maxy=max(bbox[1]),
+                minz=min(bbox[2]),
+                maxz=max(bbox[2]),
+                limit=limit if limit else 0
+                )
+
+    if ret.upper() in ['COORDS', 'LINKS']:
+        #post['with_links'] = True
+        post['with_locations'] = True
+
+    if ret.upper() == 'LINKS':
+        post['with_links'] = True
+
+    if restrict_to:
+        restrict_to = utils._make_iterable(restrict_to)
+        post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(restrict_to)})
+
+    data = remote_instance.fetch(url, post=post)
+
+    if ret.upper() == 'IDS':
+        return data
+
+    data = pd.DataFrame(data)
+
+    if ret.upper() == 'COORDS':
+        data.columns = ['connector_id', 'x', 'y', 'z']
+    else:
+        data.columns = ['connector_id', 'x', 'y', 'z', 'skeleton',
+                        'confidence', 'creator_id', 'connected_treenode',
+                        'creation_time', 'edition_time', 'relation_id']
+
+    return data
 

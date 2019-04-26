@@ -52,6 +52,7 @@ Treenodes
     pymaid.get_skid_from_treenode
     pymaid.get_node_details
     pymaid.get_node_location
+    pymaid.get_connectors_in_bbox
 
 Tags
 ----
@@ -72,6 +73,7 @@ Connectivity
     pymaid.get_connector_details
     pymaid.get_connectors_between
     pymaid.get_connector_links
+    pymaid.get_connectors_in_bbox
     pymaid.get_edges
     pymaid.get_partners
     pymaid.get_partners_in_volume
