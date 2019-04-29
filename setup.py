@@ -1,9 +1,4 @@
-try:
-    from setuptools import setup
-except:
-    print('Setuptools not found - falling back to distutils')
-    from distutils.core import setup
-
+from setuptools import setup, find_packages
 import re
 
 
@@ -23,7 +18,7 @@ with open('requirements.txt') as f:
 setup(
     name='pymaid',
     version=verstr,
-    packages=['pymaid'],
+    packages=find_packages(),
     license='GNU GPL V3',
     description='Python interface with CATMAID',
     long_description=open('README.md').read(),
