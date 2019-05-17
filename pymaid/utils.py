@@ -733,10 +733,12 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
                 data.append(row)
 
     # Remove empty entries and generate nodes DataFrame
+    cols = ['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id']
     nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
-                         columns=['treenode_id', 'label', 'x', 'y', 'z',
-                                  'radius', 'parent_id'],
+                         columns=cols,
                          dtype=object)
+    # Try converting labels to int (otherwise might end up float)
+    nodes.label = nodes.label.astype(int, errors='ignore')
 
     # If any invalid nodes are found
     if any(nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull()):
@@ -798,7 +800,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
         for t in ['nodes', 'connectors']:
             for i in range(df.shape[0]):
                 if k in df.loc[i, t]:
-                    df.loc[i, t][k] = df.loc[i, t][k].astype(v)
+                    df.loc[i, t][k] = df.loc[i, t][k].astype(v, errors='ignore')
 
     # Generate neuron
     n = core.CatmaidNeuron(df)
@@ -807,11 +809,11 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
     if import_labels:
         n.tags = n.nodes.groupby('label').treenode_id.apply(list).to_dict()
 
-    # Make sure soma is correctly tagged
+    # Make sure soma is correctly tagged (notice force convert to str)
     if soma_label:
-        n.tags['soma'] = n.nodes[n.nodes.label==soma_label].treenode_id.tolist()
+        n.tags['soma'] = n.nodes[n.nodes.label==str(soma_label)].treenode_id.tolist()
 
-    n.nodes.drop('label', axis=1, inplace=True)
+    #n.nodes.drop('label', axis=1, inplace=True)
 
     # Add folder and filename to the neuron
     n.filename = os.path.basename(f)
