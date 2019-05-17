@@ -738,9 +738,9 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
     --------
     >>> import pymaid
     >>> # Initialize connection to Catmaid server
-    >>> rm = CatmaidInstance( url, http_user, http_pw, token )
+    >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
     >>> # Blast a neuron against default (FlyCircuit) database
-    >>> nbl = pymaid.nblast( skid = 16, remote_instance = rm  )
+    >>> nbl = rmaid.nblast(16)
     >>> # See contents of nblast_res object
     >>> help(nbl)
     >>> # Get results as Pandas Dataframe
@@ -798,23 +798,23 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
                      'See help(rmaid.nblast) for details.')
         return
 
-    if 'rpy2' in str(type(neuron)):
-        rn = neuron
-    elif isinstance(neuron, pd.DataFrame) or isinstance(neuron, core.CatmaidNeuronList):
-        if neuron.shape[0] > 1:
+    if 'rpy2' in str(type(query)):
+        rn = query
+    elif isinstance(query, pd.DataFrame) or isinstance(query, core.CatmaidNeuronList):
+        if query.shape[0] > 1:
             logger.warning('You provided more than a single neuron. Blasting '
-                           'only against the first: %s' % neuron.ix[0].neuron_name)
-        rn = neuron2r(neuron.ix[0], convert_to_um=False)
-    elif isinstance(neuron, pd.Series) or isinstance(neuron, core.CatmaidNeuron):
-        rn = neuron2r(neuron, convert_to_um=False)
-    elif isinstance(neuron, str) or isinstance(neuron, int):
+                           'only against the first: %s' % query.ix[0].neuron_name)
+        rn = neuron2r(query.ix[0], convert_to_um=False)
+    elif isinstance(query, pd.Series) or isinstance(query, core.CatmaidNeuron):
+        rn = neuron2r(query, convert_to_um=False)
+    elif isinstance(query, str) or isinstance(query, int):
         if not remote_instance:
             logger.error('You have to provide a CATMAID instance using the '
                          '<remote_instance> parameter. See help(rmaid.nblast) '
                          'for details.')
             return
-        rn = neuron2r(fetch.get_neuron(
-            neuron, remote_instance), convert_to_um=False)
+        rn = neuron2r(fetch.get_neuron(query, remote_instance),
+                      convert_to_um=False)
     else:
         logger.error('Unable to intepret <neuron> parameter provided. See '
                      'help(rmaid.nblast) for details.')
