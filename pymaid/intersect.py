@@ -38,7 +38,7 @@ __all__ = sorted(['in_volume', 'intersection_matrix'])
 
 
 def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
-              remote_instance=None):
+              method='FAST', remote_instance=None):
     """ Test if points/neurons are within a given CATMAID volume.
 
     Important
@@ -76,6 +76,11 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
                         Only relevant if input is CatmaidNeuron/List: if True,
                         will add nodes required to keep neuron from
                         fragmenting.
+    method :            'FAST' | 'SAFE', optional
+                        Method used for raycasting. "FAST" will cast only a
+                        single ray to check for intersections. If you
+                        experience problems, set method to "SAFE" to use
+                        multiple rays (slower).
     remote_instance :   CATMAID instance, optional
                         Pass if ``volume`` is a volume name.
 
@@ -131,6 +136,13 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
     if isinstance(volume, (list, dict, np.ndarray)):
         # Force into dict
         if not isinstance(volume, dict):
+            # Make sure all pymaid.Volumes can be uniquely indexed
+            vnames = set([v.name for v in volume if isinstance(v, core.Volume)])
+            dupli = [v for v in set(vnames) if vnames.count(v) > 1]
+            if dupli:
+                raise ValueError('Duplicate Volume names detected: {}. Volume.'
+                                 'name must be unique.'.format(','.join(dupli)))
+
             temp = {v: v for v in volume if isinstance(v, str)}
             temp.update({v.name: v for v in volume if isinstance(v, core.Volume)})
             volume = temp
@@ -180,14 +192,15 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
         raise ValueError('Points must be array of shape (N,3).')
 
     if pyoctree:
-        return _in_volume_ray(points, volume)
+        return _in_volume_ray(points, volume,
+                              multi_ray=method.upper() == 'SAFE')
     else:
         logger.warning(
             'Package pyoctree not found. Falling back to ConvexHull.')
         return _in_volume_convex(points, volume, approximate=False)
 
 
-def _in_volume_ray(points, volume):
+def _in_volume_ray(points, volume, multi_ray=False):
     """ Uses pyoctree's raycsasting to test if points are within a given
     CATMAID volume.
     """
@@ -206,22 +219,57 @@ def _in_volume_ray(points, volume):
     mn = np.array(volume.vertices).min(axis=0)
 
     # Get points outside of bounding box
-    out = (points > mx).any(axis=1) | (points < mn).any(axis=1)
-    isin = ~out
-    in_points = points[~out]
+    bbox_out = (points > mx).any(axis=1) | (points < mn).any(axis=1)
+    isin = ~bbox_out
+    in_points = points[isin]
 
     # Perform ray intersection on points inside bounding box
-    rayPointList = np.array([[[p[0], p[1], mn[2]], [p[0], p[1], mx[2]]] for p in in_points],
+    rayPointList = np.array([[[p[0], mn[1], mn[2]], p] for p in in_points],
                             dtype=np.float32)
+
+    # Get intersections and extract coordinates of intersection
+    intersections = [np.array([i.p for i in tree.rayIntersection(ray)]) for ray in rayPointList]
+
+    # In a few odd cases we can get the multiple intersections at the exact
+    # same coordinate (something funny with the faces).
+    unique_int = [np.unique(np.round(i), axis=0) if np.any(i) else i for i in intersections]
 
     # Unfortunately rays are bidirectional -> we have to filter intersections
     # to those that occur "above" the point we are querying
-    intersections = [len([i for i in tree.rayIntersection(
-        ray) if i.p[2] >= in_points[k][2]]) for k, ray in enumerate(rayPointList)]
+    unilat_int = [i[i[:, 2] >= p] if np.any(i) else i for i, p in zip(unique_int, in_points[:, 2])]
 
-    # Count intersections and return True for odd counts
-    # [i % 2 != 0 for i in intersections]
-    isin[~out] = np.remainder(list(intersections), 2) != 0
+    # Count intersections
+    int_count = [i.shape[0] for i in unilat_int]
+
+    # Get odd (= in volume) numbers of intersections
+    is_odd = np.remainder(int_count, 2) != 0
+
+    # If we want to play it safe, run the above again with two additional rays
+    # and find a majority decision.
+    if multi_ray:
+        # Run ray from left back
+        rayPointList = np.array([[[mn[0], p[1], mn[2]], p] for p in in_points],
+                                dtype=np.float32)
+        intersections = [np.array([i.p for i in tree.rayIntersection(ray)]) for ray in rayPointList]
+        unique_int = [np.unique(i, axis=0) if np.any(i) else i for i in intersections]
+        unilat_int = [i[i[:, 0] >= p] if np.any(i) else i for i, p in zip(unique_int, in_points[:, 0])]
+        int_count = [i.shape[0] for i in unilat_int]
+        is_odd2 = np.remainder(int_count, 2) != 0
+
+        # Run ray from lower left
+        rayPointList = np.array([[[mn[0], mn[1], p[2]], p] for p in in_points],
+                                dtype=np.float32)
+        intersections = [np.array([i.p for i in tree.rayIntersection(ray)]) for ray in rayPointList]
+        unique_int = [np.unique(i, axis=0) if np.any(i) else i for i in intersections]
+        unilat_int = [i[i[:, 1] >= p] if np.any(i) else i for i, p in zip(unique_int, in_points[:, 1])]
+        int_count = [i.shape[0] for i in unilat_int]
+        is_odd3 = np.remainder(int_count, 2) != 0
+
+        # Find majority consensus
+        is_odd = is_odd.astype(int) + is_odd2.astype(int) + is_odd3.astype(int)
+        is_odd = is_odd >= 2
+
+    isin[isin] = is_odd
     return isin
 
 
