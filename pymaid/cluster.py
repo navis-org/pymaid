@@ -759,6 +759,13 @@ class ClustResults:
         elif key == 'agg_coeff':
             return self.calc_agg_coeff()
 
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return 'ClustResults of {} items at {}'.format(self.sim_mat.shape[0],                                                        
+                                                       hex(id(self)))
+        
     def get_leafs(self, use_labels=False):
         """ Use to retrieve labels.
 
