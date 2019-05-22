@@ -5643,7 +5643,8 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 
 @cache.never_cache
 def upload_neuron(x, import_tags=True, import_annotations=False,
-                  neuron_id=None,  remote_instance=None):
+                  skeleton_id=None, neuron_id=None, force_id=False,
+                  remote_instance=None):
     """ Import neuron(s) to CATMAID instance.
 
     Currently only imports treenodes and (optionally) tags and annotations.
@@ -5659,10 +5660,17 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
                          If True, will import treenode tags from ``x.tags``.
     import_annotations : bool, optional
                          If True will import annotations from ``x.annotations``.
+    skeleton_id :        int, optional
+                         Use this to set the new skeleton's ID. If not
+                         provided will will generate a new ID upon import.
     neuron_id :          int, optional
                          Use this to associate the new skeleton with an
-                         existing neuron. THIS IS CURRENTLY BROKEN AND WILL BE
-                         IGNORED.
+                         existing neuron.
+    force_id :           bool, optional
+                         If True and neuron/skeleton IDs already exist in
+                         project, their instances will be replaced. If False
+                         and you pass ``neuron_id`` or ``skeleton_id`` that
+                         already exist, an error will be thrown.
     remote_instance :    CATMAID instance, optional
                          If not passed directly, will try using global.
 
@@ -5731,8 +5739,11 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
 
     import_url = remote_instance._import_skeleton_url()
 
-    import_post = {'neuron_id': None, #providing neuron_id breaks backend
-                   'name': x.neuron_name}
+    import_post = {'neuron_id': neuron_id,
+                   'skeleton_id': skeleton_id,
+                   'name': x.neuron_name,
+                   'force': force_id,
+                   'auto_id': False}
 
     f = os.path.join(tempfile.gettempdir(), 'temp.swc')
 
@@ -5741,7 +5752,7 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
 
     with open(f, 'rb') as file:
         # Large files can cause a 504 Gateway timeout. In that case, we want
-        # to have a log of it without interupting potential subsequent uploads.
+        # to have a log of it without interrupting potential subsequent uploads.
         try:
             resp = remote_instance.fetch(import_url,
                                          post=import_post,
@@ -5753,8 +5764,13 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
             else:
                 # Any other error should just raise
                 raise
-        except:
+        except BaseException:
             raise
+
+    # If error is returned
+    if 'error' in resp:
+        logger.error('Error uploading neuron "{}"'.format(x.neuron_name))
+        return resp
 
     # Exporting to SWC changes the node IDs -> we will revert this in the
     # response of the server
@@ -5774,7 +5790,7 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
                                 'TREENODE',
                                 remote_instance=remote_instance)
 
-    # Make sure not not access `.annotations` directly to not trigger
+    # Make sure to not access `.annotations` directly to not trigger
     # fetching annotations
     if import_annotations and 'annotations' in x.__dict__:
         an = x.__dict__.get('annotations', [])
