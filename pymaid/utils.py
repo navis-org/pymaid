@@ -728,7 +728,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
                 if not row[0].startswith('#'):
                     data.append(row)
                 else:
-                    header.append(row)
+                    header.append(' '.join(row))
 
         # Remove empty entries and generate nodes DataFrame
         nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
