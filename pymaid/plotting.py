@@ -1200,8 +1200,6 @@ def plot3d(x, **kwargs):
                             alphahull=.5,
                             color=c,
                             name=neuron_name,
-                            legendgroup=neuron_name,
-                            showlegend=False,
                             hoverinfo='name'))
 
             if connectors or connectors_only:
@@ -1298,9 +1296,7 @@ def plot3d(x, **kwargs):
 
                 color=c,
                 name=neuron.gene_name,
-                legendgroup=neuron.gene_name,
-                showlegend=False,
-                hoverinfo='name'
+                hoverlabel='name'
             )
             )
 
@@ -1325,7 +1321,6 @@ def plot3d(x, **kwargs):
                 opacity=.5,
                 color='rgb' + str(volumes_data[v]['color']),
                 name=v,
-                showlegend=True,
                 hoverinfo='none'
             )
             )
