@@ -113,7 +113,7 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
     ...          'v14.DM3', 'v14.DL1', 'v14.DP1m']
     >>> # Get neuron to check
     >>> n = pymaid.get_neuron('name:PN unknown glomerulus',
-    ...                       remote_instance = remote_instance )
+    ...                       remote_instance=remote_instance)
     >>> # Calc intersections with each of the above glomeruli
     >>> res = pymaid.in_volume(n, gloms, remote_instance=remote_instance)
     >>> # Extract cable
@@ -122,7 +122,7 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
     >>> import pandas as pd
     >>> import matplotlib.pyplot as plt
     >>> df = pd.DataFrame(list( cable.values() ),
-    ...                   index = list( cable.keys() )
+    ...                   index=list( cable.keys() )
     ...                   )
     >>> df.boxplot()
     >>> plt.show()
@@ -151,7 +151,7 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
         for v in config.tqdm(volume, desc='Volumes', disable=config.pbar_hide,
                              leave=config.pbar_leave):
             data[v] = in_volume(x, volume[v], remote_instance=remote_instance,
-                                inplace=False, mode=mode)
+                                inplace=False, mode=mode, method=method)
         return data
 
     if isinstance(volume, str):
@@ -165,7 +165,8 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
     if isinstance(x, pd.DataFrame):
         points = x[['x', 'y', 'z']].values
     elif isinstance(x, core.CatmaidNeuron):
-        in_v = in_volume(x.nodes[['x', 'y', 'z']].values, volume)
+        in_v = in_volume(x.nodes[['x', 'y', 'z']].values, volume,
+                         method=method)
 
         # If mode is OUT, invert selection
         if mode == 'OUT':
@@ -180,7 +181,8 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
         return
     elif isinstance(x, core.CatmaidNeuronList):
         for n in x:
-            _ = in_volume(n, volume, inplace=True, mode=mode)
+            _ = in_volume(n, volume, inplace=True, mode=mode, method=method,
+                          prevent_fragments=prevent_fragments)
 
         if inplace is False:
             return x
@@ -309,7 +311,8 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
         return [False not in [bbox[0][0] < p.x < bbox[0][1], bbox[1][0] < p.y < bbox[1][1], bbox[2][0] < p.z < bbox[2][1], ] for p in points]
 
 
-def intersection_matrix(x, volumes, attr=None, remote_instance=None):
+def intersection_matrix(x, volumes, attr=None, method='FAST',
+                        remote_instance=None):
     """ Computes intersection matrix between a set of neurons and a set of
     volumes.
 
@@ -321,6 +324,8 @@ def intersection_matrix(x, volumes, attr=None, remote_instance=None):
     attr :            str | None, optional
                       Attribute to return for intersected neurons (e.g.
                       'cable_length'). If None, will return CatmaidNeuron.
+    method :          'FAST' | 'SAFE', optional
+                      See :func:`pymaid.in_volume`.
     remote_instance : CATMAID instance, optional
                       Pass if ``volume`` is a volume name.
 
@@ -346,7 +351,7 @@ def intersection_matrix(x, volumes, attr=None, remote_instance=None):
             raise TypeError('Wrong data type found in volumes: "{}"'.format(type(v)))
 
 
-    data = in_volume(x, volumes, inplace=False, mode='IN',
+    data = in_volume(x, volumes, inplace=False, mode='IN', method=method,
                      remote_instance=remote_instance)
 
     if not attr:
@@ -359,6 +364,3 @@ def intersection_matrix(x, volumes, attr=None, remote_instance=None):
                           columns=x.skeleton_id)
 
     return df
-
-
-
