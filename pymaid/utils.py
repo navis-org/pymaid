@@ -625,7 +625,7 @@ def _parse_objects(x, remote_instance=None):
 def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
              pre_label=None, post_label=None, soma_label=1,
              include_subdirs=False):
-    """ Generate neuron object from SWC file.
+    """ Generate neuron object from SWC file/DataFrame.
 
     This import is following format specified
     `here <http://research.mssm.edu/cnic/swc.html>`_
@@ -636,9 +636,9 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
 
     Parameters
     ----------
-    f :                 str | iterable
-                        SWC filename(s) or folder(s). If folder, will import
-                        all ``.swc`` files.
+    f :                 str | pandas.DataFrame | iterable
+                        SWC string, filename, folder or DataFrame. If folder,
+                        will import all ``.swc`` files.
     neuronname :        str, optional
                         Name to use for the neuron. If not provided, will use
                         filename minus extension.
@@ -683,7 +683,20 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
                                                             disable=config.pbar_hide,
                                                             leave=config.pbar_leave)])
 
-    if os.path.isdir(f):
+    header = []
+    cols = ['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id']
+    if isinstance(f, pd.DataFrame):
+        # Replace 'node_id' column with 'treenode_id'
+        if 'node_id' in f.columns and 'treenode_id' not in f.columns:
+            f.columns = [c.replace('node_id', 'treenode_id') for c in f.columns]
+
+        missing = [c for c in cols if c not in f.columns]
+        if missing:
+            raise ValueError('SWC DataFrame is missing required columns: '
+                             '{}'.format(','.join(missing)))
+        nodes = f
+        f = 'SWC'
+    elif os.path.isdir(f):
         if not include_subdirs:
             swc = [os.path.join(f, x) for x in os.listdir(f) if
                    os.path.isfile(os.path.join(f, x)) and x.endswith('.swc')]
@@ -703,40 +716,41 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
                                  desc='Reading {}'.format(f.split('/')[-1]),
                                  disable=config.pbar_hide,
                                  leave=config.pbar_leave)])
+    else:
+        data = []
+        with open(f) as file:
+            reader = csv.reader(file, delimiter=' ')
+            for row in reader:
+                # skip empty rows
+                if not row:
+                    continue
+                # skip comments
+                if not row[0].startswith('#'):
+                    data.append(row)
+                else:
+                    header.append(row)
 
-    filename = os.path.splitext(os.path.basename(f))[0]
+        # Remove empty entries and generate nodes DataFrame
+        nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
+                             columns=cols,
+                             dtype=object)
+
+    # Get filename
+    fname = os.path.splitext(os.path.basename(f))[0]
 
     if not neuron_id:
         # If filename is numeric use it as skeleton ID
-        fname = os.path.splitext(os.path.basename(f))[0]
         if fname.isnumeric():
             neuron_id = int(fname)
         else:
             # Use 30 bit - 32bit raises error when converting to R StrVector
             neuron_id = random.getrandbits(30)
-        #neuron_id = uuid.uuid4().int
     elif callable(neuron_id):
-        neuron_id = neuron_id(filename)
+        neuron_id = neuron_id(fname)
 
     if not neuron_name:
-        neuron_name = filename
+        neuron_name = fname
 
-    data = []
-    with open(f) as file:
-        reader = csv.reader(file, delimiter=' ')
-        for row in reader:
-            # skip empty rows
-            if not row:
-                continue
-            # skip comments
-            if not row[0].startswith('#'):
-                data.append(row)
-
-    # Remove empty entries and generate nodes DataFrame
-    cols = ['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id']
-    nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
-                         columns=cols,
-                         dtype=object)
     # Try converting labels to int (otherwise might end up float)
     nodes.label = nodes.label.astype(int, errors='ignore')
 
@@ -816,8 +830,9 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
     #n.nodes.drop('label', axis=1, inplace=True)
 
     # Add folder and filename to the neuron
-    n.filename = os.path.basename(f)
-    n.filepath = os.path.dirname(f)
+    n.filename = fname
+    n.filepath = os.path.dirname(fname)
+    n.swc_header = '\n'.join(header)
 
     return n
 
