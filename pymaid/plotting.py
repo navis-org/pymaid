@@ -370,7 +370,9 @@ def plot2d(x, method='2d', **kwargs):
             ax.azim = -90
             ax.elev = 0
             ax.dist = 7
-        ax.set_aspect('equal')
+        # matplotlib 3.1.0 deprecated this as it was apparently broken to
+        # begin with. We will just have to scale our axes appropriately.
+        #ax.set_aspect('equal')
     else:
         if not isinstance(ax, mpl.axes.Axes):
             raise TypeError('Ax must be of type "mpl.axes.Axes", '
