@@ -436,8 +436,9 @@ def plot2d(x, method='2d', **kwargs):
     for i, neuron in enumerate(config.tqdm(skdata.itertuples(),
                                            desc='Plot neurons',
                                            total=skdata.shape[0], leave=False,
-                                           disable=config.pbar_hide | len(dotprops) == 0)):
+                                           disable=config.pbar_hide)):
         this_color = neuron_cmap[i]
+        this_alpha = this_color[3] if len(this_color) == 4 else alpha
 
         if neuron.nodes.empty:
             logger.warning('Skipping neuron w/o nodes: '
@@ -445,7 +446,6 @@ def plot2d(x, method='2d', **kwargs):
             continue
 
         if not connectors_only:
-            soma = neuron.nodes[neuron.nodes.radius > 1]
 
             # Now make traces (invert y axis)
             coords = _segments_to_coords(
@@ -460,7 +460,8 @@ def plot2d(x, method='2d', **kwargs):
 
                     this_line = mlines.Line2D(coords[:, 0], coords[:, 1],
                                               lw=linewidth, ls=linestyle,
-                                              alpha=alpha, color=this_color,
+                                              alpha=this_alpha,
+                                              color=this_color,
                                               label='{} - #{}'.format(neuron.neuron_name,
                                                                       neuron.skeleton_id))
                     ax.add_line(this_line)
@@ -472,18 +473,20 @@ def plot2d(x, method='2d', **kwargs):
                     lc.set_array(neuron.nodes.loc[~neuron.nodes.parent_id.isnull(),
                                                   'z'].values)
                     lc.set_linewidth(linewidth)
-                    lc.set_alpha(alpha)
+                    lc.set_alpha(this_alpha)
                     lc.set_linestyle(linestyle)
                     lc.set_label('{} - #{}'.format(neuron.neuron_name,
                                                    neuron.skeleton_id))
                     line = ax.add_collection(lc)
 
-                for n in soma.itertuples():
+                if neuron.soma:
+                    soma = neuron.nodes.set_index('treenode_id').loc[neuron.soma]
                     if depth_coloring:
-                        this_color = mpl.cm.jet(norm(n.z))
+                        this_color = mpl.cm.jet(norm(soma.z))
 
-                    s = mpatches.Circle((int(n.x), int(-n.y)), radius=n.radius,
-                                        alpha=alpha, fill=True, fc=this_color,
+                    s = mpatches.Circle((int(soma.x), int(-soma.y)), radius=soma.radius,
+                                        alpha=this_alpha, fill=True,
+                                        fc=this_color,
                                         zorder=4, edgecolor='none')
                     ax.add_patch(s)
 
@@ -502,7 +505,7 @@ def plot2d(x, method='2d', **kwargs):
                     lc = Line3DCollection(this_coords,
                                           color=this_color,
                                           label=neuron.neuron_name,
-                                          alpha=alpha,
+                                          alpha=this_alpha,
                                           cmap=cmap,
                                           lw=linewidth,
                                           linestyle=linestyle)
@@ -518,7 +521,7 @@ def plot2d(x, method='2d', **kwargs):
                         lc = Line3DCollection([c[:, [0, 2, 1]]],
                                               color=this_color,
                                               lw=linewidth,
-                                              alpha=alpha,
+                                              alpha=this_alpha,
                                               linestyle=linestyle)
                         if group_neurons:
                             lc.set_gid(neuron.neuron_name)
@@ -529,20 +532,22 @@ def plot2d(x, method='2d', **kwargs):
                 lim.append(coords.min(axis=0))
 
                 surf3D_collections.append([])
-                for n in soma.itertuples():
-                    resolution = 20
-                    u = np.linspace(0, 2 * np.pi, resolution)
-                    v = np.linspace(0, np.pi, resolution)
-                    x = n.radius * np.outer(np.cos(u), np.sin(v)) + n.x
-                    y = n.radius * np.outer(np.sin(u), np.sin(v)) - n.y
-                    z = n.radius * \
-                        np.outer(np.ones(np.size(u)), np.cos(v)) + n.z
-                    surf = ax.plot_surface(
-                        x, z, y, color=this_color, shade=False, alpha=alpha)
-                    if group_neurons:
-                        surf.set_gid(neuron.neuron_name)
+                if neuron.soma:
+                    for s in utils._make_iterable(neuron.soma):
+                        soma = neuron.nodes.set_index('treenode_id').loc[s]
+                        resolution = 20
+                        u = np.linspace(0, 2 * np.pi, resolution)
+                        v = np.linspace(0, np.pi, resolution)
+                        x = soma.radius * np.outer(np.cos(u), np.sin(v)) + soma.x
+                        y = soma.radius * np.outer(np.sin(u), np.sin(v)) - soma.y
+                        z = soma.radius * \
+                            np.outer(np.ones(np.size(u)), np.cos(v)) + soma.z
+                        surf = ax.plot_surface(
+                            x, z, y, color=this_color, shade=False, alpha=this_alpha)
+                        if group_neurons:
+                            surf.set_gid(neuron.neuron_name)
 
-                    surf3D_collections[-1].append(surf)
+                        surf3D_collections[-1].append(surf)
 
         if (connectors or connectors_only) and not neuron.connectors.empty:
             if not cn_mesh_colors:
@@ -555,7 +560,7 @@ def plot2d(x, method='2d', **kwargs):
                     this_cn = neuron.connectors[neuron.connectors.relation == c]
                     ax.scatter(this_cn.x.values,
                                (-this_cn.y).values,
-                               c=cn_types[c], alpha=alpha, zorder=4,
+                               c=cn_types[c], alpha=this_alpha, zorder=4,
                                edgecolor='none', s=cn_size)
                     ax.get_children(
                     )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
@@ -564,7 +569,7 @@ def plot2d(x, method='2d', **kwargs):
                 c = [cn_types[i] for i in all_cn.relation.values]
                 ax.scatter(all_cn.x.values, all_cn.z.values, -all_cn.y.values,
                            c=c, s=cn_size, depthshade=False, edgecolor='none',
-                           alpha=alpha)
+                           alpha=this_alpha)
                 ax.get_children(
                 )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
 
@@ -577,7 +582,7 @@ def plot2d(x, method='2d', **kwargs):
                                            desc='Plt dotprops',
                                            total=dotprops.shape[0],
                                            leave=False,
-                                           disable=config.pbar_hide | len(dotprops) == 0)):
+                                           disable=config.pbar_hide)):
         # Prepare lines - this is based on nat:::plot3d.dotprops
         halfvect = neuron.points[
             ['x_vec', 'y_vec', 'z_vec']] / 2
