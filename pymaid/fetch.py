@@ -1133,8 +1133,8 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
 
 
 @cache.undo_on_error
-def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
-                           min_size=2):
+def get_partners_in_volume(x, volume, remote_instance=None,
+                           syn_threshold=None, min_size=2):
     """ Retrieve the synaptic/gap junction partners of neurons of interest
     **within** a given CATMAID Volume.
 
@@ -1158,11 +1158,9 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
                         :func:`~pymaid.get_volume()`.
     remote_instance :   CATMAID instance
                         If not passed directly, will try using global.
-    threshold :         int, optional
-                        Does not seem to have any effect on CATMAID API and is
-                        therefore filtered afterwards. This threshold is
-                        applied to the TOTAL number of synapses across all
-                        neurons!
+    syn_threshold :     int, optional
+                        Synapse threshold. This threshold is applied to the
+                        TOTAL number of synapses across all neurons!
     min_size :          int, optional
                         Minimum node count of partner
                         (default = 2 -> hide single-node partner).
@@ -1297,6 +1295,10 @@ def get_partners_in_volume(x, volume, remote_instance=None, threshold=1,
 
     # Filter for min size
     df = df[df.num_nodes >= min_size]
+
+    # Filter for synapse threshold
+    if syn_threshold:
+        df = df[df.total >= syn_threshold]
 
     # Reorder columns
     df = df[['neuron_name', 'skeleton_id', 'num_nodes', 'relation', 'total'] + x]
