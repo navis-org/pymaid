@@ -25,6 +25,7 @@ Neurons
     pymaid.get_names
     pymaid.get_neuron_id
     pymaid.upload_neuron
+    pymaid.upload_volume
     pymaid.transfer_neuron
 
 Annotations

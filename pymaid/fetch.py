@@ -91,7 +91,7 @@ __all__ = sorted(['CatmaidInstance', 'add_annotations', 'add_tags',
                   'get_node_location', 'add_meta_annotations',
                   'remove_meta_annotations', 'get_annotated',
                   'upload_neuron', 'update_radii', 'get_neuron_id',
-                  'get_connectors_in_bbox'])
+                  'get_connectors_in_bbox', 'upload_volume'])
 
 # Set up logging
 logger = config.logger
@@ -803,11 +803,15 @@ class CatmaidInstance:
         """
         return self.make_url(self.project_id, 'neurons', 'from-models', **GET)
 
+    def _upload_volume_url(self, **GET):
+        """ Use to parse url for uploading volumes. """
+        return self.make_url(self.project_id, 'volumes', 'add', **GET)
+
 
 @cache.undo_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
                get_history=False, get_merge_history=False, get_abutting=False,
-               return_df=False, kwargs={}):
+               return_df=False, fetch_kwargs={}, init_kwargs={}):
     """ Retrieve 3D skeleton data.
 
     Parameters
@@ -6014,3 +6018,63 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
 
     return data
 
+
+@cache.never_cache
+def upload_volume(x, name, comments=None, remote_instance=None):
+    """ Upload volume/mesh to CATMAID instance.
+
+    Parameters
+    ----------
+    x :                 Volume | dict
+                        Volume to export. Can be::
+                          - pymaid.Volume
+                          - dict: {
+                                   'faces': array-like,
+                                   'vertices':  array-like
+                                   }
+    name :              str
+                        Name of volume. If ``None`` will use the Volume's
+                        ``.name`` property.
+    comments :          str, optional
+                        Comments to upload.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                         Server response.
+
+    """
+
+    if isinstance(x, core.Volume):
+        verts = x.vertices.astype(int).tolist()
+        faces = x.faces.astype(int).tolist()
+    elif isinstance(x, dict):
+        verts = x['vertices'].astype(int).tolist()
+        faces = x['faces'].astype(int).tolist()
+    else:
+        raise TypeError('Expected pymaid.Volume or dictionary, '
+                        'got "{}"'.format(type(x)))
+
+    if not isinstance(name, str) and isinstance(x, core.Volume):
+        name = getattr(x, 'name', 'not named')
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    postdata = {'title': name,
+                'type': 'trimesh',
+                'mesh': json.dumps([verts, faces]),
+                'comment': comments if comments else ''
+                }
+
+    url = remote_instance._upload_volume_url()
+
+    response = remote_instance.fetch(url, postdata)
+
+    if 'success' in response and response['success'] is True:
+        pass
+    else:
+        logger.error('Error exporting volume {}'.format(name))
+
+    return response
