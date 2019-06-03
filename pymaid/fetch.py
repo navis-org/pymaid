@@ -3181,7 +3181,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                         the query with a leading ``/``.
     allow_partial :     bool, optional
                         If True, partial matches are returned too.
-    remote_instance :   CATMAID instance, optional
+    remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
     Returns
@@ -5647,7 +5647,7 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 def upload_neuron(x, import_tags=True, import_annotations=False,
                   skeleton_id=None, neuron_id=None, force_id=False,
                   remote_instance=None):
-    """ Import neuron(s) to CATMAID instance.
+    """ Export neuron(s) to CATMAID instance.
 
     Currently only imports treenodes and (optionally) tags and annotations.
     Also note that skeleton and treenode IDs will change (see server response
@@ -5657,14 +5657,14 @@ def upload_neuron(x, import_tags=True, import_annotations=False,
     Parameters
     ----------
     x :                  CatmaidNeuron/List
-                         Neurons to import.
+                         Neurons to upload.
     import_tags :        bool, optional
-                         If True, will import treenode tags from ``x.tags``.
+                         If True, will export treenode tags from ``x.tags``.
     import_annotations : bool, optional
-                         If True will import annotations from ``x.annotations``.
+                         If True will export annotations from ``x.annotations``.
     skeleton_id :        int, optional
                          Use this to set the new skeleton's ID. If not
-                         provided will will generate a new ID upon import.
+                         provided will will generate a new ID upon export.
     neuron_id :          int, optional
                          Use this to associate the new skeleton with an
                          existing neuron.
