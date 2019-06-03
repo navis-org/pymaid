@@ -143,3 +143,9 @@ tbody tr:nth-child(odd) {
 tbody tr:hover {
     background: rgba(66, 165, 245, 0.2);
 }
+
+/* This prevents default style limit max width*/
+div.body {
+    min-width: 450px;
+    max-width: 1200px !important;
+}
