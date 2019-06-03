@@ -2431,7 +2431,7 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     neuron_ids = get_neuron_id(x, remote_instance=remote_instance)
 
-    for i, s in enumerate(len(x)):
+    for i, s in enumerate(x):
         # This requires neuron IDs
         key = 'entity_ids[%i]' % i
         remove_annotations_postdata[key] = neuron_ids[str(s)]
@@ -2450,13 +2450,9 @@ def remove_annotations(x, annotations, remote_instance=None):
             logger.info('No annotations removed.')
 
         for a in resp['deleted_annotations']:
-            logger.info('Removed "{0}" from {1} entities ({2} uses left)'
-                               .format(an_list.loc[int(a), 'annotation'],
-                                       len(resp['deleted_annotations']
-                                                      [a]['targetIds']),
-                                       resp['left_uses'][a]
-                                       )
-                        )
+            logger.info('Removed "{0}" from {1} entities ({2} uses left)'.format(an_list.loc[int(a), 'annotation'],
+                                                                                 len(resp['deleted_annotations'][a]['targetIds']),
+                                                                                 resp['left_uses'][a]))
     else:
         logger.info('No annotations removed.')
 
