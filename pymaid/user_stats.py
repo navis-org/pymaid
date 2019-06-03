@@ -79,7 +79,7 @@ def get_user_stats(start_date=None, end_date=None, remote_instance=None):
     end_date :          tuple | datetime.date, optional
                         Start and end date of time window to check. If
                         ``None``, will use entire project history.
-    remote_instance :   Catmaid Instance, optional
+    remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
 
     Returns
@@ -198,7 +198,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
                         connectors. Use to subset contributions e.g. to a given
                         neuropil by pruning neurons before passing to this
                         function.
-    remote_instance :   Catmaid Instance, optional
+    remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
 
     Returns
@@ -438,7 +438,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
                         Users not part of any team, will be grouped as team
                         ``'others'``.
 
-    remote_instance :   Catmaid Instance, optional
+    remote_instance :   CatmaidInstance, optional
                         Either pass explicitly or define globally.
 
     Returns

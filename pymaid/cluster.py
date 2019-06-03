@@ -129,7 +129,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                          (i.e. no up-/ and/or downstream partners after
                          filtering) will be skipped. If False, will keep them
                          but they will have similarity ``nan``.
-    remote_instance :    CATMAID instance, optional
+    remote_instance :    CatmaidInstance, optional
 
     Returns
     -------

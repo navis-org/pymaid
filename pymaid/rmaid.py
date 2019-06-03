@@ -29,7 +29,7 @@ Examples
 >>> from rpy2.robjects.packages import importr
 >>> # Load nat as module
 >>> nat = importr('nat')
->>> # Initialise Catmaid instance
+>>> # Initialise CatmaidInstance
 >>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
 >>> # Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
@@ -96,7 +96,7 @@ def init_rcatmaid(**kwargs):
 
     Parameters
     ----------
-    remote_instance :   CATMAID instance
+    remote_instance :   CatmaidInstance
                         From pymaid.CatmaidInstance(). This is used to
                         extract credentials. Overrides other credentials
                         provided!
@@ -274,7 +274,7 @@ def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
                         Neuron to convert to Python
     convert_to_nm :     bool, optional
                         If True will convert from um to nm.
-    remote_instance :   CATMAID instance, optional
+    remote_instance :   CatmaidInstance, optional
                         Provide if you want neuron names to be updated from.
 
     Returns
@@ -603,7 +603,7 @@ def nblast_allbyall(x, target=None, normalize=True, n_cores=os.cpu_count(),
     use_alpha :         bool, optional
                         Emphasises neurons' straight parts (backbone) over
                         parts that have lots of branches.
-    remote_instance :   Catmaid Instance, optional
+    remote_instance :   CatmaidInstance, optional
                         Only neccessary if only skeleton IDs are provided.
 
     Returns
@@ -724,7 +724,7 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
                         Whether to return normalised NBLAST scores.
     reference :         string | R file object, optional
                         Default = 'nat.flybrains::FCWB'
-    remote_instance :   Catmaid Instance, optional
+    remote_instance :   CatmaidInstance, optional
                         Only neccessary if only a SKID is provided
 
     Returns

@@ -59,7 +59,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
     restrict_to :       str | pymaid.Volume | CatmaidNeuronList
                         Volume or neurons to restrict connectivity to. Strings
                         will be interpreted as volumes.
-    remote_instance :   CATMAID instance, optional
+    remote_instance :   CatmaidInstance, optional
                         If not passed, will try using globally defined.
 
     Returns
@@ -813,7 +813,7 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
                         4. CatmaidNeuron or CatmaidNeuronList object
 
                         If not provided, ``source neurons = target neurons``.
-    remote_instance :   CATMAID instance, optional
+    remote_instance :   CatmaidInstance, optional
     syn_cutoff :        int, optional
                         If set, will cut off connections above given value.
     syn_threshold :     int, optional
