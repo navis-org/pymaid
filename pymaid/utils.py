@@ -920,10 +920,9 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
     # Make a dictionary treenode_id -> index
     tn2ix = this_tn['index'].to_dict()
-    tn2ix[None] = -1
 
     # Make parent index column
-    this_tn['parent_ix'] = this_tn.parent_id.map(tn2ix)
+    this_tn['parent_ix'] = this_tn.parent_id.map(lambda x: tn2ix.get(x, -1))
 
     # Set Label column to 0 (undefined)
     this_tn['label'] = 0
