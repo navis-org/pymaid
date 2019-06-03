@@ -1367,7 +1367,7 @@ def get_nth_partners(x, n_circles=1, min_pre=2, min_post=2,
 @cache.undo_on_error
 def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                  min_confidence=1, directions=['incoming', 'outgoing',
-                 'gapjunctions', 'attachments']):
+                                               'gapjunctions', 'attachments']):
     """ Retrieve partners connected by synapses, gap junctions or attachments
     to a set of neurons.
 
@@ -1399,6 +1399,7 @@ def get_partners(x, remote_instance=None, threshold=1, min_size=2, filt=[],
                         skeleton_ids.
     min_confidence :    int | None, optional
                         If set, edges with lower confidence will be ignored.
+                        Applied before ``threshold``.
     directions :        'incoming' | 'outgoing' | 'gapjunctions' | 'attachments', optional
                         Use to restrict to either up- or downstream partners.
 
