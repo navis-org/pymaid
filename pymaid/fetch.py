@@ -241,7 +241,7 @@ class CatmaidInstance:
 
     def load_cache(self, filename):
         """ Load cache from file. """
-        self._cache = Cache.load(filename)
+        self._cache = cache.Cache.load(filename)
 
         # Deactivate time limit - otherwise might not use data
         self._cache.time_limit = False
