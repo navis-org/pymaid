@@ -142,10 +142,10 @@ def _make_non_iterable(x):
 
 
 def _is_iterable(x):
-    """ Helper function. Returns True if x is an iterable but not str or
-    dictionary.
+    """ Helper function. Returns True if x is an iterable but not str,
+    dictionary or pandas DataFrame.
     """
-    if isinstance(x, collections.Iterable) and not isinstance(x, six.string_types):
+    if isinstance(x, collections.Iterable) and not isinstance(x, (six.string_types, pd.DataFrame)):
         return True
     else:
         return False
