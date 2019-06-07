@@ -812,27 +812,35 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
         return all_ts.fillna(0)
 
     elif mode == 'OVER_TIME':
-        # First count all minutes with minimum number of actions
-        minutes_counting = (all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(
-            pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions)
-        # Then remove the minutes that have less than minimum actions
-        minutes_counting = minutes_counting[minutes_counting.timestamp == True]
-        # Now group by hour
-        all_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
-        all_ts.columns = ['all_users']
-        all_ts = all_ts.T
-        # Get total time spent
+        # Go over all users and collect time invested
+        all_ts = []
         for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
+            # First count all minutes with minimum number of actions
             minutes_counting = (all_timestamps[all_timestamps.user == u].set_index(
                 'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions)
-            minutes_counting = minutes_counting[minutes_counting.timestamp == True]
+            # Then remove the minutes that have less than minimum actions
+            minutes_counting = minutes_counting[minutes_counting.timestamp]
+
+            # Now group timestamps by day
             this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
 
+            # Rename columns to user login
             this_ts.columns = [user_list.loc[u, 'login']]
 
-            all_ts = pd.concat([all_ts, this_ts.T])
+            # Append and move on
+            all_ts.append(this_ts.T)
 
+        # Turn into DataFrame
+        all_ts = pd.concat(all_ts).sort_index()
+
+        # Replace NaNs with 0
         all_ts.fillna(0, inplace=True)
+
+        # Add all users column
+        all_users = all_ts.sum(axis=0)
+        all_users.name = 'all_users'
+
+        all_ts = pd.concat([all_users, all_ts.T], axis=1).T
 
         return all_ts
 
