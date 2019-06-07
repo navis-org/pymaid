@@ -467,12 +467,12 @@ class CatmaidNeuron:
 
         return x
 
-    def get_skeleton(self, remote_instance=None, **kwargs):
+    def get_skeleton(self, remote_instance=None, **fetch_kwargs):
         """Get/Update skeleton data for neuron.
 
         Parameters
         ----------
-        **kwargs
+        **fetch_kwargs
                     Will be passed to :func:`pymaid.get_neuron` e.g. to get
                     the full treenode history use::
 
@@ -496,9 +496,9 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
         logger.info('Retrieving skeleton data...')
         skeleton = fetch.get_neuron(self.skeleton_id,
-                                    remote_instance,
+                                    remote_instance=remote_instance,
                                     return_df=True,
-                                    kwargs=kwargs).iloc[0]
+                                    fetch_kwargs=fetch_kwargs).iloc[0]
 
         self.nodes = skeleton.nodes
         self.connectors = skeleton.connectors
