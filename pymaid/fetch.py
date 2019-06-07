@@ -854,10 +854,13 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
     return_df :         bool, optional
                         If True, a ``pandas.DataFrame`` instead of
                         ``CatmaidNeuron``/``CatmaidNeuronList`` is returned.
-    **kwargs
+    fetch_kwargs :      dict, optional
                         Above BOOLEAN parameters can also be passed as dict.
                         This is then used in CatmaidNeuron objects to
                         override implicitly set parameters!
+    init_kwargs :       dict, optional
+                        Keyword arguments passed when initializing
+                        ``CatmaidNeuron``/``CatmaidNeuronList``.
 
     Returns
     -------
@@ -903,12 +906,12 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
     # Update from kwargs if available
-    tag_flag = kwargs.get('tag_flag', tag_flag)
-    connector_flag = kwargs.get('connector_flag', connector_flag)
-    get_history = kwargs.get('get_history', get_history)
-    get_merge_history = kwargs.get('get_merge_history', get_merge_history)
-    get_abutting = kwargs.get('get_abutting', get_abutting)
-    return_df = kwargs.get('return_df', return_df)
+    tag_flag = fetch_kwargs.get('tag_flag', tag_flag)
+    connector_flag = fetch_kwargs.get('connector_flag', connector_flag)
+    get_history = fetch_kwargs.get('get_history', get_history)
+    get_merge_history = fetch_kwargs.get('get_merge_history', get_merge_history)
+    get_abutting = fetch_kwargs.get('get_abutting', get_abutting)
+    return_df = fetch_kwargs.get('return_df', return_df)
 
     # Convert tag_flag, connector_tag, get_history and get_merge_history to
     # bool if necessary
@@ -923,11 +926,10 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
 
     # Generate URLs to retrieve
     urls = [remote_instance._get_compact_details_url(s) for s in x]
-    GET = urllib.parse.urlencode(
-                {'with_history': str(get_history).lower(),
-                'with_tags': str(tag_flag).lower(),
-                'with_connectors': str(connector_flag).lower(),
-                'with_merge_history': str(get_merge_history).lower()})
+    GET = urllib.parse.urlencode({'with_history': str(get_history).lower(),
+                                  'with_tags': str(tag_flag).lower(),
+                                  'with_connectors': str(connector_flag).lower(),
+                                  'with_merge_history': str(get_merge_history).lower()})
     urls = [u + '?%s' % GET for u in urls]
 
     skdata = remote_instance.fetch(urls, desc='Fetch neurons')
@@ -1029,9 +1031,9 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
         return df
 
     if df.shape[0] > 1:
-        return core.CatmaidNeuronList(df, remote_instance=remote_instance)
+        return core.CatmaidNeuronList(df, remote_instance=remote_instance, **init_kwargs)
     else:
-        return core.CatmaidNeuron(df.loc[0], remote_instance=remote_instance)
+        return core.CatmaidNeuron(df.loc[0], remote_instance=remote_instance, **init_kwargs)
 
 
 # This is for legacy reasons -> will remove eventually
