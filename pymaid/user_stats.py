@@ -817,7 +817,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
         for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
             # First count all minutes with minimum number of actions
             minutes_counting = (all_timestamps[all_timestamps.user == u].set_index(
-                'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() > minimum_actions)
+                'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() >= minimum_actions)
             # Then remove the minutes that have less than minimum actions
             minutes_counting = minutes_counting[minutes_counting.timestamp]
 
