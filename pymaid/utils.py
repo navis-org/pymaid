@@ -628,7 +628,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
     """ Generate neuron object from SWC file/DataFrame.
 
     This import is following format specified
-    `here <http://research.mssm.edu/cnic/swc.html>`_
+    `here <http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html>`_
 
     Important
     ---------
@@ -841,7 +841,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
     """ Generate SWC file from neuron(s).
 
     Follows the format specified
-    `here <http://research.mssm.edu/cnic/swc.html>`_.
+    `here <http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html>`_.
 
     Important
     ---------
