@@ -539,7 +539,7 @@ def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
         neuron = neuron.copy()
 
     if reroot_soma and neuron.soma:
-        neuron.reroot(neuron.soma)
+        neuron.reroot(neuron.soma, inplace=True)
 
     if 'strahler_index' not in neuron.nodes or force_strahler_update:
         strahler_index(neuron)
