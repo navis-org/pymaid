@@ -162,8 +162,8 @@ def calc_cable(skdata, remote_instance=None, return_skdata=False):
     skdata :            int | str | CatmaidNeuron | CatmaidNeuronList
                         If skeleton ID (str or in), 3D skeleton data will be
                         pulled from CATMAID server.
-    remote_instance :   CATMAID instance, optional
-                        Pass if skdata is a skeleton ID.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
     return_skdata :     bool, optional
                         If True: instead of the final cable length, a dataframe
                         containing the distance to each treenode's parent.

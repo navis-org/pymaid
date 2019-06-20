@@ -98,9 +98,9 @@ logger = config.logger
 
 
 class CatmaidInstance:
-    """ Class giving access to a CATMAID instance. Holds base url, credentials
-    and fetches data. You can either pass it to functions individually or
-    define globally (default).
+    """ Class giving access to a CATMAID project. Holds base url, credentials
+    and project ID. Fetches data and takes care of caching results. You can
+    either pass it to functions individually or define globally (default).
 
     Attributes
     ----------
@@ -111,7 +111,9 @@ class CatmaidInstance:
     authpassword :  str | None
                     The http password.
     authtoken :     str | None
-                    User token - see CATMAID documentation on how to get it.
+                    User token - see CATMAID `documentation <https://catmaid.
+                    readthedocs.io/en/stable/api.html#api-token>`_ on how to
+                    get it.
     project_id :    int, optional
                     ID of your project. Default = 1.
     max_threads :   int | None
@@ -170,7 +172,7 @@ class CatmaidInstance:
     ...                             'HTTP_PASSWORD',
     ...                             'TOKEN')
     >>> skeleton_id = 16
-    >>> url = rm._get_compact_skeleton_url(skeleton_id)
+    >>> url = rm._get_compact_details_url(skeleton_id)
     >>> raw_data = rm.fetch(url)
     >>> # 2. Query for neurons matching given criteria using GET request
     >>> GET = {'nodecount_gt': 1000, # min node size
@@ -1135,8 +1137,8 @@ def get_arbor(x, remote_instance=None, node_flag=1, connector_flag=1,
 
 
 @cache.undo_on_error
-def get_partners_in_volume(x, volume, remote_instance=None,
-                           syn_threshold=None, min_size=2):
+def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
+                           remote_instance=None):
     """ Retrieve the synaptic/gap junction partners of neurons of interest
     **within** a given CATMAID Volume.
 
@@ -1158,14 +1160,14 @@ def get_partners_in_volume(x, volume, remote_instance=None,
                         Name of the CATMAID volume to test OR volume dict with
                         {'vertices':[],'faces':[]} as returned by e.g.
                         :func:`~pymaid.get_volume()`.
-    remote_instance :   CATMAID instance
-                        If not passed directly, will try using global.
     syn_threshold :     int, optional
                         Synapse threshold. This threshold is applied to the
                         TOTAL number of synapses across all neurons!
     min_size :          int, optional
                         Minimum node count of partner
                         (default = 2 -> hide single-node partner).
+    remote_instance :   CatmaidInstance
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -4093,7 +4095,7 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
     Examples
     --------
     Get all neurons a given users have worked on in the last week. This example
-    assumes that you have already set up a CATMAID instance.
+    assumes that you have already set up a CatmaidInstance.
 
     >>> # We are using user IDs but you can also use login names
     >>> import datetime
@@ -4264,6 +4266,8 @@ def get_history(remote_instance=None,
     -------
     :func:`~pymaid.get_user_stats`
             Returns a summary of user stats as table.
+    :func:`~pymaid.plot_history`
+            Quick way to plot history over time.
 
     """
 
@@ -4532,7 +4536,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                         filter.
     only_soma :         bool, optional
                         If True, only neurons with a soma are returned.
-    remote_instance :   CATMAID instance
+    remote_instance :   CatmaidInstance
                         If not passed directly, will try using globally
                         defined CatmaidInstance.
     Returns
@@ -4814,7 +4818,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
                             volumes or just a single.
     only_soma :             bool, optional
                             If True, only neurons with a soma will be returned.
-    remote_instance :       CATMAID instance
+    remote_instance :       CatmaidInstance
                             If not passed directly, will try using global.
 
     Returns
@@ -4912,7 +4916,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
     min_cable :             int, optional
                             Minimum cable length [nm] for a neuron within
                             given bounding box.
-    remote_instance :       CATMAID instance
+    remote_instance :       CatmaidInstance
                             If not passed directly, will try using global.
 
     Returns
@@ -4958,7 +4962,7 @@ def get_user_list(remote_instance=None):
 
     Parameters
     ----------
-    remote_instance :   CATMAID instance
+    remote_instance :   CatmaidInstance
                         If not passed directly, will try using global.
 
     Returns
@@ -5060,7 +5064,7 @@ def get_paths(sources, targets, remote_instance=None, n_hops=2, min_synapses=1,
 
     Examples
     --------
-    >>> # This assumes that you have already set up a Catmaid Instance
+    >>> # This assumes that you have already set up a CatmaidInstance
     >>> import networkx as nx
     >>> import matplotlib.pyplot as plt
     >>> g, paths = pymaid.get_paths(['annotation:glomerulus DA1'],
@@ -5647,10 +5651,10 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 
 
 @cache.never_cache
-def upload_neuron(x, import_tags=True, import_annotations=False,
+def upload_neuron(x, import_tags=False, import_annotations=False,
                   skeleton_id=None, neuron_id=None, force_id=False,
                   remote_instance=None):
-    """ Export neuron(s) to CATMAID instance.
+    """ Export neuron(s) to CatmaidInstance.
 
     Currently only imports treenodes and (optionally) tags and annotations.
     Also note that skeleton and treenode IDs will change (see server response
@@ -5930,7 +5934,7 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
     ret :                   'IDS' |'COORDS' | 'LINKS'
                             Connector data to be returned. See below for
                             explanation.
-    remote_instance :       CATMAID instance
+    remote_instance :       CatmaidInstance
                             If not passed directly, will try using global.
 
     Returns
@@ -6026,7 +6030,7 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
 
 @cache.never_cache
 def upload_volume(x, name, comments=None, remote_instance=None):
-    """ Upload volume/mesh to CATMAID instance.
+    """ Upload volume/mesh to CatmaidInstance.
 
     Parameters
     ----------

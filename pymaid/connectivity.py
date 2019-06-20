@@ -492,8 +492,10 @@ def cn_table_from_connectors(x, remote_instance=None):
 
     Parameters
     ----------
-    x :         CatmaidNeuron | CatmaidNeuronList
-                Neuron(s) for which to generate connectivity table.
+    x :                 CatmaidNeuron | CatmaidNeuronList
+                        Neuron(s) for which to generate connectivity table.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
 
     Returns
     -------
@@ -653,9 +655,11 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
     Parameters
     ----------
-    source,target : skeleton IDs | CatmaidNeuron | CatmaidNeuronList
-                    Neuron(s) for which to generate adjacency matrix.
-                    If ``target==None``, will use ``target=source``.
+    source,target :     skeleton IDs | CatmaidNeuron | CatmaidNeuronList
+                        Neuron(s) for which to generate adjacency matrix.
+                        If ``target==None``, will use ``target=source``.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
 
     Returns
     -------
@@ -788,9 +792,9 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
     return edges
 
 
-def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
-                     target_grp={}, syn_threshold=None, syn_cutoff=None,
-                     use_connectors=False):
+def adjacency_matrix(s, t=None, source_grp={}, target_grp={},
+                     syn_threshold=None, syn_cutoff=None,
+                     use_connectors=False, remote_instance=None):
     """ Generate adjacency matrix between sets of neurons.
 
     Directional: sources = rows, targets = columns.
@@ -813,7 +817,6 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
                         4. CatmaidNeuron or CatmaidNeuronList object
 
                         If not provided, ``source neurons = target neurons``.
-    remote_instance :   CatmaidInstance, optional
     syn_cutoff :        int, optional
                         If set, will cut off connections above given value.
     syn_threshold :     int, optional
@@ -833,6 +836,8 @@ def adjacency_matrix(s, t=None, remote_instance=None, source_grp={},
                         if e.g. you are using pruned neurons. **Important**:
                         This does not work if you have multiple fragments per
                         neuron!
+    remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
 
     Returns
     -------
@@ -960,6 +965,9 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
                         row/col_group are dropped from the matrix.
     method :            'AVERAGE' | 'MAX' | 'MIN' | 'SUM', optional
                         Method by which values are collapsed into groups.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
+
 
     Returns
     -------
