@@ -837,6 +837,68 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
     return n
 
 
+def _generate_swc_table(x, export_synapses=False, min_radius=0):
+    """ Generate SWC table for given neuron.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron
+
+    Returns
+    -------
+    swc :           pandas.DataFrame
+                    SWC node table
+    tn2ix :         dict
+                    Dictionary mapping treenode IDs to new node indices.
+
+    """
+
+    # Make copy of nodes and reorder such that the parent is always before a
+    # treenode
+    nodes_ordered = [n for seg in x.segments for n in seg[::-1]]
+    this_tn = x.nodes.set_index('treenode_id').loc[nodes_ordered]
+
+    # Because the last treenode ID of each segment is a duplicate
+    # (except for the first segment ), we have to remove them
+    this_tn = this_tn[~this_tn.index.duplicated(keep='first')]
+
+    # Add an index column (must start with "1", not "0")
+    this_tn['index'] = list(range(1, this_tn.shape[0] + 1))
+
+    # Make a dictionary treenode_id -> index
+    tn2ix = this_tn['index'].to_dict()
+
+    # Make parent index column
+    this_tn['parent_ix'] = this_tn.parent_id.map(lambda x: tn2ix.get(x, -1))
+
+    # Set Label column to 0 (undefined)
+    this_tn['label'] = 0
+    # Add end/branch labels
+    this_tn.loc[this_tn.type == 'branch', 'label'] = 5
+    this_tn.loc[this_tn.type == 'end', 'label'] = 6
+    # Add soma label
+    if x.soma:
+        this_tn.loc[x.soma, 'label'] = 1
+    if export_synapses:
+        # Add synapse label
+        this_tn.loc[x.presynapses.treenode_id.values, 'label'] = 7
+        this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
+
+    # Make sure we don't have too small radii
+    if not isinstance(min_radius, type(None)):
+        this_tn.loc[this_tn.radius < min_radius, 'radius'] = min_radius
+
+    # Generate table consisting of PointNo Label X Y Z Radius Parent
+    # .copy() is to prevent pandas' chaining warnings
+    swc = this_tn[['index', 'label', 'x', 'y', 'z',
+                   'radius', 'parent_ix']].copy()
+
+    # Adjust column titles
+    swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']
+
+    return swc, tn2ix
+
+
 def to_swc(x, filename=None, export_synapses=False, min_radius=0):
     """ Generate SWC file from neuron(s).
 
@@ -906,48 +968,9 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
     elif not filename.endswith('.swc'):
         filename += '.swc'
 
-    # Make copy of nodes and reorder such that the parent is always before a
-    # treenode
-    nodes_ordered = [n for seg in x.segments for n in seg[::-1]]
-    this_tn = x.nodes.set_index('treenode_id').loc[nodes_ordered]
-
-    # Because the last treenode ID of each segment is a duplicate
-    # (except for the first segment ), we have to remove them
-    this_tn = this_tn[~this_tn.index.duplicated(keep='first')]
-
-    # Add an index column (must start with "1", not "0")
-    this_tn['index'] = list(range(1, this_tn.shape[0] + 1))
-
-    # Make a dictionary treenode_id -> index
-    tn2ix = this_tn['index'].to_dict()
-
-    # Make parent index column
-    this_tn['parent_ix'] = this_tn.parent_id.map(lambda x: tn2ix.get(x, -1))
-
-    # Set Label column to 0 (undefined)
-    this_tn['label'] = 0
-    # Add end/branch labels
-    this_tn.loc[this_tn.type == 'branch', 'label'] = 5
-    this_tn.loc[this_tn.type == 'end', 'label'] = 6
-    # Add soma label
-    if x.soma:
-        this_tn.loc[x.soma, 'label'] = 1
-    if export_synapses:
-        # Add synapse label
-        this_tn.loc[x.presynapses.treenode_id.values, 'label'] = 7
-        this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
-
-    # Make sure we don't have too small radii
-    if not isinstance(min_radius, type(None)):
-        this_tn.loc[this_tn.radius < min_radius, 'radius'] = min_radius
-
-    # Generate table consisting of PointNo Label X Y Z Radius Parent
-    # .copy() is to prevent pandas' chaining warnings
-    swc = this_tn[['index', 'label', 'x', 'y', 'z',
-                   'radius', 'parent_ix']].copy()
-
-    # Adjust column titles
-    swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']
+    swc, tn2ix = _generate_swc_table(x,
+                                     export_synapses=export_synapses,
+                                     min_radius=min_radius)
 
     with open(filename, 'w') as file:
         # Write header
@@ -961,7 +984,7 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
         if export_synapses:
             for l in ['7 = presynapse', '8 = postsynapse']:
                 file.write('# {}\n'.format(l))
-        #file.write('\n')
+        # file.write('\n')
 
         writer = csv.writer(file, delimiter=' ')
         writer.writerows(swc.astype(str).values)
