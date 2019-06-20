@@ -33,7 +33,7 @@ logger = config.logger
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
                   'predict_connectivity', 'adjacency_matrix', 'group_matrix',
                   'adjacency_from_connectors', 'cn_table_from_connectors',
-                  'connection_density', 'sparseness'])
+                  'connection_density', 'sparseness', 'shared_partners'])
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
@@ -1251,8 +1251,79 @@ def sparseness(x, which='LTS'):
     if which == 'LTK':
         return np.nansum(((x - np.nanmean(x, axis=0)) / np.nanstd(x, axis=0)) ** 4, axis=0) / N - 3
     elif which == 'LTS':
-        return 1 / (1 - (1/N)) * (1 - np.nansum(x/N, axis=0) ** 2 / np.nansum(x**2/N, axis=0))
+        return 1 / (1 - (1 / N)) * (1 - np.nansum(x/N, axis=0) ** 2 / np.nansum(x ** 2 / N, axis=0))
     else:
         raise ValueError('Parameter "which" must be either "LTS" or "LTK"')
 
+
+def shared_partners(a, b, upstream=True, downstream=True, syn_threshold=None,
+                    restrict_to=None, remote_instance=None):
+    """ Returns shared partners of neuron(s) A and B.
+
+    Parameters
+    ----------
+    a,b :                   CatmaidNeuron/List
+                            Neurons to search shared partners for.
+    upstream, downstream:   bool, int, optional
+                            Set to True/False to restrict direction.
+    syn_threshold :         int, optional
+                            Synapse threshold. Edges to both neurons A and B
+                            must be above threshold!
+    restrict_to :           str | pymaid.Volume, optional
+                            Volume to restrict connectivity to.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed, will try using globally defined.
+
+    Returns
+    -------
+    pandas.DataFrame
+                            Pandas DataFrame with shared partners and edges::
+
+                                neuron_name  skeleton_id  relation edges_a  edges_b
+                             0
+                             1
+                             2
+
+    """
+
+    if isinstance(a, core.CatmaidNeuron):
+        a = core.CatmaidNeuronList(a)
+    elif not isinstance(a, core.CatmaidNeuronList):
+        raise TypeError('Expected CatmaidNeuron/List, got {}'.format(type(a)))
+
+    if isinstance(b, core.CatmaidNeuron):
+        b = core.CatmaidNeuronList(b)
+    elif not isinstance(b, core.CatmaidNeuronList):
+        raise TypeError('Expected CatmaidNeuron/List, got {}'.format(type(b)))
+
+    if not isinstance(syn_threshold, (float, int)):
+        syn_threshold = 1
+    elif syn_threshold <= 0:
+        raise ValueError('Synapse threshold must not be <= 0.')
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    cn = fetch.get_partners(a + b, remote_instance=remote_instance)
+
+    if not upstream:
+        cn = cn[cn.relation != 'upstream']
+
+    if not downstream:
+        cn = cn[cn.relation != 'downstream']
+
+    if restrict_to:
+        cn = filter_connectivity(cn, restrict_to=restrict_to,
+                                 remote_instance=remote_instance)
+
+    # Collapse into A + B by direction
+    cn['edges_a'] = 0
+    cn['edges_b'] = 0
+    for rel in cn.relation.unique():
+        cn.loc[cn.relation == rel, 'edges_a'] = cn.loc[cn.relation == rel, a.skeleton_id].sum(axis=1)
+        cn.loc[cn.relation == rel, 'edges_b'] = cn.loc[cn.relation == rel, b.skeleton_id].sum(axis=1)
+
+    # Remove connections where either a or b are sub-threshold
+    cn = cn[(cn['edges_a'] >= syn_threshold) & (cn['edges_b'] >= syn_threshold)]
+
+    return cn[['neuron_name', 'skeleton_id', 'relation', 'edges_a', 'edges_b']].reset_index()
 

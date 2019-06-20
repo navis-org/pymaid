@@ -359,6 +359,7 @@ Filtering
     :toctree: generated/
 
     pymaid.filter_connectivity
+    pymaid.shared_partners
 
 Import/Export
 +++++++++++++
