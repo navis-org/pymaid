@@ -205,17 +205,31 @@ class CatmaidInstance:
         self._future_session = FuturesSession(session=self._session,
                                               max_workers=self.max_threads)
 
-        if authname is not None and authpassword is not None:
+        if authname and authpassword:
             self._session.auth = (authname, authpassword)
 
-        if authtoken is not None:
+        if authtoken:
             self._session.headers['X-Authorization'] = 'Token ' + authtoken
+        else:
+            # If no authtoken, we have to get a CSRF token instead
+            r = self._session.get(self.server)
+            r.raise_for_status()
+            # Extract token
+            key = [k for k in r.cookies.keys() if 'csrf' in k.lower()]
+
+            if not key:
+                logger.warning("No CSRF Token found. You won't be able to "
+                               "do POST requests to this server.")
+            else:
+                csrf = r.cookies[key[0]]
+                self._session.headers['referer'] = self.server
+                self._session.headers['X-CSRFToken'] = csrf
 
         if make_global:
             self.make_global()
 
     def setup_cache(self, caching=True, size_limit=128, time_limit=None):
-        """ Setup a cache for responses from the CATMAID server.
+        """Set up a cache for responses from the CATMAID server.
 
         Parameters
         ----------
