@@ -1637,7 +1637,8 @@ def get_node_details(x, remote_instance=None, chunk_size=10000,
                         errors. We will thus query them in amenable bouts.
     convert_ts :        bool, optional
                         If True, will convert timestamps from strings to
-                        datetime objects.
+                        datetime objects. This can be very costly for large
+                        lists.
 
     Returns
     -------
@@ -1690,13 +1691,29 @@ def get_node_details(x, remote_instance=None, chunk_size=10000,
     df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
     if convert_ts:
+        df['creation_time'] = pd.to_datetime(df['creation_time'], utc=True)
+        df['edition_time'] = pd.to_datetime(df['edition_time'], utc=True)
+
+        # Review times are lists of datetimes unfortunately - so we have to
+        # take a detour via a dictionary first to make use of pandas' ultra
+        # fast conversion:
+        # Unpack first
+        dstr = [d for lst in df['review_times'].values for d in lst]
+        # Convert to datetimes
+        rdates = pd.to_datetime(dstr, utc=True)
+        # Generate dictionary
+        ddict = dict(zip(dstr, rdates))
+        # Map dictionary
+        df['review_times'] = df['review_times'].map(lambda x: [ddict[d] for d in x])
+
+        """
         df['creation_time'] = [datetime.datetime.strptime(
             d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
         df['edition_time'] = [datetime.datetime.strptime(
             d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
         df['review_times'] = [[datetime.datetime.strptime(
             d[:16], '%Y-%m-%dT%H:%M') for d in lst] for lst in df['review_times'].values]
-
+        """
     return df
 
 
@@ -2142,10 +2159,15 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
         df = df[df.connector_id.isin(x.connectors.connector_id)]
 
     # Convert to timestamps
+    df['creation_time'] = pd.to_datetime(df['creation_time'], utc=True)
+    df['edition_time'] = pd.to_datetime(df['edition_time'], utc=True)
+
+    """
     df['creation_time'] = [datetime.datetime.strptime(
         d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
     df['edition_time'] = [datetime.datetime.strptime(
         d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
+    """
 
     if with_tags:
         return df, tags
