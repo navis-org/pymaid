@@ -1775,7 +1775,7 @@ class CatmaidNeuronList:
                                      make_copy=self.copy_on_subset)
         elif utils._is_iterable(to_sub):
             # Make sure everything is a string
-            other = [str(s) for s in other]
+            to_sub = [str(s) for s in to_sub]
             return CatmaidNeuronList([n for n in self.neurons if n.skeleton_id not in to_sub and n.neuron_name not in to_sub],
                                      make_copy=self.copy_on_subset)
         else:
