@@ -2036,6 +2036,7 @@ def _neuron2vispy(x, **kwargs):
                       Set linewidth. Might not work depending on your backend.
     cn_mesh_colors :  bool, optional
                       If True, connectors will have same color as the neuron.
+    soma :            bool, optional
     synapse_layout :  dict, optional
                       Sets synapse layout. Default settings::
                         {
@@ -2209,15 +2210,15 @@ def _neuron2vispy(x, **kwargs):
                 # Convert array back to a single color without alpha
                 neuron_color = neuron_color[0][:3]
 
-            # Add soma by default. If use_radii=True, add soma only if
+            # Add soma by default. If use_radius=True, add soma only if
             # explicitly requested
-            if kwargs.get('soma', kwargs.get('use_radii', False) is False):
+            if kwargs.get('soma', kwargs.get('use_radius', False) is False):
                 # Extract and plot soma
                 soma = neuron.nodes[neuron.nodes.radius > 1]
-                if soma.shape[0] >= 1:
-                    radius = soma.ix[soma.index[0]].radius
-                    sp = create_sphere(7, 7, radius=radius)
-                    verts = sp.get_vertices() + soma.ix[soma.index[0]][['x', 'y', 'z']].values
+                if neuron.soma:
+                    soma = neuron.nodes.set_index('treenode_id').loc[neuron.soma]
+                    sp = create_sphere(7, 7, radius=soma.radius)
+                    verts = sp.get_vertices() + soma[['x', 'y', 'z']].values
                     s = scene.visuals.Mesh(vertices=verts,
                                            shading='smooth',
                                            faces=sp.get_faces(),
