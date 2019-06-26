@@ -1123,7 +1123,8 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
     return
 
 
-def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
+def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
+                   suggest_only=False):
     """ Stitch multiple neurons together.
 
     Uses minimum spanning tree to determine a way to connect all fragments
@@ -1160,6 +1161,9 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
                         If provided, these treenodes will be preferentially
                         used to stitch neurons together. Overrides methods
                         ``'ALL'`` or ``'LEAFS'``.
+    suggest_only :      bool, optional
+                        If True, will only return list of edges to add instead
+                        of actually stitching the neuron.
 
     Returns
     -------
@@ -1326,6 +1330,9 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None):
 
     # Edges that need adding are those with weight > 0
     to_add = [e for e in edges if e[2]['new']]
+
+    if suggest_only:
+        return to_add
 
     # Keep track of original master root
     master_root = master.root[0]
