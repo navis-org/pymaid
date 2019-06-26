@@ -140,7 +140,7 @@ def get_user_stats(start_date=None, end_date=None, remote_instance=None):
                        hist.treenodes.sum(axis=1),
                        hist.reviewed.sum(axis=1),
                        hist.connector_links.sum(axis=1)],
-                       axis=1, sort=True).fillna(0).astype(int)
+                      axis=1, sort=True).fillna(0).astype(int)
 
     stats.index.name = 'username'
     stats.columns = ['cable', 'nodes_created', 'nodes_reviewed',
@@ -827,8 +827,9 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
             # Rename columns to user login
             this_ts.columns = [user_list.loc[u, 'login']]
 
-            # Append and move on
-            all_ts.append(this_ts.T)
+            # Append if an and move on
+            if not this_ts.empty:
+                all_ts.append(this_ts.T)
 
         # Turn into DataFrame
         all_ts = pd.concat(all_ts).sort_index()
