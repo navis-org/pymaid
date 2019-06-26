@@ -801,6 +801,18 @@ class CatmaidInstance:
         """ Use to parse url for uploading volumes. """
         return self.make_url(self.project_id, 'volumes', 'add', **GET)
 
+    def _create_link_url(self, **GET):
+        """ Use to parse url for creating connector links. """
+        return self.make_url(self.project_id, 'link', 'create', **GET)
+
+    def _join_skeletons_url(self, **GET):
+        """ Use to parse url for joining skeletons. """
+        return self.make_url(self.project_id, 'skeleton', 'join', **GET)
+
+    def _get_login_info_url(self, **GET):
+        """ Use to parse url for fetching login information for self."""
+        return self.make_url('accounts', 'login', **GET)
+
 
 @cache.undo_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
