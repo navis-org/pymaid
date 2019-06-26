@@ -20,13 +20,18 @@ import json
 import numbers
 import os
 import tempfile
+import traceback
 
 import requests
 
 import numpy as np
 import pandas as pd
 
-from . import core, utils, morpho, config, cache, fetch
+import seaborn as sns
+
+from scipy.spatial.distance import cdist
+
+from . import core, utils, morpho, config, cache, fetch, scene3d
 
 __all__ = sorted(['add_annotations', 'remove_annotations',
                   'add_tags', 'delete_tags',
@@ -34,7 +39,9 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'rename_neurons',
                   'add_meta_annotations', 'remove_meta_annotations',
                   'upload_neuron', 'upload_volume',
-                  'update_radii'])
+                  'update_radii', 'update_skeleton',
+                  'join_skeletons', 'join_nodes',
+                  'link_connector'])
 
 # Set up logging
 logger = config.logger
@@ -299,6 +306,263 @@ def update_skeleton(x, skeleton_id=None, remote_instance=None):
                             }
     """
     pass
+
+
+@cache.never_cache
+def join_skeletons(x, winner=None, no_prompt=False, method='LEAFS',
+                   remote_instance=None):
+    """ Join multiple skeletons based on minimum spanning tree.
+
+    Parameters
+    ----------
+    x :                 CatmaidNeuronList
+                        Skeletons to join.
+    winner :            CatmaidNeuron | skeleton ID, optional
+                        Winning skeleton that gets to keep its skeleton ID.
+                        If not provided, will use the largest fragment.
+    method :            'LEAFS' | 'ALL'', optional
+                        Set stitching method:
+                            (1) 'LEAFS': Only leaf (including root) nodes will
+                                be allowed to make new edges.
+                            (2) 'ALL': All treenodes are considered.
+    no_prompt :         bool, optional
+                        If True, will NOT prompt before joining.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Server response
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if not isinstance(x, core.CatmaidNeuronList):
+        raise TypeError('Expected CatmaidNeuronList, got "{}"'.format(type(x)))
+
+    if len(x) < 2:
+        raise ValueError('Must provide at least two skeletons')
+
+    if winner and winner not in x:
+        raise ValueError('Winner must be in list of skeletons')
+    elif not winner:
+        winner = sorted([n for n in x], key=lambda x: x.n_nodes, reverse=True)[0]
+
+    ALLOWED_METHODS = ['LEAFS', 'ALL']
+    if method.upper() not in ALLOWED_METHODS:
+        raise ValueError('Method "{}" not allowed'.format(method))
+
+    # Get edges that need adding
+    edges_to_add = morpho.stitch_neurons(x, method=method, suggest_only=True)
+
+    if not no_prompt:
+        # Create mock neuron for visualization
+        coords = x.nodes.set_index('treenode_id')[['x', 'y', 'z']].to_dict()
+        swc = pd.DataFrame([])
+        swc['treenode_id'] = np.arange(0, len(edges_to_add) * 2)
+        swc['parent_id'] = None  # we need this to prevent conversion to floats
+        swc.loc[np.arange(0, len(edges_to_add)), 'parent_id'] = np.arange(len(edges_to_add), len(edges_to_add) * 2)
+
+        swc.loc[np.arange(0, len(edges_to_add)), 'x'] = [coords['x'][e[0]] for e in edges_to_add]
+        swc.loc[np.arange(0, len(edges_to_add)), 'y'] = [coords['y'][e[0]] for e in edges_to_add]
+        swc.loc[np.arange(0, len(edges_to_add)), 'z'] = [coords['z'][e[0]] for e in edges_to_add]
+        swc.loc[np.arange(len(edges_to_add), len(edges_to_add) * 2), 'x'] = [coords['x'][e[1]] for e in edges_to_add]
+        swc.loc[np.arange(len(edges_to_add), len(edges_to_add) * 2), 'y'] = [coords['y'][e[1]] for e in edges_to_add]
+        swc.loc[np.arange(len(edges_to_add), len(edges_to_add) * 2), 'z'] = [coords['z'][e[1]] for e in edges_to_add]
+
+        swc['radius'] = 200
+
+        mock = core.CatmaidNeuron(1)
+        mock.neuron_name = 'Mock'
+        mock.nodes = swc
+        mock.tags = {}
+        mock.connectors = pd.DataFrame([])
+        mock._clear_temp_attr()
+
+        colors = sns.color_palette('bright', len(x))
+
+        # Visualise before prompting
+        v = scene3d.Viewer()
+        v.add(x, color=colors, connectors=False)
+        v.add(mock.nodes[['x', 'y', 'z']].values,
+              scatter_kws={'size': 10,
+                           'color': 'w'})
+        v.add(mock, color='w', use_radius=False, connectors=False)
+
+        answer = ""
+        print('Please check suggested joins in 3D viewer before proceeding.')
+        while answer not in ["y", "n"]:
+            answer = input("Proceed? [Y/N] ").lower()
+            if answer != 'y':
+                return
+
+    responses = []
+    for e in config.tqdm(edges_to_add,
+                         desc='Joining',
+                         disable=config.pbar_hide,
+                         leave=config.pbar_leave):
+        # Make sure that we keep the winner on top
+        if e[1] in winner.nodes.treenode_id.values:
+            win, loose = e[1], e[0]
+        else:
+            win, loose = e[0], e[1]
+
+        responses.append(join_nodes(win, loose,
+                                    no_prompt=True,
+                                    remote_instance=remote_instance))
+
+        # Stop early if error encountered
+        if 'error' in responses[-1]:
+            return responses
+
+    return responses
+
+
+@cache.never_cache
+def join_nodes(winner_node, looser_node, no_prompt=False,
+               remote_instance=None):
+    """ Join two skeletons by nodes.
+
+    All annotations are being kept. Reference to original neuron will be
+    added.
+
+    Parameters
+    ----------
+    winner_node :       int
+                        Treenode ID of winning skeleton to merge onto.
+                        Skeleton ID of this neuron will persist.
+    looser_node :       int
+                        Treenode ID of loosing skeleton to merge. Skeleton ID
+                        of this neuron will be lost!
+    no_prompt :         bool, optional
+                        If True, will NOT prompt before joining.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    Server response
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    try:
+        winner_node = int(winner_node)
+        looser_node = int(looser_node)
+    except BaseException:
+        raise ValueError('winner/looser_node must be numeric IDs')
+
+    # We need to provide a state for each node
+    details = fetch.get_node_details([winner_node, looser_node],
+                                     convert_ts=False,
+                                     remote_instance=remote_instance)
+    details.node_id = details.node_id.astype(int)
+    edition_times = details.set_index('node_id').edition_time.to_dict()
+
+    if winner_node not in edition_times:
+        raise ValueError('winner_node does not exist')
+    if looser_node not in edition_times:
+        raise ValueError('looser_node does not exist')
+
+    skids = fetch.get_skid_from_treenode([winner_node, looser_node],
+                                         remote_instance=remote_instance)
+    winner_skid = skids[winner_node]
+    looser_skid = skids[looser_node]
+
+    names = fetch.get_names([winner_skid, looser_skid],
+                            remote_instance=remote_instance)
+    winner_name = names[str(winner_skid)]
+    looser_name = names[str(looser_skid)]
+
+    # Get annotations
+    annotations = fetch.get_annotation_details([winner_skid, looser_skid],
+                                               remote_instance=remote_instance)
+    # Turn annotations into dictionary
+    annotation_set = annotations.set_index('annotation').user_id.to_dict()
+    # Add reference to original neuron
+    login = remote_instance.fetch(remote_instance._get_login_info_url())
+    annotation_set[looser_name] = login['userid']
+
+    if not no_prompt:
+        print('Joining {} ({}) into {} ({})'.format(looser_name,
+                                                    looser_skid,
+                                                    winner_name,
+                                                    winner_skid))
+        print('Skeleton ID {} will cease to exist'.format(looser_skid))
+        answer = ""
+        while answer not in ["y", "n"]:
+            answer = input("Proceed? [Y/N] ").lower()
+            if answer != 'y':
+                return
+
+    join_url = remote_instance._join_skeletons_url()
+    join_post = {'from_id': winner_node,
+                 'to_id': looser_node,
+                 'annotation_set': json.dumps(annotation_set),
+                 'edition_times': json.dumps([[n, edition_times[n]] for n in [winner_node, looser_node]]),
+                 'sampler_handling': 'domain-end'}
+
+    resp = remote_instance.fetch(join_url, join_post)
+    if 'error' in resp:
+        logger.error('Error joining nodes: see response for details.')
+    return resp
+
+
+@cache.never_cache
+def link_connector(links, remote_instance=None):
+    """ Link connectors with treenode.
+
+    Parameters
+    ----------
+    links :             tuple | list of tuples
+                        Tuple (or list thereof) of node IDs describing the
+                        link to make::
+
+                            (treenode_id, connector_id, 'presynaptic_to') will make treenode presynaptic to connector
+                            (treenode_id, connector_id, 'postsynaptic_to') will make treenode postsynaptic to connector
+
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    # Some sanity checks
+    if not utils._is_iterable(links):
+        raise TypeError('Expected tuple(s) of node, connector IDs.')
+
+    # Turn into list of tuples
+    if not utils._is_iterable(links[0]):
+        links = [links]
+
+    # Make sure all tuples have correct length
+    if any([len(l) != 3 for l in links]):
+        raise ValueError('Tuples must have exactly three entries: '
+                         '(treenode_id, connector_id, relation)')
+
+    # Make sure all relations are correct
+    if any([l[2] not in ['presynaptic_to', 'postsynaptic_to'] for l in links]):
+        raise ValueError('Tuple relationships must only be "presynaptic_to" '
+                         'or "postsynaptic_to".')
+
+    create_link_url = [remote_instance._create_link_url()] * len(links)
+
+    # We need to provide a state for each node
+    all_ids = [n for l in links for n in l[:2]]
+    details = fetch.get_node_details(all_ids,
+                                     convert_ts=False,
+                                     remote_instance=remote_instance)
+    edition_times = details.set_index('node_id').edition_time.to_dict()
+
+    # State has to be provided as {'state': [(node_id, edition_time), ..]}
+    # We have to explicitly convert the state in a json string because passing
+    # it to requests as "post" will fuck this up otherwise
+    link_post = [{'from_id': l[0],
+                  'to_id': l[1],
+                  'state': json.dumps([[n, edition_times[str(n)]] for n in l[:2]]),
+                  'link_type': l[2]} for l in links]
+
+    return remote_instance.fetch(create_link_url, link_post)
 
 
 @cache.never_cache
