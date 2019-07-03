@@ -805,6 +805,10 @@ class CatmaidInstance:
         """ Use to parse url for creating connector links. """
         return self.make_url(self.project_id, 'link', 'create', **GET)
 
+    def _create_connector_url(self, **GET):
+        """ Use to parse url for creating connectors. """
+        return self.make_url(self.project_id, 'connector', 'create', **GET)
+
     def _join_skeletons_url(self, **GET):
         """ Use to parse url for joining skeletons. """
         return self.make_url(self.project_id, 'skeleton', 'join', **GET)

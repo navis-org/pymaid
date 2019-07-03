@@ -16,6 +16,8 @@
 """ This module contains functions to push data to a Catmaid server.
 """
 
+from datetime import datetime as dt
+from datetime import timezone
 import json
 import numbers
 import os
@@ -39,9 +41,10 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'rename_neurons',
                   'add_meta_annotations', 'remove_meta_annotations',
                   'upload_neuron', 'upload_volume',
-                  'update_radii', 'update_skeleton',
+                  'update_radii', 'replace_skeleton',
                   'join_skeletons', 'join_nodes',
-                  'link_connector'])
+                  'link_connector', 'delete_nodes',
+                  'add_connector'])
 
 # Set up logging
 logger = config.logger
@@ -49,7 +52,7 @@ logger = config.logger
 
 @cache.never_cache
 def upload_volume(x, name, comments=None, remote_instance=None):
-    """ Upload volume/mesh to CatmaidInstance.
+    """Upload volume/mesh to CatmaidInstance.
 
     Parameters
     ----------
@@ -74,7 +77,6 @@ def upload_volume(x, name, comments=None, remote_instance=None):
                          Server response.
 
     """
-
     if isinstance(x, core.Volume):
         verts = x.vertices.astype(int).tolist()
         faces = x.faces.astype(int).tolist()
@@ -276,42 +278,293 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
 
 @cache.never_cache
-def update_skeleton(x, skeleton_id=None, remote_instance=None):
-    """ Update skeleton in CatmaidInstance.
+def replace_skeleton(x, skeleton_id=None, force_mapping=False,
+                     cold_run=False, remote_instance=None):
+    """Replace skeleton in CatmaidInstance.
 
-    This will override existing skeleton data and map back annotations, tags
-    and connectors.
+    This will override existing skeleton data and tries to map back tags
+    and connectors. Requires user to have import and API token write access
+    privileges!
+
+    Connectors are re-connected by: For each connector,
+
+      1. get treenode this connector is connected to in current skeleton.
+      2. get distance to the nodes up- and downstream of it as proxy for
+         sampling resolution.
+      3. find the closest treenode in new skeleton.
+      4. connect automatically if closest treenode within sampling resolution.
+         Else flag and return connector as "requires manual review".
+
+    Node tags are mapped back by: For each tagged node:
+
+      1. get distance to the nodes up- and downstream of it as proxy for
+         sampling resolution.
+      2. find the closest treenode in new skeleton.
+      3. map tag automatically if closest treenode is within the sampling
+         resolution. Else flag and return connector as "requires manual review".
+
+    Note that this does not respect types of nodes. E.g. an "ends" tag could end
+    up on a non-leaf node.
+
+    Any connectors/tags that have not been automatically fixed will be returned
+    as DataFrame for manual review. See examples.
 
     Parameters
     ----------
-    x :                  CatmaidNeuron
-                         Neuron to update.
-    skeleton_id :        int, optional
-                         ID of skeleton to update. If not provided will use
-                         `.skeleton_id` of input neuron.
-    remote_instance :    CatmaidInstance, optional
-                         If not passed directly, will try using global.
+    x :                 CatmaidNeuron
+                        Neuron to update.
+    skeleton_id :       int, optional
+                        ID of skeleton to update. If not provided will use
+                        `.skeleton_id` property of input neuron.
+    force_mapping :     bool, optional
+                        If True, will always re-connect connectors and map tags
+                        onto the closest node in new skeleton regardless of
+                        distance.
+    cold_run :          bool, optional
+                        If True, will only calculate and return table of nodes
+                        to fix without actually uploading anything.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
-    dict
-                         Server response with new skeleton/treenode IDs::
+    pandas.DataFrame
+                        DataFrame listing connectors and node tags that were
+                        either fixed automatically or need manual review.
 
-                            {
-                             'neuron_id': new neuron ID,
-                             'skeleton_id': new skeleton ID,
-                             'node_id_map': {'old_node_id': new_node_id, ...},
-                             'annotations': if import_annotations=True,
-                             'tags': if tags=True
-                            }
+                            auto_fix    type        connector_id    old_node_id  ...
+                         0  False       'connector' 123456          11111
+                         1  True        'tag'       None            22222
+
+                            sugg_node_id    relation    tags        x   y   z
+                         0  33333           0           None        ...
+                         1  44444           None        ['ends']    ...
+
+                        In this example node `11111` in the old skeleton was
+                        connected presynaptically (``relation=0``) to a
+                        connector. The closest node in the new skeleton is
+                        `33333` but it's too far away to be automatically
+                        reconnected.
+
+                        Node `22222` had an `ends` tag in the old skeleton and
+                        the closest node in the new skeleton is `44444`. Because
+                        this node was close enough, it was automatically fixed.
+
+                        ``x/y/z`` coordinates always refer to the position of
+                        the old treenode!
+
+    Examples
+    --------
+    Pull a neuron from CATMAID, smooth it and upload it again:
+
+    >>> n = pymaid.get_neuron(16)
+    >>> n_smoothed = pymaid.smooth_neuron(n, inplace=False)
+    >>> to_fix = pymaid.replace_skeleton(n_smoothed)
+    Updating skeleton 16
+    # of nodes:	12853 -> 12853 (+0)
+    Cable length:	2904.2 -> 3027.3 (+123.1)
+    1983 of 2116 connectors will be automatically re-connected
+    654 of 654 tagged nodes will be automatically mapped back
+    Remaining connectors/tagged nodes will be returned as DataFramefor manual review
+    Proceed? [Y/N] Y
+    >>> # There are 133 items (connectors and tags) to check manually:
+    >>> to_fix[~to_fix.auto_fix].shape[0]
+    133
+    >>> to_fix[~to_fix.auto_fix].head()
+        connector_id  old_node_id  relation  sugg_node_id tags       type       x       y       z
+    20        304403       125722       NaN        125717  NaN  connector  452034  139101  204160
+    47        553830       123430       NaN          2698  NaN  connector  437855  165228  216280
+    77        653778       123637       NaN        123636  NaN  connector  450508  134607  188720
+    86        666783       127623       NaN        127620  NaN  connector  438700  147328  219840
+
+    To facilitate fixing , we can add urls to the positions and then copy the
+    DataFrame to e.g. a spreadsheet:
+
+    >>> fix_manual = to_fix[~to_fix.auto_fix]
+    >>> fix_manual['url'] = pymaid.url_to_coordinates(coords=fix_manual,
+    ...                                               stack_id=5,  # change this according to your projects
+    ...                                               active_skeleton_id=n.skeleton_id,
+    ...                                               active_node_id=fix_manual.sugg_node_id.values)
+    >>> # Copy to clipboard
+    >>> fix_manual.to_clipboard()
+
     """
-    pass
+    # TODO:
+    # - use tangent vector to map connectors/tags back?
+    # - constrain certain tags (e.g. "ends" only on leafs)
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if not isinstance(x, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))
+
+    if isinstance(skeleton_id, type(None)):
+        skeleton_id = x.skeleton_id
+
+    if not fetch.neuron_exists(skeleton_id):
+        raise ValueError('Neuron with skeleton ID "{}" does not exist'.format(skeleton_id))
+
+    # Get current skeleton that is should be replaced
+    y = fetch.get_neuron(skeleton_id, remote_instance=remote_instance)
+
+    # Because compact-skeleton does not return all types of connectors, we have
+    # to get them via a separate endpoint
+    lk = fetch.get_connector_links(skeleton_id, remote_instance=remote_instance)
+
+    # Find out which connectors we can automatically reconnect:
+    # First get distance between each connector treenode and its neighbours
+    cn_nodes = lk.treenode_id.values
+    g = y.graph.to_undirected()
+    cn_nodes_dist = []
+    for n in cn_nodes:
+        cn_nodes_dist.append(np.mean([g.edges[(n, n2)]['weight'] for n2 in g.neighbors(n)]))
+    cn_nodes_dist = np.array(cn_nodes_dist)
+
+    # Now find closest treenode in the new neuron
+    cn_dist_new = cdist(y.nodes.set_index('treenode_id').loc[cn_nodes,
+                                                             ['x', 'y', 'z']],
+                        x.nodes[['x', 'y', 'z']].values)
+    cn_closest_ix = np.argmin(cn_dist_new, axis=1)
+    cn_closest_id = x.nodes.iloc[cn_closest_ix]['treenode_id'].values
+    cn_closest_dist = np.amin(cn_dist_new, axis=1)
+
+    if not force_mapping:
+        cn_is_close = cn_closest_dist <= cn_nodes_dist
+    else:
+        cn_is_close = cn_closest_dist <= float('inf')
+
+    # Create dictionary mapping old to new connector treenode ID
+    cn_to_tn = {int(c): int(t) for c, t in zip(cn_nodes, cn_closest_id)}
+
+    # Find out which tags we can automatically map back:
+    # First get distance between each tagged node and its connected nodes
+    tg_nodes = np.array(list(set([n for t in y.tags for n in y.tags[t]])))
+    tg_nodes_dist = []
+    for n in tg_nodes:
+        tg_nodes_dist.append(np.mean([g.edges[(n, n2)]['weight'] for n2 in g.neighbors(n)]))
+    tg_nodes_dist = np.array(tg_nodes_dist)
+
+    # Find closest treenode in the new neuron
+    tg_dist_new = cdist(y.nodes.set_index('treenode_id').loc[tg_nodes,
+                                                             ['x', 'y', 'z']].values,
+                        x.nodes[['x', 'y', 'z']].values)
+    tg_closest_ix = np.argmin(tg_dist_new, axis=1)
+    tg_closest_id = x.nodes.iloc[tg_closest_ix]['treenode_id'].values
+    tg_closest_dist = np.amin(tg_dist_new, axis=1)
+
+    if not force_mapping:
+        tg_is_close = tg_closest_dist <= tg_nodes_dist
+    else:
+        tg_is_close = tg_closest_dist <= float('inf')
+
+    # Create dictionary mapping old to new treenode ID
+    tn_to_tn = {int(c): int(t) for c, t in zip(tg_nodes, tg_closest_id)}
+
+    # Compile list of items to fix after replacing skeleton in case we
+    # encounter an error and need to dump this
+    cn_to_fix = y.nodes.set_index('treenode_id').loc[cn_nodes, ['x', 'y', 'z']]
+    cn_to_fix = cn_to_fix.copy().reset_index(drop=True)
+    cn_to_fix['type'] = 'connector'
+    # Do not remove .astype(object) as this prevents conversion to float later
+    cn_to_fix['connector_id'] = lk.connector_id.values.astype(object)
+    cn_to_fix['old_node_id'] = lk.treenode_id.values
+    cn_to_fix['sugg_node_id'] = cn_to_fix.old_node_id.astype(int).map(cn_to_tn)
+    cn_to_fix['relation'] = lk.relation.values
+    cn_to_fix['auto_fix'] = cn_is_close
+
+    tg_to_fix = y.nodes.set_index('treenode_id').loc[tg_nodes, ['x', 'y', 'z']]
+    tg_to_fix = tg_to_fix.copy().reset_index(drop=True)
+    tg_to_fix['type'] = 'tags'
+    tg_to_fix['old_node_id'] = tg_nodes
+    tg_to_fix['sugg_node_id'] = tg_to_fix.old_node_id.astype(int).map(tn_to_tn)
+    tg_to_fix['tags'] = [[t for t in y.tags if n in y.tags[t]] for n in tg_nodes]
+    tg_to_fix['auto_fix'] = tg_is_close
+
+    # Concatenate both dataframes
+    to_fix = pd.concat([cn_to_fix, tg_to_fix], axis=0, sort=True).reset_index(drop=True)
+
+    if cold_run:
+        return to_fix
+
+    # Prepare some summary to be signed off by user
+    print('Updating skeleton {}: {}'.format(y.skeleton_id, y.neuron_name))
+    print('# of nodes:\t{} -> {} ({:+})'.format(y.n_nodes,
+                                                x.n_nodes,
+                                                x.n_nodes - y.n_nodes))
+    print('Cable length:\t{:.1f} -> {:.1f} ({:+.1f})'.format(y.cable_length,
+                                                             x.cable_length,
+                                                             x.cable_length - y.cable_length))
+    print('{} of {} connectors will be automatically re-connected'.format(sum(cn_is_close), len(cn_is_close)))
+    print('{} of {} tagged nodes will be automatically mapped back'.format(sum(tg_is_close), len(tg_is_close)))
+    print('Remaining connectors/tagged nodes will be returned as DataFrame'
+          'for manual review')
+
+    answer = ""
+    while answer not in ["y", "n"]:
+        answer = input("Proceed? [Y/N] ").lower()
+        if answer != 'y':
+            return to_fix
+
+    # Now things are getting serious!
+
+    # Get the neuron ID
+    neuron_id = fetch.get_neuron_id(y,
+                                    remote_instance=remote_instance)[y.skeleton_id]
+
+    # Update the neuron + skeleton
+    resp = upload_neuron(x,
+                         neuron_id=neuron_id,
+                         skeleton_id=skeleton_id,
+                         force_id=True,
+                         import_annotations=False,
+                         import_tags=False,
+                         remote_instance=remote_instance)
+
+    if 'error' in resp:
+        return resp
+
+    # From now on, if anything goes wrong we will return the entirety of
+    # connectors / tags for manual review
+
+    try:
+        # First, map new node IDs to old node IDs
+        to_fix['sugg_node_id'] = to_fix['sugg_node_id'].astype(int).map(resp['node_id_map'])
+
+        # Now re-connect stuff:
+        auto_fix = to_fix[to_fix['auto_fix']]
+
+        # Create list of links to make
+        new_links = auto_fix[auto_fix['type'] == 'connector'].copy()
+        # Create tuples of links
+        link_tuples = new_links[['sugg_node_id', 'connector_id', 'relation']]
+        # Make sure IDs check out
+        link_tuples = link_tuples.apply(tuple, axis=1).tolist()
+        # Make links
+        resp = link_connector(link_tuples, remote_instance=remote_instance)
+
+        # Generate dictionary of node -> tags
+        new_tags = auto_fix[auto_fix['type'] == 'tags'].copy()
+        tags_dict = new_tags.set_index('sugg_node_id').tags.to_dict()
+        # Add tags
+        resp = add_tags(node_list=new_tags.sugg_node_id.values,
+                        tags=tags_dict,
+                        node_type='TREENODE',
+                        remote_instance=remote_instance)
+
+    except BaseException:
+        traceback.print_exc()
+        logger.error('Something went wrong! Returning full list of stuff to '
+                     'manually review!')
+        return to_fix
+
+    return to_fix
 
 
 @cache.never_cache
 def join_skeletons(x, winner=None, no_prompt=False, method='LEAFS',
                    remote_instance=None):
-    """ Join multiple skeletons based on minimum spanning tree.
+    """Join multiple skeletons by minimizing the length of the newly added
+    edges (minimum spanning tree).
 
     Parameters
     ----------
@@ -333,8 +586,13 @@ def join_skeletons(x, winner=None, no_prompt=False, method='LEAFS',
     Returns
     -------
     Server response
-    """
 
+    See Also
+    --------
+    :func:`~pymaid.join_nodes`
+                        If you know exactly which nodes to join.
+
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, core.CatmaidNeuronList):
@@ -421,7 +679,7 @@ def join_skeletons(x, winner=None, no_prompt=False, method='LEAFS',
 @cache.never_cache
 def join_nodes(winner_node, looser_node, no_prompt=False,
                remote_instance=None):
-    """ Join two skeletons by nodes.
+    """Join two skeletons by nodes.
 
     All annotations are being kept. Reference to original neuron will be
     added.
@@ -442,8 +700,13 @@ def join_nodes(winner_node, looser_node, no_prompt=False,
     Returns
     -------
     Server response
-    """
 
+    See Also
+    --------
+    :func:`~pymaid.join_skeletons`
+                        If you don't know which skeletons to join.
+
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     try:
@@ -510,7 +773,7 @@ def join_nodes(winner_node, looser_node, no_prompt=False,
 
 @cache.never_cache
 def link_connector(links, remote_instance=None):
-    """ Link connectors with treenode.
+    """Link connectors with treenodes.
 
     Parameters
     ----------
@@ -521,10 +784,22 @@ def link_connector(links, remote_instance=None):
                             (treenode_id, connector_id, 'presynaptic_to') will make treenode presynaptic to connector
                             (treenode_id, connector_id, 'postsynaptic_to') will make treenode postsynaptic to connector
 
+                        See ``pymaid.config.link_types`` for allowed `relation`.
+
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
-    """
 
+    Returns
+    -------
+    list
+                        List of dictionary with server reponses.
+
+    See Also
+    --------
+    :func:`~pymaid.add_connector`
+                        To create new connectors.
+
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Some sanity checks
@@ -541,9 +816,9 @@ def link_connector(links, remote_instance=None):
                          '(treenode_id, connector_id, relation)')
 
     # Make sure all relations are correct
-    if any([l[2] not in ['presynaptic_to', 'postsynaptic_to'] for l in links]):
-        raise ValueError('Tuple relationships must only be "presynaptic_to" '
-                         'or "postsynaptic_to".')
+    ALLOWED_RELATIONS = [l['relation'] for l in config.link_types]
+    if any([l[2] not in ALLOWED_RELATIONS for l in links]):
+        raise ValueError('Tuple relationships must be either: {}'.format(', '.join(ALLOWED_RELATIONS)))
 
     create_link_url = [remote_instance._create_link_url()] * len(links)
 
@@ -562,12 +837,17 @@ def link_connector(links, remote_instance=None):
                   'state': json.dumps([[n, edition_times[str(n)]] for n in l[:2]]),
                   'link_type': l[2]} for l in links]
 
-    return remote_instance.fetch(create_link_url, link_post)
+    resp = remote_instance.fetch(create_link_url, link_post)
+
+    if any(['error' in r for r in resp]):
+        logger.error('Error creating link(s)! Check server response')
+
+    return resp
 
 
 @cache.never_cache
 def update_radii(radii, remote_instance=None):
-    """ Change radii [nm] of given treenodes.
+    """Change radii [nm] of given treenodes.
 
     Parameters
     ----------
@@ -600,7 +880,6 @@ def update_radii(radii, remote_instance=None):
     >>> pymaid.update_radii(radii)
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(radii, (core.CatmaidNeuron, core.CatmaidNeuronList)):
@@ -638,7 +917,7 @@ def update_radii(radii, remote_instance=None):
 
 @cache.never_cache
 def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
-    """ Rename neuron(s).
+    """Rename neuron(s).
 
     Parameters
     ----------
@@ -676,7 +955,6 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
     Nothing
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -728,6 +1006,50 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
             'Error renaming neuron(s): {0}'.format(','.join(failed)))
 
     return
+
+
+@cache.never_cache
+def add_connector(coords, remote_instance=None):
+    """Create connector(s) at given location.
+
+    Parameters
+    ----------
+    coords :            list-like
+                        Either single or list of [x, y, z] coordinates at which
+                        to create new connectors.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                        Response from Catmaid server containing new connector ID.
+
+    See Also
+    --------
+    :func:`~pymaid.link_connector`
+                        To link your newly created connectors to treenodes.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if not utils._is_iterable(coords[0]):
+        coords = [coords]
+
+    coords = np.array(coords)
+
+    if coords.shape[1] != 3:
+        raise ValueError('Expected x/y/z coordinates, got {}'.format(coords.shape[1]))
+
+    url = [remote_instance._create_connector_url()] * coords.shape[0]
+
+    post = [{'pid': remote_instance.project_id,
+             'confidence': 5,
+             'x': c[0],
+             'y': c[1],
+             'z': c[2]} for c in coords]
+
+    return remote_instance.fetch(url, post=post)
 
 
 @cache.never_cache
@@ -820,7 +1142,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     Parameters
     ----------
     x
-                        Neurons to check if they exist in Catmaid. Can be
+                        Neurons to delete. Can be
                         either:
 
                         1. list of skeleton ID(s) (int or str)
@@ -865,6 +1187,160 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     url = remote_instance._delete_neuron_url(neuronid)
 
     return remote_instance.fetch(url)
+
+
+@cache.never_cache
+def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
+    """Delete given tree- or connector nodes.
+
+    Due to the way CATMAID's node deletion API works, this function is not
+    suited for deleting directly linked nodes (e.g. A->B->C). For this to work,
+    you will have to call this function in a for loop!
+
+    .. danger::
+
+        **Use this with EXTREME caution as this is irreversible!**
+
+    Parameters
+    ----------
+    node_ids
+                        Single or list of treenode or connector IDs. Must not
+                        be a mix of connectors and treenodes.
+    node_type :         'TREENODE' | 'CONNECTOR'
+                        Set which type of node you want to delete as they use
+                        different API endpoints!
+    no_prompt :         bool, optional
+                        By default, you will be prompted to confirm before
+                        deleting the node(s). Set this to True to skip that
+                        step.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    server response
+
+    See Also
+    --------
+    :func:`~navis.delete_neuron`
+                        Use this to delete entire neurons.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if not isinstance(node_ids, (list, np.ndarray)):
+        node_ids = [node_ids]
+
+    # Make sure node_ids are integers
+    node_ids = [int(n) for n in node_ids]
+
+    # For each node, we need to provide its state, the states of its
+    # children and any connector links - the best way to get this is
+    # using the list query. Matter of fact: there is currently no other
+    # query that gives us link IDs AFAIK and we need this as state.
+    # First get node locations
+    node_locs = fetch.get_node_location(node_ids,
+                                        remote_instance=remote_instance)
+
+    missing = set(node_ids) - set(node_locs.node_id.values.astype(int))
+    if missing:
+        missing = np.array(list(missing)).astype(str)
+        raise ValueError('Node(s) {} not found.'.format(', '.join(missing)))
+
+    # For each node query a window to get its state
+    urls = []
+    for n in node_locs.itertuples():
+        params = {'left':   n.x-2500,
+                  'right':  n.x+2500,
+                  'top':    n.y-2500,
+                  'bottom': n.y+2500,
+                  'z1':     n.z,
+                  'z2':     n.z+40}
+        if 'treenode' in node_type.lower():
+            params['treenode_ids[0]'] = n.node_id
+        elif 'connector' in node_type.lower():
+            params['connector_ids[0]'] = n.node_id
+
+        u = remote_instance._get_node_list_url(**params)
+        urls.append(u)
+
+    # Format of the response is
+    # [[treenodes], [connectors], {labels}, node_limit_reached, {relation_map}, {extraNodes}]
+    # Format of [treenodes] is
+    # [id, parent_id, location_x, location_y, location_z, confidence, radius, skeleton_id, edition_time, user_id]
+    # Format of [connectors] is
+    # [id, location_x, location_y, location_z, confidence, edition_time, user_id, [partners]]
+    resp = remote_instance.fetch(urls)
+
+    if node_type.lower() in ['treenode', 'treenodes']:
+        # Turn state into dict
+        # Get edition times and parents for each node
+        states = {n[0]: {'edition_time': dt.fromtimestamp(n[-2],
+                                                          tz=timezone.utc).isoformat(),
+                         'parent_id': n[1]} for r in resp for n in r[0]}
+        # Get parent edition time, children and links
+        for n in states:
+            states[n]['parent'] = [states[n]['parent_id'],
+                                   states.get(states[n]['parent_id'], {}).get('edition_time')] if states[n]['parent_id'] else None
+            states[n]['children'] = [[c,
+                                      states[c]['edition_time']] for c in [c for c in states if states[c]['parent_id'] == n]]
+            states[n]['links'] = [[l[-1],
+                                   dt.fromtimestamp(l[-2],
+                                                    tz=timezone.utc).isoformat()
+                                   ] for r in resp for c in r[1] for l in c[-1] if l[0] == n]
+
+        # Generate postdata for each node
+        post = [{'treenode_id': n,
+                 'state': json.dumps({'edition_time': states[n]['edition_time'],
+                           'parent':       states[n]['parent'],
+                           'children':     states[n]['children'],
+                           'links':        states[n]['links']
+                           })
+                } for n in node_ids]
+
+        # Sanity check:
+        # If any of the nodes shows up as another nodes parent, we won't be able
+        # to delete as states will have changed between deletes.
+        parents = [states[n]['parent'][0] for n in node_ids if states[n]['parent']]
+        if set(node_ids) & set(parents):
+            raise ValueError('Unable to delete linked nodes in a single go. '
+                             'Please use for-loops for this.')
+
+        urls = [remote_instance._delete_treenode_url()] * len(post)
+    elif node_type.lower() in ['connector', 'connectors']:
+        # Filter each response to just the connector we need
+        states = [[c for c in r[1] if c[0]==n][0] for n, r in zip(node_ids, resp)]
+
+        post = [{'connector_id': n,
+                 'state': json.dumps({'edition_time': dt.fromtimestamp(st[-3],
+                                                                       tz=timezone.utc).isoformat(),
+                                      'c_links'     : [[l[-1],
+                                                        dt.fromtimestamp(l[-2],
+                                                                         tz=timezone.utc).isoformat()
+                                                        ]
+                                                       for l in st[-1]]})}
+                 for n, st in zip(node_ids, states)]
+
+        urls = [remote_instance._delete_connector_url()] * len(post)
+    else:
+        raise TypeError('Unknown node_type parameter "{}"'.format(node_type))
+
+    if not no_prompt:
+        answer = ""
+        while answer not in ["y", "n"]:
+            q = "Please confirm deletion of {} nodes [Y/N] ".format(len(node_ids))
+            answer = input(q).lower()
+
+        if answer != 'y':
+            return
+
+    resp = remote_instance.fetch(urls, post=post)
+    errors = [str(n) for i, n in enumerate(node_ids) if 'error' in resp[i]]
+
+    if errors:
+        logger.error('Error deleting node(s) {}. See server responses.'.format(', '.join(errors)))
+
+    return resp
 
 
 @cache.never_cache
