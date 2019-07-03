@@ -112,13 +112,12 @@ def upload_volume(x, name, comments=None, remote_instance=None):
 
 @cache.never_cache
 def upload_neuron(x, import_tags=False, import_annotations=False,
-                  skeleton_id=None, neuron_id=None, force_id=False,
-                  remote_instance=None):
-    """ Export neuron(s) to CatmaidInstance.
+                  import_connectors=False, skeleton_id=None, neuron_id=None,
+                  force_id=False, remote_instance=None):
+    """Export neuron(s) to CatmaidInstance.
 
-    Currently only imports treenodes and (optionally) tags and annotations.
-    Also note that skeleton and treenode IDs will change (see server response
-    for old->new mapping). Neuron to import must not have more than one
+    Note that skeleton, treenode and connector IDs will change (see server
+    response for old->new mapping). Neuron to import must not have more than one
     skeleton (i.e. disconnected components = more than one root node).
 
     Parameters
@@ -126,9 +125,11 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
     x :                  CatmaidNeuron/List
                          Neurons to upload.
     import_tags :        bool, optional
-                         If True, will export treenode tags from ``x.tags``.
+                         If True, will upload treenode tags from ``x.tags``.
     import_annotations : bool, optional
-                         If True will export annotations from ``x.annotations``.
+                         If True will upload annotations from ``x.annotations``.
+    import_connectors :  bool, optional
+                         If True will upload connectors from ``x.connectors``.
     skeleton_id :        int, optional
                          Use this to set the new skeleton's ID. If not
                          provided will will generate a new ID upon export.
@@ -157,7 +158,6 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                             }
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(x, core.CatmaidNeuronList):
@@ -251,12 +251,12 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
     # Exporting to SWC changes the node IDs -> we will revert this in the
     # response of the server
-    nmap = {n: resp['node_id_map'].get(str(swc_map[n]), None) for n in swc_map}
-    resp['node_id_map'] = nmap
+    n_map = {n: resp['node_id_map'].get(str(swc_map[n]), None) for n in swc_map}
+    resp['node_id_map'] = n_map
 
     if import_tags and getattr(x, 'tags', {}):
         # Map old to new nodes
-        tags = {t: [nmap[n] for n in v] for t, v in x.tags.items()}
+        tags = {t: [n_map[n] for n in v] for t, v in x.tags.items()}
         # Invert tag dictionary: map node ID -> list of tags
         ntags = {}
         for t in tags:
@@ -273,6 +273,32 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         an = x.__dict__.get('annotations', [])
         resp['annotations'] = add_annotations(resp['skeleton_id'], an,
                                               remote_instance=remote_instance)
+
+    if import_connectors and not x.connectors.empty:
+        # First create new connectors
+        cn_resp = add_connector(x.connectors[['x', 'y', 'z']].values,
+                                remote_instance=remote_instance)
+
+        resp['connector_response'] = cn_resp
+
+        # Create old to new IDs map
+        cn_map = {old: new['connector_id'] for old, new in zip(x.connectors.connector_id.values,
+                                                               cn_resp)}
+
+        # Add map to server response
+        resp['connector_id_map'] = cn_map
+
+        # Hard-wired relation map
+        rl_map = config.compact_skeleton_relations
+
+        # Link connectors
+        links = [[n_map[n.treenode_id],
+                  cn_map[n.connector_id],
+                  rl_map[n.relation]] for n in x.connectors.itertuples()]
+
+        ln_resp = link_connector(links, remote_instance=remote_instance)
+
+        resp['link_response'] = ln_resp
 
     return resp
 
