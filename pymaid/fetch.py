@@ -889,14 +889,17 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
                                 ``{'tag': [treenode_id, treenode_id, ...]}``
 
     Dataframe column titles for ``nodes`` and ``connectors`` should be
-    self-explanatory with the exception of ``relation`` in connector table::
+    self-explanatory with the exception of ``relation`` in connector table.
+    This columns describes the connection ("relation") from the neuron's
+    treenode TO the connector::
 
         connectors['relation']
 
-                    0 = presynapse
-                    1 = postsynapse
-                    2 = gap junction
-                    3 = abutting connector
+                    0 = "presynaptic_to" -> this is a presynapse for this neuron
+                    1 = "postsynaptic_to" -> this is a postsynapse for this neuron
+                    2 = "gapjunction_with"
+                    3 = "abutting" (not returned by default)
+                    -1 = other (hypothetical as CATMAID does only return the above)
 
     Examples
     --------
@@ -2003,20 +2006,12 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     # Add tags
     df['tags'] = df.connector_id.map(data['tags'])
 
-    # Hard-wired connector types. Use this to check for what's on the server:
-    # types = remote_instance.fetch(remote_instance._get_connector_types_url())
-    rel_ids = {8: {'relation': 'postsynaptic_to', 'type': 'synaptic'},
-               14: {'relation': 'presynaptic_to', 'type': 'synaptic'},
-               54650: {'relation': 'abutting', 'type': 'abutting'},
-               686364: {'relation': 'gapjunction_with',
-                        'type': 'gap_junction'},
-               # ATTENTION: "attachment" can be part of any connector type
-               5989640: {'relation': 'attached_to', 'type': 'attachment'},
-               6216812: {'relation': 'close_to', 'type': 'close_to'}
-               }
+    # Map hardwire connector type ID to their type name
+    # ATTENTION: "attachment" can be part of any connector type
+    rel_ids = {r['relation_id']: r for r in config.link_types}
 
     # Get connector type IDs
-    cn_ids = {k: v[0][-2] for k, v in data['partners'].items()}
+    cn_ids = {k: v[0][3] for k, v in data['partners'].items()}
 
     # Map type ID to relation (also note conversion of connector ID to integer)
     cn_type = {int(k): rel_ids.get(v, {'type': 'unknown'})['type']
@@ -2101,14 +2096,15 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
 
     df_collection = []
     tags = {}
+
+    link_types = [l['relation'] for l in config.link_types]
+
     with config.tqdm(desc='Fetching links', total=len(skids),
                      disable=config.pbar_hide,
                      leave=config.pbar_leave) as pbar:
         for chunk in [skids[i:i + chunk_size] for i in range(0, len(skids), chunk_size)]:
             # Generate URLs
             GET = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(chunk)}
-            link_types = ['presynaptic_to', 'postsynaptic_to',
-                          'abutting', 'gapjunction_with']
             urls = [remote_instance._get_connector_links_url(relation_type=cn,
                                                              **GET) for cn in link_types]
 
