@@ -78,7 +78,7 @@ __all__ = sorted(['CatmaidInstance',
                   'get_label_list', 'find_neurons',
                   'get_skid_from_treenode', 'get_transactions',
                   'get_connector_links',
-                  'get_nth_partners', 'get_treenodes_by_tag',
+                  'get_nth_partners', 'find_treenodes',
                   'get_node_location', 'get_annotated',
                   'get_neuron_id',
                   'get_connectors_in_bbox'])
@@ -1957,8 +1957,8 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
         If you need to find the connectors between sets of neurons.
     :func:`~pymaid.get_connector_links`
         If you ned details about links for each connector.
-    :func:`pymaid.get_treenodes_by_tag`
-            Function to get treenodes by tags.
+    :func:`pymaid.find_treenodes`
+            Function to get treenodes by tags, IDs or skeleton.
 
     """
 
@@ -2726,14 +2726,20 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
 
 
 @cache.undo_on_error
-def get_treenodes_by_tag(x, skids=None, remote_instance=None):
-    """ Get treenodes by tag (label).
+def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
+                   remote_instance=None):
+    """ Get treenodes by tag (label), ID or associated skeleton.
+
+    Search intersected (logical AND) across parameters but additive (logical OR)
+    within each parameter (see examples).
 
     Parameters
     ----------
-    x :                 str | list of str
-                        Tag(s) to retrieve.
-    skids :             str | int | CatmaidNeuron/List, optional
+    tags :              str | list of str
+                        Use to restrict to nodes with given tags.
+    treenode_ids :      int | list of int
+                        Use to restrict to nodes with given IDs.
+    skeleton_ids :      str | int | CatmaidNeuron/List, optional
                         Use to restrict to a set of neurons. Can be:
 
                         1. skeleton ID(s) (int or str)
@@ -2768,12 +2774,12 @@ def get_treenodes_by_tag(x, skids=None, remote_instance=None):
     --------
     Get all nodes with a given tag
 
-    >>> tagged = pymaid.get_treenodes_by_tag('SCHLEGEL_LH')
+    >>> tagged = pymaid.find_treenodes(tags='SCHLEGEL_LH')
 
     Get all nodes of a set of neurons with either of two tags
 
-    >>> tagged = pymaid.get_treenodes_by_tag(['SCHLEGEL_LH', 'SCHLEGEL_AL'],
-                                             skids='annotation:glomerulus DA1')
+    >>> tagged = pymaid.find_treenodes(tags=['SCHLEGEL_LH', 'SCHLEGEL_AL'],
+                                             skeleton_ids='annotation:glomerulus DA1')
 
     """
 
@@ -2781,14 +2787,31 @@ def get_treenodes_by_tag(x, skids=None, remote_instance=None):
 
     url = remote_instance._get_treenode_table_url()
 
-    x = utils._make_iterable(x)
-    post = {'label_names[{}]'.format(i): t for i, t in enumerate(x)}
+    if all([isinstance(x, type(None)) for x in  [tags, skeleton_ids, treenode_ids]]):
+        answer = ""
+        while answer not in ["y", "n"]:
+            answer = input("Your search parameters will retrieve ALL "
+                           "treenodes in the dataset. Proceed? "
+                           "[Y/N] ").lower()
 
-    if not isinstance(skids, type(None)):
-        skids = utils.eval_skids(skids, remote_instance=remote_instance)
-        post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)})
+            if answer != 'y':
+                logger.info('Query cancelled')
+                return
 
-    # Fetch  only treenodes that have the soma label
+    post = {}
+    if not isinstance(tags, type(None)):
+        tags = utils._make_iterable(tags)
+        post.update({'label_names[{}]'.format(i): t for i, t in enumerate(tags)})
+
+    if not isinstance(treenode_ids, type(None)):
+        treenode_ids = utils._make_iterable(treenode_ids)
+        post.update({'label_names[{}]'.format(i): t for i, t in enumerate(treenode_ids)})
+
+    if not isinstance(skeleton_ids, type(None)):
+        skeleton_ids = utils.eval_skids(skeleton_ids, remote_instance=remote_instance)
+        post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skeleton_ids)})
+
+    # Fetch
     resp = remote_instance.fetch(url, post=post)
 
     # Format is [[ID, parent ID, x, y, z, confidence, radius, skeleton_id,

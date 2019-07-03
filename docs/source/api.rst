@@ -47,9 +47,9 @@ Treenodes
 .. autosummary::
     :toctree: generated/
 
+    pymaid.find_treenodes
     pymaid.get_treenode_table
     pymaid.get_treenode_info
-    pymaid.get_treenodes_by_tag
     pymaid.get_skid_from_treenode
     pymaid.get_node_details
     pymaid.get_node_location
