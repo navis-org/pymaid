@@ -14,33 +14,24 @@ Neurons
     :toctree: generated/
 
     pymaid.get_neuron
-    pymaid.delete_neuron
     pymaid.find_neurons
     pymaid.get_arbor
     pymaid.get_neurons_in_volume
     pymaid.get_neuron_list
     pymaid.get_skids_by_annotation
     pymaid.get_skids_by_name
-    pymaid.rename_neurons
     pymaid.get_names
     pymaid.get_neuron_id
-    pymaid.upload_neuron
-    pymaid.upload_volume
-    pymaid.transfer_neuron
 
 Annotations
 -----------
 .. autosummary::
     :toctree: generated/
 
-    pymaid.add_annotations
-    pymaid.add_meta_annotations
     pymaid.get_annotations
     pymaid.get_annotation_details
     pymaid.get_annotated
     pymaid.get_user_annotations
-    pymaid.remove_annotations
-    pymaid.remove_meta_annotations
 
 Treenodes
 ----------
@@ -61,8 +52,6 @@ Tags
     :toctree: generated/
 
     pymaid.get_label_list
-    pymaid.add_tags
-    pymaid.delete_tags
     pymaid.get_node_tags
 
 Connectivity
@@ -118,6 +107,61 @@ Misc
     pymaid.clear_cache
     pymaid.has_soma
 
+.. _api_upload:
+
+Uploading data
+++++++++++++++
+
+Neurons
+-------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.delete_neuron
+    pymaid.rename_neurons
+    pymaid.replace_skeleton
+    pymaid.upload_neuron
+    pymaid.transfer_neuron
+
+Annotations
+-----------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.add_annotations
+    pymaid.add_meta_annotations
+    pymaid.remove_annotations
+    pymaid.remove_meta_annotations
+
+Treenodes
+----------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.delete_nodes
+
+Connectivity
+------------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.add_connector
+    pymaid.link_connector
+
+Tags
+----
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.add_tags
+    pymaid.delete_tags
+
+Volumes
+-------
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.upload_volume
 
 CatmaidInstance
 +++++++++++++++
@@ -215,6 +259,7 @@ Plotting
     pymaid.plot2d
     pymaid.plot1d
     pymaid.plot_network
+    pymaid.plot_history
     pymaid.clear3d
     pymaid.close3d
     pymaid.get_viewer
@@ -487,4 +532,3 @@ Utility
     pymaid.eval_skids
     pymaid.shorten_name
     pymaid.update_radii
-
