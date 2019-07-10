@@ -37,7 +37,7 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron', 'guess_radius',
                   'smooth_neuron', 'time_machine', 'heal_fragmented_neuron',
-                  'break_fragments', 'heal_fragmented_neuron'])
+                  'break_fragments', 'union_neurons'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
@@ -1170,6 +1170,12 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
     core.CatmaidNeuron
                         Stitched neuron.
 
+    See Also
+    --------
+    :func:`~pymaid.union_neurons`
+                    Use this if your fragments partially overlap and you want
+                    to get rid of the overhang.
+
     Examples
     --------
     Stitching using a neuron list:
@@ -1361,6 +1367,173 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
     master.reroot(master_root, inplace=True)
 
     return master
+
+
+def union_neurons(*x, limit=1, base_neuron=None, track=False):
+    """Generate the union of a set of neurons.
+
+    This implementation works by iteratively merging nodes in neuron A and B
+    that are closer than given threshold. This requires neurons to have a
+    certain amount of overlap.
+
+    Parameters
+    ----------
+    *x :            CatmaidNeuron/List
+                    Neurons to be averaged.
+    limit :         int, optional
+                    Max distance [microns] for nearest neighbour search.
+    base_neuron :   skeleton_ID | CatmaidNeuron, optional
+                    Neuron to use as template for union. Node IDs of this
+                    neuron will survive. If not provided, the first neuron
+                    in the list is used as template!
+    track :         bool, optional
+                    If True, will add new columns to node/connector table of
+                    union neuron to keep track of original node IDs and origin:
+                    `treenode_id_before`, `parent_id_before`, `origin_skeleton`
+
+    Returns
+    -------
+    core.CatmaidNeuron
+                    Union of all input neurons.
+
+    See Also
+    --------
+    :func:`~pymaid.stitch_neurons`
+                    If you want to stitch neurons that do not overlap.
+
+    Examples
+    --------
+    >>> # Get a single neuron
+    >>> n = pymaid.get_neuron(16)
+    >>> # Prune to its longest neurite
+    >>> backbone = n.prune_by_longest_neurite(inplace=False)
+    >>> # Remove longest neurite and keep only fine branches
+    >>> branches = n.prune_by_longest_neurite(n=slice(1, None), inplace=False)
+    >>> # For this exercise we have to make sure skeleton IDs are unique
+    >>> branches.skeleton_id = 17
+    >>> # Now put both back together using union
+    >>> union = pymaid.union_neurons(backbone, branches, limit=2)
+
+    """
+    # Unpack neurons in *args
+    x = utils._unpack_neurons(x)
+
+    # Make sure we're working on copies and don't change originals
+    x = [n.copy() for n in x]
+
+    # This is just check on the off-chance that skeleton IDs are not unique
+    # (e.g. if neurons come from different projects) -> this is relevant because
+    # we identify the master ("base_neuron") via it's skeleton ID
+    skids = [n.skeleton_id for n in x]
+    if len(skids) > len(np.unique(skids)):
+        raise ValueError('Duplicate skeleton IDs found. Try manually assigning '
+                         'unique skeleton IDs.')
+
+    if any([not isinstance(n, core.CatmaidNeuron) for n in x]):
+        raise TypeError('Input must only be CatmaidNeurons/List')
+
+    if len(x) < 2:
+        raise ValueError('Need at least 2 neurons to make a union!')
+
+    # Make sure base_neuron is a skeleton ID
+    if isinstance(base_neuron, core.CatmaidNeuron):
+        base_neuron = base_neuron.skeleton_id
+    elif not isinstance(base_neuron, type(None)):
+        base_neuron = base_neuron
+    else:
+        base_neuron = x[0].skeleton_id
+
+    # Convert distance threshold from microns to nanometres
+    limit *= 1000
+
+    # Keep track of old IDs
+    if track:
+        for n in x:
+            n.nodes['treenode_id_before'] = n.nodes.treenode_id.values
+            n.nodes['parent_id_before'] = n.nodes.parent_id.values
+            n.nodes['origin_skeleton'] = n.skeleton_id
+            n.connectors['treenode_id_before'] = n.connectors.treenode_id.values
+            n.connectors['origin_skeleton'] = n.skeleton_id
+
+    # Now make unions
+    while len(x) > 1:
+        # First we need to find a pair of overlapping neurons
+        comb = itertools.combinations(x, 2)
+        ol = False
+        for c in comb:
+            # If combination contains base_neuron, make sure it's the master
+            if c[0].skeleton_id == base_neuron:
+                master, minion = c[0], c[1]
+            else:
+                master, minion = c[1], c[0]
+
+            # Generate KDTree for master neuron
+            tree = graph.neuron2KDTree(master, tree_type='c', data='treenodes')
+
+            # For each node in master get the nearest neighbor in minion
+            coords = minion.nodes[['x', 'y', 'z']].values
+            nn_dist, nn_ix = tree.query(coords, k=1, distance_upper_bound=limit)
+
+            # Use this combination if overlap found
+            if any(nn_dist <= limit):
+                ol = True
+                break
+
+        # Raise if no combination shows overlap
+        if not ol:
+            return x
+            raise ValueError('Neurons do not overlap. Try increasing `limit`')
+
+        # Now collapse minion nodes that are within distance limits into master
+        to_clps = minion.nodes.loc[nn_dist <= limit, 'treenode_id'].values
+        clps_into = master.nodes.loc[nn_ix[nn_dist <= limit], 'treenode_id'].values
+
+        # Generate a map: minion node -> master node to collapse into
+        clps_map = dict(zip(to_clps, clps_into))
+
+        # Reroot minion to one of the nodes that will be collapsed
+        graph_utils.reroot_neuron(minion, to_clps[0], inplace=True)
+
+        # Collapse nodes by first dropping all collapsed nodes
+        minion.nodes = minion.nodes.loc[~minion.nodes.treenode_id.isin(to_clps)]
+        # Make independent of original table to prevent warnings
+        minion.nodes = minion.nodes.copy()
+
+        # Reconnect children of the collapsed nodes to their new parents
+        new_parents = minion.nodes.loc[minion.nodes.parent_id.isin(to_clps),
+                                       'parent_id'].map(clps_map)
+        minion.nodes.loc[minion.nodes.parent_id.isin(to_clps),
+                         'parent_id'] = new_parents
+
+        # Merge minion's node table into master
+        master.nodes = pd.concat([master.nodes, minion.nodes],
+                                 axis=0,
+                                 ignore_index=True)
+
+        # Now some clean up! First up: node tags
+        # Make sure tags in minion are mapped onto their new IDs
+        tags = {k: [clps_map.get(n, n) for n in v] for k, v in minion.tags.items()}
+        # Combine master and minion tags
+        master.tags = {k: v + tags.get(k, []) for k, v in master.tags.items()}
+        master.tags.update({k: v for k, v in tags.items() if k not in master.tags})
+
+        # Last but not least: merge connector tables
+        new_tn = minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
+                                       'treenode_id'].map(clps_map)
+        minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
+                              'treenode_id'] = new_tn
+        master.connectors = pd.concat([master.connectors, minion.connectors],
+                                      axis=0,
+                                      ignore_index=True)
+
+        # Reset master's attributes (graph, node types, etc)
+        master._clear_temp_attr()
+
+        # Almost done. Just need to pop minion from "x"
+        x = [n for n in x if n.skeleton_id != minion.skeleton_id]
+
+    # Return the last survivor
+    return x[0]
 
 
 def average_neurons(x, limit=10, base_neuron=None):
@@ -2330,4 +2503,3 @@ def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
             x._clear_temp_attr()
     elif not inplace:
         return x
-

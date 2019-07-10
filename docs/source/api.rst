@@ -8,6 +8,8 @@ API Reference
 Fetching data
 +++++++++++++
 
+Functions to pull data from a CATMAID server.
+
 Neurons
 -------
 .. autosummary::
@@ -111,6 +113,8 @@ Misc
 
 Uploading data
 ++++++++++++++
+
+Functions to push data to a CATMAID server. Use these with caution!
 
 Neurons
 -------
@@ -292,23 +296,24 @@ Manipulation
 .. autosummary::
     :toctree: generated/
 
+    pymaid.average_neurons
+    pymaid.break_fragments
     pymaid.cut_neuron
-    pymaid.reroot_neuron
-    pymaid.stitch_neurons
-    pymaid.split_axon_dendrite
-    pymaid.split_into_fragments
+    pymaid.despike_neuron
+    pymaid.guess_radius
+    pymaid.heal_fragmented_neuron
     pymaid.longest_neurite
     pymaid.prune_by_strahler
-    pymaid.subset_neuron
-    pymaid.average_neurons
+    pymaid.reroot_neuron
     pymaid.remove_tagged_branches
-    pymaid.despike_neuron
     pymaid.smooth_neuron
-    pymaid.guess_radius
+    pymaid.split_axon_dendrite
+    pymaid.split_into_fragments
+    pymaid.stitch_neurons
+    pymaid.subset_neuron
     pymaid.time_machine
     pymaid.tortuosity
-    pymaid.break_fragments
-    pymaid.heal_fragmented_neuron
+    pymaid.union_neurons
 
 Resampling
 ----------
