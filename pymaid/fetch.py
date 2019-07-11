@@ -183,9 +183,9 @@ class CatmaidInstance:
 
         self.server = server
         self.project_id = project_id
-        self.authname = authname
-        self.authpassword = authpassword
-        self.authtoken = authtoken
+        self._authname = authname
+        self._authpassword = authpassword
+        self._authtoken = authtoken
         self.__max_threads = max_threads
 
         self.caching = caching
@@ -195,11 +195,18 @@ class CatmaidInstance:
         self._future_session = FuturesSession(session=self._session,
                                               max_workers=self.max_threads)
 
-        if authname and authpassword:
-            self._session.auth = (authname, authpassword)
+        self.update_credentials()
 
-        if authtoken:
-            self._session.headers['X-Authorization'] = 'Token ' + authtoken
+        if make_global:
+            self.make_global()
+
+    def update_credentials(self):
+        """Update session headers."""
+        if self.authname and self.authpassword:
+            self._session.auth = (self.authname, self.authpassword)
+
+        if self.authtoken:
+            self._session.headers['X-Authorization'] = 'Token ' + self.authtoken
         else:
             # If no authtoken, we have to get a CSRF token instead
             r = self._session.get(self.server)
@@ -215,8 +222,33 @@ class CatmaidInstance:
                 self._session.headers['referer'] = self.server
                 self._session.headers['X-CSRFToken'] = csrf
 
-        if make_global:
-            self.make_global()
+    @property
+    def authname(self):
+        return self._authname
+
+    @authname.setter
+    def authname(self, v):
+        self._authname = v
+        self.update_credentials()
+
+    @property
+    def authpassword(self):
+        return self._authpassword
+
+    @authpassword.setter
+    def authpassword(self, v):
+        self._authpassword = v
+        self.update_credentials()
+
+    @property
+    def authtoken(self):
+        return self._authtoken
+
+    @authtoken.setter
+    def authtoken(self, v):
+        self._authtoken = v
+        self.update_credentials()
+
 
     def setup_cache(self, caching=True, size_limit=128, time_limit=None):
         """Set up a cache for responses from the CATMAID server.
