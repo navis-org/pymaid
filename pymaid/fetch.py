@@ -856,6 +856,15 @@ class CatmaidInstance:
         """ Use to parse url for fetching login information for self."""
         return self.make_url('accounts', 'login', **GET)
 
+    def _update_node_url(self, **GET):
+        """Use to parse url for updating node locations."""
+        return self.make_url(self.project_id, 'node', 'update', **GET)
+
+    def _reroot_skeleton_url(self, **GET):
+        """Use to parse url for rerooting skeletons."""
+        return self.make_url(self.project_id, 'skeleton', 'reroot', **GET)
+
+
 
 @cache.undo_on_error
 def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
