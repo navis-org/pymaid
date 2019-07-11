@@ -301,7 +301,7 @@ class CatmaidNeuron:
     def __getattr__(self, key):
         # This is to catch empty neurons (e.g. after pruning)
         if key in ['n_open_ends', 'n_branch_nodes', 'n_end_nodes',
-                  'cable_length'] and self.node_data and self.nodes.empty:
+                   'cable_length'] and self.node_data and self.nodes.empty:
             return 0
 
         if key == 'igraph':
@@ -904,8 +904,7 @@ class CatmaidNeuron:
             # Reinitialise with proximal data
             x.__init__(prox, x._remote_instance, x.meta_data)
             # Remove potential "left over" attributes (happens if we use a copy)
-            x._clear_temp_attr(exclude=['graph', 'igraph', 'type',
-                                        'classify_nodes'])
+            x._clear_temp_attr()
 
         if not inplace:
             return x
@@ -940,8 +939,7 @@ class CatmaidNeuron:
             # Reinitialise with distal data
             x.__init__(dist, x._remote_instance, x.meta_data)
             # Remove potential "left over" attributes (happens if we use a copy)
-            x._clear_temp_attr(exclude=['graph', 'igraph', 'type',
-                                        'classify_nodes'])
+            x._clear_temp_attr()
 
         # Clear temporary attributes is done by cut_neuron
         # x._clear_temp_attr()
@@ -1202,7 +1200,7 @@ class CatmaidNeuron:
             # If a number, consider this an offset for coordinates
             n = self.copy()
             n.nodes.loc[:, ['x', 'y', 'z', 'radius']] /= other
-            n.connectors.loc[: ,['x', 'y', 'z']] /= other
+            n.connectors.loc[:, ['x', 'y', 'z']] /= other
             n._clear_temp_attr(exclude=['classify_nodes'])
             return n
         else:
@@ -1214,7 +1212,7 @@ class CatmaidNeuron:
             # If a number, consider this an offset for coordinates
             n = self.copy()
             n.nodes.loc[:, ['x', 'y', 'z', 'radius']] *= other
-            n.connectors.loc[: ,['x', 'y', 'z']] *= other
+            n.connectors.loc[:, ['x', 'y', 'z']] *= other
             n._clear_temp_attr(exclude=['classify_nodes'])
             return n
         else:
@@ -1225,7 +1223,7 @@ class CatmaidNeuron:
 
         # Set logger to warning only - otherwise you might get tons of
         # "skeleton data not available" messages
-        l = logger.level
+        lvl = logger.level
         logger.setLevel('WARNING')
 
         # Look up these values without requesting them
@@ -1243,7 +1241,7 @@ class CatmaidNeuron:
                              'n_end_nodes', 'n_open_ends', 'cable_length',
                              'review_status', 'soma'])
 
-        logger.setLevel(l)
+        logger.setLevel(lvl)
         return s
 
     def to_dataframe(self):
@@ -1541,7 +1539,7 @@ class CatmaidNeuronList:
         d = []
 
         # Set level to warning to avoid spam of "skeleton data not available"
-        l = logger.level
+        lvl = logger.level
         logger.setLevel('WARNING')
 
         if not isinstance(n, slice):
@@ -1563,7 +1561,7 @@ class CatmaidNeuronList:
 
             d.append(this_n)
 
-        logger.setLevel(l)
+        logger.setLevel(lvl)
 
         return pd.DataFrame(data=d,
                             columns=['neuron_name', 'skeleton_id', 'n_nodes',
@@ -1650,8 +1648,7 @@ class CatmaidNeuronList:
         elif key == 'bbox':
             return self.nodes.describe().loc[['min', 'max'], ['x', 'y', 'z']].values.T
         elif key == '_remote_instance':
-            all_instances = [
-                n._remote_instance for n in self.neurons if n._remote_instance != None]
+            all_instances = [n._remote_instance for n in self.neurons if n._remote_instance]
 
             if len(set(all_instances)) > 1:
                 # Note that multiprocessing causes remote_instances to be pickled
@@ -1788,7 +1785,7 @@ class CatmaidNeuronList:
             nl = self.copy()
             for n in nl:
                 n.nodes.loc[:, ['x', 'y', 'z', 'radius']] /= other
-                n.connectors.loc[: ,['x', 'y', 'z']] /= other
+                n.connectors.loc[:, ['x', 'y', 'z']] /= other
                 n._clear_temp_attr(exclude=['classify_nodes'])
             return nl
         else:
@@ -1801,7 +1798,7 @@ class CatmaidNeuronList:
             nl = self.copy()
             for n in nl:
                 n.nodes.loc[:, ['x', 'y', 'z', 'radius']] *= other
-                n.connectors.loc[: ,['x', 'y', 'z']] *= other
+                n.connectors.loc[:, ['x', 'y', 'z']] *= other
                 n._clear_temp_attr(exclude=['classify_nodes'])
             return nl
         else:
