@@ -2503,3 +2503,51 @@ def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
             x._clear_temp_attr()
     elif not inplace:
         return x
+
+
+def _diff_report(a, b):
+    """Compare neurons ``a`` and ``b`` and report on differences.
+
+    This relies on treenode IDs!
+
+    Parameters
+    ----------
+    a,b :       CatmaidNeuron
+                Neurons to compare.
+
+    Returns
+    -------
+    dict
+                Report with differences::
+
+                    {'nodes_mutual':    [nodeA, nodeB, ...],
+                     'nodes_a_only':    [nodeC, ...],
+                     'nodes_by_only':   [nodeD, ...],
+                     'nodes_moved':     [nodeB, ...]}
+
+    """
+    if not isinstance(a, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(a)))
+
+    if not isinstance(b, core.CatmaidNeuron):
+        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(b)))
+
+    nA = set(a.nodes.treenode_id.values)
+    nB = set(b.nodes.treenode_id.values)
+
+    report = {}
+
+    report['nodes_mutual'] = list(nA & nB)
+    report['nodes_a_only'] = list(nA - nB)
+    report['nodes_b_only'] = list(nB - nA)
+
+    posA = a.nodes.set_index('treenode_id').loc[report['nodes_mutual'],
+                                                ['x', 'y', 'z']].values
+    posB = b.nodes.set_index('treenode_id').loc[report['nodes_mutual'],
+                                                ['x', 'y', 'z']].values
+    diff = posA - posB
+    moved = np.any(diff > 0, axis=1)
+
+    report['nodes_moved'] = list(np.array(report['nodes_mutual'])[moved])
+
+    return report
