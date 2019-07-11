@@ -7,49 +7,56 @@ API Reference
 
 Fetching data
 +++++++++++++
-
-Functions to pull data from a CATMAID server.
+This section contains functions to pull data from a CATMAID server.
 
 Neurons
 -------
+Functions related to searching for neurons and fetching their 3D skeletons:
+
 .. autosummary::
     :toctree: generated/
 
-    pymaid.get_neuron
     pymaid.find_neurons
     pymaid.get_arbor
+    pymaid.get_names
+    pymaid.get_neuron
+    pymaid.get_neuron_id
     pymaid.get_neurons_in_volume
     pymaid.get_neuron_list
     pymaid.get_skids_by_annotation
     pymaid.get_skids_by_name
-    pymaid.get_names
-    pymaid.get_neuron_id
 
 Annotations
 -----------
+Functions to fetch annotations:
+
 .. autosummary::
     :toctree: generated/
 
+    pymaid.get_annotated
     pymaid.get_annotations
     pymaid.get_annotation_details
-    pymaid.get_annotated
     pymaid.get_user_annotations
 
 Treenodes
 ----------
+Functions to fetch treenodes and connectors:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.find_treenodes
-    pymaid.get_treenode_table
-    pymaid.get_treenode_info
+    pymaid.get_connectors_in_bbox
     pymaid.get_skid_from_treenode
     pymaid.get_node_details
     pymaid.get_node_location
-    pymaid.get_connectors_in_bbox
+    pymaid.get_treenode_table
+    pymaid.get_treenode_info
 
 Tags
 ----
+Functions to fetch node tags:
+
 .. autosummary::
     :toctree: generated/
 
@@ -58,9 +65,13 @@ Tags
 
 Connectivity
 ------------
+Functions to fetch connectivity data:
+
 .. autosummary::
     :toctree: generated/
 
+    pymaid.adjacency_from_connectors
+    pymaid.cn_table_from_connectors
     pymaid.get_connectors
     pymaid.get_connector_details
     pymaid.get_connectors_between
@@ -71,64 +82,89 @@ Connectivity
     pymaid.get_partners_in_volume
     pymaid.get_nth_partners
     pymaid.get_paths
-    pymaid.adjacency_from_connectors
-    pymaid.cn_table_from_connectors
-    pymaid.sparseness
+
+.. _api_userstats:
 
 User stats
 ----------
+Functions to fetch user stats:
+
 .. autosummary::
     :toctree: generated/
 
-    pymaid.get_user_list
-    pymaid.get_history
-    pymaid.get_time_invested
-    pymaid.get_user_contributions
     pymaid.get_contributor_statistics
+    pymaid.get_history
     pymaid.get_logs
     pymaid.get_transactions
     pymaid.get_team_contributions
+    pymaid.get_time_invested
+    pymaid.get_user_list
+    pymaid.get_user_contributions
 
 Volumes
 -------
+Functions to fetch volumes (meshes):
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.get_volume
 
+Image data (tiles)
+------------------
+Functions to fetch and process image data. Note that this is not imported at
+top level but has to be imported explicitly::
+
+  >>> from pymaid import tiles
+  >>> help(tiles.crop_neuron)
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.tiles.LoadTiles
+    pymaid.tiles.crop_neuron
+
 .. _api_misc:
 
 Misc
 ----
+Functions to fetch miscellaneous data:
+
 .. autosummary::
     :toctree: generated/
 
-    pymaid.url_to_coordinates
-    pymaid.get_review
-    pymaid.get_review_details
     pymaid.clear_cache
     pymaid.has_soma
+    pymaid.get_review
+    pymaid.get_review_details
+    pymaid.url_to_coordinates
 
 .. _api_upload:
 
 Uploading data
 ++++++++++++++
-
 Functions to push data to a CATMAID server. Use these with caution!
 
 Neurons
 -------
+Upload, rename, move or delete neurons:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.delete_neuron
+    pymaid.differential_upload
+    pymaid.push_new_root
     pymaid.rename_neurons
     pymaid.replace_skeleton
-    pymaid.upload_neuron
     pymaid.transfer_neuron
+    pymaid.update_radii
+    pymaid.upload_neuron
 
 Annotations
 -----------
+Edit neuron annotations:
+
 .. autosummary::
     :toctree: generated/
 
@@ -139,13 +175,18 @@ Annotations
 
 Treenodes
 ----------
+Edit treenodes:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.delete_nodes
+    pymaid.move_nodes
 
 Connectivity
 ------------
+Edit connectors and connector links:
+
 .. autosummary::
     :toctree: generated/
 
@@ -154,6 +195,8 @@ Connectivity
 
 Tags
 ----
+Edit tags:
+
 .. autosummary::
     :toctree: generated/
 
@@ -162,6 +205,8 @@ Tags
 
 Volumes
 -------
+Upload volumes:
+
 .. autosummary::
     :toctree: generated/
 
@@ -169,24 +214,25 @@ Volumes
 
 CatmaidInstance
 +++++++++++++++
+Methods of the remote CatmaidInstance object interfacing with CATMAID server:
 
 .. autosummary::
     :toctree: generated/
 
     pymaid.CatmaidInstance
+    pymaid.CatmaidInstance.copy
+    pymaid.CatmaidInstance.clear_cache
     pymaid.CatmaidInstance.fetch
+    pymaid.CatmaidInstance.load_cache
     pymaid.CatmaidInstance.make_url
     pymaid.CatmaidInstance.setup_cache
-    pymaid.CatmaidInstance.clear_cache
-    pymaid.CatmaidInstance.load_cache
     pymaid.CatmaidInstance.save_cache
-    pymaid.CatmaidInstance.copy
-    pymaid.CatmaidInstance.make_url
 
 .. _api_neurons:
 
 CatmaidNeuron/List
 ++++++++++++++++++
+Neuron/List objects representing neurons and lists thereof:
 
 .. autosummary::
     :toctree: generated/
@@ -196,10 +242,13 @@ CatmaidNeuron/List
 
 CatmaidNeuron/List methods
 --------------------------
+Methods common to both CatmaidNeurons and CatmaidNeuronLists:
 
 .. autosummary::
     :toctree: generated/
 
+    pymaid.CatmaidNeuron.copy
+    pymaid.CatmaidNeuron.downsample
     pymaid.CatmaidNeuron.plot3d
     pymaid.CatmaidNeuron.plot2d
     pymaid.CatmaidNeuron.plot_dendrogram
@@ -210,43 +259,44 @@ CatmaidNeuron/List methods
     pymaid.CatmaidNeuron.prune_by_longest_neurite
     pymaid.CatmaidNeuron.reroot
     pymaid.CatmaidNeuron.reload
-    pymaid.CatmaidNeuron.summary
     pymaid.CatmaidNeuron.resample
-    pymaid.CatmaidNeuron.downsample
-    pymaid.CatmaidNeuron.copy
+    pymaid.CatmaidNeuron.summary
     pymaid.CatmaidNeuron.from_swc
     pymaid.CatmaidNeuron.to_swc
 
 CatmaidNeuronList-specific
 --------------------------
+Methods specific to CatmaidNeuronLists:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.CatmaidNeuronList.to_selection
     pymaid.CatmaidNeuronList.from_selection
     pymaid.CatmaidNeuronList.has_annotation
-    pymaid.CatmaidNeuronList.sample
-    pymaid.CatmaidNeuronList.remove_duplicates
     pymaid.CatmaidNeuronList.head
     pymaid.CatmaidNeuronList.tail
     pymaid.CatmaidNeuronList.itertuples
+    pymaid.CatmaidNeuronList.remove_duplicates
+    pymaid.CatmaidNeuronList.sample
     pymaid.CatmaidNeuronList.summary
     pymaid.CatmaidNeuronList.mean
     pymaid.CatmaidNeuronList.sum
     pymaid.CatmaidNeuronList.sort_values
 
-
 Volumes
 -------
+Methods of Volume object representing CATMAID meshes:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.Volume
-    pymaid.Volume.resize
     pymaid.Volume.combine
     pymaid.Volume.from_csv
-    pymaid.Volume.to_csv
     pymaid.Volume.plot3d
+    pymaid.Volume.resize
+    pymaid.Volume.to_csv
     pymaid.Volume.to_2d
     pymaid.Volume.to_trimesh
 
@@ -255,6 +305,7 @@ Volumes
 
 Plotting
 ++++++++
+Functions for plotting.
 
 .. autosummary::
     :toctree: generated/
@@ -270,6 +321,8 @@ Plotting
     pymaid.screenshot
 
 Vispy 3D viewer
+---------------
+Methods of vispy 3D viewer:
 
 .. autosummary::
     :toctree: generated/
@@ -290,9 +343,12 @@ Vispy 3D viewer
 
 Neuron Morphology
 +++++++++++++++++
+Functions to analyse and manipulate neuron morphology.
 
 Manipulation
 ------------
+Change neuron morphology:
+
 .. autosummary::
     :toctree: generated/
 
@@ -317,14 +373,18 @@ Manipulation
 
 Resampling
 ----------
+Resample neurons:
+
 .. autosummary::
     :toctree: generated/
 
-    pymaid.resample_neuron
     pymaid.downsample_neuron
+    pymaid.resample_neuron
 
 Analysis
 --------
+Various morphology metrics:
+
 .. autosummary::
     :toctree: generated/
 
@@ -339,16 +399,20 @@ Analysis
 
 Distances
 ---------
+Functions to work with (geodesic -> "along-the-arbor") distances:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.cable_overlap
-    pymaid.geodesic_matrix
     pymaid.distal_to
     pymaid.dist_between
+    pymaid.geodesic_matrix
 
 Intersection
 ------------
+Functions to query whether points intersect with a given volume:
+
 .. autosummary::
     :toctree: generated/
 
@@ -359,9 +423,12 @@ Intersection
 
 Connectivity
 ++++++++++++
+Various functions to work with connectivity data.
 
 Graphs
 ------
+Turn neurons or connectivity into iGraph or networkX objects:
+
 .. autosummary::
     :toctree: generated/
 
@@ -373,31 +440,40 @@ Graphs
 
 Predicting connectivity
 -----------------------
+Function to predict connectivity:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.predict_connectivity
-    pymaid.connection_density
 
 Adjacency matrices
 ------------------
+Function to generate or manipulate adjacency matrices:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.adjacency_matrix
     pymaid.group_matrix
 
-Connectivity clustering
------------------------
+Analyses
+--------
+Functions to analyse connectivity:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.cluster_by_connectivity
     pymaid.cluster_by_synapse_placement
     pymaid.ClustResults
+    pymaid.connection_density
+    pymaid.sparseness
 
 Plotting network
 ----------------
+Functions to plot networks:
+
 .. autosummary::
     :toctree: generated/
 
@@ -405,6 +481,8 @@ Plotting network
 
 Filtering
 ---------
+Functions to filter connectivity data:
+
 .. autosummary::
     :toctree: generated/
 
@@ -413,21 +491,44 @@ Filtering
 
 Import/Export
 +++++++++++++
+Functions to import and export neuron objects:
+
 .. autosummary::
     :toctree: generated/
 
     pymaid.from_swc
-    pymaid.to_swc
-    pymaid.neuron2json
     pymaid.json2neuron
+    pymaid.neuron2json
+    pymaid.to_swc
+
+.. _api_interfaces:
+
+Interfaces
+++++++++++
+Interfaces with various external tools. These modules have to be exported
+explicitly as they are not imported at top level. For example::
+
+   >>> from pymaid import b3d
+   >>> h = b3d.handler()
 
 .. _api_b3d:
 
 Blender API
-+++++++++++
+-----------
+Functions to be run inside `Blender 3D <https://www.blender.org/>`_ and import
+CATMAID data (see Examples)
+
+The interface is realised through a :class:`~pymaid.b3d.handler` object. It
+is used to import objects and facilitate working with them programmatically
+once they are imported.
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.b3d.handler
 
 Objects
--------
+~~~~~~~
 .. autosummary::
     :toctree: generated/
 
@@ -438,7 +539,7 @@ Objects
     pymaid.b3d.handler.unhide
 
 Materials
----------
+~~~~~~~~~
 .. autosummary::
     :toctree: generated/
 
@@ -450,7 +551,7 @@ Materials
     pymaid.b3d.handler.bevel
 
 Selections
-----------
+~~~~~~~~~~
 .. autosummary::
     :toctree: generated/
 
@@ -473,7 +574,9 @@ Selections
 
 
 Cytoscape API
-+++++++++++++
+-------------
+Functions to use `Cytoscape <https://cytoscape.org/>`_ via the cyREST API.
+
 .. autosummary::
     :toctree: generated/
 
@@ -481,59 +584,31 @@ Cytoscape API
     pymaid.cytoscape.get_client
     pymaid.cytoscape.watch_network
 
-.. _api_userstats:
-
-User statistics
-+++++++++++++++
-
-.. autosummary::
-    :toctree: generated/
-
-    pymaid.get_user_contributions
-    pymaid.get_time_invested
-    pymaid.get_history
-    pymaid.get_logs
-    pymaid.get_contributor_statistics
-    pymaid.get_user_list
-    pymaid.get_user_actions
-    pymaid.get_user_stats
-    pymaid.get_transactions
-
-
-Image data (tiles)
-++++++++++++++++++
-
-.. autosummary::
-    :toctree: generated/
-
-    pymaid.tiles.LoadTiles
-    pymaid.tiles.crop_neuron
-
-
 R interface (rMAID)
-+++++++++++++++++++
+-------------------
+Bundle of functions to use R libraries.
 
 .. autosummary::
     :toctree: generated/
-
-    pymaid.rmaid.init_rcatmaid
     pymaid.rmaid.data2py
+    pymaid.rmaid.dotprops2py
+    pymaid.rmaid.get_neuropil
+    pymaid.rmaid.init_rcatmaid
     pymaid.rmaid.nblast
     pymaid.rmaid.nblast_allbyall
+    pymaid.rmaid.NBLASTresults
     pymaid.rmaid.neuron2py
     pymaid.rmaid.neuron2dps
-    pymaid.rmaid.dotprops2py
     pymaid.rmaid.neuron2r
-    pymaid.rmaid.NBLASTresults
-    pymaid.rmaid.get_neuropil
 
 Utility
 +++++++
+Various utility functions.
+
 .. autosummary::
     :toctree: generated/
 
+    pymaid.eval_skids
     pymaid.set_pbars
     pymaid.set_loggers
-    pymaid.eval_skids
     pymaid.shorten_name
-    pymaid.update_radii
