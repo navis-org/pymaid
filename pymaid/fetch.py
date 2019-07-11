@@ -377,23 +377,30 @@ class CatmaidInstance:
 
             # Flag if any data is from cache
             if True in [getattr(r, 'is_cached', False) for r in resp]:
+                logger.debug('Cached url: {}'.format(url))
                 logger.info('Cached data used. Use `pymaid.clear_cache()` '
                             'to clear.')
 
         # Return requested data
         if return_type.lower() == 'json':
-            resp = [r.json() for r in resp]
+            parsed = []
+            for r in resp:
+                try:
+                    parsed.append(r.json())
+                except BaseException:
+                    logger.error('Error decoding json inr response. Content: {}'.format(r.content))
+                    raise
         elif return_type.lower() == 'raw':
-            resp = [r.content for r in resp]
+            parsed = [r.content for r in resp]
         elif return_type.lower() == 'request':
-            pass
+            parsed = resp
         else:
             raise ValueError('Unknown return type "{}"'.format(return_type))
 
         if was_single:
-            return resp[0]
+            return parsed[0]
         else:
-            return resp
+            return parsed
 
     def make_url(self, *args, **GET):
         """ Generates URL.
