@@ -39,7 +39,7 @@ logger = config.logger
 
 __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
            'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache',
-           'shorten_name', 'transfer_neuron']
+           'shorten_name']
 
 
 def clear_cache():
@@ -1124,52 +1124,6 @@ def shorten_name(x, max_len=30):
             short = short.replace('[..] [..]', '[..]')
 
     return short
-
-
-def transfer_neuron(x, source_instance, target_instance):
-    """ Copy neuron from one CatmaidInstance to another.
-
-    Only transfers nodes, **not** connectors. Skeleton and treenode IDs
-    will change!
-
-    Parameters
-    ----------
-    x :                 list | array-like
-                        Skeleton IDs of neurons to copy over.
-    source_instance :   CatmaidInstance
-                        Source instance to take neuron from.
-    target_instance :   CatmaidInstance
-                        Target instance to copy neuron to.
-
-    Returns
-    -------
-    dict
-                        Server response.
-    """
-
-    if not isinstance(source_instance, fetch.CatmaidInstance):
-        raise TypeError('Expected CatmaidInstance, got "{}"'.format(type(source_instance)))
-
-    if not isinstance(target_instance, fetch.CatmaidInstance):
-        raise TypeError('Expected CatmaidInstance, got "{}"'.format(type(target_instance)))
-
-    if source_instance == target_instance:
-        raise ValueError('Source must not be the same as target instance.')
-
-    x = eval_skids(x, remote_instance=source_instance)
-
-    if len(x) > 1:
-        return {n : transfer_neuron(n,
-                                    source_instance=source_instance,
-                                    target_instance=target_instance)
-                for n in config.tqdm(x,
-                                     desc='Copying',
-                                     disable=config.pbar_hide,
-                                     leave=config.pbar_leave)}
-
-    n = fetch.get_neuron(x, remote_instance=source_instance)
-
-    return fetch.upload_neuron(n, remote_instance=target_instance)
 
 
 def to_float(x):

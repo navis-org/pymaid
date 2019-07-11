@@ -24,11 +24,9 @@ import os
 import tempfile
 import traceback
 
-import requests
-
 import numpy as np
 import pandas as pd
-
+import requests
 import seaborn as sns
 
 from scipy.spatial.distance import cdist
@@ -44,7 +42,7 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'update_radii', 'replace_skeleton',
                   'join_skeletons', 'join_nodes',
                   'link_connector', 'delete_nodes',
-                  'add_connector'])
+                  'add_connector', 'transfer_neuron',
 
 # Set up logging
 logger = config.logger
@@ -110,11 +108,108 @@ def upload_volume(x, name, comments=None, remote_instance=None):
     return response
 
 
+def transfer_neuron(x, source_instance, target_instance, move_tags=False,
+                    move_annotations=False, move_connectors=False,
+                    force_id=False, no_prompt=False):
+    """Copy neuron(s) from one CatmaidInstance to another.
+
+    Note that skeleton, treenode and connector IDs will change (see server
+    response for old->new mapping).
+
+    Parameters
+    ----------
+    x :                  Skeleton ID(s)
+                         Neuron(s) to move from ``source_instance`` to
+                         ``target_instance``.
+    source_instance :    CatmaidInstance
+                         Instance that the neuron(s) currently live in.
+    target_instance :    CatmaidInstance
+                         Instance to copy the neuron(s) to.
+    move_tags :          bool, optional
+                         If True, will upload treenode tags from ``x.tags``.
+    move_annotations :   bool, optional
+                         If True will upload annotations from ``x.annotations``.
+    move_connectors :    bool, optional
+                         If True will upload connectors from ``x.connectors``.
+    force_id :           bool, optional
+                         If True and neuron/skeleton IDs already exist in
+                         target instance, they will be replaced. **Use this with
+                         extrem caution!**
+    no_prompt :          bool, optional
+                         If True, will not prompt before transferring neurons!
+
+    Returns
+    -------
+    dict
+                         Server response with new skeleton/treenode IDs::
+
+                            {
+                             'neuron_id': new neuron ID,
+                             'skeleton_id': new skeleton ID,
+                             'node_id_map': {'old_node_id': new_node_id, ...},
+                             'annotations': if import_annotations=True,
+                             'tags': if tags=True
+                            }
+
+    """
+    if not isinstance(source_instance, fetch.CatmaidInstance):
+        raise TypeError('"source_instance" must be CatmaidInstance not "{}"'.format(type(source_instance)))
+
+    if not isinstance(target_instance, fetch.CatmaidInstance):
+        raise TypeError('"target_instance" must be CatmaidInstance not "{}"'.format(type(target_instance)))
+
+    if source_instance == target_instance:
+        raise ValueError('source_instance must the same as target_instance')
+
+    # We can't use the decorator in this case because the remote instances are
+    # not a "remote_instance" keyword argument
+    old_caching = source_instance.caching
+    source_instance.caching = False
+    try:
+        skids = utils.eval_skids(x, remote_instance=source_instance)
+
+        neurons = fetch.get_neurons(skids, remote_instance=source_instance)
+
+        if not isinstance(neurons, core.CatmaidNeuronList):
+            neurons = core.CatmaidNeuronList(neurons)
+
+        if move_annotations:
+            neurons.get_annotations()
+    except BaseException:
+        raise
+    finally:
+        source_instance.caching = old_caching
+
+    if not no_prompt:
+        q = 'Transferring neurons from {} (PID {}) to {} (PID {}):'
+        q = q.format(source_instance.server,
+                     source_instance.project_id,
+                     target_instance.server,
+                     target_instance.project_id)
+        print(q)
+        for n in neurons:
+            print('{} (#{})'.format(n.neuron_name, n.skeleton_id))
+
+        answer = ""
+        while answer not in ["y", "n"]:
+            answer = input("Proceed? [Y/N] ").lower()
+            if answer != 'y':
+                return
+
+    return upload_neuron(neurons,
+                         import_tags=move_tags,
+                         import_annotations=move_annotations,
+                         import_connectors=move_connectors,
+                         skeleton_id=neurons.skeleton_id.astype(int) if force_id else None,
+                         force_id=force_id,
+                         remote_instance=target_instance)
+
+
 @cache.never_cache
 def upload_neuron(x, import_tags=False, import_annotations=False,
                   import_connectors=False, skeleton_id=None, neuron_id=None,
                   force_id=False, remote_instance=None):
-    """Export neuron(s) to CatmaidInstance.
+    """Export (upload) neurons to CatmaidInstance.
 
     Note that skeleton, treenode and connector IDs will change (see server
     response for old->new mapping). Neuron to import must not have more than one
