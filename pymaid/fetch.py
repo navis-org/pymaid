@@ -864,6 +864,10 @@ class CatmaidInstance:
         """Use to parse url for rerooting skeletons."""
         return self.make_url(self.project_id, 'skeleton', 'reroot', **GET)
 
+    def _create_treenode_url(self, **GET):
+        """Use to parse url for generating treenodes."""
+        return self.make_url(self.project_id, 'treenode', 'create', **GET)
+
 
 
 @cache.undo_on_error
