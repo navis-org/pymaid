@@ -522,21 +522,32 @@ def differential_upload(x, skeleton_id=None, no_prompt=False, remote_instance=No
 
         # Upload each fragment and connect to live neuron
         for f in tqdm(frags, 'Uploading & Joining'):
-            # Keep track of new skeleton and node IDs
-            nmap = upload_neuron(f, remote_instance=remote_instance)
+            # Single nodes can't be uploaded as SWC neurons
+            if f.nodes.shape[0] == 1:
+                parent_id = x.nodes.set_index('treenode_id').loc[f.root[0],
+                                                                 'parent_id']
+                coords = f.nodes.iloc[0][['x', 'y', 'z']].values
+                radius = f.nodes.iloc[0].radius
+                resp = add_treenode(coords,
+                                    parent_id=parent_id,
+                                    radius=radius,
+                                    remote_instance=remote_instance)
+            else:
+                # Keep track of new skeleton and node IDs
+                nmap = upload_neuron(f, remote_instance=remote_instance)
 
-            if 'error' in nmap:
-                # Error is already logged by upload_neuron
-                return nmap
+                if 'error' in nmap:
+                    # Error is already logged by upload_neuron
+                    return nmap
 
-            # Now connect this fragment's root with it's former parent in
-            # the input neuron (which is a mutual node)
-            looser_node = nmap['node_id_map'][f.root[0]]
-            winner_node = x.nodes.set_index('treenode_id').loc[f.root[0],
-                                                               'parent_id']
+                # Now connect this fragment's root with it's former parent in
+                # the input neuron (which is a mutual node)
+                looser_node = nmap['node_id_map'][f.root[0]]
+                winner_node = x.nodes.set_index('treenode_id').loc[f.root[0],
+                                                                   'parent_id']
 
-            resp = join_nodes(winner_node, looser_node, no_prompt=True,
-                              remote_instance=remote_instance)
+                resp = join_nodes(winner_node, looser_node, no_prompt=True,
+                                  remote_instance=remote_instance)
 
             if 'error' in resp:
                 # Error is already logged by join_nodes
