@@ -46,7 +46,7 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'link_connector', 'delete_nodes',
                   'add_connector', 'transfer_neuron',
                   'differential_upload', 'move_nodes',
-                  'push_new_root'])
+                  'push_new_root', 'add_treenode'])
 
 # Set up logging
 logger = config.logger
@@ -479,7 +479,7 @@ def differential_upload(x, skeleton_id=None, no_prompt=False, remote_instance=No
 
     if not no_prompt:
         q = 'Neuron "{}" (#{}) on {} (PID {}) will have:\n{} nodes deleted\n' \
-             '{} nodes moved\n{} nodes added\nPlease confirm [Y/N] '
+            '{} nodes moved\n{} nodes added\nPlease confirm [Y/N] '
         q = q.format(live.neuron_name,
                      live.skeleton_id,
                      remote_instance.server,
@@ -1289,6 +1289,68 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
             'Error renaming neuron(s): {0}'.format(','.join(failed)))
 
     return
+
+
+@cache.never_cache
+def add_treenode(coords, parent_id=None, radius=-1, confidence=5,
+                 remote_instance=None):
+    """Create single(!) treenode at given location.
+
+    Parameters
+    ----------
+    coords :            tuple
+                        Tuple containing x/y/z coordinates.
+    parent_id :         int | None, optional
+                        If not None, will connect new node to this parent.
+    radius :            int, optional
+                        Radius of new treenode.
+    confidence :        int, optional
+                        Edge confidence to parent (if applicable).
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                        Response from Catmaid server.
+
+    See Also
+    --------
+    :func:`~pymaid.delete_nodes`
+                        Use this to delete tree- and connector nodes.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    coords = np.array(coords) if not isinstance(coords, np.ndarray) else coords
+
+    if coords.ndim != 1 or coords.shape[0] != 3:
+        raise ValueError('Must provide x/y/z coordinate')
+
+    url = remote_instance._create_treenode_url()
+
+    post = {'confidence': confidence,
+            'radius': radius,
+            'useneuron': -1,
+            'neuron_name': None,
+            'x': coords[0],
+            'y': coords[1],
+            'z': coords[2]}
+
+    # If parent is provided, we have to get the link
+    if parent_id:
+        nd = fetch.get_node_details(parent_id,
+                                    convert_ts=False,
+                                    remote_instance=remote_instance)
+        state = {"parent": [int(parent_id), nd.iloc[0]['edition_time']]}
+        post['parent_id'] = int(parent_id)
+    else:
+        # If no parent we just pass an empy state
+        state = {"parent": [-1, ""]}
+
+    post['state'] = json.dumps(state)
+
+    return remote_instance.fetch(url, post=post)
 
 
 @cache.never_cache

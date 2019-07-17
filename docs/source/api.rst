@@ -180,6 +180,7 @@ Edit treenodes:
 .. autosummary::
     :toctree: generated/
 
+    pymaid.add_treenode
     pymaid.delete_nodes
     pymaid.move_nodes
 
@@ -505,7 +506,7 @@ Functions to import and export neuron objects:
 
 Interfaces
 ++++++++++
-Interfaces with various external tools. These modules have to be exported
+Interfaces with various external tools. These modules have to be imported
 explicitly as they are not imported at top level. For example::
 
    >>> from pymaid import b3d
