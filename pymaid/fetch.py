@@ -81,7 +81,8 @@ __all__ = sorted(['CatmaidInstance',
                   'get_nth_partners', 'find_treenodes',
                   'get_node_location', 'get_annotated',
                   'get_neuron_id',
-                  'get_connectors_in_bbox'])
+                  'get_connectors_in_bbox',
+                  'get_cable_lengths'])
 
 # Set up logging
 logger = config.logger
@@ -868,6 +869,9 @@ class CatmaidInstance:
         """Use to parse url for generating treenodes."""
         return self.make_url(self.project_id, 'treenode', 'create', **GET)
 
+    def _get_neuron_cable_url(self, **GET):
+        """Use to parse url for fetching neuron cable lengths."""
+        return self.make_url(self.project_id, 'skeletons', 'cable-length', **GET)
 
 
 @cache.undo_on_error
@@ -5174,6 +5178,44 @@ def get_neuron_id(x, remote_instance=None):
     resp = remote_instance.fetch(url, post=post)
 
     return resp
+
+
+@cache.undo_on_error
+def get_cable_lengths(x, chunk_size=500, remote_instance=None):
+    """ Get cable lengths directly from Catmaid Server.
+
+    Parameters
+    ----------
+    x :                 list-like | CatmaidNeuron/List
+                        Skeleton IDs for which to get cable lengths.
+    chunk_size :        int, optional
+                        Retrieves cable in chunks of given size.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                        ``{skeleton_id (str): cable [nm] (int), ... }``
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    url = remote_instance._get_neuron_cable_url()
+
+    cable = {}
+    for i in config.trange(0, len(skids), int(chunk_size),
+                           desc='Fetching chunks'):
+        chunk = skids[i: i + chunk_size]
+        post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(chunk)}
+
+        resp = remote_instance.fetch(url, post=post)
+        cable.update(resp)
+
+    return cable
 
 
 @cache.undo_on_error

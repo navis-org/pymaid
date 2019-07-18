@@ -135,6 +135,7 @@ Functions to fetch miscellaneous data:
 
     pymaid.clear_cache
     pymaid.has_soma
+    pymaid.get_cable_lengths
     pymaid.get_review
     pymaid.get_review_details
     pymaid.url_to_coordinates
