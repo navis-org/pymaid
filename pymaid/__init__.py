@@ -1,4 +1,4 @@
-__version__ = "0.97"
+__version__ = "0.98"
 
 from . import config
 
@@ -91,3 +91,9 @@ try:
 except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.utils:\n' + str(error))
+
+try:
+    from .snapshot import *
+except Exception as error:
+    logger.warning(str(error))
+    logger.warning('Error importing pymaid.snapshot:\n' + str(error))
