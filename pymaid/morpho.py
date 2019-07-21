@@ -37,7 +37,7 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'to_dotproduct', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron', 'guess_radius',
                   'smooth_neuron', 'time_machine', 'heal_fragmented_neuron',
-                  'break_fragments', 'union_neurons'])
+                  'break_fragments', 'union_neurons', 'prune_twigs'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
@@ -2551,3 +2551,104 @@ def _diff_report(a, b):
     report['nodes_moved'] = list(np.array(report['nodes_mutual'])[moved])
 
     return report
+
+
+def prune_twigs(x, size, inplace = False, recursive = False):
+    """Prune terminal twigs under a given size.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron/List
+    size :          int | float
+                    Twigs shorter than this length [um] will be pruned.
+    inplace :       bool, optional
+                    If False, pruning is performed on copy of original neuron
+                    which is then returned.
+    recursive :     int | bool | float("inf"), optional
+                    If `int` will undergo that many rounds of recursive
+                    pruning. Use `float(`"inf")`` to prune until no more twigs
+                    under the given size are left.
+
+    Returns
+    -------
+    CatmaidNeuron/List
+                    Pruned neuron(s).
+
+    Examples
+    --------
+    >>> import pymaid
+    >>> n = pymaid.get_neurons(16)
+    >>> # Prune twigs smaller than 5 microns
+    >>> n_pr = pymaid.prune_twigs(n,
+    ...                           size=5,
+    ...                           recursive=float('inf'),
+    ...                           inplace=False)
+    >>> n.n_nodes > n_pr.n_nodes
+    True
+
+    """
+
+    if isinstance(x, core.CatmaidNeuronList):
+        if not inplace:
+            x = x.copy()
+
+        [prune_twigs(n,
+                     size=size,
+                     inplace=True,
+                     recursive=recursive) for n in x]
+
+        if not inplace:
+            return x
+        else:
+            return None
+    elif isinstance(x, core.CatmaidNeuron):
+        neuron = x
+    else:
+        raise TypeError('Expected CatmaidNeuron/List, got {}'.format(type(x)))
+
+    # If people set recursive=True, assume that they mean float("inf")
+    if isinstance(recursive, bool) and recursive:
+        recursive = float('inf')
+
+    # Make a copy if necessary before making any changes
+    if not inplace:
+        neuron = neuron.copy()
+
+    # Convert units to microns
+    size *= 1000
+
+    # Find terminal nodes
+    leafs = neuron.nodes[neuron.nodes.type == 'end'].treenode_id.values
+
+    # Find terminal segments
+    segs = graph_utils._break_segments(neuron)
+    segs = np.array([s for s in segs if s[0] in leafs])
+
+    # Get segment lengths
+    seg_lengths = np.array([graph_utils.segment_length(neuron, s) for s in segs])
+
+    # Find out which to delete
+    segs_to_delete = segs[seg_lengths <= size]
+
+    if len(segs_to_delete) == 1:
+        return segs_to_delete
+
+    if segs_to_delete.any():
+        # Unravel the into list of node IDs -> skip the last parent
+        nodes_to_delete = [n for s in segs_to_delete for n in s[:-1]]
+
+        # Subset neuron
+        nodes_to_keep = neuron.nodes[~neuron.nodes.treenode_id.isin(nodes_to_delete)].treenode_id.values
+        graph_utils.subset_neuron(neuron,
+                                  nodes_to_keep,
+                                  inplace=True)
+
+        # Go recursive
+        if recursive:
+            recursive -= 1
+            prune_twigs(neuron, size=size, inplace=True, recursive=recursive)
+
+    if not inplace:
+        return neuron
+    else:
+        return None
