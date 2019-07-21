@@ -480,16 +480,17 @@ def plot2d(x, method='2d', **kwargs):
                                                    neuron.skeleton_id))
                     line = ax.add_collection(lc)
 
-                if neuron.soma:
-                    soma = neuron.nodes.set_index('treenode_id').loc[neuron.soma]
-                    if depth_coloring:
-                        this_color = mpl.cm.jet(norm(soma.z))
+                if neuron.soma and kwargs.get('soma', True):
+                    for s in utils._make_iterable(neuron.soma):
+                        soma = neuron.nodes.set_index('treenode_id').loc[s]
+                        if depth_coloring:
+                            this_color = mpl.cm.jet(norm(soma.z))
 
-                    s = mpatches.Circle((int(soma.x), int(-soma.y)), radius=soma.radius,
-                                        alpha=this_alpha, fill=True,
-                                        fc=this_color,
-                                        zorder=4, edgecolor='none')
-                    ax.add_patch(s)
+                        p = mpatches.Circle((int(soma.x), int(-soma.y)), radius=soma.radius,
+                                            alpha=this_alpha, fill=True,
+                                            fc=this_color,
+                                            zorder=4, edgecolor='none')
+                        ax.add_patch(p)
 
             elif method in ['3d', '3d_complex']:
                 cmap = mpl.cm.jet if depth_coloring else None
@@ -533,7 +534,7 @@ def plot2d(x, method='2d', **kwargs):
                 lim.append(coords.min(axis=0))
 
                 surf3D_collections.append([])
-                if neuron.soma:
+                if neuron.soma and kwargs.get('soma', True):
                     for s in utils._make_iterable(neuron.soma):
                         soma = neuron.nodes.set_index('treenode_id').loc[s]
                         resolution = 20
@@ -1193,8 +1194,9 @@ def plot3d(x, **kwargs):
                                                ))
 
                 # Add soma(s):
-                if kwargs.get('soma', True):
-                    for n in neuron.nodes[neuron.nodes.treenode_id == neuron.soma].itertuples():
+                if neuron.soma and kwargs.get('soma', True):
+                    for s in utils._make_iterable(neuron.soma):
+                        n = neuron.nodes.set_index('treenode_id').loc[s]
                         try:
                             c = 'rgb{}'.format(neuron_cmap[i])
                         except BaseException:
