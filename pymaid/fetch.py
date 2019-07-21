@@ -102,7 +102,7 @@ class CatmaidInstance:
     authpassword :  str | None
                     The http password.
     authtoken :     str | None
-                    User token - see CATMAID `documentation <https://catmaid.
+                    API token - see CATMAID `documentation <https://catmaid.
                     readthedocs.io/en/stable/api.html#api-token>`_ on how to
                     get it.
     project_id :    int, optional
@@ -110,7 +110,8 @@ class CatmaidInstance:
     max_threads :   int | None
                     Maximum parallel threads to be used. Note that some
                     functions (e.g. :func:`pymaid.get_skid_from_treenode`)
-                    override this parameter.
+                    override this parameter. If this is set too high, you
+                    might experience time outs when fetching data.
     set_global :    bool, optional
                     If True, this instance will be set as global (default)
                     CatmaidInstance. This overrides pre-existing global
@@ -124,6 +125,22 @@ class CatmaidInstance:
     --------
     Initialise a CatmaidInstance. Note that ``HTTP_USER`` and ``HTTP_PASSWORD``
     are only necessary if your server requires HTTP authentification.
+
+    >>> rm = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
+    ...                             'HTTP_USER',
+    ...                             'HTTP_PASSWORD',
+    ...                             'TOKEN')
+    INFO  : Global CATMAID instance set. (pymaid.fetch)
+
+    If your server does not requires HTTP authentification, just set
+    ``HTTP_USER`` and ``HTTP_PASSWORD`` to ``None``:
+
+    >>> rm = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
+    ...                             None,
+    ...                             None,
+    ...                             'TOKEN')
+    INFO  : Global CATMAID instance set. (pymaid.fetch)
+
 
     >>> rm = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
     ...                             'HTTP_USER',
@@ -145,11 +162,12 @@ class CatmaidInstance:
     >>> # Make copy of CatmaidInstance and change project ID
     >>> p2 = p1.copy()
     >>> p2.project_id = 2
-    >>> # Fetch a neuron from project 1 and another from project 2
+    >>> # Fetch a neuron from project 1 and another from project 2 by
+    >>> # passing the CatmaidInstance explicitly via `remote_instance`
     >>> n1 = pymaid.get_neuron(16, remote_instance=p1)
     >>> n2 = pymaid.get_neuron(233007, remote_instance=p2)
 
-    Manually make one CatmaidInstance the global one
+    Manually make one CatmaidInstance the global one.
 
     >>> p2.make_global()
 

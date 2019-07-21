@@ -809,7 +809,7 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
         rn = neuron2r(query, convert_to_um=False)
     elif isinstance(query, str) or isinstance(query, int):
         if not remote_instance:
-            logger.error('You have to provide a CATMAID instance using the '
+            logger.error('You have to provide a CatmaidInstance using the '
                          '<remote_instance> parameter. See help(rmaid.nblast) '
                          'for details.')
             return
