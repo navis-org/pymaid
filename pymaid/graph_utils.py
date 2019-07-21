@@ -37,7 +37,8 @@ __all__ = sorted(['classify_nodes', 'cut_neuron', 'longest_neurite',
                   'split_into_fragments', 'reroot_neuron', 'distal_to',
                   'dist_between', 'find_main_branchpoint',
                   'generate_list_of_childs', 'geodesic_matrix',
-                  'subset_neuron', 'node_label_sorting'])
+                  'subset_neuron', 'node_label_sorting',
+                  'segment_length'])
 
 
 def _generate_segments(x, weight=None):
@@ -1458,3 +1459,37 @@ def connected_subgraph(x, ss):
         new_root = first_common
 
     return np.array(list(include)), new_root
+
+
+def segment_length(x, segment):
+    """ Get length of a linear segment.
+
+    This function is superfast but has no checks - you must provide a
+    valid segment.
+
+    Parameters
+    ----------
+    x :         CatmaidNeuron
+                Neuron to which this segment belongs.
+    segment :   list of ints
+                Linear segment as list of node IDs ordered child->parent.
+
+    Returns
+    -------
+    length :    float
+
+    See Also
+    --------
+    :func:`pymaid.dist_between`
+        If you only know start and end points of the segment.
+
+    Examples
+    --------
+    >>> import pymaid
+    >>> n = pymaid.get_neuron(16)
+    >>> l = pymaid.segment_length(n, n.segments[0])
+
+    """
+    dist = np.array([x.graph.edges[(c, p)]['weight']
+                     for c, p in zip(segment[:-1], segment[1:])])
+    return sum(dist)
