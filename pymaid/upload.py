@@ -1000,7 +1000,7 @@ def join_skeletons(x, winner=None, no_prompt=False, method='LEAFS',
 
 
 @cache.never_cache
-def join_nodes(winner_node, looser_node, no_prompt=False,
+def join_nodes(winner_node, looser_node, no_prompt=False, tag_nodes=True,
                remote_instance=None):
     """Join two skeletons by nodes.
 
@@ -1017,6 +1017,18 @@ def join_nodes(winner_node, looser_node, no_prompt=False,
                         of this neuron will be lost!
     no_prompt :         bool, optional
                         If True, will NOT prompt before joining.
+    tag_nodes :         bool | str | tuple of str, optional
+                        If not False, will add tags to nodes::
+
+                            If True add "joined into {WINNING SKELETON ID}"
+                            to loosing and "joined from {LOOSING SKELETON ID}"
+                            to winning node.
+
+                            If str, will add string as tag to both nodes.
+
+                            If tuple of two strings (str1, str2), will add
+                            str1 to winning and str2 to loosing node.
+
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
@@ -1027,7 +1039,7 @@ def join_nodes(winner_node, looser_node, no_prompt=False,
     See Also
     --------
     :func:`~pymaid.join_skeletons`
-                        If you don't know which skeletons to join.
+                        If you don't know how at what nodes to join skeletons.
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -1070,10 +1082,10 @@ def join_nodes(winner_node, looser_node, no_prompt=False,
     annotation_set[looser_name] = login['userid']
 
     if not no_prompt:
-        print('Joining {} ({}) into {} ({})'.format(looser_name,
-                                                    looser_skid,
-                                                    winner_name,
-                                                    winner_skid))
+        print('Joining "{}" #{} into "{}"" #{}'.format(looser_name,
+                                                       looser_skid,
+                                                       winner_name,
+                                                       winner_skid))
         print('Skeleton ID {} will cease to exist'.format(looser_skid))
         answer = ""
         while answer not in ["y", "n"]:
@@ -1090,7 +1102,32 @@ def join_nodes(winner_node, looser_node, no_prompt=False,
 
     resp = remote_instance.fetch(join_url, join_post)
     if 'error' in resp:
-        logger.error('Error joining nodes: see response for details.')
+        logger.error('Error joining nodes {} and {}. See response for details.'.format(winner_node, looser_node))
+        return resp
+
+    if tag_nodes:
+        if isinstance(tag_nodes, bool):
+            tags = {winner_node: 'joined from {}'.format(looser_skid),
+                    looser_node: 'joined into {}'.format(winner_skid)}
+        elif isinstance(tag_nodes, str):
+            tags = tag_nodes
+        elif isinstance(tag_nodes, (tuple, list, np.ndarray)):
+            if any([not isinstance(s, str) for s in tag_nodes]):
+                raise TypeError('Tags must be strings')
+            tags = {winner_node: tag_nodes[0],
+                    looser_node: tag_nodes[1]}
+        else:
+            raise TypeError('Unable to parse node tags of type "{}"'.format(type(tag_nodes)))
+
+        tag_resp = add_tags([winner_node, looser_node],
+                            tags=tags,
+                            node_type='TREENODE',
+                            remote_instance=remote_instance,
+                            override_existing=False)
+
+        if 'error' in tag_resp:
+            return tag_resp
+
     return resp
 
 
