@@ -449,13 +449,17 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
 @cache.never_cache
 def differential_upload(x, skeleton_id=None, no_prompt=False, remote_instance=None):
-    """Upload neuron but keep existing nodes.
+    """Upload only changes made to a neuron.
 
     In brief, this function takes the input neuron ``x``, compares with its
-    live version on the live server and make incremental changes:
+    live version on the server and makes incremental changes:
         1. Remove nodes not present in ``x`` from live neuron
         2. Add nodes present in ``x`` but not in live neuron
-        3. Move nodes present in ``x`` and live neuron but have changed positions
+        3. Move nodes present in ``x`` and live neuron that have changed positions
+
+    .. danger::
+
+        **Use this with EXTREME caution as this is irreversible!**
 
     Parameters
     ----------
@@ -631,6 +635,10 @@ def replace_skeleton(x, skeleton_id=None, force_mapping=False,
 
     Any connectors/tags that have not been automatically fixed will be returned
     as DataFrame for manual review. See examples.
+
+    .. danger::
+
+        **Use this with EXTREME caution as this is irreversible!**
 
     Parameters
     ----------
@@ -1197,7 +1205,7 @@ def link_connector(links, remote_instance=None):
                   'state': json.dumps([[n, edition_times[str(n)]] for n in l[:2]]),
                   'link_type': l[2]} for l in links]
 
-    resp = remote_instance.fetch(create_link_url, link_post)
+    resp = remote_instance.fetch(create_link_url, link_post, desc='Linking connectors')
 
     if any(['error' in r for r in resp]):
         logger.error('Error creating link(s)! Check server response')
@@ -1471,7 +1479,7 @@ def add_connector(coords, remote_instance=None):
              'y': c[1],
              'z': c[2]} for c in coords]
 
-    return remote_instance.fetch(url, post=post)
+    return remote_instance.fetch(url, post=post, desc='Creating connectors')
 
 
 @cache.never_cache
@@ -1533,6 +1541,9 @@ def add_tags(node_list, tags, node_type, remote_instance=None,
         raise TypeError('Unknown node_type parameter: %s' % str(node_type))
 
     if isinstance(tags, dict):
+        # Make sure that it's a dict of {node: [tag1, tag2]}
+        tags = {n: t if utils._is_iterable(t) else [t] for n, t in tags.items()}
+
         post_data = [{'tags': ','.join(tags[n]),
                       'delete_existing': override_existing}
                      for n in node_list]
@@ -1541,9 +1552,14 @@ def add_tags(node_list, tags, node_type, remote_instance=None,
                       'delete_existing': override_existing}
                      for n in node_list]
 
-    return remote_instance.fetch(add_tags_urls,
+    resp = remote_instance.fetch(add_tags_urls,
                                  post=post_data,
                                  desc='Modifying tags')
+
+    if 'error' in resp:
+        logger.error('Error tagging nodes. See response for details.')
+
+    return resp
 
 
 @cache.never_cache
@@ -1812,7 +1828,7 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
     # [id, parent_id, location_x, location_y, location_z, confidence, radius, skeleton_id, edition_time, user_id]
     # Format of [connectors] is
     # [id, location_x, location_y, location_z, confidence, edition_time, user_id, [partners]]
-    resp = remote_instance.fetch(urls)
+    resp = remote_instance.fetch(urls, desc='Fetching node states')
 
     if node_type.lower() in ['treenode', 'treenodes']:
         # Turn state into dict
@@ -1876,7 +1892,7 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
         if answer != 'y':
             return
 
-    resp = remote_instance.fetch(urls, post=post)
+    resp = remote_instance.fetch(urls, post=post, desc='Deleting nodes')
     errors = [str(n) for i, n in enumerate(node_ids) if 'error' in resp[i]]
 
     if errors:
@@ -1989,6 +2005,10 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     Works by getting existing tags, removing given tag(s) and then using
     pymaid.add_tags() to push updated tags back to CATMAID.
 
+    .. danger::
+
+        **Use this with EXTREME caution as this is irreversible!**
+
     Parameters
     ----------
     node_list :         list
@@ -2085,7 +2105,8 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
 
     Returns
     -------
-    Nothing
+    dict
+                        Server response.
 
     See Also
     --------
@@ -2121,10 +2142,7 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(x)
 
-    logger.info(remote_instance.fetch(
-        add_annotations_url, add_annotations_postdata))
-
-    return
+    return remote_instance.fetch(add_annotations_url, add_annotations_postdata)
 
 
 @cache.never_cache
@@ -2142,7 +2160,8 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
 
     Returns
     -------
-    Nothing
+    dict
+                        Server response.
 
     See Also
     --------
@@ -2183,12 +2202,7 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
         key = 'annotation_ids[%i]' % i
         remove_annotations_postdata[key] = str(x)
 
-    print(remove_annotations_postdata)
-
-    logger.info(remote_instance.fetch(
-        add_annotations_url, remove_annotations_postdata))
-
-    return
+    return remote_instance.fetch(add_annotations_url, remove_annotations_postdata)
 
 
 @cache.never_cache
@@ -2212,7 +2226,8 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     Returns
     -------
-    None
+    dict
+                        Server response.
 
     See Also
     --------
@@ -2268,7 +2283,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     else:
         logger.info('No annotations removed.')
 
-    return
+    return resp
 
 
 @cache.never_cache
