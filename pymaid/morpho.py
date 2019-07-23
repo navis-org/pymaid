@@ -1148,7 +1148,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
                             (3) 'NONE': Node and connector tables will simply
                                 be combined without generating any new edges.
                                 The resulting neuron will have multiple roots.
-    master :            'SOMA' | 'LARGEST' | 'FIRST', optional
+    master :            'SOMA' | 'LARGEST' | 'FIRST' | CatmaidNeuron | skeleton ID, optional
                         Sets the master neuron:
                             (1) 'SOMA': The largest fragment with a soma
                                 becomes the master neuron. If no neuron with
@@ -1157,6 +1157,8 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
                                 master neuron.
                             (3) 'FIRST': The first fragment provided becomes
                                 the master neuron.
+                            (4) CatmaidNeuron | skeleton ID: explicitly set the
+                                master neuron.
     tn_to_stitch :      List of treenode IDs, optional
                         If provided, these treenodes will be preferentially
                         used to stitch neurons together. Overrides methods
@@ -1193,13 +1195,9 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
 
     """
     method = str(method).upper()
-    master = str(master).upper()
 
     if method not in ['LEAFS', 'ALL', 'NONE']:
         raise ValueError('Unknown method: %s' % str(method))
-
-    if master not in ['SOMA', 'LARGEST', 'FIRST']:
-        raise ValueError('Unknown master: %s' % str(master))
 
     # Compile list of individual neurons
     x = utils._unpack_neurons(x)
@@ -1213,7 +1211,11 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
         return x[0]
 
     # First find master
-    if master == 'SOMA':
+    if isinstance(master, core.CatmaidNeuron):
+        if master not in x:
+            raise ValueError('Master neuron not in input neurons.')
+        master = x.skid[master.skeleton_id]
+    elif master == 'SOMA':
         has_soma = [n for n in x if not isinstance(n.soma, type(None))]
         if len(has_soma) > 0:
             master = has_soma[0]
@@ -1225,9 +1227,20 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
         master = sorted(x.neurons,
                         key=lambda x: x.cable_length,
                         reverse=True)[0]
-    else:
+    elif master == 'FIRST':
         # Simply pick the first neuron
         master = x[0]
+    elif isinstance(master, int):
+        master = x.skid[int(master)]
+    elif isinstance(master, str) and master.isnumeric():
+        master = x.skid[int(master)]
+    else:
+        raise TypeError('Unable to parse master of type "{}"'.format(type(master)))
+
+    # In case of duplicates
+    if isinstance(master, core.CatmaidNeuronList):
+        raise ValueError('Multiple matching masters found. Duplicate skeleton '
+                         'IDs in neurons to stitch?')
 
     # Check if we need to make any node IDs unique
     if x.nodes.duplicated(subset='treenode_id').sum() > 0:
@@ -1267,9 +1280,11 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
     # If method is none, we can just merge the data tables
     if method == 'NONE' or method is None:
         master.nodes = pd.concat([n.nodes for n in x],
-                                 ignore_index=True)
+                                 ignore_index=True,
+                                 sort=True)
         master.connectors = pd.concat([n.connectors for n in x],
-                                      ignore_index=True)
+                                      ignore_index=True,
+                                      sort=True)
         master.tags = {}
         for n in x:
             master.tags.update(n.tags)
