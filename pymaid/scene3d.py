@@ -56,7 +56,9 @@ import matplotlib.colors as mcl
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    import vispy as vp
+    import vispy
+    import vispy.scene
+    import vispy.util
 
 from . import utils, plotting, fetch, config
 
@@ -64,6 +66,19 @@ __all__ = ['Viewer', 'Browser']
 
 logger = config.logger
 
+# This makes sure the app is run correctly
+if utils._type_of_script() == 'ipython':
+    try:
+        ipython = get_ipython()
+        ipython.magic("%gui qt5")
+    except BaseException:
+        pass
+
+try:
+    # Try setting vispy backend to PyQt5
+    vispy.use(app='PyQt5')
+except BaseException:
+    pass
 
 def block_all(function):
     """ Decorator to block all events on canvas and view while changes
@@ -123,7 +138,7 @@ class Browser:
         defaults.update(kwargs)
 
         # Generate canvas
-        self.canvas = vp.scene.SceneCanvas(**defaults)
+        self.canvas = vispy.scene.SceneCanvas(**defaults)
 
         # Add grid
         self.grid = self.canvas.central_widget.add_grid()
@@ -244,7 +259,7 @@ class Browser:
         if isinstance(viewer, int):
             viewer = self.viewers[viewer]
 
-        return [v for v in viewer.children[0].children if isinstance(v, vp.scene.visuals.VisualNode)]
+        return [v for v in viewer.children[0].children if isinstance(v, vispy.scene.visuals.VisualNode)]
 
     def center_camera(self, viewer):
         """ Center camera on visuals. """
@@ -312,12 +327,19 @@ class Viewer:
                         bgcolor='black')
         defaults.update(kwargs)
 
+        # Set border rim -> this depends on how the framework (e.g. QT5)
+        # renders the window
+        self._rim_bot = 15
+        self._rim_top = 20
+        self._rim_left = 10
+        self._rim_right = 10
+
         # Generate canvas
-        self.canvas = vp.scene.SceneCanvas(**defaults)
+        self.canvas = vispy.scene.SceneCanvas(**defaults)
 
         # Add and setup 3d view
         self.view3d = self.canvas.central_widget.add_view()
-        self.camera3d = vp.scene.ArcballCamera()
+        self.camera3d = vispy.scene.ArcballCamera()
         self.view3d.camera = self.camera3d
 
         # Add permanent overlays
@@ -367,15 +389,15 @@ class Viewer:
         # Labels
         self._labelmap = {}
         self._labels = {}
-        self.label_mode = False        
+        self.label_mode = False
 
     def _draw_overlay(self):
-        overlay = vp.scene.widgets.ViewBox(parent=self.canvas.scene)
+        overlay = vispy.scene.widgets.ViewBox(parent=self.canvas.scene)
         self.view3d.add_widget(overlay)
 
         """
         # Legend title
-        t = vp.scene.visuals.Text('Legend', pos=(10,10),
+        t = vispy.scene.visuals.Text('Legend', pos=(10,10),
                                   anchor_x='left', name='permanent',
                                   parent=overlay,
                                   color=(0,0,0), font_size=9)
@@ -399,23 +421,28 @@ class Viewer:
         shorts_text = 'SHORTCUTS: ' + \
                       ' | '.join(['<{0}> {1}'.format(k, v)
                                 for k, v in self._key_shortcuts.items()])
-        self._shortcuts = vp.scene.visuals.Text(shorts_text,
-                                                pos=(10, overlay.size[1]),
-                                                anchor_x='left',
-                                                anchor_y='bottom',
-                                                name='permanent',
-                                                parent=overlay,
-                                                color=text_color,
-                                                font_size=6)
+        self._shortcuts = vispy.scene.visuals.Text(shorts_text,
+                                                   pos=(self._rim_left,
+                                                        overlay.size[1] - self._rim_bot),
+                                                   anchor_x='left',
+                                                   anchor_y='bottom',
+                                                   name='permanent',
+                                                   method='gpu',
+                                                   parent=overlay,
+                                                   color=text_color,
+                                                   font_size=6)
 
         # FPS (hidden at start)
-        self._fps_text = vp.scene.visuals.Text('FPS',
-                                               pos=(overlay.size[0]/2, 10),
-                                               anchor_x='center',
-                                               anchor_y='top',
-                                               name='permanent',
-                                               parent=overlay,
-                                               color=(0, 0, 0), font_size=6)
+        self._fps_text = vispy.scene.visuals.Text('FPS',
+                                                  pos=(overlay.size[0] / 2,
+                                                       self._rim_top),
+                                                  anchor_x='center',
+                                                  anchor_y='top',
+                                                  name='permanent',
+                                                  method='gpu',
+                                                  parent=overlay,
+                                                  color=text_color,
+                                                  font_size=6)
         self._fps_text.visible = False
 
         # Picking shortcuts (hidden at start)
@@ -423,7 +450,8 @@ class Viewer:
                                    'SHIFT+LMB @neuron': 'select neuron',
                                    'D': 'deselect all',
                                    'H': 'hide selected',
-                                   'C': 'url to cursor',}
+                                   'C': 'url to cursor'}
+
         # Add platform-specific modifiers
         if platform.system() == 'darwin':
             self._picking_shortcuts['CMD+LMB'] = 'set cursor'
@@ -433,26 +461,29 @@ class Viewer:
         shorts_text = 'PICKING: ' + \
                       ' | '.join(['<{0}> {1}'.format(k, v)
                                 for k, v in self._picking_shortcuts.items()])
-        self._picking_text = vp.scene.visuals.Text(shorts_text,
-                                                   pos=(10,
-                                                        overlay.size[1] - 10),
-                                                   anchor_x='left',
-                                                   anchor_y='bottom',
-                                                   name='permanent',
-                                                   parent=overlay,
-                                                   color=text_color,
-                                                   font_size=6)
+        self._picking_text = vispy.scene.visuals.Text(shorts_text,
+                                                      pos=(self._rim_left,
+                                                           overlay.size[1] - self._rim_bot - 10),
+                                                      anchor_x='left',
+                                                      anchor_y='bottom',
+                                                      name='permanent',
+                                                      method='gpu',
+                                                      parent=overlay,
+                                                      color=text_color,
+                                                      font_size=6)
         self._picking_text.visible = False
 
         # Text box in top right to display arbitrary data
-        self._data_text = vp.scene.visuals.Text('',
-                                                pos=(overlay.size[0] - 10, 10),
-                                                anchor_x='right',
-                                                anchor_y='top',
-                                                name='permanent',
-                                                parent=overlay,
-                                                color=text_color,
-                                                font_size=6)
+        self._data_text = vispy.scene.visuals.Text('',
+                                                   pos=(overlay.size[0] - self._rim_right,
+                                                        self._rim_top),
+                                                   anchor_x='right',
+                                                   anchor_y='top',
+                                                   name='permanent',
+                                                   method='gpu',
+                                                   parent=overlay,
+                                                   color=text_color,
+                                                   font_size=6)
 
         return overlay
 
@@ -487,6 +518,23 @@ class Viewer:
         """ Set to ``True`` to allow picking."""
         return self.__picking
 
+    def _render_fb(self, crop=None):
+        """Render framebuffer. """
+        if not crop:
+            crop=(0, 0,
+                  self.canvas.size[0] * self.canvas.pixel_scale,
+                  self.canvas.size[1] * self.canvas.pixel_scale)
+
+        # We have to temporarily deactivate the overlay and view3d
+        # otherwise we won't be able to see what's on the 3D or might
+        # see holes in the framebuffer
+        self.view3d.interactive = False
+        self.overlay.interactive = False
+        p = self.canvas._render_picking(crop=crop)
+        self.view3d.interactive = True
+        self.overlay.interactive = True
+        return p
+
     def toggle_picking(self):
         """ Toggle picking and overlay text."""
         if self.picking:
@@ -510,8 +558,13 @@ class Viewer:
 
     @property
     def visible(self):
-        """ Returns skeleton IDs of currently selected visible. """
+        """Return skeleton IDs of currently visible neurons."""
         return [s for s in self.neurons if self.neurons[s][0].visible]
+
+    @property
+    def invisible(self):
+        """Return skeleton IDs of currently invisible neurons."""
+        return [s for s in self.neurons if not self.neurons[s][0].visible]
 
     @property
     def selected(self):
@@ -533,7 +586,7 @@ class Viewer:
         # First un-highlight neurons no more selected
         for s in [s for s in self.__selected if s not in set(skids)]:
             for v in neurons[s]:
-                if isinstance(v, vp.scene.visuals.Mesh):
+                if isinstance(v, vispy.scene.visuals.Mesh):
                     v.color = v._stored_color
                 else:
                     v.set_data(color=v._stored_color)
@@ -546,7 +599,7 @@ class Viewer:
                     v.unfreeze()
                     v._stored_color = v.color
                     v.freeze()
-                    if isinstance(v, vp.scene.visuals.Mesh):
+                    if isinstance(v, vispy.scene.visuals.Mesh):
                         v.color = self.highlight_color
                     else:
                         v.set_data(color=self.highlight_color)
@@ -567,7 +620,7 @@ class Viewer:
     @property
     def visuals(self):
         """ Returns list of all 3D visuals on this canvas. """
-        return [v for v in self.view3d.children[0].children if isinstance(v, vp.scene.visuals.VisualNode)]
+        return [v for v in self.view3d.children[0].children if isinstance(v, vispy.scene.visuals.VisualNode)]
 
     @property
     def neurons(self):
@@ -577,7 +630,7 @@ class Viewer:
         Returns
         -------
         dict
-                    {skeleton_ID : [ neurites, soma ]}
+                    ``{skeleton_ID: [neurites, soma]}``
         """
         # Collect neuron objects
         neuron_obj = [c for c in self.visuals if 'neuron' in getattr(
@@ -605,7 +658,7 @@ class Viewer:
     def clear_legend(self):
         """ Clear legend. """
         # Clear legend except for title
-        for l in [l for l in self.overlay.children if isinstance(l, vp.scene.visuals.Text) and l.name != 'permanent']:
+        for l in [l for l in self.overlay.children if isinstance(l, vispy.scene.visuals.Text) and l.name != 'permanent']:
             l.parent = None
 
     def clear(self):
@@ -619,7 +672,7 @@ class Viewer:
         """ Remove given neurons/visuals from canvas.
         """
 
-        if not isinstance(to_remove, vp.scene.visuals.VisualNode):
+        if not isinstance(to_remove, vispy.scene.visuals.VisualNode):
             skids = utils.eval_skids(to_remove)
             to_remove = [v for v in self.neurons[s] if s in self.neurons]
 
@@ -652,12 +705,12 @@ class Viewer:
         # Generate new labels
         to_add = [s for s in self._neuron_obj if s not in labels]
         for s in to_add:
-            l = vp.scene.visuals.Text('{0} - #{1}'.format(self._neuron_obj[s][0]._neuron_name,
-                                                          self._neuron_obj[s][0]._skeleton_id),
-                                      anchor_x='left',
-                                      anchor_y='top',
-                                      parent=self.overlay,
-                                      font_size=self.legend_font_size)
+            l = vispy.scene.visuals.Text('{0} - #{1}'.format(self._neuron_obj[s][0]._neuron_name,
+                                                             self._neuron_obj[s][0]._skeleton_id),
+                                         anchor_x='left',
+                                         anchor_y='top',
+                                         parent=self.overlay,
+                                         font_size=self.legend_font_size)
             l.interactive = True
             l.unfreeze()
             l._object_id = s
@@ -675,7 +728,7 @@ class Viewer:
 
             offset = 10 * (self.legend_font_size / 7)
 
-            labels[s].pos = (10, offset * (i + 1))
+            labels[s].pos = (10, self._rim_top + offset * (i + 1))
             labels[s].color = color
             labels[s].font_size = self.legend_font_size
 
@@ -870,7 +923,7 @@ class Viewer:
                     if v._neuron_part == 'connectors' and not include_connectors:
                         continue
                     new_c = mcl.to_rgba(cmap[n])
-                    if isinstance(v, vp.scene.visuals.Mesh):
+                    if isinstance(v, vispy.scene.visuals.Mesh):
                         v.color = new_c
                     else:
                         v.set_data(color=mcl.to_rgba(cmap[n]))
@@ -913,7 +966,7 @@ class Viewer:
                         continue
 
                     new_c = tuple([this_c[0], this_c[1], this_c[2], amap[n]])
-                    if isinstance(v, vp.scene.visuals.Mesh):
+                    if isinstance(v, vispy.scene.visuals.Mesh):
                         v.color = mcl.to_rgba(new_c)
                     else:
                         v.set_data(color=mcl.to_rgba(new_c))
@@ -1000,19 +1053,19 @@ class Viewer:
     def _snap_cursor(self, pos, visual, open_browser=False):
         """ Snap cursor to clostest vertex of visual."""
         if not getattr(self, '_cursor', None):
-            self._cursor = vp.scene.visuals.Arrow(pos=np.array([(0, 0, 0), (1000, 0, 0)]),
-                                                  color=(1, 0, 0, 1),
-                                                  arrow_color=(1, 0, 0, 1),
-                                                  arrow_size=10,
-                                                  arrows=np.array([[800, 0, 0, 1000, 0, 0]]))
+            self._cursor = vispy.scene.visuals.Arrow(pos=np.array([(0, 0, 0), (1000, 0, 0)]),
+                                                     color=(1, 0, 0, 1),
+                                                     arrow_color=(1, 0, 0, 1),
+                                                     arrow_size=10,
+                                                     arrows=np.array([[800, 0, 0, 1000, 0, 0]]))
 
         if not self._cursor.parent:
             self.add(self._cursor, center=False)
 
         # Get vertices for this visual
-        if isinstance(visual, vp.scene.visuals.Line):
+        if isinstance(visual, vispy.scene.visuals.Line):
             verts = visual.pos
-        elif isinstance(visual, vp.scene.visuals.Mesh):
+        elif isinstance(visual, vispy.scene.visuals.Mesh):
             verts = visual.mesh_data.get_vertices()
 
         # Map vertices to canvas
@@ -1111,10 +1164,9 @@ class Viewer:
 
     def visuals_at(self, pos):
         """ Returns visuals at given canvas position. """
-
-        # There appears to be some odd y offset - perhaps because of the
-        # window's top bar? On OSX this is about 15px
-        pos = (pos[0], pos[1] - 15)
+        # There appears to be some odd offsets - perhaps because of the
+        # window's top bar?
+        pos = (pos[0] - self._rim_left, pos[1] - self._rim_top)
 
         # Map mouse pos to framebuffer
         tr = self.canvas.transforms.get_transform(map_from='canvas',
@@ -1122,10 +1174,13 @@ class Viewer:
         pos = tr.map(pos)
 
         # Render framebuffer in picking mode
-        p = self.canvas._render_picking(region=(pos[0] - self._picking_radius / 2,
-                                                pos[1] - self._picking_radius / 2,
-                                                self._picking_radius,
-                                                self._picking_radius))
+        p = self._render_fb(crop=(pos[0] - self._picking_radius / 2,
+                                  pos[1] - self._picking_radius / 2,
+                                  self._picking_radius,
+                                  self._picking_radius))
+
+        logger.debug('Picking framebuffer:')
+        logger.debug(p)
 
         # List visuals in order from distance to center
         ids = []
@@ -1137,7 +1192,7 @@ class Viewer:
             subr_ids = set(list(np.unique(subr)))
             ids.extend(list(subr_ids - seen))
             seen |= subr_ids
-        visuals = [vp.scene.visuals.VisualNode._visual_ids.get(x, None) for x in ids]
+        visuals = [vispy.scene.visuals.VisualNode._visual_ids.get(x, None) for x in ids]
 
         return [v for v in visuals if v is not None]
 
@@ -1146,24 +1201,24 @@ class Viewer:
 
         Parameters
         ----------
-        view :      "XY" | "XZ" | "YZ" | 
+        view :      "XY" | "XZ" | "YZ" |
                     Use e.g. "-XY" to invert rotation
         """
 
-        if isinstance(view, vp.util.quaternion.Quaternion):
+        if isinstance(view, vispy.util.quaternion.Quaternion):
             q = view
         elif view == 'XY':
-            q = vp.util.quaternion.Quaternion(w=1, x=0, y=0, z=0)
+            q = vispy.util.quaternion.Quaternion(w=1, x=0, y=0, z=0)
         elif view == '-XY':
-            q = vp.util.quaternion.Quaternion(w=0, x=1, y=0, z=0)    
+            q = vispy.util.quaternion.Quaternion(w=0, x=1, y=0, z=0)
         elif view == 'XZ':
-            q = vp.util.quaternion.Quaternion(w=-.65, x=-.75, y=0, z=0)
+            q = vispy.util.quaternion.Quaternion(w=-.65, x=-.75, y=0, z=0)
         elif view == '-XZ':
-            q = vp.util.quaternion.Quaternion(w=1, x=-.4, y=0, z=0)
+            q = vispy.util.quaternion.Quaternion(w=1, x=-.4, y=0, z=0)
         elif view == 'YZ':
-            q = vp.util.quaternion.Quaternion(w=.6, x=0.5, y=0.5, z=-.4)
+            q = vispy.util.quaternion.Quaternion(w=.6, x=0.5, y=0.5, z=-.4)
         elif view == '-YZ':
-            q = vp.util.quaternion.Quaternion(w=-.5, x=-0.5, y=0.5, z=-.5)
+            q = vispy.util.quaternion.Quaternion(w=-.5, x=-0.5, y=0.5, z=-.5)
         else:
             raise TypeError('Unable to set view from {}'.format(type(view)))
 
@@ -1197,6 +1252,10 @@ class Viewer:
         >>> pns = nl.skid[v.labels['PN']]
         """
 
+        # TODO:
+        # - Make sure to only cycle through non-labeled neurons
+        # - Add labels to the actual neurons
+
         if not isinstance(labels, dict):
             raise TypeError('Expected dict, got "{}"'.format(type(labels)))
 
@@ -1208,13 +1267,13 @@ class Viewer:
     @property
     def labels(self):
         """ Manually assigned labels. See :func:`pymaid.Viewer.label_setup`."""
-        return {l : [n for n, k in self._labels.items() if k==l] for l in self._labelmap.values()}    
+        return {l : [n for n, k in self._labels.items() if k==l] for l in self._labelmap.values()}
 
     def _label(self, key):
         """ Checks event key against annotations, adds annotation to neuron
         and cycles to the next neuron.
         """
-        if self.label_mode:                        
+        if self.label_mode:
             if key in self._labelmap:
                 l = self._labelmap[key]
                 self._labels.update({n: l for n in self.active_neuron})
@@ -1244,10 +1303,10 @@ def on_mouse_press(event):
     # Iterate over visuals in this canvas at cursor position
     for v in vis_at:
         # Skip views
-        if isinstance(v, vp.scene.widgets.ViewBox):
+        if isinstance(v, vispy.scene.widgets.ViewBox):
             continue
         # If legend entry, toggle visibility
-        elif isinstance(v, vp.scene.visuals.Text):
+        elif isinstance(v, vispy.scene.visuals.Text):
             viewer.toggle_neurons(v._object_id)
             break
         # If control modifier, try snapping cursor
@@ -1256,7 +1315,7 @@ def on_mouse_press(event):
                                 open_browser='Shift' in modifiers)
             break
         # If shift modifier, add to/remove from current selection
-        elif isinstance(v, vp.scene.visuals.VisualNode) and \
+        elif isinstance(v, vispy.scene.visuals.VisualNode) and \
              getattr(v, '_skeleton_id', None) and 'Shift' in modifiers:
             if v._skeleton_id not in set(viewer.selected):
                 viewer.selected = np.append(viewer.selected, v._skeleton_id)
@@ -1296,7 +1355,7 @@ def on_key_press(event):
         viewer.toggle_picking()
     elif event.text.lower() in ['1', '2', '3', '!', '@', '£']:
         v = {'1': 'XY', '2': 'XZ', '3': 'YZ',
-             '!': '-XY', '@': '-XZ', '£': '-YZ'}[event.text.lower()]        
+             '!': '-XY', '@': '-XZ', '£': '-YZ'}[event.text.lower()]
         viewer.set_view(v)
     elif event.text.lower() == 'c':
         viewer.url_to_cursor(open_browser=True)
@@ -1306,7 +1365,7 @@ def on_key_press(event):
 
 
 def on_resize(event):
-    """ Keep overlay in place upon resize. """
+    """ Keep overlay in place upon resize. """    
     viewer = event.source._wrapper
     viewer._shortcuts.pos = (10, event.size[1])
     viewer._picking_text.pos = (10, event.size[1] - 10)
