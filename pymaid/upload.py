@@ -261,6 +261,12 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(x, core.CatmaidNeuronList):
+        # Check if any neurons are only single nodes
+        if any(x.n_nodes <= 1) and (not isinstance(skeleton_id, type(None))
+                                    or not isinstance(neuron_id, type(None))):
+            raise ValueError('Single-node neurons can currently not be uploaded '
+                             'with a given skeleton or neuron ID.')
+
         # Parse skeleton_id and neuron_id
         if not isinstance(skeleton_id, type(None)) and not isinstance(skeleton_id, bool):
             # Make sure it's an iterable
@@ -321,53 +327,76 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                        ' fragments before import!')
         x = morpho.heal_fragmented_neuron(x, min_size=0, inplace=False)
 
-    import_url = remote_instance._import_skeleton_url()
+    # Check if any neurons are only single nodes
+    # -> these need to be uploaded differently
+    if x.n_nodes <= 1:
+        if not isinstance(skeleton_id, type(None)) or not isinstance(neuron_id, type(None)):
+            raise ValueError('Single-node neurons can currently not be uploaded '
+                             'with a given skeleton or neuron ID.')
 
-    import_post = {'neuron_id': neuron_id,
-                   'skeleton_id': skeleton_id,
-                   'name': x.neuron_name,
-                   'force': force_id,
-                   'auto_id': False}
+        node = x.nodes.iloc[0]
+        resp = add_treenode(coords=node[['x', 'y', 'z']].values,
+                            parent_id=None,
+                            radius=node.radius,
+                            confidence=node.confidence,
+                            remote_instance=remote_instance)
 
-    f = os.path.join(tempfile.gettempdir(), 'temp.swc')
+        # If error is returned
+        if 'error' in resp:
+            logger.error('Error uploading neuron "{}"'.format(x.neuron_name))
+            return resp
 
-    # Keep SWC node map
-    swc_map = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
+        # Add node ID map to match with normal upload
+        resp['node_id_map'] = {node.treenode_id: resp['treenode_id']}
 
-    with open(f, 'rb') as file:
-        # Large files can cause a 504 Gateway timeout. In that case, we want
-        # to have a log of it without interrupting potential subsequent uploads.
-        try:
-            resp = remote_instance.fetch(import_url,
-                                         post=import_post,
-                                         files={'file': file})
-        except requests.exceptions.HTTPError as err:
-            if 'gateway time-out' in str(err).lower():
-                logger.debug('Gateway time-out while uploading {}. Retrying..'.format(x.neuron_name))
-                try:
-                    resp = remote_instance.fetch(import_url,
-                                                 post=import_post,
-                                                 files={'file': file})
-                except requests.exceptions.HTTPError as err:
-                    logger.error('Timeout uploading neuron "{}"'.format(x.neuron_name))
-                    return {'error': err}
-                except BaseException:
+    else:
+        import_url = remote_instance._import_skeleton_url()
+
+        import_post = {'neuron_id': neuron_id,
+                       'skeleton_id': skeleton_id,
+                       'name': x.neuron_name,
+                       'force': force_id,
+                       'auto_id': False}
+
+        f = os.path.join(tempfile.gettempdir(), 'temp.swc')
+
+        # Keep SWC node map
+        swc_map = utils.to_swc(x, filename=f, export_synapses=False, min_radius=-1)
+
+        with open(f, 'rb') as file:
+            # Large files can cause a 504 Gateway timeout. In that case, we want
+            # to have a log of it without interrupting potential subsequent uploads.
+            try:
+                resp = remote_instance.fetch(import_url,
+                                             post=import_post,
+                                             files={'file': file})
+            except requests.exceptions.HTTPError as err:
+                if 'gateway time-out' in str(err).lower():
+                    logger.debug('Gateway time-out while uploading {}. Retrying..'.format(x.neuron_name))
+                    try:
+                        resp = remote_instance.fetch(import_url,
+                                                     post=import_post,
+                                                     files={'file': file})
+                    except requests.exceptions.HTTPError as err:
+                        logger.error('Timeout uploading neuron "{}"'.format(x.neuron_name))
+                        return {'error': err}
+                    except BaseException:
+                        raise
+                else:
+                    # Any other error should just raise
                     raise
-            else:
-                # Any other error should just raise
+            except BaseException:
                 raise
-        except BaseException:
-            raise
 
-    # If error is returned
-    if 'error' in resp:
-        logger.error('Error uploading neuron "{}"'.format(x.neuron_name))
-        return resp
+        # If error is returned
+        if 'error' in resp:
+            logger.error('Error uploading neuron "{}"'.format(x.neuron_name))
+            return resp
 
-    # Exporting to SWC changes the node IDs -> we will revert this in the
-    # response of the server
-    n_map = {n: resp['node_id_map'].get(str(swc_map[n]), None) for n in swc_map}
-    resp['node_id_map'] = n_map
+        # Exporting to SWC changes the node IDs -> we will revert this in the
+        # response of the server
+        n_map = {n: resp['node_id_map'].get(str(swc_map[n]), None) for n in swc_map}
+        resp['node_id_map'] = n_map
 
     if import_tags and getattr(x, 'tags', {}):
         # Map old to new nodes
