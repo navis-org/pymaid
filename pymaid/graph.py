@@ -340,7 +340,8 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
     the Graph. Therefore the graph may not contain loops!
 
     Treenode attributes (``x``, ``y``, ``z``, ``radius``, ``confidence``) need
-    to be properties of the graph's nodes.
+    to be properties of the graph's nodes. All node property will be added to
+    the neuron's ``.nodes`` table.
 
     Parameters
     ----------
@@ -387,7 +388,7 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
     skeleton_id = skeleton_id if skeleton_id else random.randint(0, 100000)
     neuron_name = neuron_name if neuron_name else 'neuron ' + str(skeleton_id)
 
-    lop = {k: v[0] if v else None for k, v in lop.items()}
+    lop = {k: v[0] if v else -1 for k, v in lop.items()}
 
     # Generate treenode table
     tn_table = pd.DataFrame(index=list(g.nodes))
@@ -396,19 +397,27 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
     # Add parents
     tn_table['parent_id'] = tn_table.index.map(lop)
 
-    # Add coordinates
-    x = nx.get_node_attributes(g, 'x')
-    tn_table['x'] = tn_table.index.map(lambda a: x.get(a, 0))
-    y = nx.get_node_attributes(g, 'y')
-    tn_table['y'] = tn_table.index.map(lambda a: y.get(a, 0))
-    z = nx.get_node_attributes(g, 'z')
-    tn_table['z'] = tn_table.index.map(lambda a: z.get(a, 0))
+    # Set root's parent from -1 to None -> do not do this earlier otherwise
+    # we will get problems with node IDs as floats
+    tn_table['parent_id'] = tn_table.parent_id.astype(object)
+    tn_table.loc[tn_table.parent_id < 0, 'parent_id'] = None
 
-    # Add confidence and radii
-    conf = nx.get_node_attributes(g, 'confidence')
-    tn_table['confidence'] = tn_table.index.map(lambda x: conf.get(x, 5))
-    radii = nx.get_node_attributes(g, 'radius')
-    tn_table['radius'] = tn_table.index.map(lambda x: radii.get(x, -1))
+    # Add additional generic attribute -> will skip treenode_id and parent_id
+    # if they exist
+    all_attr = set([k for n in g.nodes for k in g.nodes[n].keys()])
+
+    # Remove some that we don't need
+    all_attr -= set(['parent_id', 'treenode_id'])
+    # Add some that we want as columns even if they don't exist
+    all_attr |= set(['x', 'y', 'z', 'confidence', 'radius'])
+
+    # For some we want to have set default values
+    defaults = {'x': 0, 'y': 0, 'z': 0, 'confidence': 5, 'radius': -1}
+
+    # Now map the attributes onto node table
+    for at in all_attr:
+        vals = nx.get_node_attributes(g, at)
+        tn_table[at] = tn_table.index.map(lambda a: vals.get(a, defaults.get(at)))
 
     # Turn this into a Series
     n = pd.Series({'skeleton_id': skeleton_id,
