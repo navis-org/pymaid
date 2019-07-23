@@ -390,15 +390,16 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
 
     lop = {k: v[0] if v else -1 for k, v in lop.items()}
 
-    # Generate treenode table
+    # Generate treenode table and make sure node IDs are integers
     tn_table = pd.DataFrame(index=list(g.nodes))
-    tn_table.index = tn_table.index.set_names('treenode_id')
+    tn_table.index = tn_table.index.set_names('treenode_id').astype(int)
 
     # Add parents
     tn_table['parent_id'] = tn_table.index.map(lop)
 
     # Set root's parent from -1 to None -> do not do this earlier otherwise
     # we will get problems with node IDs as floats
+    tn_table['parent_id'] = tn_table.parent_id.astype(int)
     tn_table['parent_id'] = tn_table.parent_id.astype(object)
     tn_table.loc[tn_table.parent_id < 0, 'parent_id'] = None
 
