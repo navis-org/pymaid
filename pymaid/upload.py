@@ -1073,9 +1073,9 @@ def join_nodes(winner_node, looser_node, no_prompt=False, tag_nodes=True,
     edition_times = details.set_index('node_id').edition_time.to_dict()
 
     if winner_node not in edition_times:
-        raise ValueError('winner_node does not exist')
+        raise ValueError('winner_node "{}" does not exist'.format(winner_node))
     if looser_node not in edition_times:
-        raise ValueError('looser_node does not exist')
+        raise ValueError('looser_node "{}" does not exist'.format(looser_node))
 
     skids = fetch.get_skid_from_treenode([winner_node, looser_node],
                                          remote_instance=remote_instance)
