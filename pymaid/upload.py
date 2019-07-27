@@ -1221,7 +1221,7 @@ def link_connector(links, remote_instance=None):
 
 
 @cache.never_cache
-def update_radii(radii, remote_instance=None):
+def update_radii(radii, chunk_size=1000, remote_instance=None):
     """Change radii [nm] of given treenodes.
 
     Parameters
@@ -1229,6 +1229,9 @@ def update_radii(radii, remote_instance=None):
     radii :             dict, CatmaidNeuron/List
                         Dictionary mapping treenode IDs to new radii or a
                         CatmaidNeuron.
+    chunk_size :        int, optional
+                        Update radii in chunks of this size. The maximal
+                        chunk size depends on your server's configuration.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
@@ -1271,23 +1274,44 @@ def update_radii(radii, remote_instance=None):
 
     update_radii_url = remote_instance._update_treenode_radii()
 
-    update_post = {"treenode_ids[{}]".format(i): k for i, k in enumerate(radii.keys())}
-    update_post.update({"treenode_radii[{}]".format(i): k for i, k in enumerate(radii.values())})
-
     # We need to provide a state for each node
     details = fetch.get_node_details(list(radii.keys()),
                                      convert_ts=False,
                                      remote_instance=remote_instance)
     edition_times = details.set_index('node_id').edition_time.to_dict()
 
-    # State has to be provided as {'state': [(node_id, edition_time), ..]}
-    update_post.update({"state": [(str(k), edition_times[str(k)]) for k in radii]})
+    tn_ids = list(radii.keys())
+    resp = {}
+    for i in config.trange(0, len(radii), int(chunk_size),
+                           desc='Updating radii',
+                           disable=config.pbar_hide,
+                           leave=config.pbar_leave):
+        this_chunk = {n: radii[n] for n in tn_ids[i: i + chunk_size]}
 
-    # We have to explicitly convert the state in a json string because passing
-    # it to requests as "post" will fuck this up otherwise
-    update_post['state'] = json.dumps(update_post['state'])
+        update_post = {"treenode_ids[{}]".format(i): k for i, k in enumerate(this_chunk.keys())}
+        update_post.update({"treenode_radii[{}]".format(i): k for i, k in enumerate(this_chunk.values())})
 
-    return remote_instance.fetch(update_radii_url, update_post)
+        # State has to be provided as {'state': [(node_id, edition_time), ..]}
+        update_post.update({"state": [(str(k), edition_times[str(k)]) for k in this_chunk]})
+
+        # We have to explicitly convert the state in a json string because passing
+        # it to requests as "post" will fuck this up otherwise
+        update_post['state'] = json.dumps(update_post['state'])
+
+        this_resp = remote_instance.fetch(update_radii_url, update_post)
+
+        # Merge responses
+        for r, v in this_resp.items():
+            if isinstance(v, dict):
+                d = resp.get(r, {})
+                d.update(v)
+                resp[r] = d
+            elif isinstance(v, list):
+                resp[r] = resp.get(r, []) + v
+            else:
+                resp[r] = resp.get(r, []) + [v]
+
+    return resp
 
 
 @cache.never_cache
