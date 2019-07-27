@@ -4268,7 +4268,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by user
     if users:
         urls = [remote_instance._get_list_skeletons_url() for u in users]
-        GET_data = [{'nodecount_gt': min_size,
+        GET_data = [{'nodecount_gt': min_size - 1,
                      'created_by': u} for u in users]
 
         if from_date and to_date:
@@ -4288,7 +4288,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by reviewer
     if reviewed_by:
         urls = [remote_instance._get_list_skeletons_url() for u in reviewed_by]
-        GET_data = [{'nodecount_gt': min_size,
+        GET_data = [{'nodecount_gt': min_size - 1,
                      'reviewed_by': u} for u in reviewed_by]
 
         if from_date and to_date:
@@ -4347,8 +4347,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                 return
 
         logger.info(
-            'Get all neurons with > {0} nodes'.format(min_size))
-        get_skeleton_list_GET_data = {'nodecount_gt': min_size}
+            'Get all neurons with >= {0} nodes'.format(min_size))
+        get_skeleton_list_GET_data = {'nodecount_gt': min_size - 1}
         remote_get_list_url = remote_instance._get_list_skeletons_url()
         remote_get_list_url += '?%s' % urllib.parse.urlencode(
             get_skeleton_list_GET_data)
@@ -4369,7 +4369,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     if min_size > 1 and (volumes or annotations or names):
         logger.info('Filtering neurons for size')
 
-        get_skeleton_list_GET_data = {'nodecount_gt': min_size}
+        get_skeleton_list_GET_data = {'nodecount_gt': min_size - 1}
         remote_get_list_url = remote_instance._get_list_skeletons_url()
         remote_get_list_url += '?%s' % urllib.parse.urlencode(
             get_skeleton_list_GET_data)
