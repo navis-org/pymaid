@@ -466,7 +466,8 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
 
     Parameters
     ----------
-    x :         single CatmaidNeuron
+    x :         CatmaidNeuron/List
+                If CatmaidNeuronList, all nodes will used for the KDTree.
     tree_type : 'c' | 'normal', optional
                 Type of KDTree:
                   1. ``'c'`` = ``scipy.spatial.cKDTree`` (faster)
@@ -493,13 +494,8 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
         raise ValueError(
             '"data" needs to be either "treenodes" or "connectors"')
 
-    if isinstance(x, core.CatmaidNeuronList):
-        if len(x) == 1:
-            x = x[0]
-        else:
-            raise ValueError('Need a single CatmaidNeuron')
-    elif not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Need CatmaidNeuron, got "{0}"'.format(type(x)))
+    if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        raise TypeError('Need CatmaidNeuron/List, got "{0}"'.format(type(x)))
 
     if data == 'treenodes':
         d = x.nodes[['x', 'y', 'z']].values
