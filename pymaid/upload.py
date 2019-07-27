@@ -309,6 +309,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                                              remote_instance=remote_instance)
                 for i, n in config.tqdm(enumerate(x),
                                         desc='Import',
+                                        total=len(x),
                                         disable=config.pbar_hide,
                                         leave=config.pbar_leave)}
 
@@ -537,7 +538,10 @@ def differential_upload(x, skeleton_id=None, no_prompt=False, remote_instance=No
     # them sequentially anyway - so we'll just go through the pain in any
     # event
     if report['nodes_b_only']:
-        for n in tqdm(report['nodes_b_only'], desc='Removing nodes'):
+        for n in config.tqdm(report['nodes_b_only'],
+                             desc='Removing nodes',
+                             leave=config.pbar_leave,
+                             disable=config.pbar_hide):
             resp = delete_nodes(n, 'TREENODE',
                                 no_prompt=True,
                                 remote_instance=remote_instance)
@@ -554,7 +558,10 @@ def differential_upload(x, skeleton_id=None, no_prompt=False, remote_instance=No
         frags = morpho.break_fragments(x_ss)
 
         # Upload each fragment and connect to live neuron
-        for f in tqdm(frags, 'Uploading & Joining'):
+        for f in config.tqdm(frags,
+                             desc='Uploading & Joining',
+                             leave=config.pbar_leave,
+                             disable=config.pbar_hide):
             # Single nodes can't be uploaded as SWC neurons
             if f.nodes.shape[0] == 1:
                 parent_id = x.nodes.set_index('treenode_id').loc[f.root[0],
@@ -1660,10 +1667,10 @@ def push_new_root(new_root, no_prompt=False, remote_instance=None):
         return {r: push_new_root(r,
                                  no_prompt=no_prompt,
                                  remote_instance=remote_instance)
-                                 for r in tqdm(new_root,
-                                               desc='Rerooting',
-                                               disable=config.pbar_hide,
-                                               leave=config.pbar_leave)}
+                                 for r in config.tqdm(new_root,
+                                                      desc='Rerooting',
+                                                      disable=config.pbar_hide,
+                                                      leave=config.pbar_leave)}
 
     try:
         new_root = int(new_root)
