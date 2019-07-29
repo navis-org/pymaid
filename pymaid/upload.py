@@ -156,6 +156,8 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
                             }
 
     """
+    # TODOs:
+    # - move node confidences
     if not isinstance(source_instance, fetch.CatmaidInstance):
         raise TypeError('"source_instance" must be CatmaidInstance not "{}"'.format(type(source_instance)))
 
@@ -185,18 +187,28 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
         source_instance.caching = old_caching
 
     if not no_prompt:
-        q = 'Transferring neurons from {} (PID {}) to {} (PID {}):'
+        summary = neurons.summary()[['neuron_name', 'skeleton_id', 'n_nodes']]
+
+        if move_connectors:
+            summary['n_connectors'] = neurons.n_connectors
+
+        if move_tags:
+            summary['n_tags'] = [len(n.tags) for n in neurons]
+
+        if move_annotations:
+            summary['n_annotations'] = [len(n.annotations) for n in neurons]
+
+        print(summary.to_string())
+
+        q = 'Transferring above neurons from {} (project ID {}) to {} (project ID {}). Proceed? [Y/N] '
         q = q.format(source_instance.server,
                      source_instance.project_id,
                      target_instance.server,
                      target_instance.project_id)
-        print(q)
-        for n in neurons:
-            print('{} (#{})'.format(n.neuron_name, n.skeleton_id))
 
         answer = ""
         while answer not in ["y", "n"]:
-            answer = input("Proceed? [Y/N] ").lower()
+            answer = input(q).lower()
             if answer != 'y':
                 return
 
