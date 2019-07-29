@@ -1813,7 +1813,8 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
 
 
 @cache.undo_on_error
-def get_treenode_table(x, include_details=True, remote_instance=None):
+def get_treenode_table(x, include_details=True, convert_ts=True,
+                       remote_instance=None):
     """ Retrieve treenode table(s) for a list of neurons.
 
     Parameters
@@ -1829,6 +1830,9 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
                         If True, tags and reviewer are included in the table.
                         For larger lists, it is recommended to set this to
                         False to improve performance.
+    convert_ts :        bool, optional
+                        If True, will convert edition timestamp to pandas
+                        datetime. Set to False to improve performance.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
@@ -1856,8 +1860,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
     logger.info('Retrieving {} treenode table(s)...'.format(len(x)))
 
     user_list = get_user_list(remote_instance)
-
-    user_dict = user_list.set_index('id').T.to_dict()
+    user_dict = user_list.set_index('id').login.to_dict()
 
     # Generate URLs to retrieve
     urls = []
@@ -1865,7 +1868,7 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
         remote_nodes_list_url = remote_instance._get_skeleton_nodes_url(skid)
         urls.append(remote_nodes_list_url)
 
-    node_list = remote_instance.fetch(urls, desc='Get tbls')
+    node_list = remote_instance.fetch(urls, desc='Get tables')
 
     logger.info('{} treenodes retrieved. Creating table..'
                 '.'.format(sum([len(nl[0]) for nl in node_list])))
@@ -1876,41 +1879,40 @@ def get_treenode_table(x, include_details=True, remote_instance=None):
                                        desc='Creating table',
                                        leave=config.pbar_leave,
                                        disable=config.pbar_hide)):
+
+        this_df = pd.DataFrame(nl[0],
+                               columns=['treenode_id', 'parent_node_id',
+                                        'confidence', 'x', 'y', 'z', 'radius',
+                                        'creator', 'last_edited'],
+                               dtype=object
+                               )
+        this_df['skeleton_id'] = x[i]
+
         if include_details:
-            tag_dict = {n[0]: [] for n in nl[0]}
-            reviewer_dict = {n[0]: [] for n in nl[0]}
-            [tag_dict[n[0]].append(n[1]) for n in nl[2]]
-            [reviewer_dict[n[0]].append(user_list[user_list.id == n[1]]['login'].values[
-                                        0]) for n in nl[1]]
+            tag_dict = {}
+            for t in nl[2]:
+                tag_dict[t[0]] = tag_dict.get(t[0], []) + [t[1]]
 
-            this_df = pd.DataFrame([[x[i]] + n + [reviewer_dict[n[0]], tag_dict[n[0]]] for n in nl[0]],
-                                   columns=['skeleton_id', 'treenode_id',
-                                            'parent_node_id', 'confidence',
-                                            'x', 'y', 'z', 'radius', 'creator',
-                                            'last_edited', 'reviewers',
-                                            'tags'],
-                                   dtype=object
-                                   )
-        else:
-            this_df = pd.DataFrame([[x[i]] + n for n in nl[0]],
-                                   columns=['skeleton_id', 'treenode_id',
-                                            'parent_node_id', 'confidence',
-                                            'x', 'y', 'z', 'radius', 'creator',
-                                            'last_edited'],
-                                   dtype=object
-                                   )
+            reviewer_dict = {}
+            for r in nl[1]:
+                reviewer_dict[r[0]] = reviewer_dict.get(r[0], []) + [user_dict[r[1]]]
 
-        # Replace creator_id with their login
-        this_df['creator'] = [user_dict[u]['login']
-                              for u in this_df['creator']]
-
-        # Replace timestamp with datetime object
-        this_df['last_edited'] = [datetime.datetime.fromtimestamp(
-            t, tz=datetime.timezone.utc) for t in this_df['last_edited']]
+            this_df['reviewers'] = this_df.treenode_id.map(reviewer_dict)
+            this_df['tags'] = this_df.treenode_id.map(tag_dict)
 
         all_tables.append(this_df)
 
-    tn_table = pd.concat(all_tables, axis=0)
+    # Concatenate all DataFrames
+    tn_table = pd.concat(all_tables, axis=0, ignore_index=True)
+
+    # Replace creator_id with their login
+    tn_table['creator'] = tn_table.creator.map(user_dict)
+
+    # Replace timestamp with datetime object
+    if convert_ts:
+        tn_table['last_edited'] = pd.to_datetime(tn_table.last_edited,
+                                                 utc=True,
+                                                 unit='s')
 
     return tn_table
 
