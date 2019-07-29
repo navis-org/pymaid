@@ -58,6 +58,13 @@ import pandas as pd
 from . import core, graph, utils, config, cache
 from .intersect import in_volume
 
+try:
+    import ujson as json
+except ImportError:
+    import json
+except BaseException:
+    raise
+
 __all__ = sorted(['CatmaidInstance',
                   'get_3D_skeleton', 'get_3D_skeletons',
                   'get_annotation_details', 'get_annotation_id',
@@ -405,16 +412,16 @@ class CatmaidInstance:
             parsed = []
             for r in resp:
                 try:
-                    parsed.append(r.json())
+                    parsed.append(json.loads(r.content))
                 except BaseException:
-                    logger.error('Error decoding json inr response. Content: {}'.format(r.content))
+                    logger.error('Error decoding json in response:\n{}'.format(r.content))
                     raise
         elif return_type.lower() == 'raw':
             parsed = [r.content for r in resp]
         elif return_type.lower() == 'request':
             parsed = resp
         else:
-            raise ValueError('Unknown return type "{}"'.format(return_type))
+            raise ValueError('Unknown return_type "{}"'.format(return_type))
 
         if was_single:
             return parsed[0]

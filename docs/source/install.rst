@@ -218,6 +218,15 @@ Optional
     pip3 install shapely
 
 
+`ujson <https://pypi.org/project/ujson/>`_
+  Fast json en-/decoder written in C/C++. This will speed up fetching data.
+
+  ::
+
+    pip3 install ujson
+
+
+
 Advanced users: more speed with iGraph
 --------------------------------------
 
@@ -227,7 +236,6 @@ written in pure Python, well maintained and easy to install.
 
 If you need that extra bit of speed, consider manually installing
 `iGraph <http://igraph.org/>`_. It is written in C and therefore very fast. If
-available, pymaid will try using iGraph over NetworkX. iGraph is difficult to
+available, pymaid will use iGraph over NetworkX. iGraph is difficult to
 install though because you have to install the C core first and then its
 Python bindings, ``python-igraph``.
-

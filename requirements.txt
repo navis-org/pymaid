@@ -24,3 +24,4 @@ vispy==0.5.3
 # trimesh==2.35.2
 # rpy2==2.9.4
 # fuzzywuzzy[speedup]==0.17.0
+# rjson
