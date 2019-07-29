@@ -138,7 +138,8 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
     force_id :           bool, optional
                          If True and neuron/skeleton IDs already exist in
                          target instance, they will be replaced. **Use this with
-                         extrem caution!**
+                         extrem caution as this will destroy the existing
+                         skeleton!**
     no_prompt :          bool, optional
                          If True, will not prompt before transferring neurons!
 
@@ -320,7 +321,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                                              force_id=force_id,
                                              remote_instance=remote_instance)
                 for i, n in config.tqdm(enumerate(x),
-                                        desc='Import',
+                                        desc='Uploading',
                                         total=len(x),
                                         disable=config.pbar_hide,
                                         leave=config.pbar_leave)}
@@ -449,7 +450,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         rl_map = config.compact_skeleton_relations
 
         # Link connectors
-        links = [[n_map[n.treenode_id],
+        links = [[resp['node_id_map'][n.treenode_id],
                   cn_map[n.connector_id],
                   rl_map[n.relation]] for n in x.connectors.itertuples()]
 
