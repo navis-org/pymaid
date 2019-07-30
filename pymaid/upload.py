@@ -337,6 +337,9 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Expected CatmaidNeuron/List, got "{}"'.format(type(x)))
 
+    if x.nodes.empty:
+        raise ValueError('{} #{}: Unable to upload neuron without nodes'.format(x.neuron_name, x.skeleton_id))
+
     if x.n_skeletons > 1:
         logger.warning('Neuron has multiple disconnected skeletons. Will heal'
                        ' fragments before import!')
@@ -415,7 +418,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
     if import_tags and getattr(x, 'tags', {}):
         # Map old to new nodes
-        tags = {t: [n_map[n] for n in v] for t, v in x.tags.items()}
+        tags = {t: [resp['node_id_map'][n] for n in v] for t, v in x.tags.items()}
         # Invert tag dictionary: map node ID -> list of tags
         ntags = {}
         for t in tags:
