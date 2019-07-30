@@ -46,7 +46,8 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'link_connector', 'delete_nodes',
                   'add_connector', 'transfer_neuron',
                   'differential_upload', 'move_nodes',
-                  'push_new_root', 'add_treenode'])
+                  'push_new_root', 'add_treenode',
+                  'update_node_confidence'])
 
 # Set up logging
 logger = config.logger
@@ -1229,6 +1230,70 @@ def link_connector(links, remote_instance=None):
 
     if any(['error' in r for r in resp]):
         logger.error('Error creating link(s)! Check server response')
+
+    return resp
+
+
+@cache.never_cache
+def update_node_confidence(confidences, to_connector=False, remote_instance=None):
+    """Change node confidences.
+
+    Parameters
+    ----------
+    confidences :       dict
+                        Dictionary mapping treenode ID -> confidences::
+
+                            {treenode_id[int]: new_confidence[int]}
+
+    to_connector:       bool, optional
+                        If True, will change confidence between this node and
+                        linked connector.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    list
+                        List of dictionary with server reponses.
+
+    See Also
+    --------
+    :func:`~pymaid.add_treenode`
+                        To create new treenodes.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    # Some sanity checks
+    if not isinstance(confidences, dict):
+        raise TypeError('Expected dict, got "{}"'.format(type(confidences)))
+
+    if any([5 <= c <= 1 for c in confidences.values()]):
+        raise ValueError('New confidences must be 1-5')
+
+    all_ids = list(confidences.keys())
+
+    update_conf_url = [remote_instance._update_node_confidence_url(n) for n in all_ids]
+
+    details = fetch.get_node_details(all_ids,
+                                     convert_ts=False,
+                                     remote_instance=remote_instance)
+    edition_times = details.set_index('node_id').edition_time.to_dict()
+
+    missing = [str(n) for n in all_ids if str(n) not in edition_times]
+    if missing:
+        raise ValueError('Node(s) do not exist: {}'.format(', '.join(missing)))
+
+    # We have to explicitly convert the state in a json string because passing
+    # it to requests as "post" will fuck this up otherwise
+    conf_post = [{'new_confidence': confidences[n],
+                  'state': json.dumps({'edition_time': edition_times[str(n)]}),
+                  'to_connector': to_connector} for n in all_ids]
+
+    resp = remote_instance.fetch(update_conf_url, conf_post, desc='Updating confidences')
+
+    if any(['error' in r for r in resp]):
+        logger.error('Error changing confidences! Check server response')
 
     return resp
 
