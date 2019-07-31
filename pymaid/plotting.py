@@ -1039,7 +1039,7 @@ def plot3d(x, **kwargs):
                       Use to modify scatter plots. Accepted parameters are
                         - ``size`` to adjust size of dots
                         - ``color`` to adjust color
-    remote_instance : CATMAID Instance, optional
+    remote_instance : CatmaidInstance, optional
                       Will try using globally defined CatmaidInstance if not
                       provided.
     plotly_inline :   bool, default=True
@@ -1153,27 +1153,32 @@ def plot3d(x, **kwargs):
             skid = neuron.skeleton_id
 
             if not connectors_only:
-                if by_strahler:
-                    s_index = morpho.strahler_index(neuron, return_dict=True)
+                # Generate coordinates along segments
+                coords = _segments_to_coords(neuron, neuron.segments,
+                                             modifier=(-1, -1, -1))
 
-                coords = _segments_to_coords(
-                    neuron, neuron.segments, modifier=(-1, -1, -1))
-
-                # We have to add (None,None,None) to the end of each slab to
+                # We have to add (None, None, None) to the end of each slab to
                 # make that line discontinuous there
-                coords = np.vstack(
-                    [np.append(t, [[None] * 3], axis=0) for t in coords])
+                coords = np.vstack([np.append(t, [[None] * 3], axis=0) for t in coords])
 
                 if by_strahler:
-                    c = []
-                    for k, s in enumerate(coords):
-                        this_c = 'rgba(%i,%i,%i,%f)' % (neuron_cmap[i][0],
-                                                        neuron_cmap[i][1],
-                                                        neuron_cmap[i][2],
-                                                        s_index[s[0]] / max(s_index.values()))
-                        # Slabs are separated by a <None> coordinate -> this is
-                        # why we need one more color entry
-                        c += [this_c] * (len(s) + 1)
+                    if 'strahler_index' not in neuron.nodes.columns:
+                        morpho.strahler_index(neuron, inplace=True)
+
+                    # Prepare strahler indices
+                    s_index = neuron.nodes.set_index('treenode_id').strahler_index.to_dict()
+                    max_si = neuron.nodes.strahler_index.max()
+                    s_index_norm = {k: v/max_si for k,v in s_index.items()}
+
+                    # Get node IDs along the segments and add the "(None, None, None)"
+                    node_ids = np.hstack([np.append(s, [None], axis=0) for s in neuron.segments])
+
+                    # Get alpha values
+                    alpha = [s_index_norm.get(n, 1) for n in node_ids]
+
+                    # Generate colors
+                    bc = 'rgba({:d},{:d},{:d},'.format(*neuron_cmap[i][:3])
+                    c = [bc + '{:f})'.format(a) for a in alpha]
                 else:
                     try:
                         c = 'rgb{}'.format(neuron_cmap[i])
