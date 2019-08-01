@@ -903,12 +903,15 @@ def reroot_neuron(x, new_root, inplace=False):
     # Propagate changes in graph back to treenode table
     x.nodes.set_index('treenode_id', inplace=True)
     x.nodes.loc[path[1:], 'parent_id'] = path[:-1]
+    # Give the old root a new node type
     if old_root_deg == 1:
         x.nodes.loc[path[-1], 'type'] = 'slab'
     elif old_root_deg > 1:
         x.nodes.loc[path[-1], 'type'] = 'branch'
     else:
         x.nodes.loc[path[-1], 'type'] = 'end'
+    # Give the new root node type "root"
+    x.nodes.loc[path[0], 'type'] = 'root' 
     x.nodes.reset_index(drop=False, inplace=True)
 
     # Set new root's parent to None
