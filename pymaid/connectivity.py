@@ -792,23 +792,23 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
     return edges
 
 
-def adjacency_matrix(s, t=None, source_grp={}, target_grp={},
-                     syn_threshold=None, syn_cutoff=None,
-                     use_connectors=False, remote_instance=None):
-    """ Generate adjacency matrix between sets of neurons.
+def adjacency_matrix(sources, targets=None, source_grp={}, target_grp={},
+                     fractions=False, syn_threshold=None, syn_cutoff=None,
+                     use_connectors=False, volume_filter=None, remote_instance=None):
+    """Generate adjacency matrix between source and target neurons.
 
     Directional: sources = rows, targets = columns.
 
     Parameters
     ----------
-    s
+    sources
                         Source neurons as single or list of either:
 
                         1. skeleton IDs (int or str)
                         2. neuron name (str, exact match)
                         3. annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    t
+    targets
                         Optional. Target neurons as single or list of either:
 
                         1. skeleton IDs (int or str)
@@ -817,10 +817,13 @@ def adjacency_matrix(s, t=None, source_grp={}, target_grp={},
                         4. CatmaidNeuron or CatmaidNeuronList object
 
                         If not provided, ``source neurons = target neurons``.
+    fractions :         bool, optional
+                        If True, will return connectivity as fraction of total
+                        number of postsynaptic links to target neuron.
     syn_cutoff :        int, optional
-                        If set, will cut off connections above given value.
+                        If set, will cut off connections ABOVE given value.
     syn_threshold :     int, optional
-                        If set, will ignore connections with less synapses.
+                        If set, will ignore connections with LESS synapses.
     source_grp :        dict, optional
                         Use to collapse sources into groups. Can be either:
                           1. ``{group1: [neuron1, neuron2, ... ], ..}``
@@ -833,9 +836,11 @@ def adjacency_matrix(s, t=None, source_grp={}, target_grp={},
     use_connectors :    bool, optional
                         If True AND ``s`` or ``t`` are ``CatmaidNeuron/List``,
                         restrict adjacency matrix to their connectors. Use
-                        if e.g. you are using pruned neurons. **Important**:
-                        This does not work if you have multiple fragments per
-                        neuron!
+                        if e.g. you are using pruned neurons.
+    volume_filter :     Volume | list of Volumes, optional
+                        Volume(s) to restrict connections to. Can be a
+                        pymaid.Volume, the name of a CATMAID volume or a
+                        list thereof.
     remote_instance :   CatmaidInstance, optional
                         If not passed, will try using globally defined.
 
@@ -890,47 +895,116 @@ def adjacency_matrix(s, t=None, source_grp={}, target_grp={},
     >>> ax = sns.heatmap(adj_merged)
     >>> plt.show()
 
+    Restrict adjacency matrix to a given volume:
+
+    >>> neurons = pymaid.get_neurons('annotation:glomerulus DA1')
+    >>> lh = pymaid.get_volume('LH_R')
+    >>> adj = pymaid.adjacency_matrix(neurons, volume_filter=lh)
+
+    Get adjacency matrix with fraction of inputs instead of total
+    synapse count:
+
+    >>> neurons = pymaid.get_neurons('annotation:glomerulus DA1')
+    >>> adj = pymaid.adjacency_matrix(neurons, fractions=True)
+
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if t is None:
-        t = s
+    source_skids = utils.eval_skids(sources, remote_instance=remote_instance)
 
-    neuronsA = utils.eval_skids(s, remote_instance=remote_instance)
-    neuronsB = utils.eval_skids(t, remote_instance=remote_instance)
+    if isinstance(targets, type(None)):
+        targets = sources
+        target_skids = source_skids
+    else:
+        target_skids = utils.eval_skids(targets, remote_instance=remote_instance)
 
     # Make sure neurons are  integers
-    neurons = list(set([int(n) for n in (neuronsA + neuronsB)]))
-    neuronsA = [int(n) for n in neuronsA]
-    neuronsB = [int(n) for n in neuronsB]
+    source_skids = [int(n) for n in source_skids]
+    target_skids = [int(n) for n in target_skids]
 
-    # Make sure neurons are unique
-    neuronsA = sorted(set(neuronsA), key=neuronsA.index)
-    neuronsB = sorted(set(neuronsB), key=neuronsB.index)
+    # Make sure skeleton IDs are unique
+    source_skids = sorted(set(source_skids), key=source_skids.index)
+    target_skids = sorted(set(target_skids), key=target_skids.index)
 
-    logger.info('Retrieving and filtering connectivity...')
+    # Get the adjacency matrix
+    url = remote_instance._get_connectivity_matrix_url()
+    post = {}
+    post.update({'rows[{}]'.format(i): s for i, s in enumerate(source_skids)})
+    post.update({'columns[{}]'.format(i): s for i, s in enumerate(target_skids)})
+    post['with_locations'] = bool(volume_filter) or use_connectors
 
-    if use_connectors and (isinstance(s, (core.CatmaidNeuron, core.CatmaidNeuronList))
-                           or isinstance(t, (core.CatmaidNeuron, core.CatmaidNeuronList))):
-        edges = _edges_from_connectors(
-            s, t, remote_instance=remote_instance)
+    # Data will be in format::
+    # {'source_skid': {'target_skid': {'count': int,
+    #                                  'locations': {connector_id: {'pos': [x, y, z],
+    #                                                               'count: int'}}}}}
+    data = remote_instance.fetch(url, post)
+
+    # Check which connectors to keep
+    if use_connectors or bool(volume_filter):
+        # Extract connector IDs and their locations
+        cn_loc = {cn: t['locations'][cn]['pos'] for s in data.values() for t in s.values() for cn in t['locations']}
+        to_keep = set(cn_loc.keys())
+
+        # Remove connectors that aren't part of the neurons anymore
+        if use_connectors:
+            if isinstance(sources, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+                to_keep = to_keep & set(sources.connectors.connector_id.values.astype(str))
+
+            if isinstance(targets, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+                to_keep = to_keep & set(targets.connectors.connector_id.values.astype(str))
+
+        # Turn into list so we can check for in_volume
+        to_keep = np.array(list(to_keep))
+        if bool(volume_filter):
+            volume_filter = utils._make_iterable(volume_filter)
+            for vol in volume_filter:
+                if not isinstance(vol, core.Volume):
+                    vol = fetch.get_volume(vol, remote_instance=remote_instance)
+                # Get positions of remaining connectors
+                pos = np.array([cn_loc[cn] for cn in to_keep])
+                in_vol = intersect.in_volume(pos, vol)
+                to_keep = to_keep[in_vol]
+
+        # Now recount depending on left-over connectors
+        to_keep = set(to_keep)  # this speeds up the "in" query by ALOT
+        for s in data:
+            for t in data[s]:
+                # Sum up count for connectors that we have kept
+                new_count = sum([val['count'] for cn, val in data[s][t]['locations'].items() if cn in to_keep])
+                data[s][t]['count'] = new_count
+
+        # Change to records
+        records = {s: {t: val['count'] for t, val in data[s].items()} for s in data}
     else:
-        edges = fetch.get_edges(neurons, remote_instance=remote_instance)
+        records = data
 
-    # Turn into a adjacency matrix
-    matrix = edges.pivot(values='weight',
-                         columns='target_skid',
-                         index='source_skid').fillna(0)
+    # Parse data into adjacency matrix
+    matrix = pd.DataFrame.from_records(records).fillna(0).T
 
-    # Filter to actual sources and targets
-    matrix = matrix.reindex(neuronsA, columns=neuronsB, fill_value=0)
+    # Make sure Skids are integers
+    matrix.index = matrix.index.astype(int)
+    matrix.columns = matrix.columns.astype(int)
+
+    # Filter and sort to actual sources and targets
+    matrix = matrix.reindex(index=source_skids, columns=target_skids, fill_value=0)
 
     # Apply cutoff and threshold
     matrix = matrix.clip(upper=syn_cutoff)
-
     if syn_threshold:
         matrix[matrix < syn_threshold] = 0
+
+    # Convert to fractions
+    if fractions:
+        cn_counts = fetch.get_connectivity_counts(target_skids,
+                                                  source_relations=['postsynaptic_to'],
+                                                  target_relations=['presynaptic_to'],
+                                                  remote_instance=remote_instance)
+        cn_counts = cn_counts['connectivity']
+
+        div = [list(cn_counts.get(s).values())[0] for s in matrix.columns.astype(str)]
+
+        matrix = matrix / div
 
     matrix.datatype = 'adjacency_matrix'
 
@@ -940,7 +1014,9 @@ def adjacency_matrix(s, t=None, source_grp={}, target_grp={},
                               target_grp,
                               drop_ungrouped=False)
 
-    logger.info('Finished!')
+    # Make pretty
+    matrix.columns.name = 'targets'
+    matrix.index.name = 'sources'
 
     return matrix
 
@@ -1334,4 +1410,3 @@ def shared_partners(a, b, upstream=True, downstream=True, syn_threshold=None,
     cn = cn[(cn['edges_a'] >= syn_threshold) & (cn['edges_b'] >= syn_threshold)]
 
     return cn[['neuron_name', 'skeleton_id', 'relation', 'edges_a', 'edges_b']].reset_index()
-

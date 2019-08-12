@@ -35,7 +35,7 @@ neurons (no duplicate skeleton IDs)
 
 >>> # Get a set of projection neurons
 >>> nl = pymaid.get_neurons('annotation:glomerulus DA1 right excitatory')
->>> # Split get only the axonal branches in the laterl horn using a tag
+>>> # Split get only the axonal branches in the lateral horn using a tag
 >>> nl.reroot(nl.soma)
 >>> nl_axon = nl.prune_proximal_to('SCHLEGEL_LH', inplace=False)
 >>> # Get a list of the all partners (axon + dendrites)
@@ -54,13 +54,13 @@ and compare their connectivity (duplicate skeleton IDs!)
 >>> import numpy as np
 >>> # Get a set of neurons
 >>> nl = pymaid.get_neurons('annotation:PD2a1/b1')
->>> # Split into axon dendrite by using synapse flow
+>>> # Split into axon dendrite using synapse flow
 >>> nl.reroot(nl.soma)
 >>> nl_split = pymaid.split_axon_dendrite(nl)
 >>> # Get a list of partners
 >>> cn_table = pymaid.get_partners(nl)
->>> ds_partners = cn_table[ cn_table.relation == 'downstream' ]
->>> us_partners = cn_table[ cn_table.relation == 'upstream' ]
+>>> ds_partners = cn_table[cn_table.relation == 'downstream']
+>>> us_partners = cn_table[cn_table.relation == 'upstream']
 >>> # Take the top 10 up- and downstream partners
 >>> top10 = np.append(ds_partners.iloc[:10].skeleton_id.values,
 ...                   us_partners.iloc[:10].skeleton_id.values)
@@ -77,13 +77,22 @@ and compare their connectivity (duplicate skeleton IDs!)
 >>> plt.show()
 
 Above example illustrate how to subset connectivity to given part(s) of a
-neuron. Subsetting to a volume is even easier:
-Following up on above example, we will next subset the connectivity table to
-connections in a given CATMAID volume:
+neuron. Subsetting to a volume is even easier! Following up on above example,
+we will next subset the connectivity table to connections in a given
+CATMAID volume:
 
 >>> # Get a CATMAID volume
->>> vol = pymaid.get_volume('LH_R')
->>> cn_table_lh = pymaid.filter_connectivity(cn_table, vol)
+>>> lh = pymaid.get_volume('LH_R')
+>>> cn_table_lh = pymaid.filter_connectivity(cn_table, lh)
+
+Subsetting a adjacency matrix is equally straight forward:
+
+>>> # Without restrictions
+>>> top10_downstream = ds_partners.iloc[:10].skeleton_id.values
+>>> adj = pymaid.adjacency_matrix(sources=nl, targets=top10_downstream)
+>>> # Subset to the lateral horn
+>>> adj_lh = pymaid.adjacency_matrix(sources=nl, targets=top10_downstream,
+...                                  volume_filter=lh)
 
 Reference
 =========
