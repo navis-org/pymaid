@@ -699,13 +699,13 @@ class ClustResults:
     >>> import matplotlib.pyplot as plt
     >>> # Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
-    >>> # Perform all-by-all nblast
-    >>> res = pymaid.nblast_allbyall(nl)
-    >>> # res is a ClustResults object
+    >>> # Perform connectivity clustering
+    >>> res = pymaid.cluster_by_connectivity(nl)
+    >>> # `res` is a ClustResults object with handy methods:
     >>> res.plot_matrix()
     >>> plt.show()
     >>> # Extract 5 clusters
-    >>> res.get_clusters(5, criterion = 'maxclust' )
+    >>> res.get_clusters(5, criterion = 'maxclust')
 
     """
 
