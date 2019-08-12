@@ -31,8 +31,10 @@ try:
     from pyoctree import pyoctree
 except ImportError:
     pyoctree = None
-    logger.warning("Module pyoctree not found. Falling back to scipy's \
-                            ConvexHull for intersection calculations.")
+    logger.warning("Optional dependency 'pyoctree' not found. Falling back "
+                   "to Scipy for intersection calculations. This may return "
+                   "incorrect results for concave volumes. You might want to "
+                   "consider installing pyoctree via: pip3 install pyoctree")
 
 __all__ = sorted(['in_volume', 'intersection_matrix'])
 
