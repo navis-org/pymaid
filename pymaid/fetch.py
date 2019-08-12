@@ -89,7 +89,8 @@ __all__ = sorted(['CatmaidInstance',
                   'get_node_location', 'get_annotated',
                   'get_neuron_id',
                   'get_connectors_in_bbox',
-                  'get_cable_lengths'])
+                  'get_cable_lengths',
+                  'get_connectivity_counts'])
 
 # Set up logging
 logger = config.logger
@@ -897,6 +898,19 @@ class CatmaidInstance:
     def _get_neuron_cable_url(self, **GET):
         """Use to parse url for fetching neuron cable lengths."""
         return self.make_url(self.project_id, 'skeletons', 'cable-length', **GET)
+
+    def _update_node_confidence_url(self, treenode_id, **GET):
+        """Use to parse url for fetching neuron cable lengths."""
+        return self.make_url(self.project_id, 'treenodes', treenode_id, 'confidence', **GET)
+
+    def _get_connectivity_counts_url(self, **GET):
+        """Use to parse url for fetching connectivity counts (e.g. number of
+        postsynapses).  Needs POST data."""
+        return self.make_url(self.project_id, 'skeletons', 'connectivity-counts', **GET)
+
+    def _get_connectivity_matrix_url(self, **GET):
+        """Use to parse url for fetching adjacency matrices. Needs POST data."""
+        return self.make_url(self.project_id, 'skeleton', 'connectivity_matrix', **GET)
 
 
 @cache.undo_on_error
@@ -5362,3 +5376,67 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
                         'creation_time', 'edition_time', 'relation_id']
 
     return data
+
+
+@cache.undo_on_error
+def get_connectivity_counts(x, source_relations = ['presynaptic_to'],
+                            target_relations = ['postsynaptic_to'],
+                            count_partner_links=True, remote_instance=None):
+    """Fetch number of connections of a given type for a set of neurons.
+
+    Parameters
+    ----------
+    x :                     list-like | CatmaidNeuron/List
+                            Skeleton IDs for which to get cable lengths.
+    source_relations :      str | list of str, optional
+                            A list of pre-connector relations.
+    target_relations :      str | list of str, optional
+                            A list of post-connector relations. Default
+                            settings count the number of outgoing connections
+                            for the input neurons.
+    count_partner_links :   bool, optional
+                            Whether to count partner links or links
+                            to a connector.
+    remote_instance :       CatmaidInstance
+                            If not passed directly, will try using global.
+
+    Examples
+    --------
+    # Get the count of all outgoing connections (default):
+
+    >>> counts = pymaid.get_connectivity_counts('annotation:glomerulus DA1')
+
+    # Get both incoming and outgoing connections:
+
+    >>> counts = pymaid.get_connectivity_counts('annotation:glomerulus DA1',
+    ...                                         source_relations=['presynaptic_to',
+    ...                                                           'postsynaptic_to'],
+    ...                                         target_relations=['postsynaptic_to',
+    ...                                                           'presynaptic_to'])
+
+
+    Returns
+    -------
+    dict
+                Dictionary with server response.
+
+                    {'connectivity': {skid1: {relation_ID: count},
+                                      skid2: {relation_ID: count}},
+                     'relations': {relation_ID: relation_name}}
+
+    """
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    url = remote_instance._get_connectivity_counts_url()
+
+    source_relations = utils._make_iterable(source_relations)
+    target_relations = utils._make_iterable(target_relations)
+
+    post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
+    post.update({'source_relations[{}]'.format(i): s for i, s in enumerate(source_relations)})
+    post.update({'target_relations[{}]'.format(i): t for i, t in enumerate(target_relations)})
+
+    return remote_instance.fetch(url, post)
