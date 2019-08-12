@@ -359,7 +359,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
 
     # Find branch, root and end nodes
     if 'type' not in x.nodes:
-        classify_nodes(x)
+        graph_utils.classify_nodes(x)
 
     end_nodes = x.nodes[x.nodes.type == 'end'].treenode_id.values
     branch_nodes = x.nodes[x.nodes.type == 'branch'].treenode_id.values
@@ -369,6 +369,8 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
     branch_nodes = set(branch_nodes)
     root = set(root)
 
+    # These are branches that we will ignore for SI calculation and instead be
+    # given the SI of their parent branch
     nab_branch = []
     if fix_not_a_branch and 'not a branch' in x.tags:
         nab_branch += x.tags['not a branch']
@@ -427,7 +429,7 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
             # Find parent
             spine = [this_node]
 
-            #parent_node = list_of_parents [ this_node ]
+            # parent_node = list_of_parents [ this_node ]
             parent_node = this_tn.loc[this_node, 'parent_id']
 
             while parent_node not in branch_nodes and parent_node is not None:
@@ -471,18 +473,19 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
     x.nodes['strahler_index'] = [SI.get(n, 1)
                                  for n in x.nodes.treenode_id.values]
 
-    # Fix not-a-branch branches
+    # Fix not-a-branch branches -> give them the SI of their parent branch
     if fix_not_a_branch and 'not a branch' in x.tags:
         this_tn = x.nodes.set_index('treenode_id')
         # Go over all terminal branches with the tag
-        for tn in x.nodes[(x.nodes.type == 'end') & (x.nodes.treenode_id.isin(x.tags['not a branch']))].treenode_id.values:
+        cond1 = (x.nodes.type == 'end')
+        cond2 = (x.nodes.treenode_id.isin(x.tags['not a branch']))
+        for tn in x.nodes[cond1 & cond2].treenode_id.values:
             # Get this terminal segment
             this_seg = [s for s in x.small_segments if s[0] == tn][0]
             # Get strahler index of parent branch
             new_SI = this_tn.loc[this_seg[-1]].strahler_index
             # Set these nodes strahler index to that of the last branch point
-            x.nodes.loc[x.nodes.treenode_id.isin(
-                this_seg), 'strahler_index'] = new_SI
+            x.nodes.loc[x.nodes.treenode_id.isin(this_seg), 'strahler_index'] = new_SI
 
     if not inplace:
         return x
