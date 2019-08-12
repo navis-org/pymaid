@@ -1394,7 +1394,7 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
     Parameters
     ----------
     *x :            CatmaidNeuron/List
-                    Neurons to be averaged.
+                    Neurons to be merged.
     limit :         int, optional
                     Max distance [microns] for nearest neighbour search.
     base_neuron :   skeleton_ID | CatmaidNeuron, optional
@@ -1452,11 +1452,13 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
 
     # Make sure base_neuron is a skeleton ID
     if isinstance(base_neuron, core.CatmaidNeuron):
-        base_neuron = base_neuron.skeleton_id
+        base_skid = base_neuron.skeleton_id
     elif not isinstance(base_neuron, type(None)):
-        base_neuron = base_neuron
+        if base_neuron not in skids:
+            raise ValueError('Base neuron skeleton ID "{}" not in NeuronList'.format(base_neuron))
+        base_skid = base_neuron
     else:
-        base_neuron = x[0].skeleton_id
+        base_skid = x[0].skeleton_id
 
     # Convert distance threshold from microns to nanometres
     limit *= 1000
@@ -1464,20 +1466,20 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
     # Keep track of old IDs
     if track:
         for n in x:
-            n.nodes['treenode_id_before'] = n.nodes.treenode_id.values
-            n.nodes['parent_id_before'] = n.nodes.parent_id.values
-            n.nodes['origin_skeleton'] = n.skeleton_id
-            n.connectors['treenode_id_before'] = n.connectors.treenode_id.values
-            n.connectors['origin_skeleton'] = n.skeleton_id
+            # Original skeleton of each node
+            n.nodes['origin_skeletons'] = n.skeleton_id
+            # Original skeleton of each connector
+            n.connectors['origin_skeletons'] = n.skeleton_id
 
     # Now make unions
+    all_clps_nodes = {}
     while len(x) > 1:
         # First we need to find a pair of overlapping neurons
         comb = itertools.combinations(x, 2)
         ol = False
         for c in comb:
-            # If combination contains base_neuron, make sure it's the master
-            if c[0].skeleton_id == base_neuron:
+            # If combination contains base_skid, make sure it's the master
+            if c[0].skeleton_id == base_skid:
                 master, minion = c[0], c[1]
             else:
                 master, minion = c[1], c[0]
@@ -1496,8 +1498,8 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
 
         # Raise if no combination shows overlap
         if not ol:
-            return x
-            raise ValueError('Neurons do not overlap. Try increasing `limit`')
+            raise ValueError('At least some fragments do not overlap. Try '
+                             'increasing the `limit` parameter')
 
         # Now collapse minion nodes that are within distance limits into master
         to_clps = minion.nodes.loc[nn_dist <= limit, 'treenode_id'].values
@@ -1505,6 +1507,11 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
 
         # Generate a map: minion node -> master node to collapse into
         clps_map = dict(zip(to_clps, clps_into))
+
+        # Track the collapsed node into the master
+        if track:
+            for n1, n2 in zip(to_clps, clps_into):
+                all_clps_nodes[n2] = all_clps_nodes.get(n2, []) + [n1]
 
         # Reroot minion to one of the nodes that will be collapsed
         graph_utils.reroot_neuron(minion, to_clps[0], inplace=True)
@@ -1515,14 +1522,21 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
         minion.nodes = minion.nodes.copy()
 
         # Reconnect children of the collapsed nodes to their new parents
-        new_parents = minion.nodes.loc[minion.nodes.parent_id.isin(to_clps),
-                                       'parent_id'].map(clps_map)
-        minion.nodes.loc[minion.nodes.parent_id.isin(to_clps),
-                         'parent_id'] = new_parents
+        to_rewire = minion.nodes.parent_id.isin(to_clps)
+
+        # Track old parents before rewiring
+        if track:
+            minion.nodes['old_parent'] = None
+            minion.nodes.loc[to_rewire, 'old_parent'] = minion.nodes.loc[to_rewire, 'parent_id']
+
+        # Now rewire
+        new_parents = minion.nodes.loc[to_rewire, 'parent_id'].map(clps_map)
+        minion.nodes.loc[to_rewire, 'parent_id'] = new_parents
 
         # Merge minion's node table into master
         master.nodes = pd.concat([master.nodes, minion.nodes],
                                  axis=0,
+                                 sort=True,
                                  ignore_index=True)
 
         # Now some clean up! First up: node tags
@@ -1535,10 +1549,18 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
         # Last but not least: merge connector tables
         new_tn = minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
                                        'treenode_id'].map(clps_map)
+
+        if track:
+            minion.connectors['old_treenode'] = None
+            minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
+                                  'old_treenode'] = minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
+                                                                          'treenode_id']
+
         minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
                               'treenode_id'] = new_tn
         master.connectors = pd.concat([master.connectors, minion.connectors],
                                       axis=0,
+                                      sort=True,
                                       ignore_index=True)
 
         # Reset master's attributes (graph, node types, etc)
@@ -1547,8 +1569,17 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
         # Almost done. Just need to pop minion from "x"
         x = [n for n in x if n.skeleton_id != minion.skeleton_id]
 
+    union = x[0]
+
+    # Keep track of old IDs
+    if track:
+        # List of nodes merged into this node
+        union.nodes['treenodes_merged'] = union.nodes.treenode_id.map(all_clps_nodes)
+        # Old parent if this node got rewired
+        union.nodes['old_parent'] = None
+
     # Return the last survivor
-    return x[0]
+    return union
 
 
 def average_neurons(x, limit=10, base_neuron=None):
