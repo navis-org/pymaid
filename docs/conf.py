@@ -91,13 +91,14 @@ MOCK_MODULES = ['sklearn',
 
                 'seaborn',
 
-                'vispy', 'vispy.color', 'vispy.scene',
-                'vispy.geometry', 'vispy.gloo.util', 'vispy.visuals',
-                'vispy.scene.visuals',
-                'vispy.scene.visuals.create_visual_node',
-                'vispy.color.ColorArray', 'vispy.visuals.MeshVisual',
-                'vispy.gloo.util._screenshot',
-                'vispy.util.transforms', 'vispy.util.transforms.rotate']
+                #'vispy', 'vispy.color', 'vispy.scene',
+                #'vispy.geometry', 'vispy.gloo.util', 'vispy.visuals',
+                #'vispy.scene.visuals',
+                #'vispy.scene.visuals.create_visual_node',
+                #'vispy.color.ColorArray', 'vispy.visuals.MeshVisual',
+                #'vispy.gloo.util._screenshot',
+                #'vispy.util.transforms', 'vispy.util.transforms.rotate'
+                ]
 
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
