@@ -73,7 +73,7 @@ Functions to fetch connectivity data:
     pymaid.adjacency_matrix
     pymaid.adjacency_from_connectors
     pymaid.cn_table_from_connectors
-    pymaud.get_connectivity_counts
+    pymaid.get_connectivity_counts
     pymaid.get_connectors
     pymaid.get_connector_details
     pymaid.get_connectors_between
