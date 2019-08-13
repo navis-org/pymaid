@@ -2731,7 +2731,8 @@ def get_annotations(x, remote_instance=None):
 
 
 @cache.wipe_and_retry
-def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
+def get_annotation_id(annotations, remote_instance=None, allow_partial=False,
+                      raise_not_found=True):
     """ Retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
@@ -2740,8 +2741,11 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
                         Single annotations or list of multiple annotations.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
-    allow_partial :     bool
+    allow_partial :     bool, optional
                         If True, will allow partial matches.
+    raise_not_found :   bool, optional
+                        If True raise Exception if no match for any of the
+                        query annotations is found. Else log warning.
 
     Returns
     -------
@@ -2793,7 +2797,10 @@ def get_annotation_id(annotations, remote_instance=None, allow_partial=False):
         annotation_ids.update(res)
 
     if not annotation_ids:
-        raise Exception('No matching annotation(s) found!')
+        if raise_not_found:
+            raise Exception('No matching annotation(s) found')
+        else:
+            logger.warning('No matching annotation(s) found')
 
     return annotation_ids
 
@@ -2965,7 +2972,7 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
 
 @cache.undo_on_error
 def get_annotated(x, remote_instance=None, include_sub_annotations=False,
-                  allow_partial=True):
+                  raise_not_found=True, allow_partial=True):
     """ Retrieve entities (neurons and annotations) with given
     (meta-)annotation(s).
 
@@ -2987,6 +2994,9 @@ def get_annotated(x, remote_instance=None, include_sub_annotations=False,
     allow_partial :           bool, optional
                               If True, partially matching annotations are
                               searched to.
+    raise_not_found :         bool, optional
+                              If True raise Exception if no match for any of the
+                              query annotations is found. Else log warning.
     remote_instance :         CatmaidInstance, optional
                               If not passed directly, will try using global.
 
@@ -3016,12 +3026,14 @@ def get_annotated(x, remote_instance=None, include_sub_annotations=False,
     post = {'with_annotations': False}
     if pos:
         pos_ids = get_annotation_id(pos, allow_partial=allow_partial,
+                                    raise_not_found=raise_not_found,
                                     remote_instance=remote_instance)
         post.update({'annotated_with[{}]'.format(i): n for i, n in enumerate(pos_ids.values())})
         if include_sub_annotations:
             post.update({'sub_annotated_with[{}]'.format(i): n for i, n in enumerate(pos_ids.values())})
     if neg:
         neg_ids = get_annotation_id(neg, allow_partial=allow_partial,
+                                    raise_not_found=raise_not_found,
                                     remote_instance=remote_instance)
         post.update({'not_annotated_with[{}]'.format(i): n for i, n in enumerate(neg_ids.values())})
 
@@ -3084,7 +3096,7 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     urls = [remote_instance._get_annotated_url() for n in re_str]
     POST = [{'name': n, 'with_annotations': False} for n in re_str]
-    responses = remote_instance.fetch(urls, post=POST, desc='Get nms')
+    responses = remote_instance.fetch(urls, post=POST, desc='Fetch names')
 
     df = pd.DataFrame([[n['name'], n['skeleton_ids'][0]] for res in responses for n in res['entities'] if n['type'] == 'neuron'],
                       columns=['name', 'skeleton_id'])
@@ -3097,7 +3109,8 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
 @cache.undo_on_error
 def get_skids_by_annotation(annotations, remote_instance=None,
-                            allow_partial=False, intersect=False):
+                            allow_partial=False, intersect=False,
+                            raise_not_found=True):
     """ Retrieve the neurons annotated with given annotation(s).
 
     Parameters
@@ -3112,6 +3125,9 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     intersect :             bool, optional
                             If True, neurons must have ALL provided
                             annotations.
+    raise_not_found :       bool, optional
+                            If True raise Exception if no match for any of the
+                            query annotations is found. Else log warning.
 
     Returns
     -------
@@ -3140,15 +3156,12 @@ def get_skids_by_annotation(annotations, remote_instance=None,
 
     if pos_an:
         pos_ids = get_annotation_id(pos_an, remote_instance,
+                                    raise_not_found=raise_not_found,
                                     allow_partial=allow_partial)
-        if not pos_ids:
-            raise Exception('No matching annotation found!')
-
     if neg_an:
         neg_ids = get_annotation_id(neg_an, remote_instance,
+                                    raise_not_found=raise_not_found,
                                     allow_partial=allow_partial)
-        if not neg_ids:
-            raise Exception('No matching annotation found!')
 
     # Collapse for intersection...
     if intersect:
@@ -3171,8 +3184,7 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     # Remove duplicates
     annotated_skids = list(set(annotated_skids))
 
-    logger.info(
-        'Found %i neurons with matching annotation(s)' % len(annotated_skids))
+    logger.debug('Found {} neurons with matching annotation(s)'.format(len(annotated_skids)))
 
     return annotated_skids
 
@@ -3284,6 +3296,13 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     ...                       'TREENODE',
     ...                       remote_instance)
     {'6633237': ['ends'], '6626578': ['ends']}
+
+    See Also
+    --------
+    :func:`pymaid.add_tags`
+                        Use to add tags to nodes.
+    :func:`pymaid.delete_tags`
+                        Use to delete node tags.
 
     """
 
