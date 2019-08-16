@@ -414,7 +414,7 @@ class CatmaidInstance:
             for r in resp:
                 content = r.content
                 if isinstance(content, bytes):
-                    r.content.decode()
+                    content = content.decode()
                 try:
                     parsed.append(json.loads(content))
                 except BaseException:
