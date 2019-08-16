@@ -412,10 +412,13 @@ class CatmaidInstance:
         if return_type.lower() == 'json':
             parsed = []
             for r in resp:
+                content = r.content
+                if isinstance(content, bytes):
+                    r.content.decode()
                 try:
-                    parsed.append(json.loads(r.content))
+                    parsed.append(json.loads(content))
                 except BaseException:
-                    logger.error('Error decoding json in response:\n{}'.format(r.content))
+                    logger.error('Error decoding json in response:\n{}'.format(content))
                     raise
         elif return_type.lower() == 'raw':
             parsed = [r.content for r in resp]
