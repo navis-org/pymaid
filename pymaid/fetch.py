@@ -3059,7 +3059,8 @@ def get_annotated(x, remote_instance=None, include_sub_annotations=False,
 
 
 @cache.undo_on_error
-def get_skids_by_name(names, remote_instance=None, allow_partial=True):
+def get_skids_by_name(names, allow_partial=True, raise_not_found=True,
+                      remote_instance=None):
     """ Retrieve the all neurons with matching name.
 
     Parameters
@@ -3070,6 +3071,10 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
                         the query with a leading ``/``.
     allow_partial :     bool, optional
                         If True, partial matches are returned too.
+    raise_not_found :   bool, optional
+                        If True, will raise an exception of no matches for
+                        given name(s) are found. Else will return empty
+                        DataFrame.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
@@ -3094,25 +3099,29 @@ def get_skids_by_name(names, remote_instance=None, allow_partial=True):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
+    # Only look for unique names
+    names = list(set(utils._make_iterable(names, force_type=str)))
+
     # Prepare names for regex search on the backend
-    re_str = []
-    for n in utils._make_iterable(names, force_type=str):
-        # '/' indicates regex - will be processed on the backend
+    post = []
+    for n in names:
+        post.append({'name': n,
+                     'with_annotations': False,
+                     'exact_name': True})
+        # If we allow partial matches or are using regex, set exact_name to False
         if allow_partial or n.startswith('/'):
-            re_str.append(n)
-        # If exact match, encode this in regex
-        else:
-            re_str.append('/^{}$'.format(n))
+            post[-1]['exact_name'] = False
 
-    urls = [remote_instance._get_annotated_url() for n in re_str]
-    POST = [{'name': n, 'with_annotations': False} for n in re_str]
-    responses = remote_instance.fetch(urls, post=POST, desc='Fetch names')
+    urls = [remote_instance._get_annotated_url() for n in post]
+    responses = remote_instance.fetch(urls, post=post, desc='Fetching names')
 
-    df = pd.DataFrame([[n['name'], n['skeleton_ids'][0]] for res in responses for n in res['entities'] if n['type'] == 'neuron'],
+    neurons = [n for res in responses for n in res['entities'] if n['type'] == 'neuron']
+
+    df = pd.DataFrame([[n['name'], n['skeleton_ids'][0]] for n in neurons],
                       columns=['name', 'skeleton_id'])
 
-    if df.empty:
-        raise Exception('No matching name(s) found.')
+    if df.empty and raise_not_found:
+        raise Exception('No matching name(s) found')
 
     return df.sort_values(['name']).drop_duplicates().reset_index(drop=True)
 
@@ -4272,7 +4281,9 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     # Get skids by name
     if names:
         urls = [remote_instance._get_annotated_url() for n in names]
-        post_data = [{'name': str(n), 'with_annotations': 'false'}
+        post_data = [{'name': str(n),
+                      'with_annotations': False,
+                      'name_exact': not partial_match}
                      for n in names]
 
         results = remote_instance.fetch(urls,
