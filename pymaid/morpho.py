@@ -2264,8 +2264,10 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     ----------
     x :                 skeleton ID(s) | CatmaidNeuron | CatmaidNeuronList
                         Neuron(s) to rejuvenate.
-    target :            str| tuple | datetime | pandas.Timestamp
-                        Date or date + time to time-travel to.
+    target :            str | datetime-like | pandas.Timestamp
+                        Date or date + time to time-travel to. Must be
+                        parsable by ``pandas.TimeStamp``. Format for string
+                        is YEAR-MONTH-DAY.
     inplace :           bool, optional
                         If True, will perform time travel on and return a copy
                         of original.
@@ -2279,7 +2281,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     Examples
     --------
     >>> n = pymaid.get_neuron(16)
-    >>> previous_n = pymaid.time_machine(n, '2016-1-1')
+    >>> previous_n = pymaid.time_machine(n, '2016-12-1')
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
