@@ -2741,21 +2741,21 @@ def get_annotations(x, remote_instance=None):
 
 
 @cache.wipe_and_retry
-def get_annotation_id(annotations, remote_instance=None, allow_partial=False,
-                      raise_not_found=True):
+def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
+                      remote_instance=None):
     """ Retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
     ----------
     annotations :       str | list of str
                         Single annotations or list of multiple annotations.
-    remote_instance :   CatmaidInstance, optional
-                        If not passed directly, will try using global.
     allow_partial :     bool, optional
                         If True, will allow partial matches.
     raise_not_found :   bool, optional
                         If True raise Exception if no match for any of the
                         query annotations is found. Else log warning.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -2877,7 +2877,7 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
 
     url = remote_instance._get_treenode_table_url()
 
-    if all([isinstance(x, type(None)) for x in  [tags, skeleton_ids, treenode_ids]]):
+    if all([isinstance(x, type(None)) for x in [tags, skeleton_ids, treenode_ids]]):
         answer = ""
         while answer not in ["y", "n"]:
             answer = input("Your search parameters will retrieve ALL "
@@ -3165,13 +3165,15 @@ def get_skids_by_annotation(annotations, remote_instance=None,
     neg_ids = {}
 
     if pos_an:
-        pos_ids = get_annotation_id(pos_an, remote_instance,
+        pos_ids = get_annotation_id(pos_an,
                                     raise_not_found=raise_not_found,
-                                    allow_partial=allow_partial)
+                                    allow_partial=allow_partial,
+                                    remote_instance=remote_instance)
     if neg_an:
-        neg_ids = get_annotation_id(neg_an, remote_instance,
+        neg_ids = get_annotation_id(neg_an,
                                     raise_not_found=raise_not_found,
-                                    allow_partial=allow_partial)
+                                    allow_partial=allow_partial,
+                                    remote_instance=remote_instance)
 
     # Collapse for intersection...
     if intersect:
@@ -4289,8 +4291,9 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 
     # Get skids by annotation
     if annotations:
-        annotation_ids = get_annotation_id(
-            annotations, remote_instance, allow_partial=partial_match)
+        annotation_ids = get_annotation_id(annotations,
+                                           allow_partial=partial_match,
+                                           remote_instance=remote_instance)
 
         if not annotation_ids:
             raise Exception('No matching annotation(s) found!')
