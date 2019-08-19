@@ -367,6 +367,13 @@ class CatmaidInstance:
         else:
             was_single = False
 
+        # Warn if many individual queries with caching activated
+        if len(url) > 1e4 and self.caching:
+            logger.warning('You are making a lot of individual queries with '
+                           'caching activated. The overhead from managing the '
+                           'cache could notably slow down fetching of the '
+                           'data. Consider deactivating caching.')
+
         # Prepare futures
         if not isinstance(post, type(None)):
             if len(url) != len(post):
