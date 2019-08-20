@@ -4050,22 +4050,24 @@ def get_history(remote_instance=None,
 
 
 @cache.undo_on_error
-def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
-                        coord_format='NM', resolution=(4, 4, 50)):
-    """ Retrieve treenodes and connectors in given bounding box.
+def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
+                        remote_instance=None):
+    """Retrieve treenodes and connectors in given bounding box.
+
+    Please note that there is a cap on the number of nodes returned that is
+    hard wired into the CATMAID server's settings.
 
     Parameters
     ----------
-    left :                  int | float
-    right :                 int | float
-    top :                   int | float
-    bottom :                int | float
-    z1 :                    int | float
-    z2 :                    int | float
-                            Coordinates defining the volume
-                            Can be given in nm or pixels+slices.
-    remote_instance :       CatmaidInstance, optional
-                            If not passed directly, will try using global.
+    *x
+                            Coordinates defining the bounding box. Can be
+                            either:
+
+                             - 1d list of coordinates: left, right, top, bottom, z1, z2
+                             - 2d list of coordinates: [[left, right], [top, bottom], [z1, z2]]
+                             - pymaid.Volume
+
+                            Can be given in nm or pixels.
     coord_format :          str, optional
                             Define whether provided coordinates are in
                             nanometer ('NM') or in pixels/slices ('PIXEL').
@@ -4073,34 +4075,61 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
                             x/y/z resolution in nm [default = (4, 4, 50)]
                             Used to transform to nm if limits are given in
                             pixels.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
 
     Returns
     -------
-    dict
-        Dictionary (d) containing ``treenodes``, ``connectors``, ``labels``
-        and ``node_limit_reached``::
+    treenodes :     pandas.DataFrame
+                    DataFrame in which each row is a treenode::
 
-           "treenodes" : pandas.DataFrame
-            treenode_id  parent_id  x  y  z  confidence  radius  skeleton_id  edition_time  user_id
-         0
-         1
-         2
+                    treenode_id  parent_id  x  y  z  confidence  radius  skeleton_id  edition_time  user_id
+                 0
+                 1
+                 2
 
-           "connectors" : pandas.DataFrame
-            connector_id x y z confidence edition_time user_id partners
-         0
-         1
-         2
+    connectors :    pandas.DataFrame
+                    DataFrame in which each row is a connector::
 
-           "labels" : dictionary
-         {treenode_id: [label1, label2, ...], ...}
+                    connector_id x y z confidence edition_time user_id partners
+                 0
+                 1
+                 2
 
-           "node_limit_reached" : boolean
-          True/False; if True, node limit was exceeded
+                    ``partners`` are lists of::
+
+                    [treenode_id, relation_id, link_confidence, link_edition_time, link_id]
+
+    truncated :     bool
+                    If True, lists are truncated due to node limit reached.
+    relation_map :  dict
+                    Map for ``relation_id`` in connector's ``partner`` column.
+
+    Examples
+    --------
+    Get (truncated) lists of nodes and connectors in the bounding box of the AL:
+
+    >>> al = pymaid.get_volume('AL_R')
+    >>> nodes, connectors, truncated, relation_map = pymaid.get_nodes_in_volume(al)
+    >>> truncated
+    True
 
     """
 
     remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(x[0], core.Volume):
+        x = x[0].bbox
+
+    # Flatten the list of coordinates
+    coords = np.array(x).flatten()
+
+    if coords.shape[0] != 6:
+        raise ValueError('Must provide 6 coordinates (left, right, top, '
+                         'bottom, z1, z1) - got {}'.format(coords.shape[0]))
+
+    # Extract coords
+    left, right, top, bottom, z1, z2 = coords
 
     # Set resolution to 1:1 if coordinates are already in nm
     if coord_format == 'NM':
@@ -4120,36 +4149,32 @@ def get_nodes_in_volume(left, right, top, bottom, z1, z2, remote_instance=None,
         # -1)
         'atnid': -1,
         'labels': False,
-        'limit': 3500,  # This limits the number of nodes -> default is 3500
+        # 'limit': 3500,  # this doesn't do anything -> hard wired into server settings
 
     }
 
-    node_list = remote_instance.fetch(remote_nodes_list, node_list_postdata)
+    node_data = remote_instance.fetch(remote_nodes_list, node_list_postdata)
 
-    data = {'treenodes': pd.DataFrame([[i[0], i[1], i[2], i[3], i[4], i[5],
-                                        i[6], i[7],
-                                        datetime.datetime.fromtimestamp(int(i[8]),
-                                                                        tz=datetime.timezone.utc),
-                                        i[9]]
-                                       for i in node_list[0]],
-                                      columns=['treenode_id', 'parent_id',
-                                               'x', 'y', 'z', 'confidence',
-                                               'radius', 'skeleton_id',
-                                               'edition_time', 'user_id'],
-                                      dtype=object),
-            'connectors': pd.DataFrame([[i[0], i[1], i[2], i[3], i[4],
-                                         datetime.datetime.fromtimestamp(int(i[5]),
-                                                                         tz=datetime.timezone.utc),
-                                         i[6], i[7]]
-                                        for i in node_list[1]],
-                                       columns=['connector_id', 'x', 'y', 'z',
-                                                'confidence', 'edition_time',
-                                                'user_id', 'partners'],
-                                       dtype=object),
-            'labels': node_list[3],
-            'node_limit_reached': node_list[4]}
+    return node_data
 
-    return data
+    tn = pd.DataFrame(node_data[0],
+                      columns=['treenode_id', 'parent_id',
+                               'x', 'y', 'z', 'confidence',
+                               'radius', 'skeleton_id',
+                               'edition_time', 'user_id'])
+    tn['edition_time'] = pd.to_datetime(tn.edition_time)
+
+    cn = pd.DataFrame(node_data[1],
+                      columns=['connector_id', 'x', 'y', 'z',
+                               'confidence', 'edition_time',
+                               'user_id', 'partners'])
+    cn['edition_time'] = pd.to_datetime(cn.edition_time)
+
+    node_limit_reached = node_data[3]
+
+    relation_map = node_data[4]
+
+    return tn, cn, node_limit_reached, relation_map
 
 
 @cache.undo_on_error
