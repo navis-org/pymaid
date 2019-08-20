@@ -1387,7 +1387,8 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
     return master
 
 
-def union_neurons(*x, limit=1, base_neuron=None, track=False):
+def union_neurons(*x, limit=1, base_neuron=None, track=False,
+                  non_overlap='raise'):
     """Generate the union of a set of neurons.
 
     This implementation works by iteratively merging nodes in neuron A and B
@@ -1408,6 +1409,12 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
                     If True, will add new columns to node/connector table of
                     union neuron to keep track of original node IDs and origin:
                     `treenode_id_before`, `parent_id_before`, `origin_skeleton`
+    non_overlap :   "raise" | "stitch" | "skip", optional
+                    Determines how to deal with non-overlapping fragments. If
+                    "raise" will raise an exception. If "stitch" will try
+                    stitching the fragments using a minimum spanning tree
+                    (see :func:`pymaid.stitch_neurons`).
+
 
     Returns
     -------
@@ -1433,6 +1440,12 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
     >>> union = pymaid.union_neurons(backbone, branches, limit=2)
 
     """
+    allowed = ['raise', 'stitch', 'skip']
+    if non_overlap.lower() not in allowed:
+        msg = 'Unexpected value for non_overlap "{}". Please use either:'
+        msg = msg.format(non_overlap, '"{}", '.join(allowed))
+        raise ValueError(msg)
+
     # Unpack neurons in *args
     x = utils._unpack_neurons(x)
 
@@ -1473,6 +1486,8 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
             n.nodes['origin_skeletons'] = n.skeleton_id
             # Original skeleton of each connector
             n.connectors['origin_skeletons'] = n.skeleton_id
+            # Old parent if this node gets rewired
+            n.nodes['old_parent'] = n.nodes.parent_id.values
 
     # Now make unions
     all_clps_nodes = {}
@@ -1499,10 +1514,25 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
                 ol = True
                 break
 
-        # Raise if no combination shows overlap
+        # If no overlap between remaining fragments
         if not ol:
-            raise ValueError('At least some fragments do not overlap. Try '
-                             'increasing the `limit` parameter')
+            miss = [n.skeleton_id for n in x if n.skeleton_id != base_skid]
+            msg = "{} fragments do not overlap: {}.".format(len(x) - 1,
+                                                            ", ".join(miss))
+            # Raise ...
+            if non_overlap.lower() == 'raise':
+                raise ValueError(msg + " Try increasing the `limit` parameter")
+            # ... or stitch up neurons using mst and break the loop...
+            elif non_overlap.lower() == 'stitch':
+                logger.warning(msg + " Stitching.")
+                x = stitch_neurons(x, method='LEAFS', master=base_skid)
+                x = core.CatmaidNeuronList(x)
+                break
+            # ... or just skip remaining fragments
+            else:
+                logger.warning(msg + " Skipping.")
+                x = [n for n in x if n.skeleton_id == base_skid]
+                break
 
         # Now collapse minion nodes that are within distance limits into master
         to_clps = minion.nodes.loc[nn_dist <= limit, 'treenode_id'].values
@@ -1578,8 +1608,6 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False):
     if track:
         # List of nodes merged into this node
         union.nodes['treenodes_merged'] = union.nodes.treenode_id.map(all_clps_nodes)
-        # Old parent if this node got rewired
-        union.nodes['old_parent'] = None
 
     # Return the last survivor
     return union
