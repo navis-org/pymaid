@@ -3107,10 +3107,10 @@ def get_skids_by_name(names, allow_partial=True, raise_not_found=True,
     for n in names:
         post.append({'name': n,
                      'with_annotations': False,
-                     'exact_name': True})
+                     'name_exact': True})
         # If we allow partial matches or are using regex, set exact_name to False
         if allow_partial or n.startswith('/'):
-            post[-1]['exact_name'] = False
+            post[-1]['name_exact'] = False
 
     urls = [remote_instance._get_annotated_url() for n in post]
     responses = remote_instance.fetch(urls, post=post, desc='Fetching names')
