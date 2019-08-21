@@ -4126,7 +4126,7 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
 
     if coords.shape[0] != 6:
         raise ValueError('Must provide 6 coordinates (left, right, top, '
-                         'bottom, z1, z1) - got {}'.format(coords.shape[0]))
+                         'bottom, z1, z1), got {}'.format(coords.shape[0]))
 
     # Extract coords
     left, right, top, bottom, z1, z2 = coords
@@ -4144,9 +4144,8 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
         'bottom': bottom * resolution[1],
         'z1': z1 * resolution[2],
         'z2': z2 * resolution[2],
-        # Atnid seems to be related to fetching the
-        # active node too (will be ignored if atnid =
-        # -1)
+        # Atnid seems to be related to fetching the active node too
+        # -> will be ignored if atnid = -1
         'atnid': -1,
         'labels': False,
         # 'limit': 3500,  # this doesn't do anything -> hard wired into server settings
@@ -4154,8 +4153,6 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
     }
 
     node_data = remote_instance.fetch(remote_nodes_list, node_list_postdata)
-
-    return node_data
 
     tn = pd.DataFrame(node_data[0],
                       columns=['treenode_id', 'parent_id',
