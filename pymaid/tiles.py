@@ -62,11 +62,10 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
         x = x[0]
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Need a single CatmaidNeuron, got "{0}".'.type(x))
+        raise TypeError('Need a single CatmaidNeuron, got "{}".'.format(type(x)))
 
     if len(dimensions) != 2:
-        raise ValueError(
-            'Need two dimensions, got {0}'.format(len(dimensions)))
+        raise ValueError('Need two dimensions, got {}'.format(len(dimensions)))
 
     # Evalutate remote instance
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -126,8 +125,6 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
                     zoom_level=0,
                     coords='NM',
                     remote_instance=remote_instance)
-
-    # job.load_in_memory()
 
     return job
 
@@ -229,8 +226,7 @@ class LoadTiles:
 
     def __init__(self, bbox, stack_id, zoom_level=0, coords='NM',
                  image_mirror='auto', mem_lim=4000, remote_instance=None):
-        """ Initialise class.
-        """
+        """Initialise class."""
         if coords not in ['PIXEL', 'NM']:
             raise ValueError('Coordinates need to be "PIXEL" or "NM".')
 
@@ -281,8 +277,7 @@ class LoadTiles:
         return (n_tiles * self.bytes_per_tile) / 10 ** 6
 
     def get_stack_info(self, image_mirror='auto'):
-        """ Retrieves basic info about image stack and mirrors.
-        """
+        """Retrieves basic info about image stack and mirrors."""
 
         # Get available stacks for the project
         available_stacks = self.remote_instance.fetch(
@@ -338,9 +333,7 @@ class LoadTiles:
         logger.info('Image mirror: {0}'.format(self.mirror_url))
 
     def bboxes2imgcoords(self):
-        """ Converts bounding box(es) to coordinates for individual images.
-        """
-
+        """Convert bounding box(es) to coordinates for individual images."""
         # This keeps track of images (one per z slice)
         self.image_coords = []
 
@@ -441,7 +434,7 @@ class LoadTiles:
                 self.image_coords.append(this_im)
 
     def _get_tiles(self, tiles):
-        """ Retrieves all tiles in parallel.
+        """Retrieves all tiles in parallel.
 
         Parameters
         ----------
@@ -472,9 +465,7 @@ class LoadTiles:
         return data
 
     def _stich_tiles(self, im, tiles):
-        """ Stitch tiles into final image.
-        """
-
+        """Stitch tiles into final image."""
         # Generate empty array
         im_dim = np.array([
             math.fabs((im['tile_bot'] - im['tile_top']) * self.tile_width),
@@ -500,7 +491,7 @@ class LoadTiles:
         return cropped_img
 
     def load_and_save(self, filepath, filename=None):
-        """ Download and stitch tiles, and save as images right away (memory
+        """Download and stitch tiles, and save as images right away (memory
         efficient).
 
         Parameters
@@ -513,8 +504,8 @@ class LoadTiles:
                     - single ``str`` filename will be added a number as suffix
                     - list of ``str`` must match length of images
                     - ``None`` will result in simple numbered files
-        """
 
+        """
         if not os.path.isdir(filepath):
             raise ValueError('Invalid filepath: {}'.format(filepath))
 
@@ -637,7 +628,7 @@ class LoadTiles:
         self.img = np.dstack(images).astype(int)
 
     def scalebar(self, ax, size=1000, pos='lower left', label=True, line_kws={}, label_kws={}):
-        """ Adds scalebar to image.
+        """Adds scalebar to image.
 
         Parameters
         ----------
@@ -654,8 +645,8 @@ class LoadTiles:
                 Keyword arguments passed to plt.plot().
         label_kws
                 Keyword arguments passed to plt.text()
-        """
 
+        """
         positions = {'lower left': (self.img.shape[1] * .05, self.img.shape[0] * .95),
                      'upper left': (self.img.shape[1] * .05, self.img.shape[0] * .05),
                      'lower right': (self.img.shape[1] * .95, self.img.shape[0] * .95),
@@ -682,7 +673,7 @@ class LoadTiles:
                      tn_color='yellow', cn_color='none', tn_ec=None,
                      cn_ec='orange', skid_include=[], cn_include=[], tn_kws={},
                      cn_kws={}):
-        """ Renders nodes onto image.
+        """Renders nodes onto image.
 
         Parameters
         ----------
@@ -705,8 +696,8 @@ class LoadTiles:
         cn_kws :        dict, optional
                         Keywords passed to ``matplotlib.pyplot.scatter`` for
                         connectors.
-        """
 
+        """
         if slice_ix is None and len(self.image_coords) == 1:
             slice_ix = 0
         elif slice_ix is None:
@@ -716,7 +707,7 @@ class LoadTiles:
         slice_info = self.image_coords[slice_ix]
 
         # Get node list
-        nodes = fetch.get_nodes_in_volume(
+        data = fetch.get_nodes_in_volume(
             slice_info['nm_left'], slice_info['nm_right'],
             slice_info['nm_top'], slice_info['nm_bot'],
             slice_info['nm_z'] - self.resolution_z,  # get one slice up
@@ -725,8 +716,8 @@ class LoadTiles:
             coord_format='NM')
 
         # Interpolate virtual
-        self.nodes = self._make_virtual_nodes(nodes['treenodes'])
-        self.connectors = nodes['connectors']
+        self.nodes = self._make_virtual_nodes(data[0])
+        self.connectors = data[1]
 
         # Filter to only this Z
         self.nodes = self.nodes[self.nodes.z == slice_info['nm_z']]
@@ -760,7 +751,7 @@ class LoadTiles:
         if len(cn_include) > 0:
             cn_include = np.array(cn_include).astype(int)
             self.connectors = self.connectors[self.connectors.skeleton_id.isin(
-                node_include)]
+                cn_include)]
 
         logger.debug('{0} treenodes and {1} connectors after filtering'.format(
             self.nodes.shape[0],
@@ -830,7 +821,7 @@ class LoadTiles:
                        **cn_kws)
 
     def _get_tile_url(self, x, y, z):
-        """ Returns tile url."""
+        """Return tile url."""
         return '{0}{1}/{2}/{3}/{4}.{5}'.format(self.mirror_url,
                                                self.zoom_level,
                                                z,
@@ -839,7 +830,7 @@ class LoadTiles:
                                                self.file_ext)
 
     def _to_x_index(self, x, enforce_bounds=True):
-        """ Converts a real world position to a x pixel position.
+        """Convert a real world position to a x pixel position.
         Also, makes sure the value is in bounds.
         """
         zero_zoom = x / self.resolution_x
@@ -848,7 +839,7 @@ class LoadTiles:
         return int(zero_zoom / (2**self.zoom_level) + 0.5)
 
     def _to_y_index(self, y, enforce_bounds=True):
-        """ Converts a real world position to a y pixel position.
+        """Convert a real world position to a y pixel position.
         Also, makes sure the value is in bounds.
         """
         zero_zoom = y / self.resolution_y
@@ -857,7 +848,7 @@ class LoadTiles:
         return int(zero_zoom / (2**self.zoom_level) + 0.5)
 
     def _to_z_index(self, z, enforce_bounds=True):
-        """ Converts a real world position to a slice/section number.
+        """Convert a real world position to a slice/section number.
         Also, makes sure the value is in bounds.
         """
         section = z / self.resolution_z + 0.5
@@ -906,8 +897,7 @@ class LoadTiles:
         return pd.concat([nodes, virtual_nodes], axis=0, ignore_index=True)
 
     def render_im(self, slider=False, ax=None, **kwargs):
-        """ Draw image slices with a slider."""
-
+        """Draw image slices with a slider."""
         if isinstance(ax, type(None)):
             fig, ax = plt.subplots(**kwargs)
             ax.set_aspect('equal')
@@ -935,7 +925,7 @@ class LoadTiles:
 
 
 def test_response_time(url, calls=5):
-    """ Returns server response time. If unresponsive returns float("inf") """
+    """Return server response time. If unresponsive returns float("inf")."""
     resp_times = []
     for i in range(calls):
         start = time.time()
