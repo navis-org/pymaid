@@ -155,7 +155,12 @@ def _break_segments(x):
         end = g.vs.select(_indegree=0).indices
         branch = g.vs.select(_indegree_gt=1, _outdegree=1).indices
         root = g.vs.select(_outdegree=0).indices
+
+        # Get seeds
         seeds = branch + end
+        # Remove seeds that are also roots (=disconnected single nodes)
+        seeds = set(seeds) - set(root)
+
         # Converting to set speeds up the "parent in stops" check
         stops = set(branch + root)
         seg_list = []
