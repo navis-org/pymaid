@@ -2096,7 +2096,7 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
                                'edition_time'])
 
     # Add tags
-    df['tags'] = df.connector_id.map(data['tags'])
+    df['tags'] = df.connector_id.astype(str).map(data['tags'])
 
     # Map hardwire connector type ID to their type name
     # ATTENTION: "attachment" can be part of any connector type
