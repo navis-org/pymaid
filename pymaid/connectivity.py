@@ -37,7 +37,7 @@ __all__ = sorted(['filter_connectivity', 'cable_overlap',
 
 
 def filter_connectivity(x, restrict_to, remote_instance=None):
-    """ Filters connectivity data by volume or skeleton data.
+    """Filter connectivity data by volume or skeleton data.
 
     Use this e.g. to restrict connectivity to edges within a given volume or
     to certain compartments of neurons.
@@ -72,7 +72,6 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
             Use this function if you have multiple fragments per neuron.
 
     """
-
     if not isinstance(restrict_to, (str, core.Volume,
                                     core.CatmaidNeuron,
                                     core.CatmaidNeuronList)):
@@ -83,15 +82,21 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
         restrict_to = fetch.get_volume(
             restrict_to, remote_instance=remote_instance)
 
+    if not isinstance(x, pd.DataFrame):
+        raise TypeError('Input must be pandas DataFrame, got '
+                        ' "{}"'.format(type(x)))
+
     datatype = getattr(x, 'datatype', None)
 
-    if datatype not in ['connectivity_table', 'adjacency_matrix']:
-        raise TypeError('Unknown connectivity data. See '
-                        'help(filter_connectivity) for details.')
+    # If no datatype attribute, try guessing
+    if isinstance(datatype, type(None)):
+        if 'relation' in x.columns:
+            datatype = 'connectivity_table'
+        else:
+            datatype = 'adjacency_matrix'
 
     if datatype == 'connectivity_table':
-        neurons = [c for c in x.columns if c not in [
-            'neuron_name', 'skeleton_id', 'num_nodes', 'relation', 'total']]
+        neurons = [c for c in x.columns if str(c).isnumeric()]
 
         """
         # Keep track of existing edges
@@ -160,6 +165,9 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
         elif isinstance(restrict_to, core.Volume):
             cn_locs = np.vstack(cn_data.connector_loc.values)
             cn_data = cn_data[intersect.in_volume(cn_locs, restrict_to)]
+    else:
+        raise TypeError('Unknown connectivity data type "{}".'.format(datatype)
+                        + ' See help(filter_connectivity) for details.')
 
     if cn_data.empty:
         logger.warning('No connectivity left after filtering')
