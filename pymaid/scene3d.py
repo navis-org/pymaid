@@ -45,6 +45,7 @@ import platform
 import colorsys
 import webbrowser
 from functools import wraps
+import os
 import warnings
 
 import numpy as np
@@ -67,7 +68,7 @@ __all__ = ['Viewer', 'Browser']
 logger = config.logger
 
 # This makes sure the app is run correctly
-if utils._type_of_script() == 'ipython':
+if utils._type_of_script() == 'ipython' and not os.environ.get('PYMAID_HEADLESS', False):
     try:
         ipython = get_ipython()
         ipython.magic("%gui qt5")
