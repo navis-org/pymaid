@@ -68,7 +68,8 @@ __all__ = ['Viewer', 'Browser']
 logger = config.logger
 
 # This makes sure the app is run correctly
-if utils._type_of_script() == 'ipython' and not os.environ.get('PYMAID_HEADLESS', False):
+headless = int(os.environ.get('PYMAID_HEADLESS', '0'))
+if utils._type_of_script() == 'ipython' and not headless:
     try:
         ipython = get_ipython()
         ipython.magic("%gui qt5")
