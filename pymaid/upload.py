@@ -119,7 +119,8 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
     """Copy neuron(s) from one CatmaidInstance to another.
 
     Note that skeleton, treenode and connector IDs will change (see server
-    response for old->new mapping).
+    response for old->new mapping). Also: node confidences are currently not
+    transferred.
 
     Parameters
     ----------
@@ -226,7 +227,8 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
 @cache.never_cache
 def upload_neuron(x, import_tags=False, import_annotations=False,
                   import_connectors=False, skeleton_id=None, neuron_id=None,
-                  force_id=False, remote_instance=None):
+                  force_id=False, source_id=None, source_project_id=None,
+                  source_url=None, source_type=None, remote_instance=None):
     """Export (upload) neurons to CatmaidInstance.
 
     Note that skeleton, treenode and connector IDs will change (see server
@@ -254,6 +256,16 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                          project, their instances will be replaced. If False
                          and you pass ``neuron_id`` or ``skeleton_id`` that
                          already exist, an error will be thrown.
+    source_id :          int, optional
+    source_project_id :  int, optional
+    source_url :         str, optional
+    source_type :        "skeleton" | "segmentation", optional
+                         ``source_{}`` are optional fields that will be
+                         associated with the newly uploaded neuron to help keep
+                         track of neurons' origins. You can use
+                         :func:`~pymaid.get_origin`, :func:`~pymaid.get_skids_by_origin`
+                         and :func:`~pymaid.find_neurons` to look up neurons
+                         by their origin.
     remote_instance :    CatmaidInstance, optional
                          CatmaidInstance to upload to. If not passed directly,
                          will try using global.
@@ -281,26 +293,36 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
             raise ValueError('Single-node neurons can currently not be uploaded '
                              'with a given skeleton or neuron ID.')
 
-        # Parse skeleton_id and neuron_id
-        if not isinstance(skeleton_id, type(None)) and not isinstance(skeleton_id, bool):
-            # Make sure it's an iterable
-            skeleton_id = list(utils._make_iterable(skeleton_id))
+        vars = dict(neuron_id=neuron_id,
+                    skeleton_id=skeleton_id,
+                    source_id=source_id,
+                    source_project_id=source_project_id,
+                    source_url=source_url,
+                    source_type=source_type)
 
-            if len(x) != len(skeleton_id):
-                raise ValueError('Must provide a `skeleton_id` for each uploaded neuron.')
+        # Parse variables that require unique values for each neuron
+        for k in ['neuron_id', 'skeleton_id', 'source_id']:
+            if not isinstance(vars[k], (type(None), bool)):
+                # Make sure it is iterable
+                vars[k] = list(utils._make_iterable(vars[k]))
 
-        if not isinstance(neuron_id, type(None)) and not isinstance(neuron_id, bool):
-            # Make sure it's an iterable
-            neuron_id = list(utils._make_iterable(neuron_id))
+                if len(vars[k]) != len(x):
+                    raise ValueError('Must provide "{}" for each uploaded neuron.'.format(k))
+            else:
+                vars[k] = vars[k] * len(x)
 
-            if len(x) != len(neuron_id):
-                raise ValueError('Must provide a `neuron_id` for each uploaded neuron.')
+        # Parse variables that can (but don't have to) be the same for all neurons
+        for k in ['source_project_id', 'source_url', 'source_type']:
+            if not utils._is_iterable(vars[k]):
+                vars[k] = vars[k] * len(x)
+            elif len(vars[k]) != len(x):
+                raise ValueError('Must provide "{}" for each uploaded neuron.'.format(k))
 
         # Check if any neurons has multiple skeletons
         many = [n.skeleton_id for n in x if n.n_skeletons > 1]
         if many:
             logger.warning('Neurons with multiple disconnected skeletons'
-                           'found: {}'.format(','.join(many)))
+                           'found: {}'.format(', '.join(many)))
 
             answer = ""
             while answer not in ["y", "n"]:
@@ -314,12 +336,16 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
             x = morpho.heal_fragmented_neuron(x, min_size=0, inplace=False)
 
         resp = {n.skeleton_id: upload_neuron(n,
-                                             neuron_id=neuron_id[i] if neuron_id else None,
-                                             skeleton_id=skeleton_id[i] if skeleton_id else None,
+                                             neuron_id=vars['neuron_id'][i],
+                                             skeleton_id=vars['skeleton_id'][i],
                                              import_tags=import_tags,
                                              import_annotations=import_annotations,
                                              import_connectors=import_connectors,
                                              force_id=force_id,
+                                             source_id=vars['source_id'][i],
+                                             source_project_id=vars['source_project_id'][i],
+                                             source_url=vars['source_url'][i],
+                                             source_type=vars['source_type'][i],
                                              remote_instance=remote_instance)
                 for i, n in config.tqdm(enumerate(x),
                                         desc='Uploading',
@@ -344,6 +370,16 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         logger.warning('Neuron has multiple disconnected skeletons. Will heal'
                        ' fragments before import!')
         x = morpho.heal_fragmented_neuron(x, min_size=0, inplace=False)
+
+    if source_type and source_type not in ['skeleton', 'segmentation']:
+        raise ValueError('Expected source_type to be "skeleton" or '
+                         '"segmentation", got "{}"'.format(source_type))
+
+    for v, n, t in zip([source_id, source_url, source_project_id],
+                       ['source_id', 'source_url', 'source_project_id'],
+                       [int, str,  int]):
+        if not isinstance(v, (type(None), t)):
+            raise TypeError('{} must be None or {}, got {}'.format(n, t, type(v)))
 
     # Check if any neurons are only single nodes
     # -> these need to be uploaded differently
@@ -375,6 +411,12 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                        'name': x.neuron_name,
                        'force': force_id,
                        'auto_id': False}
+
+        # Add ID fields
+        for k, v in zip(['source_id', 'source_url', 'source_project_id', 'source_type'],
+                        [source_id, source_url, source_project_id, source_type]):
+            if v:
+                import_post[k] = v
 
         f = os.path.join(tempfile.gettempdir(), 'temp.swc')
 
