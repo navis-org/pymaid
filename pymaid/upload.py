@@ -1767,12 +1767,25 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     remote_get_neuron_name = remote_instance._get_single_neuronname_url(x)
     neuronid = remote_instance.fetch(remote_get_neuron_name)['neuronid']
 
-    # Get name
-    name = fetch.get_names(x, remote_instance=remote_instance).get(str(x))
-
     if not no_prompt:
+        # Get name
+        name = fetch.get_names(x, remote_instance=remote_instance).get(str(x))
+
+        # Get annotations
+        an = fetch.get_annotations(x, remote_instance=remote_instance).get(str(x), [])
+
+        # Get review status and # nodes
+        review = fetch.get_review(x, remote_instance=remote_instance).set_index('skeleton_id')
+
+        # Prompt
         answer = ""
-        q = 'Please confirm deletion of neuron "{}" (#{}) [Y/N] '.format(name, x)
+        s = 'Neuron "{}" (#{}) has {} nodes ({} reviewed) and {} annotation(s)'
+        s = s.format(name, x,
+                     review.loc[str(x), 'total_node_count'],
+                     review.loc[str(x), 'percent_reviewed'],
+                     len(an))
+        print(s)
+        q = 'Please confirm deletion [Y/N] '
         while answer not in ["y", "n"]:
             answer = input(q).lower()
 
