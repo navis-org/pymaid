@@ -23,8 +23,10 @@ Functions related to searching for neurons and fetching their 3D skeletons:
     pymaid.get_neuron_id
     pymaid.get_neurons_in_volume
     pymaid.get_neuron_list
+    pymaid.get_origin
     pymaid.get_skids_by_annotation
     pymaid.get_skids_by_name
+    pymaid.get_skids_by_origin
 
 Annotations
 -----------
@@ -138,6 +140,7 @@ Functions to fetch miscellaneous data:
     pymaid.clear_cache
     pymaid.has_soma
     pymaid.get_cable_lengths
+    pymaid.get_import_info
     pymaid.get_review
     pymaid.get_review_details
     pymaid.url_to_coordinates

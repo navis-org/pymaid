@@ -90,7 +90,9 @@ __all__ = sorted(['CatmaidInstance',
                   'get_neuron_id',
                   'get_connectors_in_bbox',
                   'get_cable_lengths',
-                  'get_connectivity_counts'])
+                  'get_connectivity_counts',
+                  'get_import_info',
+                  'get_origin', 'get_skids_by_origin'])
 
 # Set up logging
 logger = config.logger
@@ -396,9 +398,9 @@ class CatmaidInstance:
         # Get the responses
         resp = [f.result() for f in config.tqdm(futures,
                                                 desc=desc,
-                                                disable=(disable_pbar or
-                                                         config.pbar_hide or
-                                                         len(futures) == 1),
+                                                disable=(disable_pbar
+                                                         or config.pbar_hide
+                                                         or len(futures) == 1),
                                                 leave=leave_pbar & config.pbar_leave)]
 
         # Make sure all responses returned data
@@ -921,6 +923,18 @@ class CatmaidInstance:
     def _get_connectivity_matrix_url(self, **GET):
         """Use to parse url for fetching adjacency matrices. Needs POST data."""
         return self.make_url(self.project_id, 'skeleton', 'connectivity_matrix', **GET)
+
+    def _get_import_info_url(self, **GET):
+        """Use to parse url fetching imported nodes for a given skeleton."""
+        return self.make_url(self.project_id, 'skeletons', 'import-info', **GET)
+
+    def _get_skeleton_origin_url(self, **GET):
+        """Use to parse url fetching origin info for given skeleton."""
+        return self.make_url(self.project_id, 'skeletons', 'origin', **GET)
+
+    def _get_skeleton_by_origin_url(self, **GET):
+        """Use to parse url fetching skeleton by their origin."""
+        return self.make_url(self.project_id, 'skeletons', 'from-origin', **GET)
 
 
 @cache.undo_on_error
@@ -5505,3 +5519,112 @@ def get_connectivity_counts(x, source_relations = ['presynaptic_to'],
     post.update({'target_relations[{}]'.format(i): t for i, t in enumerate(target_relations)})
 
     return remote_instance.fetch(url, post)
+
+
+@cache.undo_on_error
+def get_import_info(x, with_treenodes=False, chunk_size=500, remote_instance=None):
+    """Get count of imported nodes for given neuron(s).
+
+    Parameters
+    ----------
+    x :                 list-like | CatmaidNeuron/List
+                        Skeleton IDs for which to get import info.
+    with_treenodes :    bool, optional
+                        Whether to include IDs of all imported nodes.
+    chunk_size :        int, optional
+                        Retrieves data in chunks of this size.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    url = remote_instance._get_import_info_url()
+
+    info = {}
+    for i in config.trange(0, len(skids), int(chunk_size),
+                           desc='Fetching info'):
+        chunk = skids[i: i + chunk_size]
+        post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(chunk)}
+        post['with_treenodes'] = with_treenodes
+
+        resp = remote_instance.fetch(url, post=post)
+        info.update(resp)
+
+    return info
+
+
+@cache.undo_on_error
+def get_origin(x, chunk_size=500, remote_instance=None):
+    """Get origin of given neuron(s).
+
+    Parameters
+    ----------
+    x :                 list-like | CatmaidNeuron/List
+                        Skeleton IDs for which to get their origin.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+            {'data_sources': {'1': {'name': None,
+                                    'source_project_id': 1,
+                                    'url': 'https://.../tracing/fafb/v14-seg-li-190805.0'}},
+             'origins': {'13348203': {'data_source_id': 1, 'source_id': 13348108}}}
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    url = remote_instance._get_skeleton_origin_url()
+
+    post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
+
+    resp = remote_instance.fetch(url, post=post)
+
+    return resp
+
+
+@cache.undo_on_error
+def get_skids_by_origin(source_ids, source_url, source_project_id,
+                        remote_instance=None):
+    """Get skeleton IDs by origin.
+
+    Parameters
+    ----------
+    source_ids :            list of int
+                            Source IDs to search for.
+    source_url :            str
+                            Source url to search for.
+    source_project_id :     int
+                            Source project ID to search for.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                    {'source_id': skeleton_id}
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    source_ids = utils._make_iterable(source_ids)
+
+    url = remote_instance._get_skeleton_by_origin_url()
+
+    post = {'source_ids[{}]'.format(i): s for i, s in enumerate(source_ids)}
+    post['source_url'] = source_url
+    post['source_project_id'] = source_project_id
+
+    resp = remote_instance.fetch(url, post=post)
+
+    return resp
