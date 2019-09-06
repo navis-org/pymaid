@@ -260,16 +260,16 @@ def to_dotproduct(x):
     Examples
     --------
     >>> x = pymaid.get_neurons(16)
-    >>> dps = pymaid.to_dotproduct(x)
+    >>> dps = pymaid.to_dotprops(x)
     >>> # Get array of all locations
     >>> locs = numpy.vstack(dps.point.values)
 
     See Also
     --------
     pymaid.CatmaidNeuron.dps
+                Shorthand to the dotprops representation of neuron.
 
     """
-
     if isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] == 1:
             x = x[0]
@@ -1361,7 +1361,7 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
     # Keep track of original master root
     master_root = master.root[0]
 
-    # Generate one big neuron
+    # Generate one big neuron -> this also keeps track of original skeleton IDs
     master.nodes = x.nodes
     master.connectors = x.connectors
     for n in x:
