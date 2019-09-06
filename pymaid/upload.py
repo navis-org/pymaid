@@ -309,12 +309,12 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                 if len(vars[k]) != len(x):
                     raise ValueError('Must provide "{}" for each uploaded neuron.'.format(k))
             else:
-                vars[k] = vars[k] * len(x)
+                vars[k] = [vars[k]] * len(x)
 
         # Parse variables that can (but don't have to) be the same for all neurons
         for k in ['source_project_id', 'source_url', 'source_type']:
             if not utils._is_iterable(vars[k]):
-                vars[k] = vars[k] * len(x)
+                vars[k] = [vars[k]] * len(x)
             elif len(vars[k]) != len(x):
                 raise ValueError('Must provide "{}" for each uploaded neuron.'.format(k))
 
