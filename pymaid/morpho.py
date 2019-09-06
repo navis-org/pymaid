@@ -1282,12 +1282,8 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
 
     # If method is none, we can just merge the data tables
     if method == 'NONE' or method is None:
-        master.nodes = pd.concat([n.nodes for n in x],
-                                 ignore_index=True,
-                                 sort=True)
-        master.connectors = pd.concat([n.connectors for n in x],
-                                      ignore_index=True,
-                                      sort=True)
+        master.nodes = x.nodes
+        master.connectors = x.connectors
         master.tags = {}
         for n in x:
             master.tags.update(n.tags)
