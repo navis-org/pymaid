@@ -1286,7 +1286,8 @@ def stitch_neurons(*x, method='LEAFS', master='SOMA', tn_to_stitch=None,
         master.connectors = x.connectors
         master.tags = {}
         for n in x:
-            master.tags.update(n.tags)
+            for k, v in n.tags.items():
+                master.tags[k] = master.tags.get(k, []) + v
 
         # Reset temporary attributes of our final neuron
         master._clear_temp_attr()
