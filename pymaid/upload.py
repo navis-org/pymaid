@@ -1434,6 +1434,10 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
             else:
                 resp[r] = resp.get(r, []) + [v]
 
+    errors = [k for k, v in resp.items() if 'error' in v]
+    if errors:
+        logger.error('{} errors when updating radii. See server response for details'.format(len(errors)))
+
     return resp
 
 
@@ -1474,7 +1478,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 
     Returns
     -------
-    Nothing
+    Server response
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -1522,12 +1526,10 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
     if False not in [r['success'] for r in responses]:
         logger.info('All neurons successfully renamed.')
     else:
-        failed = [n for i, n in enumerate(
-            x) if responses[i]['success'] is False]
-        logger.error(
-            'Error renaming neuron(s): {0}'.format(','.join(failed)))
+        failed = [n for i, n in enumerate(x) if responses[i]['success'] is False]
+        logger.error('Error renaming neuron(s): {}'.format(','.join(failed)))
 
-    return
+    return responses
 
 
 @cache.never_cache
@@ -1555,6 +1557,8 @@ def add_treenode(coords, parent_id=None, radius=-1, confidence=5,
 
     See Also
     --------
+    :func:`~pymaid.add_connector`
+                        Use this to add connectors.
     :func:`~pymaid.delete_nodes`
                         Use this to delete tree- and connector nodes.
 
@@ -1564,7 +1568,7 @@ def add_treenode(coords, parent_id=None, radius=-1, confidence=5,
     coords = np.array(coords) if not isinstance(coords, np.ndarray) else coords
 
     if coords.ndim != 1 or coords.shape[0] != 3:
-        raise ValueError('Must provide x/y/z coordinate')
+        raise ValueError('Must provide a SINGLE x/y/z coordinate')
 
     url = remote_instance._create_treenode_url()
 
@@ -1589,7 +1593,12 @@ def add_treenode(coords, parent_id=None, radius=-1, confidence=5,
 
     post['state'] = json.dumps(state)
 
-    return remote_instance.fetch(url, post=post)
+    resp = remote_instance.fetch(url, post=post)
+
+    if 'error' in resp:
+        logger.error('Error adding treenode. See server response for details.')
+
+    return resp
 
 
 @cache.never_cache
@@ -1613,6 +1622,8 @@ def add_connector(coords, remote_instance=None):
     --------
     :func:`~pymaid.link_connector`
                         To link your newly created connectors to treenodes.
+    :func:`~pymaid.add_treenode`
+                        Use this to add treenodes.
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -1633,13 +1644,18 @@ def add_connector(coords, remote_instance=None):
              'y': c[1],
              'z': c[2]} for c in coords]
 
-    return remote_instance.fetch(url, post=post, desc='Creating connectors')
+    resp = remote_instance.fetch(url, post=post, desc='Creating connectors')
+
+    if 'error' in resp:
+        logger.error('Error adding connector(s). See server response for details.')
+
+    return resp
 
 
 @cache.never_cache
 def add_tags(node_list, tags, node_type, remote_instance=None,
              override_existing=False):
-    """ Add or edit tag(s) for a list of treenode(s) or connector(s).
+    """Add or edit tag(s) for a list of treenode(s) or connector(s).
 
     Parameters
     ----------
@@ -1676,7 +1692,6 @@ def add_tags(node_list, tags, node_type, remote_instance=None,
             Function to delete given tags from nodes.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(node_list, (list, np.ndarray)):
@@ -1710,8 +1725,9 @@ def add_tags(node_list, tags, node_type, remote_instance=None,
                                  post=post_data,
                                  desc='Modifying tags')
 
-    if 'error' in resp:
-        logger.error('Error tagging nodes. See response for details.')
+    errors = [r for r in resp if 'error' in r]
+    if errors:
+        logger.error('{} error(s) tagging nodes. See response for details.'.format(len(errors)))
 
     return resp
 
@@ -1758,8 +1774,7 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if len(x) > 1:
-        return {n: delete_neuron(n, remote_instance=remote_instance)
-                for n in x}
+        return {n: delete_neuron(n, remote_instance=remote_instance) for n in x}
     else:
         x = x[0]
 
@@ -1794,7 +1809,12 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 
     url = remote_instance._delete_neuron_url(neuronid)
 
-    return remote_instance.fetch(url)
+    resp = remote_instance.fetch(url)
+
+    if 'error' in resp:
+        logger.error('Error deleting neuron {}. See server response for details'.format(x.skeleton_id))
+
+    return resp
 
 
 @cache.never_cache
@@ -1887,9 +1907,9 @@ def push_new_root(new_root, no_prompt=False, remote_instance=None):
     # Generate postdata for each node
     post = {'treenode_id': new_root,
             'state': json.dumps({'edition_time': states[new_root]['edition_time'],
-                                  'parent':      states[new_root]['parent'],
-                                  'children':    states[new_root]['children'],
-                                  'links':       states[new_root]['links']
+                                 'parent':       states[new_root]['parent'],
+                                 'children':     states[new_root]['children'],
+                                 'links':        states[new_root]['links']
                                 })
             }
 
@@ -2017,10 +2037,10 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
         # Generate postdata for each node
         post = [{'treenode_id': n,
                  'state': json.dumps({'edition_time': states[n]['edition_time'],
-                           'parent':       states[n]['parent'],
-                           'children':     states[n]['children'],
-                           'links':        states[n]['links']
-                           })
+                                      'parent':       states[n]['parent'],
+                                      'children':     states[n]['children'],
+                                      'links':        states[n]['links']
+                                       })
                 } for n in node_ids]
 
         # Sanity check:
@@ -2034,14 +2054,14 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
         urls = [remote_instance._delete_treenode_url()] * len(post)
     elif node_type.lower() in ['connector', 'connectors']:
         # Filter each response to just the connector we need
-        states = [[c for c in r[1] if c[0]==n][0] for n, r in zip(node_ids, resp)]
+        states = [[c for c in r[1] if c[0] == n][0] for n, r in zip(node_ids, resp)]
 
         post = [{'connector_id': n,
                  'state': json.dumps({'edition_time': dt.fromtimestamp(st[-3],
                                                                        tz=timezone.utc).isoformat(),
-                                      'c_links'     : [[l[-1],
-                                                        dt.fromtimestamp(l[-2],
-                                                                         tz=timezone.utc).isoformat()
+                                      'c_links':      [[l[-1],
+                                                      dt.fromtimestamp(l[-2],
+                                                                       tz=timezone.utc).isoformat()
                                                         ]
                                                        for l in st[-1]]})}
                  for n, st in zip(node_ids, states)]
@@ -2167,7 +2187,7 @@ def move_nodes(new_locs, node_type, no_prompt=False, remote_instance=None):
 
 @cache.never_cache
 def delete_tags(node_list, tags, node_type, remote_instance=None):
-    """ Remove tag(s) for a list of treenode(s) or connector(s).
+    """Remove tag(s) for a list of treenode(s) or connector(s).
 
     Works by getting existing tags, removing given tag(s) and then using
     pymaid.add_tags() to push updated tags back to CATMAID.
@@ -2216,7 +2236,6 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     ...                           tags_to_remove, 'TREENODE')
 
     """
-
     PERM_NODE_TYPES = ['TREENODE', 'CONNECTOR']
 
     if node_type not in PERM_NODE_TYPES:
@@ -2259,7 +2278,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
 
 @cache.never_cache
 def add_meta_annotations(to_annotate, to_add, remote_instance=None):
-    """ Add meta-annotation(s) to annotation(s).
+    """Add meta-annotation(s) to annotation(s).
 
     Parameters
     ----------
@@ -2281,7 +2300,6 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
                         Delete given annotations from neurons.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Get annotation IDs
@@ -2309,12 +2327,17 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(x)
 
-    return remote_instance.fetch(add_annotations_url, add_annotations_postdata)
+    resp = remote_instance.fetch(add_annotations_url, add_annotations_postdata)
+
+    if 'error' in resp:
+        logger.error('Error adding annotation. See server response for details.')
+
+    return resp
 
 
 @cache.never_cache
 def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
-    """ Remove meta-annotation(s) from annotation(s).
+    """Remove meta-annotation(s) from annotation(s).
 
     Parameters
     ----------
@@ -2336,7 +2359,6 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
                         Delete given annotations from neurons.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     an = fetch.get_annotation_list(remote_instance=remote_instance)
@@ -2369,7 +2391,12 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
         key = 'annotation_ids[%i]' % i
         remove_annotations_postdata[key] = str(x)
 
-    return remote_instance.fetch(add_annotations_url, remove_annotations_postdata)
+    resp = remote_instance.fetch(add_annotations_url, remove_annotations_postdata)
+
+    if 'error' in resp:
+        logger.error('Error adding annotation. See server response for details.')
+
+    return resp
 
 
 @cache.never_cache
@@ -2434,28 +2461,30 @@ def remove_annotations(x, annotations, remote_instance=None):
         key = 'annotation_ids[%i]' % i
         remove_annotations_postdata[key] = str(an_ids[i])
 
-    if an_ids:
-        resp = remote_instance.fetch(
-            remove_annotations_url, remove_annotations_postdata)
-
-        an_list = an_list.reset_index().set_index('annotation_id')
-
-        if len(resp['deleted_annotations']) == 0:
-            logger.info('No annotations removed.')
-
-        for a in resp['deleted_annotations']:
-            logger.info('Removed "{0}" from {1} entities ({2} uses left)'.format(an_list.loc[int(a), 'annotation'],
-                                                                                 len(resp['deleted_annotations'][a]['targetIds']),
-                                                                                 resp['left_uses'][a]))
-    else:
+    if not an_ids:
         logger.info('No annotations removed.')
+        return
 
+    resp = remote_instance.fetch(remove_annotations_url,
+                                 remove_annotations_postdata)
+
+    an_list = an_list.reset_index().set_index('annotation_id')
+
+    if 'error' in resp:
+        logger.error('Error deleting annotation(s). See server response for details.')
+    elif len(resp['deleted_annotations']) == 0:
+        logger.info('No annotations removed.')
+    else:
+        for a in resp['deleted_annotations']:
+            logger.info('Removed "{}" from {} entities ({} uses left)'.format(an_list.loc[int(a), 'annotation'],
+                                                                              len(resp['deleted_annotations'][a]['targetIds']),
+                                                                              resp['left_uses'][a]))
     return resp
 
 
 @cache.never_cache
 def add_annotations(x, annotations, remote_instance=None):
-    """ Add annotation(s) to a list of neuron(s)
+    """Add annotation(s) to a list of neuron(s).
 
     Parameters
     ----------
@@ -2503,5 +2532,10 @@ def add_annotations(x, annotations, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(annotations[i])
 
-    return remote_instance.fetch(add_annotations_url,
+    resp = remote_instance.fetch(add_annotations_url,
                                  add_annotations_postdata)
+
+    if 'error' in resp:
+        logger.error("Error adding annotations. See server response for details.")
+
+    return resp
