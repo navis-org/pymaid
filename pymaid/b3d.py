@@ -60,6 +60,12 @@ except ImportError:
     logger.error(
         'Unable to load Blender API - this module only works from within Blender!')
 
+try:
+    # Get Blender Version as float
+    blender_version = float('{}.{}'.format(bpy.app.version[0], bpy.app.version[1]))
+except:
+    blender_version = 0.0
+
 # Set pbars to off b/c Blender's console can't render them anyway
 config.pbar_hide = True
 
@@ -114,13 +120,13 @@ class handler:
     """
     cn_dict = {
         0: dict(name='presynapses',
-                color=(1, 0, 0)),
+                color=(1, 0, 0, 1)),
         1: dict(name='postsynapses',
-                color=(0, 0, 1)),
+                color=(0, 0, 1, 1)),
         2: dict(name='gapjunction',
-                color=(0, 1, 0)),
+                color=(0, 1, 0, 1)),
         3: dict(name='abutting',
-                color=(1, 0, 1))
+                color=(1, 0, 1, 1))
     }  # : defines default colours/names for different connector types
 
     def __init__(self, conversion=1 / 10000):
@@ -208,9 +214,7 @@ class handler:
         elif isinstance(x, np.ndarray):
             self._create_scatter(x, **kwargs)
         else:
-            logger.error('Unable to interpret data type ' + str(type(x)))
-            raise AttributeError('Unable to add data of type' + str(type(x)))
-
+            return NotImplemented
         print('Import done in {:.2f}s'.format(time.time() - start))
 
         return
@@ -232,8 +236,8 @@ class handler:
         coords *= [1, 1, -1]
 
         verts, faces = CalcSphere(kwargs.get('size', 0.02),
-                                            kwargs.get('sp_res', 7),
-                                            kwargs.get('sp_res', 7))
+                                             kwargs.get('sp_res', 7),
+                                             kwargs.get('sp_res', 7))
 
         mesh = bpy.data.meshes.new(kwargs.get('name', 'scatter'))
         mesh.from_pydata(verts, [], faces)
@@ -252,10 +256,13 @@ class handler:
         if group_name != 'scatter' and group_name in bpy.data.groups:
             group = bpy.data.groups[group_name]
         else:
-            group = byp.data.groups.new(group_name)
+            group = bpy.data.groups.new(group_name)
 
         for obj in objects:
-            bpy.context.scene.objects.link(obj)
+            if blender_version >= 2.8:
+                bpy.context.scene.collection.objects.link(obj)
+            else:
+                bpy.context.scene.objects.link(obj)
             group.objects.link(obj)
 
         return
@@ -298,7 +305,12 @@ class handler:
         mesh.from_pydata(verts, [], sp_faces)
         mesh.polygons.foreach_set('use_smooth', [True] * len(mesh.polygons))
         obj = bpy.data.objects.new(kwargs.get('name', 'scatter'), mesh)
-        bpy.context.scene.objects.link(obj)
+
+        if blender_version >= 2.8:
+            bpy.context.scene.collection.objects.link(obj)
+        else:
+            bpy.context.scene.objects.link(obj)
+
         obj.location = (0, 0, 0)
         obj.show_name = False
 
@@ -315,9 +327,11 @@ class handler:
 
         if neurites:
             self._create_neurites(x, mat, use_radii=use_radii)
-        if soma and x.soma:
-            if isinstance(x.soma, (int, np.int64, np.int32)):
-                self._create_soma(x, mat)
+        if soma and not isinstance(x.soma, type(None)):
+            somata = utils._make_iterable(x.soma)
+            for s in somata:
+                if isinstance(s, (int, np.int64, np.int32)):
+                    self._create_soma(s, x, mat)
         if connectors:
             self._create_connectors(x)
         return
@@ -373,7 +387,10 @@ class handler:
 
         # Link object to scene - this needs to happen BEFORE we convert to
         # curve
-        bpy.context.scene.objects.link(ob)
+        if blender_version >= 2.8:
+            bpy.context.scene.collection.objects.link(ob)
+        else:
+            bpy.context.scene.objects.link(ob)
 
         # Select and make active object
         ob.select = True
@@ -435,13 +452,21 @@ class handler:
 
         ob.active_material = mat
 
-        bpy.context.scene.objects.link(ob)
+        # Add segments (i.e. list of node ids) to neuron
+        # Because Blender does not like list of lists, we need to convert
+        # to dictionary
+        # ob['segments'] = {str(i): seg for i, seg in eumerate(x.segments)}
+
+        if blender_version >= 2.8:
+            bpy.context.scene.collection.objects.link(ob)
+        else:
+            bpy.context.scene.objects.link(ob)
 
         return
 
-    def _create_soma(self, x, mat):
-        """ Create soma """
-        s = x.nodes.set_index('treenode_id').ix[x.soma]
+    def _create_soma(self, s, x, mat):
+        """Create soma."""
+        s = x.nodes.set_index('treenode_id').loc[s]
         loc = s[['x', 'z', 'y']].values * self.conversion * [1, 1, -1]
         rad = s.radius * self.conversion
 
@@ -450,7 +475,7 @@ class handler:
 
         soma_ob.location = loc
 
-        # Construct the bmesh cube and assign it to the blender mesh.
+        # Construct the bmesh cube and assign it to the blender mesh
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, diameter=rad)
         bm.to_mesh(mesh)
@@ -466,7 +491,10 @@ class handler:
         soma_ob.active_material = mat
 
         # Add the object into the scene.
-        bpy.context.scene.objects.link(soma_ob)
+        if blender_version >= 2.8:
+            bpy.context.scene.collection.objects.link(soma_ob)
+        else:
+            bpy.context.scene.objects.link(soma_ob)
 
         return
 
@@ -531,7 +559,10 @@ class handler:
             mat.diffuse_color = self.cn_dict[i]['color']
             ob.active_material = mat
 
-            bpy.context.scene.objects.link(ob)
+            if blender_version >= 2.8:
+                bpy.context.scene.collection.objects.link(ob)
+            else:
+                bpy.context.scene.objects.link(ob)
 
         return
 
@@ -560,10 +591,10 @@ class handler:
         me = bpy.data.meshes.new(mesh_name + '_mesh')
         ob = bpy.data.objects.new(mesh_name, me)
 
-        scn = bpy.context.scene
-        scn.objects.link(ob)
-        scn.objects.active = ob
-        ob.select = True
+        if blender_version >= 2.8:
+            bpy.context.scene.collection.objects.link(ob)
+        else:
+            bpy.context.scene.objects.link(ob)
 
         me.from_pydata(list(blender_verts), [], list(volume.faces))
         me.update()
@@ -600,10 +631,17 @@ class handler:
         names = []
 
         for ob in bpy.data.objects:
-            ob.select = False
+            if blender_version >= 2.8:
+                ob.select_set(False)
+            else:
+                ob.select = False
+
             if 'skeleton_id' in ob:
                 if ob['skeleton_id'] in skids:
-                    ob.select = True
+                    if blender_version >= 2.8:
+                        ob.select_set(True)
+                    else:
+                        ob.select = True
                     names.append(ob.name)
         return object_list(names, handler=self)
 
@@ -673,7 +711,7 @@ class object_list:
         elif key in ['skeleton_id', 'skeleton_ids', 'skeletonid', 'skeletonids', 'skid', 'skids']:
             return [bpy.data.objects[n]['skeleton_id'] for n in self.object_names if n in bpy.data.objects]
         else:
-            raise AttributeError('Unknown attribute ' + key)
+            return NotImplemented
 
     def __getitem__(self, key):
         if isinstance(key, int) or isinstance(key, slice):
@@ -710,11 +748,17 @@ class object_list:
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
-                ob.select = True
+                if blender_version >= 2.8:
+                    ob.select_set(True)
+                else:
+                    ob.select = True
             elif unselect_others:
-                ob.select = False
+                if blender_version >= 2.8:
+                    ob.select_set(False)
+                else:
+                    ob.select = False
 
-    def color(self, r, g, b, vary=None):
+    def color(self, r, g, b, a=1, vary=None):
         """ Assign color to all objects in the list.
 
         Parameters
@@ -725,6 +769,8 @@ class object_list:
                 Green value, range 0-1
         b :     float
                 Blue value, range 0-1
+        a :     float
+                Alpha value, range 0-1
         vary :  float
                 Range by which to randomly vary r, g and b.
         """
@@ -736,10 +782,15 @@ class object_list:
                                    np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
                                    np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
                                   ])
-
-                    ob.active_material.diffuse_color = np.clip(rgb + v, 0, 1)
+                    c = np.clip(rgb + v, 0, 1)
                 else:
-                    ob.active_material.diffuse_color = np.clip(rgb, 0, 1)
+                    c = np.clip(rgb, 0, 1)
+
+                if blender_version >= 2.8:
+                    ob.active_material.diffuse_color = np.append(c, a)
+                else:
+                    ob.active_material.diffuse_color = c
+                    ob.active_material.alpha = a
 
     def colorize(self):
         """ Assign colors across the color spectrum
@@ -793,6 +844,12 @@ class object_list:
                         e.g. "data"
         value :         float | int | str
                         Value to set attribute to.
+
+        Examples
+        --------
+        >>> h = b3d.handler()
+        >>> h.neurons.set('data.bevel_resolution', 5)
+        >>> h.neurons.set('data.resolution_u', 6)
         """
         attribute = attribute.split('.')
         for n in self.object_names:
@@ -831,6 +888,11 @@ class object_list:
                 ob.hide = False
             else:
                 ob.hide = True
+
+    def invert(self):
+        """ Invert selection. """
+        return
+
 
     def delete(self):
         """Delete neurons in the selection"""
@@ -895,7 +957,8 @@ def CalcSphere(radius, nrPolar, nrAzimuthal):
     faces = []
     for iAzimuthal in range(nrAzimuthal):                # top faces
         iNextAzimuthal = iAzimuthal + 1
-        if iNextAzimuthal >= nrAzimuthal: iNextAzimuthal -= nrAzimuthal
+        if iNextAzimuthal >= nrAzimuthal:
+            iNextAzimuthal -= nrAzimuthal
         faces.append([0, iAzimuthal + 1, iNextAzimuthal + 1])
 
     for iPolar in range(nrPolar - 3):                    # regular faces
@@ -903,15 +966,39 @@ def CalcSphere(radius, nrPolar, nrAzimuthal):
 
         for iAzimuthal in range(nrAzimuthal):
             iNextAzimuthal = iAzimuthal + 1
-            if iNextAzimuthal >= nrAzimuthal: iNextAzimuthal -= nrAzimuthal
+            if iNextAzimuthal >= nrAzimuthal:
+                iNextAzimuthal -= nrAzimuthal
             faces.append([iAzimuthalStart + iAzimuthal, iAzimuthalStart + iAzimuthal + nrAzimuthal, iAzimuthalStart + iNextAzimuthal + nrAzimuthal, iAzimuthalStart + iNextAzimuthal])
 
     iLast = len(verts) - 1
     iAzimuthalStart = iLast - nrAzimuthal
     for iAzimuthal in range(nrAzimuthal):                # bottom faces
         iNextAzimuthal = iAzimuthal + 1
-        if iNextAzimuthal >= nrAzimuthal: iNextAzimuthal -= nrAzimuthal
+        if iNextAzimuthal >= nrAzimuthal:
+            iNextAzimuthal -= nrAzimuthal
         faces.append([iAzimuthalStart + iAzimuthal, iLast, iAzimuthalStart + iNextAzimuthal])
 
-
     return np.vstack(verts), faces
+
+
+def make_bsdf_material(obj):
+    """Turn active material of given object into Principled BSDF shader."""
+    material = obj.active_material
+    material.use_nodes = True
+
+    # Remove all nodes but output
+    material_output = None
+    for n in material.node_tree.nodes:
+        if n.name == 'Material Output':
+            material_output = n
+        else:
+            material.node_tree.nodes.remove(n)
+
+    if not material_output:
+        material_output = material.node_tree.nodes.new('Material Output')
+
+    # Create principled BSDF node
+    pbsdf = material.node_tree.nodes.new('ShaderNodeBsdfPrincipled')
+
+    # link emission shader to material
+    material.node_tree.links.new(material_output.inputs[0], pbsdf.outputs[0])
