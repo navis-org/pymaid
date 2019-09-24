@@ -66,6 +66,33 @@ def _type_of_script():
         return 'terminal'
 
 
+def is_jupyterlab():
+    """Test if we are inside Jupyter lab"""
+    import psutil
+    return any(['jupyter-lab' in x for x in psutil.Process().parent().cmdline()])
+
+
+def has_plotly_extension():
+    """Check if Jupyter lab plotly renderer extension is installed."""
+    import subprocess
+    # This is the old plotly renderer
+    result = subprocess.run(['jupyter',
+                             'labextension',
+                             'check',
+                             '@jupyterlab/plotly-extension'])
+    if result.returncode == 0:
+        return True
+
+    # This is the new one
+    result = subprocess.run(['jupyter',
+                             'labextension',
+                             'check',
+                             'jupyterlab-plotly'])
+    if result.returncode == 0:
+        return True
+    return False
+
+
 def is_jupyter():
     """ Test if pymaid is run in a Jupyter notebook."""
     return _type_of_script() == 'jupyter'
