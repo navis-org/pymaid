@@ -1853,7 +1853,10 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 
     # Need to get the neuron ID
     remote_get_neuron_name = remote_instance._get_single_neuronname_url(x)
-    neuronid = remote_instance.fetch(remote_get_neuron_name)['neuronid']
+    neuronid = remote_instance.fetch(remote_get_neuron_name).get('neuronid')
+
+    if not neuronid:
+        raise ValueError("Can't find neuron with skeleton ID {}".format(x))
 
     if not no_prompt:
         # Get name
