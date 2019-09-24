@@ -995,7 +995,7 @@ class ClustResults:
         D = self.dist_mat.copy()
 
         if isinstance(D, pd.DataFrame):
-            D = D.as_matrix()
+            D = D.values
 
         D = D[idx1, :]
         D = D[:, idx2]
@@ -1220,7 +1220,7 @@ def _calc_sparseness(x, mode='activity_ratio'):
         raise ValueError('Unknown mode: {}'.format(mode))
 
     if isinstance(x, pd.DataFrame):
-        mat = x.as_matrix()
+        mat = x.values
         names = x.columns.tolist()
     elif isinstance(x, np.ndarray):
         mat = x
