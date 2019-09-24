@@ -1162,6 +1162,10 @@ def plot3d(x, **kwargs):
             skid = neuron.skeleton_id
 
             if not connectors_only:
+                if neuron.nodes.empty:
+                    logger.warning('Neuron {} has no nodes - skipping'.format(neuron.skeleton_id))
+                    continue
+
                 # Generate coordinates along segments
                 coords = _segments_to_coords(neuron, neuron.segments,
                                              modifier=(-1, -1, -1))
