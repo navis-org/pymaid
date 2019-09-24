@@ -71,6 +71,17 @@ def is_jupyter():
     return _type_of_script() == 'jupyter'
 
 
+def ipywidgets_installed():
+    """ Test if pymaid is run in a Jupyter notebook."""
+    try:
+        import ipywidgets
+        return True
+    except ImportError:
+        return False
+    except BaseException as e:
+        logger.error('Error importing ipytwidgets: {}'.format(str(e)))
+
+
 def set_loggers(level='INFO'):
     """Helper function to set levels for all associated module loggers."""
     config.logger.setLevel(level)
