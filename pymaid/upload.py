@@ -47,7 +47,8 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'add_connector', 'transfer_neuron',
                   'differential_upload', 'move_nodes',
                   'push_new_root', 'add_treenode',
-                  'update_node_confidence'])
+                  'update_node_confidence',
+                  'delete_volume'])
 
 # Set up logging
 logger = config.logger
@@ -111,6 +112,75 @@ def upload_volume(x, name, comments=None, remote_instance=None):
         logger.error('Error exporting volume {}'.format(name))
 
     return response
+
+
+@cache.never_cache
+def delete_volume(x, no_prompt=False, remote_instance=None):
+    """Delete volume from Catmaid Instance.
+
+    Parameters
+    ----------
+    x :                 int | str
+                        Name (str) or ID (int) of volume to delete.
+    no_prompt :         bool, optional
+                        If True, will skip prompt to confirm deletion.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                         Server response.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if not isinstance(x, (str, int, np.integer)):
+        raise TypeError('Expected volume name (str) or ID (int), '
+                        'got "{}"'.format(type(x)))
+
+    # First, get volume IDs
+    get_volumes_url = remote_instance._get_volumes()
+    resp = remote_instance.fetch(get_volumes_url)
+
+    all_vols = pd.DataFrame(resp['data'], columns=resp['columns'])
+
+    # Get volume name + ID
+    if isinstance(x, (int, np.integer)):
+        id2name = all_vols.set_index('id').name.to_dict()
+
+        if x not in id2name:
+            raise ValueError('Volume "{}" not found'.format(x))
+        vol_name = id2name[x]
+        vol_id = x
+    elif isinstance(x, str):
+        name2id = all_vols.set_index('name').id.to_dict()
+
+        if x not in name2id:
+            raise ValueError('Volume "{}" not found'.format(x))
+        vol_name = x
+        vol_id = name2id[x]
+
+    if not no_prompt:
+        # Now prompt
+        answer = ""
+        q = 'Please confirm deletion of Volume "{}" (ID {}) [Y/N] '.format(vol_name, vol_id)
+        while answer not in ["y", "n"]:
+            answer = input(q).lower()
+
+        if answer != 'y':
+            return
+
+    url = remote_instance._get_volume_details(vol_id)
+
+    req = remote_instance._session.delete(url)
+    req.raise_for_status()
+    resp = req.json()
+
+    if 'error' in resp:
+        logger.error('Error deleting volume {}: {}'.format(x, resp))
+
+    return resp
 
 
 def transfer_neuron(x, source_instance, target_instance, move_tags=False,
