@@ -68,6 +68,15 @@ logger = config.logger
 if utils.is_jupyter():
     plotly.offline.init_notebook_mode(connected=True)
 
+if utils.is_jupyter() and utils.is_jupyterlab():
+    if not utils.has_plotly_extension():
+        logger.warning('It appears you are in a Jupyter lab and do not have '
+                       'the plotly renderer installed. This is required '
+                       'for pymaid.plot3d(). Please visit https://github.com'
+                       '/plotly/plotly.py/blob/master/README.md#jupyterlab-'
+                       'support-python-35 for instructions on how to '
+                       'install it')
+
 
 def screenshot(file='screenshot.png', alpha=True):
     """ Saves a screenshot of active vispy 3D canvas.
