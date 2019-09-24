@@ -291,6 +291,9 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
                          import_connectors=move_connectors,
                          skeleton_id=neurons.skeleton_id.astype(int) if force_id else None,
                          force_id=force_id,
+                         source_id=neurons.skeleton_id.astype(int),
+                         source_project_id=source_instance.project_id,
+                         source_url=source_instance.server,
                          remote_instance=target_instance)
 
 
@@ -447,7 +450,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
     for v, n, t in zip([source_id, source_url, source_project_id],
                        ['source_id', 'source_url', 'source_project_id'],
-                       [int, str,  int]):
+                       [(int, np.integer), str,  (int, np.integer)]):
         if not isinstance(v, (type(None), t)):
             raise TypeError('{} must be None or {}, got {}'.format(n, t, type(v)))
 
