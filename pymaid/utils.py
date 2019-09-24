@@ -575,6 +575,14 @@ def _parse_objects(x, remote_instance=None):
     if not isinstance(x, list):
         x = [x]
 
+    # If any list in x, flatten first
+    if any([isinstance(i, list) for i in x]):
+        # We need to be careful to preserve order because of colors
+        y = []
+        for i in x:
+            y += i if isinstance(i, list) else [i]
+        x = y
+
     # Check for skeleton IDs
     skids = []
     for ob in x:
