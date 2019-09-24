@@ -573,16 +573,16 @@ class CatmaidNeuron:
         return self.igraph
 
     def get_dps(self):
-        """Calculates/updates dotproduct representation of the neuron.
+        """Calculates/updates dotprops representation of the neuron.
 
         Once calculated stored as ``.dps``.
 
         See Also
         --------
-        :func:`pymaid.to_dotproduct`
+        :func:`pymaid.to_dotprops`
         """
 
-        self.dps = morpho.to_dotproduct(self)
+        self.dps = morpho.to_dotprops(self)
         return self.dps
 
     def _get_segments(self, how='length'):

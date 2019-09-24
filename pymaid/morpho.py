@@ -34,7 +34,7 @@ logger = config.logger
 __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'stitch_neurons', 'arbor_confidence', 'split_axon_dendrite',
                   'bending_flow', 'flow_centrality', 'segregation_index',
-                  'to_dotproduct', 'average_neurons', 'tortuosity',
+                  'to_dotprops', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron', 'guess_radius',
                   'smooth_neuron', 'time_machine', 'heal_fragmented_neuron',
                   'break_fragments', 'union_neurons', 'prune_twigs'])
@@ -234,10 +234,10 @@ def calc_cable(skdata, remote_instance=None, return_skdata=False):
     return np.sum(w[np.logical_not(np.isnan(w))]) / 1000
 
 
-def to_dotproduct(x):
-    """ Converts a neuron's neurites into dotproducts.
+def to_dotprops(x):
+    """Convert neuron to point clouds with tangent vectors (but no connectivity).
 
-    Dotproducts consist of a point and a vector. This works by (1) finding the
+    Dotprops consist of a point and a vector. This works by (1) finding the
     center between child->parent treenodes and (2) getting the vector between
     them. Also returns the length of the vector.
 
