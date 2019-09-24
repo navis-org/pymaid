@@ -55,6 +55,19 @@ def is_jupyter():
     """ Test if pymaid is run in a Jupyter notebook."""
     return _type_of_script() == 'jupyter'
 
+
+def ipywidgets_installed():
+    """Test if ipywidgets are installed."""
+    try:
+        import ipywidgets
+        return True
+    except ImportError:
+        return False
+    except BaseException as e:
+        logger.error('Error importing ipytwidgets: {}'.format(str(e)))
+        return False
+
+
 # Here, we import tqdm and determine whether we use classic notebook tbars
 from tqdm import tqdm_notebook, tnrange
 from tqdm import tqdm as tqdm_classic
@@ -63,7 +76,7 @@ from tqdm import trange as trange_classic
 # Keep this because `tqdm_notebook` is only a wrapper (type "function")
 tqdm_class = tqdm_classic
 
-if is_jupyter():
+if is_jupyter() and ipywidgets_installed():
     from tqdm import tqdm_notebook, tnrange
     tqdm = tqdm_notebook
     trange = tnrange

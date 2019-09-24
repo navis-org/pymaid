@@ -104,7 +104,11 @@ def set_pbars(hide=None, leave=None, jupyter=None):
     if isinstance(jupyter, bool):
         if jupyter:
             if not is_jupyter():
-                logger.error('No Jupyter environment detected.')
+                logger.error('Unable to use fancy Jupyter progress: '
+                             'No Jupyter environment detected.')
+            elif not ipywidgets_installed():
+                logger.error('Unable to use fancy Jupyter progress: '
+                             'ipywidgets not installed .')
             else:
                 config.tqdm = config.tqdm_notebook
                 config.trange = config.tnrange
