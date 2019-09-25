@@ -69,12 +69,17 @@ logger = config.logger
 
 # This makes sure the app is run correctly
 headless = int(os.environ.get('PYMAID_HEADLESS', '0'))
-if utils._type_of_script() == 'ipython' and not headless:
-    try:
-        ipython = get_ipython()
-        ipython.magic("%gui qt5")
-    except BaseException:
-        pass
+if utils._type_of_script() == 'ipython':
+    if headless:
+        logger.info('Pymaid is running in headless mode')
+    elif utils.is_headless():
+        logger.info('No display detected. Pymaid is running in headless mode')
+    else:
+        try:
+            ipython = get_ipython()
+            ipython.magic("%gui qt5")
+        except BaseException:
+            pass
 
 try:
     # Try setting vispy backend to PyQt5
