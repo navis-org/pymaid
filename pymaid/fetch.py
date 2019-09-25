@@ -3253,7 +3253,7 @@ def neuron_exists(x, remote_instance=None):
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
     if len(x) > 1:
-        return {n: neuron_exists(n) for n in x}
+        return {n: neuron_exists(n, remote_instance=remote_instance) for n in x}
     else:
         x = x[0]
 
