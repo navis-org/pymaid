@@ -95,7 +95,7 @@ def has_plotly_extension():
 
 def is_headless():
     """Check if Display is available."""
-    return 'DISPLAY' in os.environ
+    return 'DISPLAY' not in os.environ
 
 
 def is_jupyter():
