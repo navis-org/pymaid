@@ -67,7 +67,7 @@ def _type_of_script():
 
 
 def is_jupyterlab():
-    """Test if we are inside Jupyter lab"""
+    """Test if we are inside Jupyter lab."""
     import psutil
     return any(['jupyter-lab' in x for x in psutil.Process().parent().cmdline()])
 
@@ -91,6 +91,11 @@ def has_plotly_extension():
     if result.returncode == 0:
         return True
     return False
+
+
+def is_headless():
+    """Check if Display is available."""
+    return 'DISPLAY' in os.environ
 
 
 def is_jupyter():
