@@ -51,6 +51,7 @@ Functions to fetch treenodes and connectors:
     pymaid.get_connectors_in_bbox
     pymaid.get_skid_from_treenode
     pymaid.get_node_details
+    pymaid.get_nodes_in_volume
     pymaid.get_node_location
     pymaid.get_treenode_table
     pymaid.get_treenode_info
@@ -104,6 +105,7 @@ Functions to fetch user stats:
     pymaid.get_time_invested
     pymaid.get_user_list
     pymaid.get_user_contributions
+    pymaid.get_user_stats
 
 Volumes
 -------
@@ -163,6 +165,7 @@ Upload, rename, move or delete neurons:
     pymaid.push_new_root
     pymaid.rename_neurons
     pymaid.replace_skeleton
+    pymaid.join_skeletons
     pymaid.transfer_neuron
     pymaid.update_radii
     pymaid.upload_neuron
@@ -188,6 +191,7 @@ Edit treenodes:
 
     pymaid.add_treenode
     pymaid.delete_nodes
+    pymaid.join_nodes
     pymaid.move_nodes
     pymaid.update_node_confidence
 
@@ -404,6 +408,7 @@ Various morphology metrics:
     pymaid.flow_centrality
     pymaid.segregation_index
     pymaid.strahler_index
+    pymaid.to_dotprops
 
 Distances
 ---------
