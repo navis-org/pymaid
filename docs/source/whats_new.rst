@@ -44,7 +44,7 @@ What's new?
      - 17/05/19
      - - new function: :func:`~pymaid.get_connector_in_bbox`
        - new multi-ray option for :func:`~pymaid.in_volume` for complicated meshes
-       - other improvements: func:`~pymaid.from_swc`
+       - other improvements: :func:`~pymaid.from_swc`
        - many bugfixes
    * - 0.94
      - 09/04/19
@@ -52,13 +52,13 @@ What's new?
        - new functions: :func:`~pymaid.break_fragments`, :func:`~pymaid.heal_fragmented_neuron`, :func:`~pymaid.update_radii`, :func:`~pymaid.get_neuron_id`, :func:`~pymaid.rmaid.neuron2dps`
        - :class:`~pymaid.Volumes` now allow multiplication and division - will apply to vertex coordinates
        - improved: :func:`~pymaid.from_swc`, :func:`~pymaid.to_swc`, :func:`~pymaid.predict_connectivity`, :func:`~pymaid.stitch_neurons`, :func:`~pymaid.reroot_neuron`, :func:`~pymaid.upload_neuron`
-       - fixes in :func:`~pymaid.delete_neuron`, :func:`~pymaid.rename_neurons`, :func:`~pymaid.fetch_history`, :func:`~pymaid.split_axon_dendrite`, :func:`~pymaid.CatmaidNeuronList.remove_duplicates`
+       - fixes in :func:`~pymaid.delete_neuron`, :func:`~pymaid.rename_neurons`, :func:`~pymaid.get_history`, :func:`~pymaid.split_axon_dendrite`, :func:`~pymaid.CatmaidNeuronList.remove_duplicates`
        - updated to networkx 2.2
    * - 0.93
      - 05/02/19
      - - various improvements to the Blender interface ``pymaid.b3d``
        - improved :func:`~pymaid.predict_connectivity`
-       - new functions to import/transfer neurons to/between Catmaid instances: :func:`pymaid.import_neuron` and :func:`pymaid.transfer_neuron`
+       - new functions to import/transfer neurons to/between Catmaid instances: :func:`pymaid.upload_neuron` and :func:`pymaid.transfer_neuron`
        - new function :func:`pymaid.sparseness` to calculate lifetime sparseness
        - tons of bug fixes
    * - 0.92
@@ -76,7 +76,7 @@ What's new?
      - 20/09/18
      - - vispy 3d viewer overhaul: prettier, better picking, new shortcuts
        - indexing of :class:`~pymaid.CatmaidNeuronList` via ``.skid[]`` now returns results in order of query
-       - new function: :func:`~pymaid.get_treenodes_by_tag`
+       - new function: :func:`~pymaid.find_treenodes`
        - new function: :func:`~pymaid.connection_density`
        - improved :func:`~pymaid.split_axon_dendrite`
        - improved :func:`~pymaid.to_swc` and :func:`~pymaid.from_swc`
