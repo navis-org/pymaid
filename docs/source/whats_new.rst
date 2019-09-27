@@ -10,6 +10,42 @@ What's new?
    * - Version
      - Date
      -
+   * - 0.101
+       to
+       0.103
+     - 25/09/19
+     - - teach :func:`~pymaid.upload_neuron` and :func:`~pymaid.transfer_neuron` to make use of new ``source`` fields in CATMAID
+       - pymaid will now warn if run in Jupyter lab without plotly renderer extension
+       - renamed function ``to_dotproduct`` to :func:`pymaid.to_dotprops`
+       - auto-detect if no display available
+       - various improvements and bugfixes
+   * - 0.100
+     - 03/09/19
+     - - improve :func:`~pymaid.get_nodes_in_volume`
+       - add optional headless mode (set env variable `PYMAID_HEADLESS=TRUE`)
+   * - 0.99
+     - 12/08/19
+     - - use ``ujson`` library if available for faster unpacking
+       - new function: :func:`~pymaid.update_node_confidence`, :func:`~pymaid.get_connectivity_counts`
+       - various improvements and bug fixes
+   * - 0.98
+     - 21/06/19
+     - - new functions: :func:`~pymaid.join_nodes`, :func:`~pymaid.link_connector`, :func:`~pymaid.join_skeletons`, :func:`~pymaid.replace_skeleton`, :func:`~pymaid.link_connector`, :func:`~pymaid.delete_nodes`, :func:`~pymaid.add_connector`
+       - reworked ``get_treenodes_by_tag`` and renamed to :func:`~pymaid.find_treenodes`
+   * - 0.97
+     - 21/06/19
+     - - new functions: :func:`~pymaid.upload_volume`, :func:`~pymaid.shared_partners`
+       - improved :func:`~pymaid.upload_neuron`, :func:`~pymaid.from_swc`, :func:`~pymaid.plot2d` and more
+       - fixes for :func:`~pymaid.remove_annotations`, :func:`~pymaid.get_neuron` and more
+   * - 0.96
+     - 22/05/19
+     - - fixed bug in :func:`~pymaid.plot3d` using plotly
+   * - 0.95
+     - 17/05/19
+     - - new function: :func:`~pymaid.get_connector_in_bbox`
+       - new multi-ray option for :func:`~pymaid.in_volume` for complicated meshes
+       - other improvements: func:`~pymaid.from_swc`
+       - many bugfixes
    * - 0.94
      - 09/04/19
      - - started reworking vispy plot3d: in brief, will try reducing the number of shader programs running
