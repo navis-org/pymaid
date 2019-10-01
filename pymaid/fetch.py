@@ -977,10 +977,10 @@ class CatmaidInstance:
 
 
 @cache.undo_on_error
-def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
-               get_history=False, get_merge_history=False, get_abutting=False,
-               return_df=False, fetch_kwargs={}, init_kwargs={}):
-    """ Retrieve 3D skeleton data.
+def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
+               with_merge_history=False, with_abutting=False, return_df=False,
+               fetch_kwargs={}, init_kwargs={}, remote_instance=None):
+    """Retrieve 3D skeleton data as CatmaidNeuron/List.
 
     Parameters
     ----------
@@ -991,22 +991,20 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
                         2. list of neuron name(s), str, exact match
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    remote_instance :   CatmaidInstance, optional
-                        If not passed directly, will try using global.
-    connector_flag :    0 | False | 1 | True, optional
-                        Set if connector data should be retrieved.
+    with_connectors :   bool, optional
+                        If True, will include connector data.
                         Note: the CATMAID API endpoint does currently not
                         support retrieving abutting connectors this way.
-                        Please use ``get_abutting=True`` to set an additional
-                        flag.
-    tag_flag :          0 | False | 1 | True, optional
-                        Set if tags should be retrieved.
-    get_history:        bool, optional
+                        Please use ``with_abutting=True`` to include
+                        abutting connectors.
+    with_tags :         bool, optional
+                        If True, will include node tags.
+    with_history:       bool, optional
                         If True, the returned node data will contain
                         creation date and last modified for each
                         node.
 
-                        ATTENTION: if ``get_history=True``, nodes/connectors
+                        ATTENTION: if ``with_history=True``, nodes/connectors
                         that have been moved since their creation will have
                         multiple entries reflecting their changes in position!
                         Each state has the date it was modified as creation
@@ -1014,7 +1012,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
                         most up to date state has the original creation date
                         as last modified.
                         The creator_id is always the original creator though.
-    get_abutting:       bool, optional
+    with_abutting:      bool, optional
                         If True, will retrieve abutting connectors.
                         For some reason they are not part of compact-json, so
                         they have to be retrieved via a separate API endpoint
@@ -1029,6 +1027,8 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
     init_kwargs :       dict, optional
                         Keyword arguments passed when initializing
                         ``CatmaidNeuron``/``CatmaidNeuronList``.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -1071,126 +1071,75 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
     >>> n = pymaid.get_neuron('annotation:glomerulus DA1')
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
     # Update from kwargs if available
-    tag_flag = fetch_kwargs.get('tag_flag', tag_flag)
-    connector_flag = fetch_kwargs.get('connector_flag', connector_flag)
-    get_history = fetch_kwargs.get('get_history', get_history)
-    get_merge_history = fetch_kwargs.get('get_merge_history', get_merge_history)
-    get_abutting = fetch_kwargs.get('get_abutting', get_abutting)
+    with_tags = fetch_kwargs.get('with_tags', with_tags)
+    with_connectors = fetch_kwargs.get('with_connectors', with_connectors)
+    with_history = fetch_kwargs.get('with_history', with_history)
+    with_merge_history = fetch_kwargs.get('with_merge_history', with_merge_history)
+    with_abutting = fetch_kwargs.get('with_abutting', with_abutting)
     return_df = fetch_kwargs.get('return_df', return_df)
 
-    # Convert tag_flag, connector_tag, get_history and get_merge_history to
-    # bool if necessary
-    if isinstance(tag_flag, int):
-        tag_flag = tag_flag == 1
-    if isinstance(connector_flag, int):
-        connector_flag = connector_flag == 1
-    if isinstance(get_history, int):
-        get_history = get_history == 1
-    if isinstance(get_merge_history, int):
-        get_merge_history = get_merge_history == 1
-
     # Generate URLs to retrieve
-    urls = [remote_instance._get_compact_details_url(s) for s in x]
-    GET = urllib.parse.urlencode({'with_history': str(get_history).lower(),
-                                  'with_tags': str(tag_flag).lower(),
-                                  'with_connectors': str(connector_flag).lower(),
-                                  'with_merge_history': str(get_merge_history).lower()})
-    urls = [u + '?%s' % GET for u in urls]
+    urls = [remote_instance._get_compact_details_url(s,
+                                                     with_history=str(with_history).lower(),
+                                                     with_tags=str(with_tags).lower(),
+                                                     with_connectors=str(with_connectors).lower(),
+                                                     with_merge_history=str(with_merge_history).lower()) for s in x]
 
     skdata = remote_instance.fetch(urls, desc='Fetch neurons')
 
     # Retrieve abutting
-    if get_abutting:
-        urls = [remote_instance._get_connector_links_url() for s in x]
+    if with_abutting:
+        urls = [remote_instance._get_connector_links_url(**{'skeleton_ids[0]': str(s),
+                                                            'relation_type': 'abutting'}) for s in x]
 
-        GET = [urllib.parse.urlencode({'skeleton_ids[0]': str(s),
-                                       'relation_type': 'abutting'})
-               for s in x]
-        urls = [u + '?%s' % g for u, g in zip(urls, GET)]
-
-        cn_data = remote_instance.fetch(urls, desc='Fetch abbutt.')
+        cn_data = remote_instance.fetch(urls, desc='Fetch abutting cn')
 
         # Add abutting to other connectors in skdata with type == 3
         for i, cn in enumerate(cn_data):
-            if not get_history:
+            if not with_history:
                 skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4]]
                                  for c in cn['links']]
             else:
-                skdata[i][1] += [[c[7], c[1], 3, c[2],
-                                  c[3], c[4], c[8], None]
+                skdata[i][1] += [[c[7], c[1], 3, c[2], c[3], c[4], c[8], None]
                                  for c in cn['links']]
 
     # Get neuron names
-    names = get_names(x, remote_instance)
+    names = get_names(x, remote_instance=remote_instance)
 
-    if not get_history:
-        try:
-            df = pd.DataFrame([[
-                names[str(x[i])],
-                str(x[i]),
-                pd.DataFrame(n[0],
-                             columns=['treenode_id', 'parent_id',
-                                      'creator_id', 'x', 'y', 'z',
-                                      'radius', 'confidence'],
-                             dtype=object),
-                pd.DataFrame(n[1],
-                             columns=['treenode_id', 'connector_id',
-                                      'relation', 'x', 'y', 'z'],
-                             dtype=object),
-                n[2]]
-                for i, n in enumerate(skdata)
-            ],
-                columns=['neuron_name', 'skeleton_id',
-                         'nodes', 'connectors', 'tags'],
-                dtype=object
-            )
-        except KeyError as e:
-            cause = e.args[0]
-            raise Exception('Skeleton ID {} not found.'.format(cause))
-        except BaseException:
-            raise
-    else:
-        try:
-            df = pd.DataFrame([[
-                names[str(x[i])],
-                str(x[i]),
-                pd.DataFrame(n[0],
-                             columns=['treenode_id', 'parent_id',
-                                      'creator_id', 'x', 'y', 'z',
-                                      'radius', 'confidence',
-                                      'last_modified',
-                                      'creation_date'],
-                             dtype=object),
-                pd.DataFrame(n[1],
-                             columns=['treenode_id', 'connector_id',
-                                      'relation', 'x', 'y', 'z',
-                                      'last_modified',
-                                      'creation_date'],
-                             dtype=object),
-                n[2]]
-                for i, n in enumerate(skdata)
-            ],
-                columns=['neuron_name', 'skeleton_id',
-                         'nodes', 'connectors', 'tags'],
-                dtype=object
-            )
-        except KeyError as e:
-            cause = e.args[0]
-            raise Exception('Skeleton ID {} not found.'.format(cause))
-        except BaseException:
-            raise
+    # Parse column names
+    node_cols = ['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z',
+                 'radius', 'confidence']
+    cn_cols = ['treenode_id', 'connector_id', 'relation', 'x', 'y', 'z']
+    if with_history:
+        node_cols += ['last_modified', 'creation_date', 'still_on_skeleton']
+        cn_cols += ['last_modified', 'creation_date']
+
+    # Generate DataFrame with all neurons
+    df = pd.DataFrame([[names[str(x[i])],  # neuron name
+                        str(x[i]),  # skeleton ID
+                        pd.DataFrame(n[0], columns=node_cols),  # nodes
+                        pd.DataFrame(n[1], columns=cn_cols),  # connectors
+                        n[2]  # tags as dictionary
+                        ] for i, n in enumerate(skdata)],
+                      columns=['neuron_name', 'skeleton_id',
+                               'nodes', 'connectors', 'tags'])
 
     # Convert data to respective dtypes
-    dtypes = {'treenode_id': int, 'parent_id': object,
-              'creator_id': int, 'relation': int,
-              'connector_id': int, 'x': int, 'y': int, 'z': int,
-              'radius': int, 'confidence': int}
+    dtypes = {'treenode_id': int,
+              'parent_id': object, # This must not be int because root's parent is None
+              'creator_id': int,
+              'relation': int,
+              'connector_id': int,
+              'x': int,
+              'y': int,
+              'z': int,
+              'radius': int,
+              'confidence': int}
 
     for k, v in dtypes.items():
         for t in ['nodes', 'connectors']:
@@ -1204,7 +1153,7 @@ def get_neuron(x, remote_instance=None, connector_flag=1, tag_flag=1,
     if df.shape[0] > 1:
         return core.CatmaidNeuronList(df, remote_instance=remote_instance, **init_kwargs)
     else:
-        return core.CatmaidNeuron(df.loc[0], remote_instance=remote_instance, **init_kwargs)
+        return core.CatmaidNeuron(df.iloc[0], remote_instance=remote_instance, **init_kwargs)
 
 
 # This is for legacy reasons -> will remove eventually
