@@ -1157,7 +1157,7 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
 
 
 # This is for legacy reasons -> will remove eventually
-get_3D_skeleton = get_3D_skeletons = get_neurons = get_neuron
+get_neurons = get_neuron
 
 
 @cache.undo_on_error
