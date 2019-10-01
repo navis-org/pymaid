@@ -214,14 +214,12 @@ def _in_volume_ray(points, volume, multi_ray=False):
                                  )
         volume.pyoctree = tree
 
-    # Get min max of volume
-    mx = np.array(volume.vertices).max(axis=0)
-    mn = np.array(volume.vertices).min(axis=0)
-
-    # Get points outside of bounding box
-    bbox_out = (points > mx).any(axis=1) | (points < mn).any(axis=1)
-    isin = ~bbox_out
+    # Remove points outside of bounding box
+    isin = _in_bbox(points, volume)
     in_points = points[isin]
+
+    # mx = np.array(volume.vertices).max(axis=0)
+    mn = np.array(volume.vertices).min(axis=0)
 
     # Perform ray intersection on points inside bounding box
     rayPointList = np.array([[[p[0], mn[1], mn[2]], p] for p in in_points],
@@ -273,9 +271,53 @@ def _in_volume_ray(points, volume, multi_ray=False):
     return isin
 
 
-def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
-                      ignore_axis=[]):
-    """ Uses scipy to test if points are within a given CATMAID volume.
+def _in_bbox(points, bbox):
+    """Test if points are within a bounding box.
+
+    Parameters
+    ----------
+    points :    numpy array
+                2D  array of xyz coordinates.
+    bbox :      numpy array | pymaid.Volume
+                If Volume will use the volumes bounding box. If numpy array
+                must be either::
+
+                    [[x_min, x_max], [y_min, y_max], [z_min, z_max]]
+
+                    [[x_min, y_min, z_min], [x_max, y_max, z_max]]
+
+    Returns
+    -------
+    numpy array
+                Boolean array with True/False for each point.
+
+    """
+    # Get min max of bounding box
+    if isinstance(bbox, core.Volume):
+        mx = np.array(bbox.vertices).max(axis=0)
+        mn = np.array(bbox.vertices).min(axis=0)
+    else:
+        # Make sure bbox is array
+        bbox = np.array(bbox)
+
+        if bbox.shape == (3, 2):
+            mn, mx = bbox[:, 0], bbox[:, 1]
+        elif bbox.shape == (2, 3):
+            mn, mx = bbox[0], bbox[1]
+        else:
+            raise TypeError('Wrong shape for bounding box coordinates: {}'.format(bbox.shape))
+
+    # Get points outside of bounding box
+    bbox_out = (points >= mx).any(axis=1) | (points <= mn).any(axis=1)
+    isin = ~bbox_out
+
+    return isin
+
+
+def _in_volume_convex(points, volume, approximate=False, ignore_axis=[],
+                      remote_instance=None):
+    """Use scipy to test if points are within a given CATMAID volume.
+
     The idea is to test if adding the point to the pointcloud changes the
     convex hull -> if yes, that point is outside the convex hull.
 
