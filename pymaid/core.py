@@ -645,7 +645,8 @@ class CatmaidNeuron:
             remote_instance = self._remote_instance
 
         # Get partners
-        self.partners = fetch.get_partners(self.skeleton_id, remote_instance)
+        self.partners = fetch.get_partners(self.skeleton_id,
+                                           remote_instance=remote_instance)
 
         return self.partners
 
@@ -658,7 +659,7 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
         self.review_status = fetch.get_review(self.skeleton_id,
-                                              remote_instance).loc[0, 'percent_reviewed']
+                                              remote_instance=remote_instance).loc[0, 'percent_reviewed']
         return self.review_status
 
     def get_annotations(self, remote_instance=None):
@@ -671,8 +672,8 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.annotations = fetch.get_annotations(
-            self.skeleton_id, remote_instance).get(str(self.skeleton_id), [])
+        self.annotations = fetch.get_annotations(self.skeleton_id,
+                                                 remote_instance=remote_instance).get(str(self.skeleton_id), [])
         return self.annotations
 
     def plot2d(self, **kwargs):
@@ -773,8 +774,8 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        self.neuron_name = fetch.get_names(self.skeleton_id, remote_instance)[
-            str(self.skeleton_id)]
+        self.neuron_name = fetch.get_names(self.skeleton_id,
+                                           remote_instance=remote_instance)[str(self.skeleton_id)]
         return self.neuron_name
 
     def resample(self, resample_to, inplace=True):
@@ -2250,7 +2251,8 @@ class CatmaidNeuronList:
             x = x.copy(deepcopy=False)
 
         if not isinstance(v, Volume):
-            v = fetch.get_volume(v, combine_vols=True)
+            v = fetch.get_volume(v, combine_vols=True,
+                                 remote_instance=self._remote_instance)
 
         if x._use_parallel:
             pool = mp.Pool(x.n_cores)
@@ -2289,7 +2291,8 @@ class CatmaidNeuronList:
             remote_instance = self._remote_instance
 
         # Get all partners
-        self.partners = fetch.get_partners(self.skeleton_id, remote_instance)
+        self.partners = fetch.get_partners(self.skeleton_id,
+                                           remote_instance=remote_instance)
 
         # Propagate connectivity table to individual neurons
         for n in self.neurons:
