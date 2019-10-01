@@ -115,6 +115,17 @@ Functions to fetch volumes (meshes):
 
     pymaid.get_volume
 
+Reconstruction samplers
+-----------------------
+Functions for reconstruction samplers:
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.get_sampler
+    pymaid.get_sampler_domains
+    pymaid.get_sampler_counts
+
 Image data (tiles)
 ------------------
 Functions to fetch and process image data. Note that this is not imported at

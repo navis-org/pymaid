@@ -92,7 +92,8 @@ __all__ = sorted(['CatmaidInstance',
                   'get_cable_lengths',
                   'get_connectivity_counts',
                   'get_import_info',
-                  'get_origin', 'get_skids_by_origin'])
+                  'get_origin', 'get_skids_by_origin',
+                  'get_sampler', 'get_sampler_domains', 'get_sampler_counts'])
 
 # Set up logging
 logger = config.logger
@@ -5405,6 +5406,112 @@ def get_skids_by_origin(source_ids, source_url, source_project_id,
     post = {'source_ids[{}]'.format(i): s for i, s in enumerate(source_ids)}
     post['source_url'] = source_url
     post['source_project_id'] = source_project_id
+
+    resp = remote_instance.fetch(url, post=post)
+
+    return resp
+
+
+@cache.undo_on_error
+def get_sampler(x=None, remote_instance=None):
+    """Get list of reconstruction samplers.
+
+    Parameters
+    ----------
+    x :                     list-like | CatmaidNeuron/List | None, optional
+                            Skeleton IDs for which to get samplers. If ``None``
+                            will return all samplers.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+                            DataFrame containing all samplers. Returns empty
+                            DataFrame if no samplers.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    if isinstance(x, type(None)):
+        url = remote_instance._get_sampler_list_url()
+    else:
+        skids = utils.eval_skids(x, remote_instance=remote_instance)
+        GET = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
+        url = remote_instance._get_sampler_list_url(**GET)
+
+    resp = remote_instance.fetch(url)
+
+    if not resp:
+        return pd.DataFrame([])
+
+    # Turn into DataFrame
+    df = pd.DataFrame.from_records(resp)
+
+    # Convert timestamps
+    df['creation_time'] = pd.to_datetime(df.creation_time, unit='s', utc=True)
+    df['edition_time'] = pd.to_datetime(df.creaedition_timetion_time, unit='s', utc=True)
+
+    return df
+
+
+@cache.undo_on_error
+def get_sampler_domains(sampler, remote_instance=None):
+    """Get list of domains for given sampler.
+
+    Parameters
+    ----------
+    sampler :               int
+                            ID of sampler to fetch domains for.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    pandas.DataFrame
+                            DataFrame containing domains for given sampler.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    url = remote_instance._get_sampler_domains_url(sampler)
+
+    resp = remote_instance.fetch(url)
+
+    # Turn into DataFrame
+    df = pd.DataFrame.from_records(resp)
+
+    # Convert timestamps
+    df['creation_time'] = pd.to_datetime(df.creation_time, unit='s', utc=True)
+    df['edition_time'] = pd.to_datetime(df.creaedition_timetion_time, unit='s', utc=True)
+
+    return df
+
+
+@cache.undo_on_error
+def get_sampler_counts(x, remote_instance=None):
+    """Get number of reconstruction samplers for a set of neurons.
+
+    Parameters
+    ----------
+    x :                     list-like | CatmaidNeuron/List | None, optional
+                            Skeleton IDs for which to get sampler counts.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                            ``{skeleton_id: count, ...}``
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    url = remote_instance._get_sampler_counts_url()
+
+    post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
 
     resp = remote_instance.fetch(url, post=post)
 
