@@ -69,8 +69,9 @@ except:
 # Set pbars to off b/c Blender's console can't render them anyway
 config.pbar_hide = True
 
+
 class handler:
-    """ Class that interfaces with scene in Blender.
+    """Class that interfaces with scene in Blender.
 
     Parameters
     ----------
@@ -117,6 +118,7 @@ class handler:
     >>> handler.clear()
     >>> # Add only soma
     >>> handler.add(nl, neurites=False, connectors=False)
+
     """
     cn_dict = {
         0: dict(name='presynapses',
@@ -166,7 +168,7 @@ class handler:
 
     def add(self, x, neurites=True, soma=True, connectors=True, redraw=False,
             use_radii=False, skip_existing=False, **kwargs):
-        """ Add neuron(s) to scene.
+        """Add neuron(s) or volumes to scene.
 
         Parameters
         ----------
@@ -185,6 +187,7 @@ class handler:
                         If True, will use treenode radii.
         skip_existing : bool, optional
                         If True, will skip neurons that are already loaded.
+
         """
         start = time.time()
 
@@ -220,13 +223,16 @@ class handler:
         return
 
     def clear(self):
-        """ Clear all neurons """
+        """Clear all neurons."""
         self.all.delete()
 
     def _create_scatter2(self, x, **kwargs):
-        """ Create scatter by reusing mesh data. This generate an individual
-        objects for each data point. This is slower! """
+        """Create scatter by reusing mesh data.
 
+        This generate an individual objects for each data point. This is
+        slower!
+
+        """
         if x.ndim != 2 or x.shape[1] != 3:
             raise ValueError('Array must be of shape N,3')
 
@@ -268,8 +274,7 @@ class handler:
         return
 
     def _create_scatter(self, x, **kwargs):
-        """ Create scatter. """
-
+        """Create scatter plot."""
         if x.ndim != 2 or x.shape[1] != 3:
             raise ValueError('Array must be of shape N,3')
 
@@ -318,8 +323,7 @@ class handler:
 
     def _create_neuron(self, x, neurites=True, soma=True, connectors=True,
                        use_radii=False):
-        """ Create neuron object """
-
+        """Create neuron object."""
         mat_name = ('M#' + x.neuron_name)[:59]
 
         mat = bpy.data.materials.get(mat_name,
@@ -337,9 +341,12 @@ class handler:
         return
 
     def _create_neurites2(self, x, mat, use_radii=False):
-        """ This function generates a mesh first, then converts to curve.
+        """Create neurons.
+
+        This function generates a mesh first, then converts to curve.
         I thought it might be faster that way but turns out no. Will keep
         this code just in case it becomes useful elsewhere.
+
         """
         mesh = bpy.data.meshes.new(x.neuron_name + ' mesh')
 
@@ -406,7 +413,7 @@ class handler:
         ob.active_material = mat
 
     def _create_neurites(self, x, mat, use_radii=False):
-        """Create neuron branches. """
+        """Create neuron branches."""
         cu = bpy.data.curves.new(x.neuron_name + ' mesh', 'CURVE')
         ob = bpy.data.objects.new('#%s - %s' %
                                   (x.skeleton_id, x.neuron_name), cu)
@@ -499,7 +506,7 @@ class handler:
         return
 
     def _create_connectors(self, x):
-        """ Create connectors """
+        """Create connectors."""
         for i in self.cn_dict:
             con = x.connectors[x.connectors.relation == i]
 
@@ -567,12 +574,13 @@ class handler:
         return
 
     def _create_mesh(self, volume):
-        """ Create mesh from volume.
+        """Create mesh from volume.
 
         Parameters
         ----------
         volume :    core.Volume | dict
                     Must contain 'faces', 'vertices'
+
         """
         mesh_name = getattr(volume, 'name', 'mesh')
 
@@ -602,7 +610,7 @@ class handler:
         me.polygons.foreach_set('use_smooth', [True] * len(me.polygons))
 
     def select(self, x, *args):
-        """ Select given neurons.
+        """Select given neurons.
 
         Parameters
         ----------
@@ -621,8 +629,8 @@ class handler:
         >>> cn.hide_others()
         >>> # Change color of presynapses
         >>> selection.presynapses.color(0, 1, 0)
-        """
 
+        """
         skids = utils.eval_skids(x)
 
         if not skids:
@@ -647,7 +655,7 @@ class handler:
 
 
 class object_list:
-    """ Collection of Blender objects.
+    """Collection of Blender objects.
 
     Notes
     -----
@@ -685,7 +693,6 @@ class object_list:
     >>> handler.select('annotation:uPN right').presynapses.color(0, 1, 0)
 
     """
-
     def __init__(self, object_names, handler=None):
         if not isinstance(object_names, list):
             object_names = [object_names]
@@ -739,12 +746,13 @@ class object_list:
                            handler=self.handler)
 
     def select(self, unselect_others=True):
-        """ Select objects in 3D viewer
+        """Select objects in 3D viewer.
 
         Parameters
         ----------
         unselect_others :   bool, optional
-                            If False, will not unselect other objects
+                            If False, will not unselect other objects.
+
         """
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
@@ -759,7 +767,7 @@ class object_list:
                     ob.select = False
 
     def color(self, r, g, b, a=1, vary=None):
-        """ Assign color to all objects in the list.
+        """Assign color to all objects in the list.
 
         Parameters
         ----------
@@ -773,14 +781,15 @@ class object_list:
                 Alpha value, range 0-1
         vary :  float
                 Range by which to randomly vary r, g and b.
+
         """
         rgb = np.array([r, g, b])
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 if vary:
-                    v =  np.array([np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
-                                   np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
-                                   np.random.choice(np.arange(-vary/2, vary/2, vary/100)),
+                    v =  np.array([np.random.choice(np.arange(-vary / 2, vary / 2, vary / 100)),
+                                   np.random.choice(np.arange(-vary / 2, vary / 2, vary / 100)),
+                                   np.random.choice(np.arange(-vary / 2, vary / 2, vary / 100)),
                                   ])
                     c = np.clip(rgb + v, 0, 1)
                 else:
@@ -793,30 +802,26 @@ class object_list:
                     ob.active_material.alpha = a
 
     def colorize(self):
-        """ Assign colors across the color spectrum
-        """
+        """Assign colors across the color spectrum."""
         for i, n in enumerate(self.object_names):
             c = colorsys.hsv_to_rgb(1 / (len(self) + 1) * i, 1, 1)
             if n in bpy.data.objects:
                 bpy.data.objects[n].active_material.diffuse_color = c
 
     def emit(self, e):
-        """ Change emit value.
-        """
+        """Change emit values (0-1)."""
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.active_material.emit = e
 
     def use_transparency(self, t):
-        """ Change transparency (True/False)
-        """
+        """Change transparency (True/False)."""
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.active_material.use_transparency = t
 
     def alpha(self, a):
-        """ Change alpha (0-1).
-        """
+        """ Change alpha (0-1)."""
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.active_material.alpha = a
@@ -828,6 +833,7 @@ class object_list:
         ----------
         r :         float
                     New bevel radius
+
         """
         for n in self.object_names:
             if n in bpy.data.objects:
@@ -850,6 +856,7 @@ class object_list:
         >>> h = b3d.handler()
         >>> h.neurons.set('data.bevel_resolution', 5)
         >>> h.neurons.set('data.resolution_u', 6)
+
         """
         attribute = attribute.split('.')
         for n in self.object_names:
@@ -861,13 +868,13 @@ class object_list:
                     setattr(ob, attribute[-1], value)
 
     def hide(self):
-        """Hide objects"""
+        """Hide objects."""
         for i, n in enumerate(self.object_names):
             if n in bpy.data.objects:
                 bpy.data.objects[n].hide = True
 
     def unhide(self):
-        """Unhide objects"""
+        """Unhide objects."""
         for i, n in enumerate(self.object_names):
             if n in bpy.data.objects:
                 bpy.data.objects[n].hide = False
@@ -882,7 +889,7 @@ class object_list:
                 bpy.data.objects[n].hide_render = render == False
 
     def hide_others(self):
-        """Hide everything BUT these objects"""
+        """Hide everything BUT these objects."""
         for ob in bpy.data.objects:
             if ob.name in self.object_names:
                 ob.hide = False
@@ -890,25 +897,26 @@ class object_list:
                 ob.hide = True
 
     def invert(self):
-        """ Invert selection. """
+        """Invert selection."""
         return
 
 
     def delete(self):
-        """Delete neurons in the selection"""
+        """Delete neurons in the selection."""
         self.select(unselect_others=True)
         bpy.ops.object.delete()
 
     def to_json(self, fname='selection.json'):
-        """ Saves neuron selection as json file which can be loaded
-        in CATMAID selection table.
+        """Save neuron selection as json file.
+
+        Can be loaded in CATMAID selection table.
 
         Parameters
         ----------
         fname :     str, optional
                     Filename to save selection to
-        """
 
+        """
         neuron_objects = [
             n for n in bpy.data.objects if n.name in self.object_names and n['type'] == 'NEURON']
 
@@ -928,7 +936,7 @@ class object_list:
 
 
 def CalcSphere(radius, nrPolar, nrAzimuthal):
-    """ Calculates vertices and faces for a sphere. """
+    """Calculate vertices and faces for a sphere."""
     dPolar = math.pi / (nrPolar - 1)
     dAzimuthal = 2.0 * math.pi / (nrAzimuthal)
 

@@ -41,7 +41,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                             exclude_skids=None, min_nodes=2,
                             connectivity_table=None, cluster_kws={},
                             skip_missing=True, remote_instance=None):
-    """ Calculate connectivity similarity.
+    """Cluster neurons based on connectivity.
 
     This functions offers a selection of metrics to compare connectivity:
 
@@ -129,7 +129,8 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                          (i.e. no up-/ and/or downstream partners after
                          filtering) will be skipped. If False, will keep them
                          but they will have similarity ``nan``.
-    remote_instance :    CatmaidInstance, optional
+    remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
 
     Returns
     -------
@@ -149,8 +150,8 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
     >>> # Plot a dendrogram
     >>> fig = res.plot_dendrogram()
     >>> plt.show()
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Extract skids from CatmaidNeuron, CatmaidNeuronList, DataFrame or Series
@@ -173,8 +174,8 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                                           min_size=min_nodes,
                                           threshold=threshold)
     else:
-        connectivity = connectivity_table[(connectivity_table.num_nodes >= min_nodes) &
-                                          (connectivity_table.total >= threshold)]
+        connectivity = connectivity_table[(connectivity_table.num_nodes >= min_nodes)
+                                          & (connectivity_table.total >= threshold)]
 
     if not isinstance(include_skids, type(None)) or not isinstance(exclude_skids, type(None)):
         logger.info('Filtering connectivity. '
@@ -188,8 +189,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
             connectivity = connectivity[
                 ~connectivity.skeleton_id.isin(utils.eval_skids(exclude_skids, remote_instance=remote_instance))]
 
-        logger.info('%i entries after filtering' %
-                           (connectivity.shape[0]))
+        logger.info('{} entries after filtering'.format(connectivity.shape[0]))
 
     # Calc number of partners used for calculating matching score (i.e. ratio of input to outputs)!
     # This is AFTER filtering! Total number of partners can be altered!
@@ -203,10 +203,10 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
     if no_data:
         w = '{} neuron(s) without connectivity data found.'.format(len(no_data))
         if skip_missing:
-            w+= ' Skipped: {}'.format(', '.join(no_data))
+            w += ' Skipped: {}'.format(', '.join(no_data))
             neurons = list(set(neurons) - set(no_data))
         else:
-            w+= ' These neurons might have "NaN" similarities.'
+            w += ' These neurons might have "NaN" similarities.'
         logger.warning(w)
 
     # Retrieve names
@@ -270,7 +270,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                     r_inputs = n_partners[neuronA][
                         'upstream'] / (n_partners[neuronA]['upstream'] + n_partners[neuronA]['downstream'])
                     r_outputs = 1 - r_inputs
-                except:
+                except BaseException():
                     logger.warning('Failed to calculate input/output ratio '
                                    'for skeleton ID #{} assuming 50/50 '
                                    '(probably "division-by-0" error)'.format(neuronA))
@@ -283,8 +283,8 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
     logger.info('All done.')
 
     # Rename rows and columns
-    #dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
-    #dist_matrix.index = [ neuron_names[str(n)] for n in dist_matrix.index ]
+    # dist_matrix.columns = [neuron_names[str(n)] for n in dist_matrix.columns]
+    # dist_matrix.index = [ neuron_names[str(n)] for n in dist_matrix.index ]
 
     results = ClustResults(dist_matrix, labels=[neuron_names[str(
         n)] for n in dist_matrix.columns], mat_type='similarity')
@@ -296,12 +296,13 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
 
 
 def _unpack_connectivity_helper(x):
-    """Helper function to unpack values from pool"""
+    """Helper function to unpack values from pool."""
     return _calc_connectivity_matching_index(x[0], x[1], x[2], vertex_score=x[3], nA_cn=x[4], nB_cn=x[5], **x[6])
 
 
-def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_threshold=1, min_nodes=1, **kwargs):
-    """ Calculates and returns various matching indices between two neurons.
+def _calc_connectivity_matching_index(neuronA, neuronB, connectivity,
+                                      syn_threshold=1, min_nodes=1, **kwargs):
+    """Calculate various connectivity similarity metrics.
 
     Parameters
     ----------
@@ -362,7 +363,6 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
     |                           switches from negative to positive
 
     """
-
     if min_nodes > 1:
         connectivity = connectivity[connectivity.num_nodes > min_nodes]
 
@@ -427,7 +427,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity, syn_thresh
         try:
             similarity_indices['vertex_normalized'] = (
                 vertex_similarity - min_score.sum()) / (max_score.sum() - min_score.sum())
-        except:
+        except BaseException:
             similarity_indices['vertex_normalized'] = 0
 
     if n_total != 0:
@@ -455,7 +455,7 @@ def _unpack_synapse_helper(x):
 
 def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000,
                              restrict_cn=None):
-    """ Calculates synapses similarity score.
+    """Calculate synapses similarity score.
 
     Synapse similarity score is calculated by calculating for each synapse of
     neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
@@ -530,7 +530,7 @@ def _calc_synapse_similarity(cnA, cnB, sigma=2000, omega=2000,
 
 def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
                                  restrict_cn=None, remote_instance=None):
-    """ Clusters neurons based on their synapse placement.
+    """Cluster neurons based on their synapse placement.
 
     Distances score is calculated by calculating for each synapse of
     neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
@@ -584,6 +584,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
                         integer or list. E.g. ``restrict_cn=[0, 1]`` to use
                         only pre- and postsynapses.
     remote_instance :   CatmaidInstance, optional
+                        If not passed, will try using globally defined.
                         Need to provide if neurons are only skids or
                         annotation(s).
 
@@ -594,7 +595,6 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
                 dendrograms.
 
     """
-
     if not isinstance(x, core.CatmaidNeuronList):
         remote_instance = utils._eval_remote_instance(remote_instance)
         neurons = fetch.get_neuron(x, remote_instance=remote_instance)
@@ -605,9 +605,9 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
     if not isinstance(restrict_cn, (type(None), list, set, np.ndarray)):
         restrict_cn = [restrict_cn]
 
-    sim_matrix = pd.DataFrame(
-        np.zeros((len(neurons), len(neurons))), index=neurons.skeleton_id,
-                                                columns=neurons.skeleton_id)
+    sim_matrix = pd.DataFrame(np.zeros((len(neurons), len(neurons))),
+                              index=neurons.skeleton_id,
+                              columns=neurons.skeleton_id)
 
     combinations = [(nA.connectors, nB.connectors, sigma, omega, restrict_cn)
                     for nA in neurons for nB in neurons]
@@ -636,7 +636,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
 
 
 def cluster_xyz(x, labels=None):
-    """ Thin wrapper for ``scipy.scipy.spatial.distance``.
+    """Thin wrapper for ``scipy.scipy.spatial.distance``.
 
     Takes a list of x,y,z coordinates and calculates EUCLEDIAN distance matrix.
 
@@ -665,7 +665,6 @@ def cluster_xyz(x, labels=None):
     >>> plt.show()
 
     """
-
     # Generate numpy array containing x, y, z coordinates
     try:
         s = x[['x', 'y', 'z']].values
@@ -682,7 +681,7 @@ def cluster_xyz(x, labels=None):
 
 
 class ClustResults:
-    """ Class to handle, analyze and plot similarity/distance matrices.
+    """Class to handle, analyze and plot similarity/distance matrices.
 
     Contains thin wrappers for ``scipy.cluster``.
 
@@ -708,11 +707,10 @@ class ClustResults:
     >>> res.get_clusters(5, criterion = 'maxclust')
 
     """
-
     _PERM_MAT_TYPES = ['similarity', 'distance']
 
     def __init__(self, mat, labels=None, mat_type='distance'):
-        """ Initialize class instance.
+        """Initialize class instance.
 
         Parameters
         ----------
@@ -763,11 +761,11 @@ class ClustResults:
         return self.__repr__()
 
     def __repr__(self):
-        return 'ClustResults of {} items at {}'.format(self.sim_mat.shape[0],                                                        
+        return 'ClustResults of {} items at {}'.format(self.sim_mat.shape[0],
                                                        hex(id(self)))
-        
+
     def get_leafs(self, use_labels=False):
-        """ Use to retrieve labels.
+        """Retrieve leaf labels.
 
         Parameters
         ----------
@@ -777,7 +775,6 @@ class ClustResults:
                         or indices (if matrix is np.ndarray)
 
         """
-
         if isinstance(self.dist_mat, pd.DataFrame):
             if use_labels:
                 return [self.labels[i] for i in scipy.cluster.hierarchy.leaves_list(self.linkage)]
@@ -787,7 +784,7 @@ class ClustResults:
             return scipy.cluster.hierarchy.leaves_list(self.linkage)
 
     def calc_cophenet(self):
-        """ Returns Cophenetic Correlation coefficient of your clustering.
+        """Return Cophenetic Correlation coefficient of your clustering.
 
         This (very very briefly) compares (correlates) the actual pairwise
         distances of all your samples to those implied by the hierarchical
@@ -795,12 +792,11 @@ class ClustResults:
         preserves the original distances.
 
         """
-
         return scipy.cluster.hierarchy.cophenet(self.linkage,
                                                 self.condensed_dist_mat)
 
     def calc_agg_coeff(self):
-        """ Returns the agglomerative coefficient.
+        """Return the agglomerative coefficient.
 
         This measures the clustering structure of the linkage matrix. Because
         it grows with the number of observations, this measure should not be
@@ -812,7 +808,6 @@ class ClustResults:
         the average of all 1 - m(i).
 
         """
-
         # Turn into pandas DataFrame for fancy indexing
         Z = pd.DataFrame(self.linkage, columns=[
                          'obs1', 'obs2', 'dist', 'n_org'])
@@ -836,7 +831,7 @@ class ClustResults:
             return (sim_mat - sim_mat.max()) * -1
 
     def cluster(self, method='ward'):
-        """ Cluster distance matrix.
+        """Cluster distance matrix.
 
         This will automatically be called when attribute linkage is requested
         for the first time.
@@ -848,7 +843,6 @@ class ClustResults:
                     for reference)
 
         """
-
         # Use condensed distance matrix - otherwise clustering thinks we are
         # passing observations instead of final scores
         self.linkage = scipy.cluster.hierarchy.linkage(self.condensed_dist_mat,
@@ -861,7 +855,7 @@ class ClustResults:
 
     def plot_dendrogram(self, color_threshold=None, return_dendrogram=False,
                         labels=None, fig=None, **kwargs):
-        """ Plot dendrogram using matplotlib.
+        """Plot dendrogram using matplotlib.
 
         Parameters
         ----------
@@ -921,8 +915,7 @@ class ClustResults:
             return fig
 
     def plot_matrix2(self, **kwargs):
-        """ Plot distance matrix and dendrogram using seaborn. This package
-        needs to be installed manually.
+        """Plot distance matrix and dendrogram using seaborn.
 
         Parameters
         ----------
@@ -936,7 +929,6 @@ class ClustResults:
         seaborn.clustermap
 
         """
-
         import matplotlib.pyplot as plt
 
         try:
@@ -964,7 +956,7 @@ class ClustResults:
         return cg
 
     def plot_matrix(self):
-        """ Plot distance matrix and dendrogram using matplotlib.
+        """Plot distance matrix and dendrogram using matplotlib.
 
         Returns
         -------
@@ -1014,8 +1006,9 @@ class ClustResults:
         return fig
 
     def plot3d(self, k=5, criterion='maxclust', **kwargs):
-        """Plot neuron using :func:`pymaid.plot.plot3d`. Will only work if
-        instance has neurons attached to it.
+        """Plot neuron using :func:`pymaid.plot.plot3d`.
+
+        Will only work if the ClustResult instance has neurons attached to it.
 
         Parameters
         ----------
@@ -1033,7 +1026,6 @@ class ClustResults:
                     Function called to generate 3d plot.
 
         """
-
         if 'neurons' not in self.__dict__:
             logger.error(
                 'This works only with cluster results from neurons')
@@ -1046,8 +1038,9 @@ class ClustResults:
         return plotting.plot3d(self.neurons, **kwargs)
 
     def to_selection(self, fname='cluster.json', k=5, criterion='maxclust'):
-        """ Convert clustered neurons into json file that can be loaded into
-        CATMAID selection table.
+        """Convert clustered neurons into json file.
+
+        This file can be loaded into CATMAID selection table.
 
         Parameters
         ----------
@@ -1064,8 +1057,8 @@ class ClustResults:
                     Turn CatmaidNeuronList into CATMAID-readable selection.
         :func:`pymaid.CatmaidNeuronList.from_selection`
                     CatmaidNeuronList from CATMAID selection.
-        """
 
+        """
         cmap = self.get_colormap(k=k, criterion=criterion)
 
         # Convert to 0-255
@@ -1100,7 +1093,6 @@ class ClustResults:
                     {'skeleton_id': (r,g,b),...}
 
         """
-
         cl = self.get_clusters(k, criterion, return_type='indices')
 
         cl = [[self.dist_mat.index.tolist()[i] for i in l] for l in cl]
@@ -1111,7 +1103,9 @@ class ClustResults:
         return {n: colors[i] for i in range(len(cl)) for n in cl[i]}
 
     def get_clusters(self, k, criterion='maxclust', return_type='labels'):
-        """ Wrapper for ``scipy.cluster.hierarchy.fcluster`` to get clusters.
+        """Get get clusters.
+
+        Thin wrapper for ``scipy.cluster.hierarchy.fcluster``.
 
         Parameters
         ----------
@@ -1132,7 +1126,6 @@ class ClustResults:
                     list of clusters ``[[leaf1, leaf5], [leaf2, ...], ...]``
 
         """
-
         cl = scipy.cluster.hierarchy.fcluster(
             self.linkage, k, criterion=criterion)
 
@@ -1146,7 +1139,7 @@ class ClustResults:
             return [[j for j in range(len(cl)) if cl[j] == i] for i in range(min(cl), max(cl) + 1)]
 
     def to_tree(self):
-        """ Turns linkage to ete3 tree.
+        """Turn linkage to ete3 tree.
 
         See Also
         --------

@@ -21,8 +21,7 @@ if len(logger.handlers) == 0:
     sh = logging.StreamHandler()
     sh.setLevel(logging.DEBUG)
     # Create formatter and add it to the handlers
-    formatter = logging.Formatter(
-        '%(levelname)-5s : %(message)s (%(name)s)')
+    formatter = logging.Formatter('%(levelname)-5s : %(message)s (%(name)s)')
     sh.setFormatter(formatter)
     logger.addHandler(sh)
 
@@ -39,8 +38,9 @@ use_igraph = True
 # Default color for neurons
 default_color = (.95, .65, .04)
 
+
 def _type_of_script():
-    """ Returns context in which pymaid is run. """
+    """Return context in which pymaid is run."""
     try:
         ipy_str = str(type(get_ipython()))
         if 'zmqshell' in ipy_str:
@@ -52,7 +52,7 @@ def _type_of_script():
 
 
 def is_jupyter():
-    """ Test if pymaid is run in a Jupyter notebook."""
+    """Test if pymaid is run in a Jupyter notebook."""
     return _type_of_script() == 'jupyter'
 
 

@@ -43,7 +43,7 @@ __all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
 
 
 def clear_cache():
-    """ Clear cache of global CatmaidInstance. """
+    """Clear cache of global CatmaidInstance."""
     if 'remote_instance' in sys.modules:
         rm = sys.modules['remote_instance']
     elif 'remote_instance' in globals():
@@ -55,7 +55,7 @@ def clear_cache():
 
 
 def _type_of_script():
-    """ Returns context in which pymaid is run. """
+    """Return context in which pymaid is run."""
     try:
         ipy_str = str(type(get_ipython()))
         if 'zmqshell' in ipy_str:
@@ -99,12 +99,12 @@ def is_headless():
 
 
 def is_jupyter():
-    """ Test if pymaid is run in a Jupyter notebook."""
+    """Test if pymaid is run in a Jupyter notebook."""
     return _type_of_script() == 'jupyter'
 
 
 def ipywidgets_installed():
-    """ Test if pymaid is run in a Jupyter notebook."""
+    """Test if pymaid is run in a Jupyter notebook."""
     try:
         import ipywidgets
         return True
@@ -120,7 +120,7 @@ def set_loggers(level='INFO'):
 
 
 def set_pbars(hide=None, leave=None, jupyter=None):
-    """ Set global progress bar behaviors.
+    """Set global progress bar behaviors.
 
     Parameters
     ----------
@@ -137,7 +137,6 @@ def set_pbars(hide=None, leave=None, jupyter=None):
     Nothing
 
     """
-
     if isinstance(hide, bool):
         config.pbar_hide = hide
 
@@ -161,8 +160,10 @@ def set_pbars(hide=None, leave=None, jupyter=None):
 
 
 def _make_iterable(x, force_type=None):
-    """ Helper function. Turns x into a np.ndarray, if it isn't already. For
-    dicts, keys will be turned into array.
+    """Convert input into a np.ndarray, if it isn't already.
+
+    For dicts, keys will be turned into array.
+
     """
     if not isinstance(x, collections.Iterable) or isinstance(x, six.string_types):
         x = [x]
@@ -177,8 +178,10 @@ def _make_iterable(x, force_type=None):
 
 
 def _make_non_iterable(x):
-    """ Helper function. Turns x into non-iterable, if it isn't already. Will
-    raise error if len(x) > 1.
+    """Convert input into non-iterable, if it isn't already.
+
+    Will raise error if len(x) > 1.
+
     """
     if not _is_iterable(x):
         return x
@@ -189,8 +192,7 @@ def _make_non_iterable(x):
 
 
 def _is_iterable(x):
-    """ Helper function. Returns True if x is an iterable but not str,
-    dictionary or pandas DataFrame.
+    """Check is input is iterable but not str, dictionary or pandas DataFrame.
     """
     if isinstance(x, collections.Iterable) and not isinstance(x, (six.string_types, pd.DataFrame)):
         return True
@@ -199,7 +201,7 @@ def _is_iterable(x):
 
 
 def _eval_conditions(x):
-    """ Splits list of strings into positive (no ~) and negative (~) conditions
+    """Split list of strings into positive (no ~) and negative (~) conditions.
     """
 
     x = _make_iterable(x, force_type=str)
@@ -208,7 +210,7 @@ def _eval_conditions(x):
 
 
 def neuron2json(x, **kwargs):
-    """ Generate JSON formatted ``str`` respresentation of CatmaidNeuron/List.
+    """Generate JSON formatted ``str`` respresentation of CatmaidNeuron/List.
 
     Nodes and connectors are serialised using pandas' ``to_json()``. Most
     other items in the neuron's __dict__ are serialised using
@@ -271,7 +273,7 @@ def neuron2json(x, **kwargs):
 
 
 def json2neuron(s, **kwargs):
-    """ Load neuron from JSON string.
+    """Load neuron from JSON string.
 
     Parameters
     ----------
@@ -291,7 +293,6 @@ def json2neuron(s, **kwargs):
                 Turn neuron into json.
 
     """
-
     if not isinstance(s, str):
         raise TypeError('Need str, got "{0}"'.format(type(s)))
 
@@ -325,10 +326,24 @@ def json2neuron(s, **kwargs):
 
 
 def _eval_remote_instance(remote_instance, raise_error=True):
-    """ Evaluates remote instance and checks for globally defined remote
-    instances as fall back.
-    """
+    """Evaluates remote instance.
 
+    If input is None, checks for globally defined remote instances as fall
+    back.
+
+    Parameters
+    ----------
+    remote_instance :   CatmaidInstance | None
+                        Input to be evaluated.
+    raise_on_error :    bool, optional
+                        If True will raise error if input is ``None`` and
+                        no global CatmaidInstance was found.
+
+    Returns
+    -------
+    CatmaidInstance
+
+    """
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
             return sys.modules['remote_instance']
@@ -353,7 +368,7 @@ def _eval_remote_instance(remote_instance, raise_error=True):
 
 
 def eval_skids(x, remote_instance=None, warn_duplicates=True):
-    """ Evaluate skeleton IDs.
+    """Extract skeleton IDs from input.
 
     Will turn annotations and neuron names into skeleton IDs.
 
@@ -382,7 +397,6 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
                     List containing skeleton IDs as strings.
 
     """
-
     remote_instance = _eval_remote_instance(remote_instance,
                                             raise_error=False)
 
@@ -447,7 +461,7 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
 
 
 def eval_user_ids(x, user_list=None, remote_instance=None):
-    """ Checks a list of users and turns them into user IDs.
+    """Check a list of users and turns them into user IDs.
 
     Always returns a list! Will attempt converting in the following order:
 
@@ -470,7 +484,6 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
                 already have it, pass it along to save time.
 
     """
-
     remote_instance = _eval_remote_instance(remote_instance)
 
     if x and not isinstance(x, (list, np.ndarray)):
@@ -509,7 +522,7 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
 
 
 def eval_node_ids(x, connectors=True, treenodes=True):
-    """ Extract treenode or connector IDs.
+    """Extract treenode or connector IDs.
 
     Parameters
     ----------
@@ -530,7 +543,6 @@ def eval_node_ids(x, connectors=True, treenodes=True):
                     List containing nodes as strings.
 
     """
-
     if isinstance(x, (int, np.int64, np.int32, np.int)):
         return [x]
     elif isinstance(x, (str, np.str)):
@@ -584,8 +596,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
 
 
 def _unpack_neurons(x, raise_on_error=True):
-    """ Unpacks neurons and returns a list of individual neurons.
-    """
+    """Unpack neurons and returns a list of individual neurons."""
 
     neurons = []
 
@@ -603,7 +614,7 @@ def _unpack_neurons(x, raise_on_error=True):
 
 
 def _parse_objects(x, remote_instance=None):
-    """ Helper class to extract objects for plotting.
+    """Parse objects into different types.
 
     Returns
     -------
@@ -613,8 +624,8 @@ def _parse_objects(x, remote_instance=None):
     volumes :   list
     points :    list of arrays
     visuals :   list of vispy visuals
-    """
 
+    """
     if not isinstance(x, list):
         x = [x]
 
@@ -682,7 +693,7 @@ def _parse_objects(x, remote_instance=None):
 def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
              pre_label=None, post_label=None, soma_label=1,
              include_subdirs=False):
-    """ Generate neuron object from SWC file/DataFrame.
+    """Generate neuron object from SWC file/DataFrame.
 
     This import is following format specified
     `here <http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html>`_
@@ -895,7 +906,7 @@ def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
 
 
 def _generate_swc_table(x, export_synapses=False, min_radius=0):
-    """ Generate SWC table for given neuron.
+    """Generate SWC table for given neuron.
 
     Parameters
     ----------
@@ -909,7 +920,6 @@ def _generate_swc_table(x, export_synapses=False, min_radius=0):
                     Dictionary mapping treenode IDs to new node indices.
 
     """
-
     # Make copy of nodes and reorder such that the parent is always before a
     # treenode
     nodes_ordered = [n for seg in x.segments for n in seg[::-1]]
@@ -957,7 +967,7 @@ def _generate_swc_table(x, export_synapses=False, min_radius=0):
 
 
 def to_swc(x, filename=None, export_synapses=False, min_radius=0):
-    """ Generate SWC file from neuron(s).
+    """Generate SWC file from neuron(s).
 
     Follows the format specified
     `here <http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html>`_.
@@ -1050,10 +1060,12 @@ def to_swc(x, filename=None, export_synapses=False, min_radius=0):
 
 
 def __guess_sentiment(x):
-    """ Tries to classify a list of words into either <type>, <nickname>,
-    <tracer> or <generic> annotations.
-    """
+    """Classify a list of words.
 
+    Tries sorting words into either <type>, <nickname>, <tracer> or <generic>
+    annotations.
+
+    """
     sent = []
     for i, w in enumerate(x):
         # If word is a number, it's most likely something generic
@@ -1082,12 +1094,11 @@ def __guess_sentiment(x):
 
 
 def parse_neuronname(x):
-    """ Tries parsing neuron names into type, nickname, tracer and generic
-    information.
+    """Parse neuron names into type, nickname, tracer and generic information.
 
     This works best if neuron name follows this convention::
 
-    '{type} {generic} {nickname} {tracer initials}'
+      {type} {generic} {nickname} {tracer initials}
 
     Parameters
     ----------
@@ -1105,8 +1116,8 @@ def parse_neuronname(x):
     --------
     >>> pymaid.utils.parse_neuronname('AD1b2#7 3080184 Dust World JJ PS')
     ('AD1b2#7', 'Dust World', 'JJ PS', '3080184')
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuron):
         x = x.neuron_name
 
@@ -1126,14 +1137,13 @@ def parse_neuronname(x):
 
 
 def shorten_name(x, max_len=30):
-    """ Shorten a neuron name by iteratively removing non-essential
-    information.
+    """Shorten a neuron name by iteratively removing non-essential bits.
 
     Prioritises generic -> tracer -> nickname -> type information when removing
     until target length is reached. This works best if neuron name follows
     this convention::
 
-    '{type} {generic} {nickname} {tracers}'
+      {type} {generic} {nickname} {tracers}
 
     Parameters
     ----------
@@ -1150,8 +1160,8 @@ def shorten_name(x, max_len=30):
     --------
     >>> pymaid.shorten_name('AD1b2#7 3080184 Dust World JJ PS', 30)
     'AD1b2#7 Dust World [..]'
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuron):
         x = x.neuron_name
 
@@ -1184,8 +1194,7 @@ def shorten_name(x, max_len=30):
 
 
 def to_float(x):
-    """ Helper to try to convert to float.
-    """
+    """Convert input to float."""
     try:
         return float(x)
     except:

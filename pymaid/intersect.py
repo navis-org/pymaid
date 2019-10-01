@@ -41,7 +41,7 @@ __all__ = sorted(['in_volume', 'intersection_matrix'])
 
 def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
               method='FAST', remote_instance=None):
-    """ Test if points/neurons are within a given CATMAID volume.
+    """Test if points/neurons are within a given CATMAID volume.
 
     Important
     ---------
@@ -130,7 +130,6 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
     >>> plt.show()
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance,
                                                   raise_error=False)
 
@@ -157,7 +156,7 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
         return data
 
     if isinstance(volume, str):
-        volume = fetch.get_volume(volume, remote_instance)
+        volume = fetch.get_volume(volume, remote_instance=remote_instance)
 
     # Make copy if necessary
     if isinstance(x, (core.CatmaidNeuronList, core.CatmaidNeuron)):
@@ -205,10 +204,7 @@ def in_volume(x, volume, inplace=False, mode='IN', prevent_fragments=False,
 
 
 def _in_volume_ray(points, volume, multi_ray=False):
-    """ Uses pyoctree's raycsasting to test if points are within a given
-    CATMAID volume.
-    """
-
+    """Use pyoctree's raycsasting to test if points are within volume."""
     tree = getattr(volume, 'pyoctree', None)
 
     if not tree:
@@ -282,12 +278,12 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
     """ Uses scipy to test if points are within a given CATMAID volume.
     The idea is to test if adding the point to the pointcloud changes the
     convex hull -> if yes, that point is outside the convex hull.
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(volume, str):
-        volume = fetch.get_volume(volume, remote_instance)
+        volume = fetch.get_volume(volume, remote_instance=remote_instance)
 
     verts = volume.vertices
 
@@ -315,7 +311,7 @@ def _in_volume_convex(points, volume, remote_instance=None, approximate=False,
 
 def intersection_matrix(x, volumes, attr=None, method='FAST',
                         remote_instance=None):
-    """ Computes intersection matrix between a set of neurons and a set of
+    """Compute intersection matrix between a set of neurons and a set of
     volumes.
 
     Parameters
@@ -334,8 +330,8 @@ def intersection_matrix(x, volumes, attr=None, method='FAST',
     Returns
     -------
     pandas DataFrame
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuron):
         x = core.CatmaidNeuronList(x)
 
@@ -351,7 +347,6 @@ def intersection_matrix(x, volumes, attr=None, method='FAST',
     for v in volumes.values():
         if not isinstance(v, core.Volume):
             raise TypeError('Wrong data type found in volumes: "{}"'.format(type(v)))
-
 
     data = in_volume(x, volumes, inplace=False, mode='IN', method=method,
                      remote_instance=remote_instance)

@@ -50,6 +50,7 @@ import webbrowser
 
 import requests
 from requests_futures.sessions import FuturesSession
+from requests.exceptions import HTTPError
 
 import numpy as np
 import networkx as nx
@@ -99,18 +100,24 @@ logger = config.logger
 
 
 class CatmaidInstance:
-    """ Class giving access to a CATMAID project. Holds base url, credentials
-    and project ID. Fetches data and takes care of caching results. You can
-    either pass it to functions individually or define globally (default).
+    """Class giving access to a CATMAID project.
+
+    Holds base url, credentials and project ID. Fetches data and takes care of
+    caching results. When initialised, a CatmaidInstance is made the "global"
+    default connection for fetching data (see ``set_global`` argument).
+    Alternatively, pymaid functions accept a ``remote_instance`` argument that
+    lets you pass a CatmaidInstance explicitly.
 
     Attributes
     ----------
     server :        str
                     The url for a CATMAID server.
     authname :      str | None
-                    The http user.
+                    The HTTP user. If your server does not require HTTP
+                    authentication, set this to ``None``.
     authpassword :  str | None
-                    The http password.
+                    The HTTP password. If your server does not require HTTP
+                    authentication, set this to ``None``.
     authtoken :     str | None
                     API token - see CATMAID `documentation <https://catmaid.
                     readthedocs.io/en/stable/api.html#api-token>`_ on how to
@@ -121,7 +128,7 @@ class CatmaidInstance:
                     Maximum parallel threads to be used. Note that some
                     functions (e.g. :func:`pymaid.get_skid_from_treenode`)
                     override this parameter. If this is set too high, you
-                    might experience time outs when fetching data.
+                    might experience connection errors when fetching data.
     set_global :    bool, optional
                     If True, this instance will be set as global (default)
                     CatmaidInstance. This overrides pre-existing global
@@ -158,7 +165,7 @@ class CatmaidInstance:
     ...                             'TOKEN')
     INFO  : Global CATMAID instance set. (pymaid.fetch)
 
-    As you instanciate CatmaidInstance, it is made the default (“global”)
+    As you instanciate a CatmaidInstance, it is made the default (“global”)
     remote instance and you don’t need to worry about it anymore.
 
     By default, a CatmaidInstance will refer to the first project on your
@@ -202,8 +209,8 @@ class CatmaidInstance:
     >>> url = rm._get_contributions_url()
     >>> POST = {'skids[0]': 16, 'skids[1]': 2333007}
     >>> raw_data = rm.fetch(url, POST)
-    """
 
+    """
     def __init__(self, server, authname, authpassword, authtoken, project_id=1,
                  max_threads=100, make_global=True, caching=True):
         # Catch too many backslashes
@@ -341,7 +348,7 @@ class CatmaidInstance:
                                               max_workers=self.__max_threads)
 
     def make_global(self):
-        """Sets this variable as global by attaching it as sys.module"""
+        """Sets this variable as global by attaching it as ``sys.module``"""
         sys.modules['remote_instance'] = self
         if self.caching:
             logger.info('Global CATMAID instance set. Caching is ON.')
@@ -520,8 +527,7 @@ class CatmaidInstance:
         return self.copy()
 
     def copy(self):
-        """Returns a copy of this CatmaidInstance.
-        """
+        """Returns a copy of this CatmaidInstance. Does not copy cache."""
         return CatmaidInstance(self.server, self.authname,
                                self.authpassword, self.authtoken,
                                self.project_id, self.max_threads,
@@ -541,20 +547,20 @@ class CatmaidInstance:
 
     @property
     def catmaid_version(self):
-        """ Version of CATMAID your server is running. """
-
+        """Version of CATMAID your server is running."""
         return self.fetch(self._get_catmaid_version())['SERVER_VERSION']
 
     @property
     def available_projects(self):
-        """ List of projects hosted on your server. Depends on your user's
-        permission! """
+        """List of projects hosted on your server.
 
+        This depends on your user's permission!
+        """
         return pd.DataFrame(self.fetch(self._get_projects_url())).sort_values('id')
 
     @property
     def image_stacks(self):
-        """ Image stacks available under this project id. """
+        """Image stacks available under this project id."""
         stacks = self.fetch(self._get_stacks_url())
         details = self.fetch([self._get_stack_info_url(s['id']) for s in stacks])
 
@@ -566,414 +572,382 @@ class CatmaidInstance:
         return pd.DataFrame(stacks).set_index('id')
 
     def _get_catmaid_version(self, **GET):
-        """ Use to parse url for retrieving CATMAID server version"""
+        """Generate url for retrieving CATMAID server version."""
         return self.make_url('version', **GET)
 
     def _get_stack_info_url(self, stack_id, **GET):
-        """ Use to parse url for retrieving stack infos. """
+        """Generate url for retrieving stack infos."""
         return self.make_url(self.project_id, 'stack', stack_id, 'info', **GET)
 
     def _get_projects_url(self, **GET):
-        """ Use to get list of available projects on server.
-        Does not need postdata."""
+        """Generate URL to get list of available projects on server."""
         return self.make_url('projects', **GET)
 
     def _get_stacks_url(self, **GET):
-        """ Use to get list of available image stacks for the project.
-        Does not need postdata."""
+        """Generate URL to get list of available image stacks for the project."""
         return self.make_url(self.project_id, 'stacks', **GET)
 
     def _get_treenode_info_url(self, tn_id, **GET):
-        """ Use to parse url for retrieving skeleton info from treenodes."""
+        """Generate url for retrieving skeleton info from treenodes."""
         return self.make_url(self.project_id, 'treenodes', tn_id, 'info',
                              **GET)
 
     def _update_treenode_radii(self, **GET):
-        """ Use to parse url for updating treenode radii. Needs POST."""
+        """Generate url for updating treenode radii (POST)."""
         return self.make_url(self.project_id, 'treenodes', 'radius', **GET)
 
     def _get_node_labels_url(self, **GET):
-        """ Use to parse url for retrieving treenode infos. Needs postdata!"""
+        """Generate url for retrieving treenode infos (POST)."""
         return self.make_url(self.project_id, 'labels-for-nodes', **GET)
 
     def _get_skeleton_nodes_url(self, skid, **GET):
-        """ Use to parse url for retrieving skeleton nodes (no info on parents
-        or synapses, does need post data). """
+        """Generate url for retrieving skeleton nodes.
+
+        Does not include info on parents or synapses. Does need post data.
+
+        """
         return self.make_url(self.project_id, 'skeletons', skid,
                              'node-overview', **GET)
 
     def _get_skeleton_for_3d_viewer_url(self, skid, **GET):
-        """ ATTENTION: this url doesn't work properly anymore as of 07/07/14
-        use compact-skeleton instead
-        Used to parse url for retrieving all info the 3D viewer gets
-        (does NOT need post data). Format: name, nodes, tags, connectors,
-        reviews
+        """Generate url for retrieving all info the 3D viewer gets.
+
+        ATTENTION: this url doesn't work properly anymore as of 07/07/14
+        use compact-skeleton instead.
+
+        Does NOT need post data. Format: name, nodes, tags, connectors,
+        reviews.
+
         """
         return self.make_url(self.project_id, 'skeleton', skid, 'compact-json',
                              **GET)
 
     def _get_add_annotations_url(self, **GET):
-        """ Use to parse url to add annotations to skeleton IDs. """
+        """Generate url to add annotations to skeleton IDs (POST)."""
         return self.make_url(self.project_id, 'annotations', 'add', **GET)
 
     def _get_remove_annotations_url(self, **GET):
-        """ Use to parse url to add annotations to skeleton IDs. """
+        """Generate url to remove annotations to skeleton IDs (POST)."""
         return self.make_url(self.project_id, 'annotations', 'remove', **GET)
 
     def _get_connectivity_url(self, **GET):
-        """ Use to parse url for retrieving connectivity (does need post data).
-        """
+        """Generate url for retrieving connectivity (POST)."""
         return self.make_url(self.project_id, 'skeletons', 'connectivity',
                              **GET)
 
     def _get_connector_links_url(self, **GET):
-        """ Use to retrieve list of connectors either pre- or postsynaptic a
-        set of neurons - GET request Format: { 'links': [ skeleton_id,
-        connector_id, x,y,z, S(?), confidence, creator, treenode_id,
-        creation_date ], 'tags':[] }
+        """Generate url to list of connectors.
+
+        Either pre- or postsynaptic to a set of neurons - GET request Format::
+
+            {'links': [skeleton_id, connector_id, x,y,z, S(?), confidence,
+                       creator, treenode_id, creation_date ], 'tags':[] }
+
         """
         return self.make_url(self.project_id, 'connectors', 'links/', **GET)
 
     def _get_connectors_url(self, **GET):
-        """ Use to retrieve list of connectors - POST request
-        """
+        """Generate url to to retrieve list of connectors (POST)."""
         return self.make_url(self.project_id, 'connectors/', **GET)
 
     def _get_connector_types_url(self, **GET):
-        """ Use to retrieve list of connectors - POST request
-        """
+        """Generate URL to retrieve list of connectors (POST)."""
         return self.make_url(self.project_id, 'connectors/types/', **GET)
 
     def _get_connectors_between_url(self, **GET):
-        """ Use to retrieve list of connectors linking sets of neurons
-        """
+        """Generate url to retrieve connectors linking sets of neurons."""
         return self.make_url(self.project_id, 'connector', 'list',
                              'many_to_many', **GET)
 
     def _get_connector_details_url(self, **GET):
-        """ Use to parse url for retrieving info connectors (does need post
-        data).
-        """
+        """Generate url for retrieving info connectors (POST)."""
         return self.make_url(self.project_id, 'connector', 'skeletons', **GET)
 
     def _get_neuronnames(self, **GET):
-        """ Use to parse url for names for a list of skeleton ids
-        (does need post data: self.project_id, skid). """
+        """Generate url for names for a list of skeleton ids (POST)."""
         return self.make_url(self.project_id, 'skeleton', 'neuronnames', **GET)
 
     def _get_list_skeletons_url(self, **GET):
-        """ Use to parse url for names for a list of skeleton ids. GET request.
-        """
+        """Generate url to get neuron names (GET)."""
         return self.make_url(self.project_id, 'skeletons/', **GET)
 
     def _get_graph_dps_url(self, **GET):
-        """ Use to parse url for getting connections between source and targets.
-        """
+        """Generate url for getting connections between source and targets."""
         return self.make_url(self.project_id, 'graph', 'dps', **GET)
 
     def _get_completed_connector_links(self, **GET):
-        """ Use to parse url for retrieval of completed connector links by
-        given user GET request:
-        Returns list: [ connector_id, [x,z,y], node1_id, skeleton1_id,
-        link1_confidence, creator_id, [x,y,z], node2_id, skeleton2_id,
-        link2_confidence, creator_id ]
+        """Generate url to get completed connector links by given user (GET).
         """
         return self.make_url(self.project_id, 'connector', 'list', **GET)
 
     def _get_user_list_url(self, **GET):
-        """ Get user list for project. """
+        """Generate url to get list of users."""
         return self.make_url('user-list', **GET)
 
     def _get_single_neuronname_url(self, skid, **GET):
-        """ Use to parse url for a SINGLE neuron (will also give you
-        neuronID).
-        """
+        """Generate url to get a SINGLE neuron."""
         return self.make_url(self.project_id, 'skeleton', skid, 'neuronname',
                              **GET)
 
     def _get_review_status_url(self, **GET):
-        """ Use to get skeletons review status. """
+        """Generate URL to get review status."""
         return self.make_url(self.project_id, 'skeletons', 'review-status',
                              **GET)
 
     def _get_review_details_url(self, skid, **GET):
-        """ Use to retrieve review status for every single node of a skeleton.
-        For some reason this needs to be fetched as POST (even though actual
-        POST data is not necessary). Returns list of arbors, the nodes
-        contained and who has been reviewing them at what time
-        """
+        """Generate url to retrieve review status for individual nodes."""
         return self.make_url(self.project_id, 'skeletons', skid, 'review',
                              **GET)
 
     def _get_annotation_table_url(self, **GET):
-        """ Use to get annotations for given neuron. DOES need skid as postdata.
-        """
+        """Generate url to get annotations for given neuron (POST)."""
         return self.make_url(self.project_id, 'annotations', 'table-list',
                              **GET)
 
     def _get_intersects(self, vol_id, x, y, z, **GET):
-        """ Use to test if point intersects with volume."""
+        """Generate to test if point intersects with volume."""
         GET.update({'x': x, 'y': y, 'z': z})
         return self.make_url(self.project_id, 'volumes', vol_id, 'intersect',
                              **GET)
 
     def _get_volumes(self, **GET):
-        """ Get list of all volumes in project. """
+        """Generate url to list of all volumes in project."""
         return self.make_url(self.project_id, 'volumes/', **GET)
 
     def _get_volume_details(self, volume_id, **GET):
-        """ Get details on a given volume (mesh). """
+        """Generate url to get details on a given volume."""
         return self.make_url(self.project_id, 'volumes', volume_id, **GET)
 
     def _get_annotations_for_skid_list(self, **GET):
-        """ ATTENTION: This does not seem to work anymore as of 20/10/2015
-        -> although it still exists in CATMAID code
-        use get_annotations_for_skid_list2
-        Use to get annotations for given neuron. DOES need skid as postdata
-        """
-        return self.make_url(self.project_id, 'annotations', 'skeletons',
-                             'list', **GET)
-
-    def _get_annotations_for_skid_list2(self, **GET):
-        """ Use to get annotations for given neuron. DOES need skid as
-        postdata.
-        """
+        """Generate url to get annotations for given neuron (POST)."""
         return self.make_url(self.project_id, 'skeleton', 'annotationlist',
                              **GET)
 
     def _get_logs_url(self, **GET):
-        """ Use to get logs. DOES need skid as postdata. """
+        """Generate url to get logs (POST)."""
         return self.make_url(self.project_id, 'logs', 'list', **GET)
 
     def _get_transactions_url(self, **GET):
-        """ Use to get transactions. GET request."""
+        """Generate url to get transactions (GET)."""
         return self.make_url(self.project_id, 'transactions/', **GET)
 
     def _get_annotation_list(self, **GET):
-        """ Use to parse url for retrieving list of all annotations
-        (and their IDs!!!).
-        """
+        """Generate url to retrieve list of all annotations."""
         return self.make_url(self.project_id, 'annotations/', **GET)
 
     def _get_contributions_url(self, **GET):
-        """ Use to parse url for retrieving contributor statistics for given
-        skeleton (does need post data). """
+        """Generate url to retrieve contributor statistics."""
         return self.make_url(self.project_id, 'skeleton',
                              'contributor_statistics_multiple', **GET)
 
     def _get_annotated_url(self, **GET):
-        """ Use to parse url for retrieving annotated neurons (NEEDS post data).
-        """
+        """Generate url to retrieve annotated neurons (POST)."""
         return self.make_url(self.project_id, 'annotations', 'query-targets',
                              **GET)
 
     def _get_skid_from_tnid(self, treenode_id, **GET):
-        """ Use to parse url for retrieving the skeleton id to a single
-        treenode id (does not need postdata) API returns dict:
-        {"count": integer, "skeleton_id": integer}
+        """Generate url to retrieve the skeleton id to a single treenode id.
         """
         return self.make_url(self.project_id, 'skeleton', 'node', treenode_id,
                              'node_count', **GET)
 
     def _get_node_list_url(self, **GET):
-        """ Use to parse url for retrieving list of nodes (NEEDS post data).
-        """
+        """Generate url for retrieving list of nodes (POST)."""
         return self.make_url(self.project_id, 'node', 'list', **GET)
 
     def _get_node_info_url(self, **GET):
-        """ Use to parse url for retrieving user info on a single node (needs
-        post data).
-        """
+        """Generate url for retrieving user info on a single node (POST)."""
         return self.make_url(self.project_id, 'node', 'user-info', **GET)
 
     def _treenode_add_tag_url(self, treenode_id, **GET):
-        """ Use to parse url adding labels (tags) to a given treenode
-        (needs post data).
-        """
+        """Generate url for adding labels (tags) to a given treenode (POST)."""
         return self.make_url(self.project_id, 'label', 'treenode', treenode_id,
                              'update', **GET)
 
     def _delete_neuron_url(self, neuron_id, **GET):
-        """ Use to parse url for deleting a single neurons"""
+        """Generate url to delete a neuron."""
         return self.make_url(self.project_id, 'neuron', neuron_id, 'delete',
                              **GET)
 
     def _delete_treenode_url(self, **GET):
-        """ Use to parse url for deleting treenodes"""
+        """Generate url for deleting treenodes."""
         return self.make_url(self.project_id, 'treenode', 'delete', **GET)
 
     def _delete_connector_url(self, **GET):
-        """ Use to parse url for deleting connectors"""
+        """Generate url for deleting connectors."""
         return self.make_url(self.project_id, 'connector', 'delete', **GET)
 
     def _connector_add_tag_url(self, treenode_id, **GET):
-        """ Use to parse url adding labels (tags) to a given treenode
-        (needs post data).
-        """
+        """Generate url for adding labels (tags) to a treenode (POST)."""
         return self.make_url(self.project_id, 'label', 'connector',
                              treenode_id, 'update', **GET)
 
     def _get_compact_skeleton_url(self, skid, connector_flag=1, tag_flag=1,
                                   **GET):
-        """ Use to parse url for retrieving all info the 3D viewer gets
-        (does NOT need post data). Returns, in JSON, [[nodes], [connectors],
-        [tags]], with connectors and tags being empty when
-        0 == with_connectors and 0 == with_tags, respectively.
+        """Generate url to retrieve all info the 3D viewer gets (GET).
+
         Deprecated but kept for backwards compability!
+
         """
         return self.make_url(self.project_id, skid, connector_flag, tag_flag,
                              'compact-skeleton', **GET)
 
     def _get_compact_details_url(self, skid, **GET):
-        """ Similar to compact-skeleton but if 'with_history':True is passed
+        """Generate url to get skeleton info.
+
+        Similar to compact-skeleton but if 'with_history':True is passed
         as GET request, returned data will include all positions a
         nodes/connector has ever occupied plus the creation time and last
         modified.
+
         """
         return self.make_url(self.project_id, 'skeletons', skid,
                              'compact-detail', **GET)
 
     def _get_compact_arbor_url(self, skid, nodes_flag=1, connector_flag=1,
                                tag_flag=1, **GET):
-        """ The difference between this function and get_compact_skeleton is
+        """Generate url to get skeleton info.
+
+        The difference between this function and get_compact_skeleton is
         that the connectors contain the whole chain from the skeleton of
         interest to the partner skeleton: contains [treenode_id,
         confidence_to_connector, connector_id, confidence_from_connector,
         connected_treenode_id, connected_skeleton_id, relation1, relation2]
         relation1 = 1 means presynaptic (this neuron is upstream), 0 means
         postsynaptic (this neuron is downstream)
+
         """
         return self.make_url(self.project_id, skid, nodes_flag,
                              connector_flag, tag_flag, 'compact-arbor', **GET)
 
     def _get_edges_url(self, **GET):
-        """ Use to parse url for retrieving edges between given skeleton ids
-        (does need postdata). Returns list of edges:
-        [source_skid, target_skid, weight]
-        """
+        """Generate url for retrieving edges between neurons (POST)."""
         return self.make_url(self.project_id, 'skeletons',
                              'confidence-compartment-subgraph', **GET)
 
     def _get_skeletons_from_neuron_id(self, neuron_id, **GET):
-        """ Use to get all skeletons of a given neuron (neuron_id). """
+        """Generate url to get all skeletons of a given neuron."""
         return self.make_url(self.project_id, 'neuron', neuron_id,
                              'get-all-skeletons', **GET)
 
     def _get_history_url(self, **GET):
-        """ Use to get user history. """
+        """Generate url to get user history."""
         return self.make_url(self.project_id, 'stats', 'user-history', **GET)
 
     def _get_stats_node_count(self, **GET):
-        """ Use to get nodecounts per user. """
+        """Generate url to get nodecounts per user."""
         return self.make_url(self.project_id, 'stats', 'nodecount', **GET)
 
     def _rename_neuron_url(self, neuron_id, **GET):
-        """ Use to rename a single neuron. Does need postdata."""
+        """Generate url to rename a single neuron (POST)."""
         return self.make_url(self.project_id, 'neurons', neuron_id, 'rename',
                              **GET)
 
     def _get_label_list_url(self, **GET):
-        """ Use to get a list of all labels. Does not need postdata."""
+        """Generte url to get a list of all labels."""
         return self.make_url(self.project_id, 'labels', 'stats', **GET)
 
     def _get_circles_of_hell_url(self, **GET):
-        """ Use to get n-th order partners for a set of neurons. Does need
-        postdata.
-        """
+        """Generate url to to get n-th order partners for a set of neurons."""
         return self.make_url(self.project_id, 'graph', 'circlesofhell', **GET)
 
     def _get_treenode_table_url(self, **GET):
-        """ Use to get treenode table. Does need postdata."""
+        """Generate url to get treenode table (POST)."""
         return self.make_url(self.project_id, 'treenodes', 'compact-detail',
                              **GET)
 
     def _get_node_location_url(self, **GET):
-        """ Use to get treenode table. Does need postdata."""
+        """Generate url to get node location (POST)."""
         return self.make_url(self.project_id, 'nodes', 'location', **GET)
 
     def _import_skeleton_url(self, **GET):
-        """ Use to import skeleton into Catmaid Instance. Does need postdata.
-        """
+        """Generate url to import skeleton into Catmaid Instance (POST)."""
         return self.make_url(self.project_id, 'skeletons', 'import', **GET)
 
     def _get_skeletons_in_bbox(self, **GET):
-        """ Use to get list of skeleton in bounding box. Does need postdata.
-        """
+        """Generate url to get list of skeleton in bounding box (POST)."""
         return self.make_url(self.project_id, 'skeletons', 'in-bounding-box',
                              **GET)
 
     def _get_connector_in_bbox_url(self, **GET):
-        """ Use to parse url for retrieving list of connectors in bounding
-        box (can use GET or POST).
-        """
+        """Generate url for retrieving list of connectors in bounding box."""
         return self.make_url(self.project_id, 'connectors', 'in-bounding-box', **GET)
 
     def _get_neuron_ids_url(self, **GET):
-        """ Use to parse url for retrieving neuron IDs for a bunch of skeleton
-        IDs.
-        """
+        """Generate url for retrieving neuron IDs from skeleton IDs."""
         return self.make_url(self.project_id, 'neurons', 'from-models', **GET)
 
     def _upload_volume_url(self, **GET):
-        """ Use to parse url for uploading volumes. """
+        """Generate url for uploading volumes."""
         return self.make_url(self.project_id, 'volumes', 'add', **GET)
 
     def _create_link_url(self, **GET):
-        """ Use to parse url for creating connector links. """
+        """Generate url for creating connector links."""
         return self.make_url(self.project_id, 'link', 'create', **GET)
 
     def _create_connector_url(self, **GET):
-        """ Use to parse url for creating connectors. """
+        """Generate url for creating connectors."""
         return self.make_url(self.project_id, 'connector', 'create', **GET)
 
     def _join_skeletons_url(self, **GET):
-        """ Use to parse url for joining skeletons. """
+        """Generate url for joining skeletons."""
         return self.make_url(self.project_id, 'skeleton', 'join', **GET)
 
     def _get_login_info_url(self, **GET):
-        """ Use to parse url for fetching login information for self."""
+        """Generate url for getting login information for self."""
         return self.make_url('accounts', 'login', **GET)
 
     def _update_node_url(self, **GET):
-        """Use to parse url for updating node locations."""
+        """Generate url for updating node locations."""
         return self.make_url(self.project_id, 'node', 'update', **GET)
 
     def _reroot_skeleton_url(self, **GET):
-        """Use to parse url for rerooting skeletons."""
+        """Generate url for rerooting skeletons."""
         return self.make_url(self.project_id, 'skeleton', 'reroot', **GET)
 
     def _create_treenode_url(self, **GET):
-        """Use to parse url for generating treenodes."""
+        """Generate url for generating treenodes."""
         return self.make_url(self.project_id, 'treenode', 'create', **GET)
 
     def _get_neuron_cable_url(self, **GET):
-        """Use to parse url for fetching neuron cable lengths."""
+        """Generate url for fetching neuron cable lengths."""
         return self.make_url(self.project_id, 'skeletons', 'cable-length', **GET)
 
     def _update_node_confidence_url(self, treenode_id, **GET):
-        """Use to parse url for fetching neuron cable lengths."""
+        """Generate url for fetching neuron cable lengths."""
         return self.make_url(self.project_id, 'treenodes', treenode_id, 'confidence', **GET)
 
     def _get_connectivity_counts_url(self, **GET):
-        """Use to parse url for fetching connectivity counts (e.g. number of
-        postsynapses).  Needs POST data."""
+        """Generate url for fetching connectivity counts (POST)."""
         return self.make_url(self.project_id, 'skeletons', 'connectivity-counts', **GET)
 
     def _get_connectivity_matrix_url(self, **GET):
-        """Use to parse url for fetching adjacency matrices. Needs POST data."""
+        """Generate url for fetching adjacency matrices (POST)."""
         return self.make_url(self.project_id, 'skeleton', 'connectivity_matrix', **GET)
 
     def _get_import_info_url(self, **GET):
-        """Use to parse url fetching imported nodes for a given skeleton."""
+        """Generate url for fetching imported nodes for a given skeleton."""
         return self.make_url(self.project_id, 'skeletons', 'import-info', **GET)
 
     def _get_skeleton_origin_url(self, **GET):
-        """Use to parse url fetching origin info for given skeleton."""
+        """Generate url for fetching origin info for given skeleton."""
         return self.make_url(self.project_id, 'skeletons', 'origin', **GET)
 
     def _get_skeleton_by_origin_url(self, **GET):
-        """Use to parse url fetching skeleton by their origin."""
+        """Generate url for fetching skeleton by their origin."""
         return self.make_url(self.project_id, 'skeletons', 'from-origin', **GET)
+
+    def _get_sampler_list_url(self, **GET):
+        """Generate url for fetching list of reconstruction samplers."""
+        return self.make_url(self.project_id, 'samplers', **GET)
+
+    def _get_sampler_domains_url(self, sampler, **GET):
+        """Generate url for fetching domains for given sampler."""
+        return self.make_url(self.project_id, 'samplers', sampler, 'domains', **GET)
+
+    def _get_sampler_counts_url(self, **GET):
+        """Generate url for fetching domains for given sampler."""
+        return self.make_url(self.project_id, 'skeletons', 'sampler-count', **GET)
 
 
 @cache.undo_on_error
@@ -1213,7 +1187,6 @@ def get_arbor(x, node_flag=1, connector_flag=1, tag_flag=1, remote_instance=None
     - ``relation`` can be: ``0`` (presynaptic), ``1`` (postsynaptic), ``2`` (gap junction)
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -1256,8 +1229,7 @@ def get_arbor(x, node_flag=1, connector_flag=1, tag_flag=1, remote_instance=None
 @cache.undo_on_error
 def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
                            remote_instance=None):
-    """ Retrieve the synaptic/gap junction partners of neurons of interest
-    **within** a given CATMAID Volume.
+    """Retrieve the synaptic/gap junction partners within a CATMAID Volume.
 
     Important
     ---------
@@ -1431,7 +1403,9 @@ def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
 @cache.undo_on_error
 def get_nth_partners(x, n_circles=1, min_pre=2, min_post=2,
                      remote_instance=None):
-    """ Retrieve partners that are directly (``n_circles=1``) or via n "hops"
+    """Retrieve Nth partners.
+
+    Partners that are directly (``n_circles = 1``) or via N "hops"
     (``n_circles>1``) connected to a set of seed neurons.
 
     Parameters
@@ -1462,7 +1436,6 @@ def get_nth_partners(x, n_circles=1, min_pre=2, min_post=2,
          2   ...             ...
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
@@ -1520,6 +1493,8 @@ def get_partners(x, threshold=1, min_size=2, filt=[], min_confidence=1,
                         Applied before ``threshold``.
     directions :        'incoming' | 'outgoing' | 'gapjunctions' | 'attachments', optional
                         Use to restrict to either up- or downstream partners.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -1571,7 +1546,6 @@ def get_partners(x, threshold=1, min_size=2, filt=[], min_confidence=1,
                    working with multiple fragments from the same neuron.
 
     """
-
     if not isinstance(min_confidence, (float, int)) or min_confidence < 0 or min_confidence > 5:
         raise ValueError('min_confidence must be 0-5.')
 
@@ -1674,7 +1648,7 @@ def get_partners(x, threshold=1, min_size=2, filt=[], min_confidence=1,
 
 @cache.undo_on_error
 def get_names(x, remote_instance=None):
-    """ Retrieve neurons names for a list of skeleton ids.
+    """Retrieve neuron names for a list of skeleton ids.
 
     Parameters
     ----------
@@ -1695,7 +1669,6 @@ def get_names(x, remote_instance=None):
                     ``{skid1: 'neuron_name', skid2: 'neuron_name', ...}``
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -1711,12 +1684,12 @@ def get_names(x, remote_instance=None):
         key = 'skids[%i]' % i
         get_names_postdata[key] = x[i]
 
-    names = remote_instance.fetch(remote_get_names_url, get_names_postdata)
+    names = remote_instance.fetch(remote_get_names_url, post=get_names_postdata)
 
-    logger.debug(
-        'Names for %i of %i skeleton IDs retrieved' % (len(names), len(x)))
+    logger.debug('Names for {} of {} skeleton IDs retrieved'.format(len(names),
+                                                                    len(x)))
 
-    return(names)
+    return names
 
 
 @cache.undo_on_error
@@ -1751,7 +1724,6 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
          1
 
     """
-
     if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         node_ids = np.append(x.nodes.treenode_id.values,
                              x.connectors.connector_id.values)
@@ -1800,7 +1772,7 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
 
 @cache.undo_on_error
 def get_skid_from_treenode(treenode_ids, remote_instance=None):
-    """ Retrieve skeleton IDs from a list of nodes.
+    """Retrieve skeleton IDs from a list of nodes.
 
     Parameters
     ----------
@@ -1816,7 +1788,6 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
             exists, ``skeleton_ID`` will be ``None``.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     treenode_ids = utils.eval_node_ids(
@@ -1836,7 +1807,7 @@ def get_skid_from_treenode(treenode_ids, remote_instance=None):
 @cache.undo_on_error
 def get_treenode_table(x, include_details=True, convert_ts=True,
                        remote_instance=None):
-    """ Retrieve treenode table(s) for a list of neurons.
+    """Retrieve treenode table(s) for a list of neurons.
 
     Parameters
     ----------
@@ -1939,7 +1910,7 @@ def get_treenode_table(x, include_details=True, convert_ts=True,
 
 @cache.undo_on_error
 def get_edges(x, remote_instance=None):
-    """ Retrieve edges between sets of neurons.
+    """Retrieve edges between sets of neurons.
 
     Synaptic connections only!
 
@@ -1966,7 +1937,6 @@ def get_edges(x, remote_instance=None):
          3
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -1991,7 +1961,7 @@ def get_edges(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
-    """ Retrieve connectors based on a set of filters.
+    """Retrieve connectors based on a set of filters.
 
     Parameters
     ----------
@@ -2052,7 +2022,6 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
             Function to get treenodes by tags, IDs or skeleton.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, type(None)):
@@ -2129,7 +2098,7 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 @cache.undo_on_error
 def get_connector_links(x, with_tags=False, chunk_size=50,
                         remote_instance=None):
-    """ Retrieve connectors links for a set of neurons.
+    """Retrieve connectors links for a set of neurons.
 
     In essence, this will get you all "arrows" that point from a connector to
     your neuron or from your neuron to a connector. It does NOT give you the
@@ -2175,8 +2144,8 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
         If you just need the connector table (ID, x, y, z, creator, etc).
     :func:`~pymaid.get_connector_details`
         Get the same data but by connector, not by link.
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     skids = utils.eval_skids(x, warn_duplicates=False,
@@ -2246,7 +2215,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
 
 @cache.undo_on_error
 def get_connector_details(x, remote_instance=None):
-    """ Retrieve details on sets of connectors.
+    """Retrieve details on sets of connectors.
 
     Parameters
     ----------
@@ -2279,7 +2248,6 @@ def get_connector_details(x, remote_instance=None):
         Get the same data but by link, not by connector.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     connector_ids = utils.eval_node_ids(x, connectors=True, treenodes=False)
@@ -2323,7 +2291,7 @@ def get_connector_details(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_connectors_between(a, b, directional=True, remote_instance=None):
-    """ Retrieve connectors between sets of neurons.
+    """Retrieve connectors between sets of neurons.
 
     Important
     ---------
@@ -2376,7 +2344,6 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
         faster.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     a = utils.eval_skids(a, remote_instance=remote_instance)
@@ -2417,7 +2384,7 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
 
 @cache.undo_on_error
 def get_review(x, remote_instance=None):
-    """ Retrieve review status for a set of neurons.
+    """Retrieve review status for a set of neurons.
 
     Parameters
     ----------
@@ -2451,7 +2418,6 @@ def get_review(x, remote_instance=None):
         Gives you review status for individual nodes of a given neuron.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -2497,7 +2463,7 @@ def get_review(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_user_annotations(x, remote_instance=None):
-    """ Retrieve annotations used by given user(s).
+    """Retrieve annotations used by given user(s).
 
     Parameters
     ----------
@@ -2520,7 +2486,6 @@ def get_user_annotations(x, remote_instance=None):
          ...
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, (list, np.ndarray)):
@@ -2573,7 +2538,7 @@ def get_user_annotations(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_annotation_details(x, remote_instance=None):
-    """ Retrieve annotations for a set of neuron.
+    """Retrieve annotations for a set of neuron.
 
     Returns more details than :func:`~pymaid.get_annotations` but is slower.
     Contains timestamps and user IDs (same API as neuron navigator).
@@ -2603,7 +2568,7 @@ def get_annotation_details(x, remote_instance=None):
     See Also
     --------
     :func:`~pymaid.get_annotations`
-                        Gives you annotations for a list of neurons (faster)
+                        Gives you annotations for a list of neurons (faster).
 
     Examples
     --------
@@ -2618,7 +2583,6 @@ def get_annotation_details(x, remote_instance=None):
     >>> an[ an.time_annotated > datetime.date(2017, 6, 1) ]
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)
@@ -2671,7 +2635,7 @@ def get_annotation_details(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_annotations(x, remote_instance=None):
-    """ Retrieve annotations for a list of skeleton ids.
+    """Retrieve annotations for a list of skeleton ids.
 
     If a neuron has no annotations, it will not show up in returned dict!
 
@@ -2740,7 +2704,7 @@ def get_annotations(x, remote_instance=None):
 @cache.wipe_and_retry
 def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
                       remote_instance=None):
-    """ Retrieve the annotation ID for single or list of annotation(s).
+    """Retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
     ----------
@@ -2760,7 +2724,6 @@ def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
                         ``{'annotation_name': 'annotation_id', ...}``
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     logger.debug('Retrieving list of annotations...')
@@ -2815,7 +2778,7 @@ def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
 @cache.undo_on_error
 def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
                    remote_instance=None):
-    """ Get treenodes by tag (label), ID or associated skeleton.
+    """Get treenodes by tag (label), ID or associated skeleton.
 
     Search intersected (logical AND) across parameters but additive (logical OR)
     within each parameter (see examples).
@@ -2869,7 +2832,6 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
                                              skeleton_ids='annotation:glomerulus DA1')
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     url = remote_instance._get_treenode_table_url()
@@ -2916,7 +2878,7 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
 @cache.undo_on_error
 def has_soma(x, tag='soma', min_rad=500, return_ids=False,
              remote_instance=None):
-    """ Check if neuron(s) has soma.
+    """Check if neuron(s) has soma.
 
     Parameters
     ----------
@@ -2950,7 +2912,6 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
                           {skid1: [treenode_id], skid2: [treenode_id], ...}
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -3023,8 +2984,8 @@ def get_annotated(x, include_sub_annotations=False, raise_not_found=True,
                             Use to retrieve neurons by combining various
                             search criteria. For example names, reviewers,
                             annotations, etc.
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     pos, neg = utils._eval_conditions(x)
@@ -3057,7 +3018,7 @@ def get_annotated(x, include_sub_annotations=False, raise_not_found=True,
 @cache.undo_on_error
 def get_skids_by_name(names, allow_partial=True, raise_not_found=True,
                       remote_instance=None):
-    """ Retrieve the all neurons with matching name.
+    """Retrieve the all neurons with matching name.
 
     Parameters
     ----------
@@ -3091,8 +3052,8 @@ def get_skids_by_name(names, allow_partial=True, raise_not_found=True,
                             Use to retrieve neurons by combining various
                             search criteria. For example names, reviewers,
                             annotations, etc.
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Only look for unique names
@@ -3156,8 +3117,8 @@ def get_skids_by_annotation(annotations, allow_partial=False, intersect=False,
                             annotations, etc.
     :func:`pymaid.get_annotated`
                             Use to retrieve entities (neurons and annotations).
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     annotations = utils._make_iterable(annotations)
@@ -3192,7 +3153,7 @@ def get_skids_by_annotation(annotations, allow_partial=False, intersect=False,
 
     # Query server
     remote_annotated_url = [remote_instance._get_annotated_url() for _ in annotation_post]
-    resp = remote_instance.fetch(remote_annotated_url, annotation_post)
+    resp = remote_instance.fetch(remote_annotated_url, post=annotation_post)
 
     # Extract skids from responses
     annotated_skids = [e['skeleton_ids'][0] for r in resp for e in r['entities'] if e['type'] == 'neuron']
@@ -3207,7 +3168,7 @@ def get_skids_by_annotation(annotations, allow_partial=False, intersect=False,
 
 @cache.undo_on_error
 def neuron_exists(x, remote_instance=None):
-    """ Check if neurons exist in CATMAID.
+    """Check if neurons exist in CATMAID.
 
     Parameters
     ----------
@@ -3249,7 +3210,7 @@ def neuron_exists(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_treenode_info(x, remote_instance=None):
-    """ Retrieve info for a set of treenodes.
+    """Retrieve info for a set of treenodes.
 
     Parameters
     ----------
@@ -3270,7 +3231,6 @@ def get_treenode_info(x, remote_instance=None):
                  ...
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     treenode_ids = utils.eval_node_ids(x, connectors=False, treenodes=True)
@@ -3288,7 +3248,7 @@ def get_treenode_info(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_node_tags(node_ids, node_type, remote_instance=None):
-    """ Retrieve tags for a set of treenodes.
+    """Retrieve tags for a set of treenodes.
 
     Parameters
     ----------
@@ -3321,7 +3281,6 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
                         Use to delete node tags.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(node_ids, (list, np.ndarray)):
@@ -3346,7 +3305,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
 
 @cache.undo_on_error
 def get_segments(x, remote_instance=None):
-    """ Retrieve list of segments for a neuron just like the review widget.
+    """Retrieve list of segments for a neuron just like the review widget.
 
     Parameters
     ----------
@@ -3372,8 +3331,8 @@ def get_segments(x, remote_instance=None):
     ``CatmaidNeuron.short_segments``
                 Use these :class:`pymaid.CatmaidNeuron` attributes to access
                 segments generated by pymaid (faster).
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -3397,11 +3356,10 @@ def get_segments(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_review_details(x, remote_instance=None):
-    """ Retrieve review status (reviewer + timestamp) for each node
-    of a given skeleton.
+    """Retrieve review status (reviewer + timestamp) by node for given neuron.
 
     Parameters
-    -----------
+    ----------
     x
                         Neurons to get review-details for. Can be either:
 
@@ -3421,8 +3379,8 @@ def get_review_details(x, remote_instance=None):
           0    12345       12345123     datetime    NaT      datetime
           1
           ...
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
@@ -3502,7 +3460,6 @@ def get_logs(operations=[], entries=50, display_start=0, search="",
          ...
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not operations:
@@ -3667,7 +3624,7 @@ def get_contributor_statistics(x, separate=False, max_threads=500,
 
                 remote_get_statistics_url = remote_instance._get_contributions_url()
                 stats.append(remote_instance.fetch(remote_get_statistics_url,
-                                                   get_statistics_postdata))
+                                                   post=get_statistics_postdata))
 
         # Now generate DataFrame
         node_contributors = {user_list.loc[int(u), 'login']: sum([st['node_contributors'][u] for st in stats if u in st[
@@ -3936,7 +3893,6 @@ def get_neuron_list(remote_instance=None, user=None, node_count=1,
             Quick way to plot history over time.
 
     """
-
     def _constructor_helper(data, key, days):
         """ Helper to extract variable from data returned by CATMAID server
         """
@@ -4105,7 +4061,6 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
     True
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(x[0], core.Volume):
@@ -4170,7 +4125,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                  from_date=None, to_date=None, reviewed_by=None, skids=None,
                  intersect=False, partial_match=False, only_soma=False,
                  min_size=1, minimum_cont=None, remote_instance=None):
-    """ Find neurons matching given search criteria.
+    """Find neurons matching given search criteria.
 
     Warning
     -------
@@ -4249,7 +4204,6 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     ...                             volumes='LH_R')
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Fist, we have to prepare a whole lot of parameters
@@ -4481,7 +4435,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
 @cache.undo_on_error
 def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
                           only_soma=False, remote_instance=None):
-    """ Retrieves neurons with processes within CATMAID volumes.
+    """Retrieves neurons with processes within CATMAID volumes.
 
     This function uses the **BOUNDING BOX** around volume as proxy and queries
     for neurons that are within that volume. See examples on how to work
@@ -4542,7 +4496,6 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
     >>> n = lh_neurons[lh_pruned.cable_length > 100]
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(volumes, (list, np.ndarray)):
@@ -4586,7 +4539,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
 @cache.undo_on_error
 def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
                         remote_instance=None, **kwargs):
-    """ Retrieves neurons with processes within a defined box volume.
+    """Retrieves neurons with processes within a defined box volume.
 
     Parameters
     ----------
@@ -4616,7 +4569,6 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
                             ``[skeleton_id, skeleton_id, ...]``
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(bbox, core.Volume):
@@ -4649,7 +4601,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
 
 @cache.undo_on_error
 def get_user_list(remote_instance=None):
-    """ Get list of users.
+    """Get list of users.
 
     Parameters
     ----------
@@ -4685,7 +4637,6 @@ def get_user_list(remote_instance=None):
     ... Michaela
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     user_list = remote_instance.fetch(remote_instance._get_user_list_url())
@@ -4869,7 +4820,6 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
     >>> vol.plot3d()
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(volume_name, type(None)):
@@ -4982,7 +4932,7 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
 
 @cache.undo_on_error
 def get_annotation_list(remote_instance=None):
-    """ Get a list of all annotations in the project.
+    """Get a list of all annotations in the project.
 
     Parameters
     ----------
@@ -4998,8 +4948,8 @@ def get_annotation_list(remote_instance=None):
              0
              1
              ...
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     an = remote_instance.fetch(remote_instance._get_annotation_list())[
@@ -5014,7 +4964,7 @@ def get_annotation_list(remote_instance=None):
 def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
                        active_node_id=None, zoom=0, tool='tracingtool',
                        open_browser=False, remote_instance=None):
-    """ Generate URL to a location.
+    """Generate URL to a location.
 
     Parameters
     ----------
@@ -5052,8 +5002,8 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     >>> urls = pymaid.url_to_coordinates(low_c[['x', 'y', 'z']].values,
     ...                                  stack_id=5,
     ...                                  active_node_id=low_c.treenode_id.values)
-    """
 
+    """
     def gen_url(c, stid, nid, sid):
         """ This function generates the actual urls
         """
@@ -5117,7 +5067,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
 
 @cache.undo_on_error
 def get_node_location(x, remote_instance=None):
-    """ Retrieves location for a set of tree- or connector nodes.
+    """Retrieves location for a set of tree- or connector nodes.
 
     Parameters
     ----------
@@ -5191,7 +5141,7 @@ def get_label_list(remote_instance=None):
 
 @cache.undo_on_error
 def get_transactions(range_start=None, range_length=25, remote_instance=None):
-    """ Retrieve individual transactions with server.
+    """Retrieve individual transactions with server.
 
     **This API endpoint is extremely slow!**
 
@@ -5203,6 +5153,8 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
     range_length :      int, optional
                         End of table. If None, will return all.
     remote_instance :   CatmaidInstance, optional
+                        If not provided, will search for globally defined
+                        CatmaidInstance.
 
     Returns
     -------
@@ -5223,7 +5175,6 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
              4  1            404899162        151     dacksa
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     remote_transactions_url = remote_instance._get_transactions_url()
@@ -5249,7 +5200,7 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 
 @cache.undo_on_error
 def get_neuron_id(x, remote_instance=None):
-    """ Get neuron ID(s) for given skeleton(s).
+    """Get neuron ID(s) for given skeleton(s).
 
     Parameters
     ----------
@@ -5264,7 +5215,6 @@ def get_neuron_id(x, remote_instance=None):
                         ``{skeleton_id (str): neuron_id (int), ... }``
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)
@@ -5279,7 +5229,7 @@ def get_neuron_id(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_cable_lengths(x, chunk_size=500, remote_instance=None):
-    """ Get cable lengths directly from Catmaid Server.
+    """Get cable lengths directly from Catmaid Server.
 
     Parameters
     ----------
@@ -5296,7 +5246,6 @@ def get_cable_lengths(x, chunk_size=500, remote_instance=None):
                         ``{skeleton_id (str): cable [nm] (int), ... }``
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)
@@ -5373,7 +5322,6 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
              ..
 
     """
-
     if ret.upper() not in ['IDS', 'COORDS', 'LINKS']:
         raise ValueError('"ret" must be "IDS", "COORDS" or "LINKS"')
 
@@ -5481,7 +5429,6 @@ def get_connectivity_counts(x, source_relations = ['presynaptic_to'],
                      'relations': {relation_ID: relation_name}}
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)

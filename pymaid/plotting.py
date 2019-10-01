@@ -79,7 +79,7 @@ if utils.is_jupyter() and utils.is_jupyterlab():
 
 
 def screenshot(file='screenshot.png', alpha=True):
-    """ Saves a screenshot of active vispy 3D canvas.
+    """Save a screenshot of active vispy 3D canvas.
 
     Parameters
     ----------
@@ -92,6 +92,7 @@ def screenshot(file='screenshot.png', alpha=True):
     --------
     :func:`pymaid.Viewer.screenshot`
                 Take screenshot of specific canvas.
+
     """
     if alpha:
         mode = 'RGBA'
@@ -105,7 +106,7 @@ def screenshot(file='screenshot.png', alpha=True):
 
 
 def get_viewer():
-    """ Returns active 3D viewer.
+    """Return active 3D viewer.
 
     Returns
     -------
@@ -130,8 +131,7 @@ def get_viewer():
 
 
 def clear3d():
-    """ Clear viewer 3D canvas.
-    """
+    """Clear viewer 3D canvas."""
     viewer = get_viewer()
 
     if viewer:
@@ -139,8 +139,7 @@ def clear3d():
 
 
 def close3d():
-    """ Close existing vispy 3D canvas (wipes memory).
-    """
+    """Close existing vispy 3D canvas (wipes memory)."""
     try:
         viewer = get_viewer()
         viewer.close()
@@ -151,11 +150,12 @@ def close3d():
 
 
 def _orthogonal_proj(zfront, zback):
-    """ Function to get matplotlib to use orthogonal instead of perspective
-    view.
+    """Get matplotlib to use orthogonal instead of perspective view.
 
-    Usage:
+    Examples
+    --------
     proj3d.persp_transformation = _orthogonal_proj
+
     """
     a = (zfront + zback) / (zfront - zback)
     b = -2 * (zfront * zback) / (zfront - zback)
@@ -168,7 +168,7 @@ def _orthogonal_proj(zfront, zback):
 
 
 def plot2d(x, method='2d', **kwargs):
-    """ Generate 2D plots of neurons and neuropils.
+    """Generate 2D plots of neurons and neuropils.
 
     The main advantage of this is that you can save plot as vector graphics.
 
@@ -302,7 +302,6 @@ def plot2d(x, method='2d', **kwargs):
             and if you don't need vector graphics as outputs.
 
     """
-
     _ACCEPTED_KWARGS = ['remote_instance', 'connectors', 'connectors_only',
                         'ax', 'color', 'colors', 'c', 'view', 'scalebar',
                         'cn_mesh_colors', 'linewidth', 'cn_size',
@@ -777,14 +776,14 @@ def plot2d(x, method='2d', **kwargs):
             ax.add_collection3d(lc)
 
     def set_depth():
-        """Sets depth information for neurons according to camera position."""
+        """Set depth information for neurons according to camera position."""
 
         # Modifier for soma coordinates
         modifier = np.array([1, 1, -1])
 
         # Get all coordinates
         all_co = np.concatenate([lc._segments3d[:, 0, :] for lc in line3D_collections],
-                                 axis=0)
+                                axis=0)
 
         # Get projected coordinates
         proj_co = mpl_toolkits.mplot3d.proj3d.proj_points(all_co, ax.get_proj())
@@ -843,10 +842,11 @@ def plot2d(x, method='2d', **kwargs):
 
 
 def _fix_default_dict(x):
-    """ Consolidates duplicate settings in e.g. scatter kwargs when 'c' and
-    'color' is provided.
-    """
+    """Fix duplicate settings.
 
+    E.g. in scatter kwargs when 'c' and 'color' is provided.
+
+    """
     # The first entry is the "survivor"
     duplicates = [['color', 'c'], ['size', 's']]
 
@@ -859,7 +859,7 @@ def _fix_default_dict(x):
 
 
 def _tn_pairs_to_coords(x, modifier=(1, 1, 1)):
-    """Returns pairs of treenode -> parent node coordinates.
+    """Return pairs of treenode -> parent node coordinates.
 
     Parameters
     ----------
@@ -874,7 +874,6 @@ def _tn_pairs_to_coords(x, modifier=(1, 1, 1)):
                 ``[[[x1, y1, z1], [x2, y2, z2]], [[x3, y3, y4], [x4, y4, z4]] ]``
 
     """
-
     if not isinstance(modifier, np.ndarray):
         modifier = np.array(modifier)
 
@@ -892,7 +891,7 @@ def _tn_pairs_to_coords(x, modifier=(1, 1, 1)):
 
 
 def _segments_to_coords(x, segments, modifier=(1, 1, 1)):
-    """Turns lists of treenode_ids into coordinates
+    """Turn lists of treenode_ids into coordinates.
 
     Parameters
     ----------
@@ -908,7 +907,6 @@ def _segments_to_coords(x, segments, modifier=(1, 1, 1)):
                 [ (x,y,z), (x,y,z ) ]
 
     """
-
     if not isinstance(modifier, np.ndarray):
         modifier = np.array(modifier)
 
@@ -920,12 +918,12 @@ def _segments_to_coords(x, segments, modifier=(1, 1, 1)):
 
 
 def _random_colors(count, color_space='RGB', color_range=1):
-    """ Divides colorspace into N evenly distributed colors
+    """Divides colorspace into N evenly distributed colors.
 
     Returns
     -------
     colormap :  list
-             [ (r,g,b),(r,g,b),... ]
+                ``[(r, g, b), (r, g, b), ...]``
 
     """
     if count == 1:
@@ -973,8 +971,7 @@ def _random_colors(count, color_space='RGB', color_range=1):
 
 
 def _fibonacci_sphere(samples=1, randomize=True):
-    """ Calculates points on a sphere
-    """
+    """Calculate points on a sphere."""
     rnd = 1.
     if randomize:
         rnd = random.random() * samples
@@ -998,7 +995,7 @@ def _fibonacci_sphere(samples=1, randomize=True):
 
 
 def plot3d(x, **kwargs):
-    """ Generate 3D plot.
+    """Generate 3D plot.
 
     Uses either `vispy <http://vispy.org>`_ (default) or
     `plotly <http://plot.ly>`_.
@@ -1113,7 +1110,6 @@ def plot3d(x, **kwargs):
     >>> pymaid.plot3d(nl1, connectors=True, clear3d=True)
 
     """
-
     def _plot3d_vispy():
         """
         Plot3d() helper function to generate vispy 3D plots. This is just to
@@ -1184,7 +1180,7 @@ def plot3d(x, **kwargs):
                     # Prepare strahler indices
                     s_index = neuron.nodes.set_index('treenode_id').strahler_index.to_dict()
                     max_si = neuron.nodes.strahler_index.max()
-                    s_index_norm = {k: v/max_si for k,v in s_index.items()}
+                    s_index_norm = {k: v / max_si for k,v in s_index.items()}
 
                     # Get node IDs along the segments and add the "(None, None, None)"
                     node_ids = np.hstack([np.append(s, [None], axis=0) for s in neuron.segments])
@@ -1425,7 +1421,6 @@ def plot3d(x, **kwargs):
                         ' to plot. Optimized for Google Chrome.')
             return fig
 
-
     skids, skdata, dotprops, volumes, points, visual = utils._parse_objects(x)
 
     # Backend
@@ -1525,8 +1520,7 @@ def plot3d(x, **kwargs):
 
 def _prepare_colormap(colors, skdata=None, dotprops=None,
                       use_neuron_color=False, color_range=255):
-    """ Maps color(s) to neuron/dotprop colorlists.
-    """
+    """Map color(s) to neuron/dotprop colorlists."""
 
     # Prepare dummies in case either no skdata or no dotprops
     if isinstance(skdata, type(None)):
@@ -1598,8 +1592,7 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
 
 
 def _eval_color(x, color_range=255):
-    """ Helper to evaluate colors. Always returns tuples.
-    """
+    """Evaluate color and force to r/g/b tuple."""
 
     if color_range not in [1, 255]:
         raise ValueError('color_range must be 1 or 255')
@@ -1621,16 +1614,16 @@ def _eval_color(x, color_range=255):
                         '"{}"'.format(type(x)))
 
     # Check if we need to convert
-    if not any([v > 1 for v in c]) and color_range==255:
+    if not any([v > 1 for v in c]) and color_range == 255:
         c = [int(v * 255) for v in c]
-    elif any([v > 1 for v in c]) and color_range==1:
+    elif any([v > 1 for v in c]) and color_range == 1:
         c = [v / 255 for v in c]
 
     return tuple(c)
 
 
 def plot_network(x, **kwargs):
-    """ Uses NetworkX to generate a Plotly network plot.
+    """Use NetworkX to generate a Plotly network plot.
 
     The purpose of this function is to have a quick 'n dirty look at your
     neurons' connectivity. For higher quality, interactive visualizations
@@ -1687,7 +1680,6 @@ def plot_network(x, **kwargs):
        generate html file and open it webbrowser.
 
     """
-
     remote_instance = kwargs.get('remote_instance', None)
 
     layout = kwargs.get('layout', nx.spring_layout)
@@ -1740,7 +1732,7 @@ def plot_network(x, **kwargs):
     annotations = []
     try:
         max_weight = max(nx.get_edge_attributes(g, 'weight').values())
-    except:
+    except BaseException:
         # This will fail if there are no edges
         max_weight = 1
     for e in list(g.edges.data()):
@@ -1875,7 +1867,7 @@ def plot_network(x, **kwargs):
 
 
 def plot1d(x, ax=None, color=None, **kwargs):
-    """ Plot neuron topology in 1D according to Cuntz et al. (2010).
+    """Plot neuron topology in 1D according to Cuntz et al. (2010).
 
     This function breaks a neurons into segments between branch points.
     See Cuntz et al., PLoS Computational Biology (2010) for detailed
@@ -1903,7 +1895,6 @@ def plot1d(x, ax=None, color=None, **kwargs):
     >>> plt.show()
 
     """
-
     if isinstance(x, core.CatmaidNeuronList):
         pass
     elif isinstance(x, core.CatmaidNeuron):
@@ -1988,7 +1979,7 @@ def plot1d(x, ax=None, color=None, **kwargs):
 
 
 def _volume2vispy(x, **kwargs):
-    """ Converts CatmaidVolume(s) to vispy visuals."""
+    """Convert CatmaidVolume(s) to vispy visuals."""
 
     # Must not use _make_iterable here as this will turn into list of keys!
     if not isinstance(x, (list, np.ndarray)):
@@ -2037,7 +2028,7 @@ def _volume2vispy(x, **kwargs):
 
 
 def _neuron2vispy(x, **kwargs):
-    """ Converts a CatmaidNeuron/List to vispy visuals.
+    """Convert a CatmaidNeuron/List to vispy visuals.
 
     Parameters
     ----------
@@ -2083,8 +2074,8 @@ def _neuron2vispy(x, **kwargs):
     -------
     list
                     Contains vispy visuals for each neuron.
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuron):
         x = core.CatmaidNeuronList(x)
     elif isinstance(x, core.CatmaidNeuronList):
@@ -2322,7 +2313,7 @@ def _neuron2vispy(x, **kwargs):
 
 
 def _dp2vispy(x, **kwargs):
-    """ Converts dotprops(s) to vispy visuals.
+    """Convert dotprops(s) to vispy visuals.
 
     Parameters
     ----------
@@ -2338,8 +2329,8 @@ def _dp2vispy(x, **kwargs):
     -------
     list
                     Contains vispy visuals for each dotprop.
-    """
 
+    """
     if not isinstance(x, (core.Dotprops, pd.DataFrame)):
         raise TypeError('Unable to process data of type "{}"'.format(type(x)))
 
@@ -2411,7 +2402,7 @@ def _dp2vispy(x, **kwargs):
 
 
 def _points2vispy(x, **kwargs):
-    """ Converts points to vispy visuals.
+    """Convert points to vispy visuals.
 
     Parameters
     ----------
@@ -2426,6 +2417,7 @@ def _points2vispy(x, **kwargs):
     -------
     list
                     Contains vispy visuals for points.
+
     """
     colors = kwargs.get('color',
                         kwargs.get('c',

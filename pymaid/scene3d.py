@@ -87,9 +87,9 @@ try:
 except BaseException:
     pass
 
+
 def block_all(function):
-    """ Decorator to block all events on canvas and view while changes
-    are being made. """
+    """Decorator to block all events on canvas and view."""
     @wraps(function)
     def wrapper(*args, **kwargs):
         viewer = args[0]
@@ -109,7 +109,7 @@ def block_all(function):
 
 
 def block_canvas(function):
-    """ Decorator to block all events on canvas are being made. """
+    """Decorator to block all events on canvas are being made."""
     @wraps(function)
     def wrapper(*args, **kwargs):
         viewer = args[0]
@@ -127,7 +127,7 @@ def block_canvas(function):
 
 
 class Browser:
-    """ Vispy browser.
+    """Vispy browser.
 
     Parameters
     ----------
@@ -135,7 +135,6 @@ class Browser:
                     Number of rows and columns in the browser.
 
     """
-
     def __init__(self, n_rows=2, n_cols=3, link=False, **kwargs):
         # Update some defaults as necessary
         defaults = dict(keys=None,
@@ -185,7 +184,7 @@ class Browser:
                     v = 0
 
     def add(self, x, viewer=1, center=True, clear=False, **kwargs):
-        """ Add objects to canvas.
+        """Add objects to canvas.
 
         Parameters
         ----------
@@ -204,8 +203,8 @@ class Browser:
         Returns
         -------
         None
-        """
 
+        """
         (skids, skdata, dotprops, volumes,
          points, visuals) = utils._parse_objects(x)
 
@@ -252,24 +251,24 @@ class Browser:
                 self.center_camera(view)
 
     def show(self):
-        """ Show viewer. """
+        """Show viewer."""
         self.canvas.show()
 
     def close(self):
-        """ Close viewer. """
+        """Close viewer. """
         if self == globals().get('viewer', None):
             globals().pop('viewer')
         self.canvas.close()
 
     def get_visuals(self, viewer):
-        """ Returns list of all 3D visuals on given viewer. """
+        """Return list of all 3D visuals on given viewer."""
         if isinstance(viewer, int):
             viewer = self.viewers[viewer]
 
         return [v for v in viewer.children[0].children if isinstance(v, vispy.scene.visuals.VisualNode)]
 
     def center_camera(self, viewer):
-        """ Center camera on visuals. """
+        """Center camera on visuals."""
         if isinstance(viewer, int):
             viewer = self.viewers[viewer]
 
@@ -277,7 +276,7 @@ class Browser:
 
 
 class Viewer:
-    """ Vispy 3D viewer.
+    """Vispy 3D viewer.
 
     Parameters
     ----------
@@ -496,7 +495,7 @@ class Viewer:
 
     @property
     def show_legend(self):
-        """ Set to ``True`` to hide neuron legend."""
+        """Set to ``True`` to hide neuron legend."""
         return self.__show_legend
 
     @show_legend.setter
@@ -511,7 +510,7 @@ class Viewer:
 
     @property
     def legend_font_size(self):
-        """ Change legend's font size."""
+        """Change legend's font size."""
         return self.__legend_font_size
 
     @legend_font_size.setter
@@ -522,7 +521,7 @@ class Viewer:
 
     @property
     def picking(self):
-        """ Set to ``True`` to allow picking."""
+        """Set to ``True`` to allow picking."""
         return self.__picking
 
     def _render_fb(self, crop=None):
@@ -543,7 +542,7 @@ class Viewer:
         return p
 
     def toggle_picking(self):
-        """ Toggle picking and overlay text."""
+        """Toggle picking and overlay text."""
         if self.picking:
             self.picking = False
             self._picking_text.visible = False
@@ -565,17 +564,17 @@ class Viewer:
 
     @property
     def visible(self):
-        """Return skeleton IDs of currently visible neurons."""
+        """List of skeleton IDs of currently visible neurons."""
         return [s for s in self.neurons if self.neurons[s][0].visible]
 
     @property
     def invisible(self):
-        """Return skeleton IDs of currently invisible neurons."""
+        """List of skeleton IDs of currently invisible neurons."""
         return [s for s in self.neurons if not self.neurons[s][0].visible]
 
     @property
     def selected(self):
-        """ Skeleton IDs of currently selected neurons. """
+        """Skeleton IDs of currently selected neurons."""
         return self.__selected
 
     @selected.setter
@@ -626,18 +625,18 @@ class Viewer:
 
     @property
     def visuals(self):
-        """ Returns list of all 3D visuals on this canvas. """
+        """List of all 3D visuals on this canvas."""
         return [v for v in self.view3d.children[0].children if isinstance(v, vispy.scene.visuals.VisualNode)]
 
     @property
     def neurons(self):
-        """ Returns visible and invisible neuron visuals currently on the
-        canvas.
+        """List of visible + invisible neuron visuals currently on the canvas.
 
         Returns
         -------
         dict
                     ``{skeleton_ID: [neurites, soma]}``
+
         """
         # Collect neuron objects
         neuron_obj = [c for c in self.visuals if 'neuron' in getattr(
@@ -651,7 +650,7 @@ class Viewer:
 
     @property
     def _neuron_obj(self):
-        """ Returns neurons by their object id. """
+        """Return neurons by their object id."""
         # Collect neuron objects
         neuron_obj = [c for c in self.visuals if 'neuron' in getattr(
             c, '_object_type', '')]
@@ -663,32 +662,35 @@ class Viewer:
         return {s: [ob for ob in neuron_obj if ob._object_id == s] for s in obj_ids}
 
     def clear_legend(self):
-        """ Clear legend. """
+        """Clear legend."""
         # Clear legend except for title
         for l in [l for l in self.overlay.children if isinstance(l, vispy.scene.visuals.Text) and l.name != 'permanent']:
             l.parent = None
 
     def clear(self):
-        """ Clear canvas. """
+        """Clear canvas."""
         for v in self.visuals:
             v.parent = None
 
         self.clear_legend()
 
+    def make_global(self):
+        """Make this the global viewer."""
+        globals()['viewer'] = self
+
     def remove(self, to_remove):
-        """ Remove given neurons/visuals from canvas.
-        """
+        """Remove given neurons/visuals from canvas."""
 
         if not isinstance(to_remove, vispy.scene.visuals.VisualNode):
             skids = utils.eval_skids(to_remove)
-            to_remove = [v for v in self.neurons[s] if s in self.neurons]
+            to_remove = [v for s in skids for v in self.neurons.get(s, [])]
 
         for v in to_remove:
             v.parent = None
 
     @block_canvas
     def update_legend(self):
-        """ Update legend. """
+        """Update legend."""
 
         # Get existing labels
         labels = {l._object_id: l for l in self.overlay.children if getattr(l, '_object_id', None)}
@@ -740,11 +742,11 @@ class Viewer:
             labels[s].font_size = self.legend_font_size
 
     def toggle_overlay(self):
-        """ Toggle legend on and off. """
+        """Toggle legend on and off."""
         self.overlay.visible = self.overlay.visible is False
 
     def center_camera(self):
-        """ Center camera on visuals. """
+        """Center camera on visuals."""
         if not self.visuals:
             return
 
@@ -757,7 +759,7 @@ class Viewer:
                                 (zbounds.min(), zbounds.max()))
 
     def add(self, x, center=True, clear=False, **kwargs):
-        """ Add objects to canvas.
+        """Add objects to canvas.
 
         Parameters
         ----------
@@ -774,8 +776,8 @@ class Viewer:
         Returns
         -------
         None
-        """
 
+        """
         (skids, skdata, dotprops, volumes,
          points, visuals) = utils._parse_objects(x)
 
@@ -815,17 +817,17 @@ class Viewer:
             self.update_legend()
 
     def show(self):
-        """ Show viewer. """
+        """Show viewer."""
         self.canvas.show()
 
     def close(self):
-        """ Close viewer. """
+        """Close viewer."""
         if self == globals().get('viewer', None):
             globals().pop('viewer')
         self.canvas.close()
 
     def hide_neurons(self, n):
-        """ Hide given neuron(s). """
+        """Hide given neuron(s)."""
         skids = utils.eval_skids(n)
 
         neurons = self.neurons
@@ -838,13 +840,14 @@ class Viewer:
         self.update_legend()
 
     def hide_selected(self):
-        """ Hide currently selected neuron(s). """
+        """Hide currently selected neuron(s)."""
         self.hide_neurons(self.selected)
 
     def unhide_neurons(self, n=None, check_alpha=False):
-        """ Unhide given neuron(s).
+        """Unhide given neuron(s).
 
         Use ``n`` to unhide specific neurons.
+
         """
         if not isinstance(n, type(None)):
             skids = utils.eval_skids(n)
@@ -868,7 +871,7 @@ class Viewer:
         self.active_neuron = []
 
     def toggle_neurons(self, n):
-        """ Toggle neuron(s) visibility. """
+        """Toggle neuron(s) visibility."""
 
         n = utils._make_iterable(n)
 
@@ -885,7 +888,7 @@ class Viewer:
         self.update_legend()
 
     def toggle_select(self, n):
-        """ Toggle selected of given neuron. """
+        """Toggle selected of given neuron."""
         skids = utils.eval_skids(n)
 
         neurons = self.neurons
@@ -905,7 +908,7 @@ class Viewer:
 
     @block_all
     def set_colors(self, c, include_connectors=False):
-        """ Set neuron color.
+        """Set neuron color.
 
         Parameters
         ----------
@@ -915,7 +918,6 @@ class Viewer:
                    2. Dictionary mapping skeleton IDs to colors.
 
         """
-
         if isinstance(c, (tuple, list, np.ndarray, str)):
             cmap = {s: c for s in self.neurons}
         elif isinstance(c, dict):
@@ -940,7 +942,7 @@ class Viewer:
 
     @block_all
     def set_alpha(self, a, include_connectors=True):
-        """ Set neuron color alphas.
+        """Set neuron color alphas.
 
         Parameters
         ----------
@@ -950,7 +952,6 @@ class Viewer:
                    2. Dictionary mapping skeleton IDs to alpha.
 
         """
-
         if isinstance(a, (tuple, list, np.ndarray, str)):
             amap = {s: a for s in self.neurons}
         elif isinstance(a, dict):
@@ -982,7 +983,7 @@ class Viewer:
             self.update_legend()
 
     def colorize(self, palette='hls', include_connectors=False):
-        """ Colorize neurons using a seaborn color palette."""
+        """Colorize neurons using a seaborn color palette."""
 
         colors = sns.color_palette(palette, len(self.neurons))
         cmap = {s: colors[i] for i, s in enumerate(self.neurons)}
@@ -990,7 +991,7 @@ class Viewer:
         self.set_colors(cmap, include_connectors=include_connectors)
 
     def _cycle_neurons(self, increment):
-        """ Cycle through neurons. """
+        """Cycle through neurons."""
         self._cycle_index += increment
 
         # If mode is 'hide' cycle over all neurons
@@ -1045,11 +1046,11 @@ class Viewer:
                                                    len(self.neurons))
 
     def _draw_fps(self, fps):
-        """ Callback for ``canvas.measure_fps``. """
+        """Callback for ``canvas.measure_fps``."""
         self._fps_text.text = '{:.2f} FPS'.format(fps)
 
     def _toggle_fps(self):
-        """ Switch FPS measurement on and off. """
+        """Switch FPS measurement on and off."""
         if not self._fps_text.visible:
             self.canvas.measure_fps(1, self._draw_fps)
             self._fps_text.visible = True
@@ -1058,7 +1059,7 @@ class Viewer:
             self._fps_text.visible = False
 
     def _snap_cursor(self, pos, visual, open_browser=False):
-        """ Snap cursor to clostest vertex of visual."""
+        """Snap cursor to clostest vertex of visual."""
         if not getattr(self, '_cursor', None):
             self._cursor = vispy.scene.visuals.Arrow(pos=np.array([(0, 0, 0), (1000, 0, 0)]),
                                                      color=(1, 0, 0, 1),
@@ -1107,7 +1108,7 @@ class Viewer:
             webbrowser.open_new_tab(url)
 
     def url_to_cursor(self, open_browser=False):
-        """ Open or return URL to current cursor position.
+        """Open or return URL to current cursor position.
 
         Parameters
         ----------
@@ -1118,8 +1119,8 @@ class Viewer:
         -------
         URL :           str
                         Only if open_browser is False.
-        """
 
+        """
         if isinstance(self.cursor_pos, type(None)):
             logger.info('Must place cursor first.')
             return
@@ -1134,7 +1135,7 @@ class Viewer:
 
     def screenshot(self, filename='screenshot.png', pixel_scale=2,
                    alpha=True, hide_overlay=True):
-        """ Save a screenshot of this viewer.
+        """Save a screenshot.
 
         Parameters
         ----------
@@ -1147,8 +1148,8 @@ class Viewer:
                         If True, will export transparent background.
         hide_overlay :  bool, optional
                         If True, will hide overlay for screenshot.
-        """
 
+        """
         if alpha:
             bgcolor = list(self.canvas.bgcolor.rgb) + [0]
         else:
@@ -1170,7 +1171,7 @@ class Viewer:
         im.save(filename)
 
     def visuals_at(self, pos):
-        """ Returns visuals at given canvas position. """
+        """Return visuals at given canvas position."""
         # There appears to be some odd offsets - perhaps because of the
         # window's top bar?
         pos = (pos[0] - self._rim_left, pos[1] - self._rim_top)
@@ -1204,14 +1205,14 @@ class Viewer:
         return [v for v in visuals if v is not None]
 
     def set_view(self, view):
-        """ Reset camera position.
+        """Reset camera position.
 
         Parameters
         ----------
         view :      "XY" | "XZ" | "YZ" |
                     Use e.g. "-XY" to invert rotation
-        """
 
+        """
         if isinstance(view, vispy.util.quaternion.Quaternion):
             q = view
         elif view == 'XY':
@@ -1234,7 +1235,7 @@ class Viewer:
         self.camera3d.set_range()
 
     def label_setup(self, labels):
-        """ Quickly label neurons.
+        """Quickly label neurons.
 
         Binds keys to labels. Pressing a label key will add this label
         as `.label` property to the neuron and cycle to the next neuron.
@@ -1257,8 +1258,8 @@ class Viewer:
         >>> # Now use keys "n" and "m" to assign labels
         >>> # Subset by applied labels
         >>> pns = nl.skid[v.labels['PN']]
-        """
 
+        """
         # TODO:
         # - Make sure to only cycle through non-labeled neurons
         # - Add labels to the actual neurons
@@ -1273,11 +1274,15 @@ class Viewer:
 
     @property
     def labels(self):
-        """ Manually assigned labels. See :func:`pymaid.Viewer.label_setup`."""
-        return {l : [n for n, k in self._labels.items() if k==l] for l in self._labelmap.values()}
+        """Manually assigned labels.
+
+        See :func:`pymaid.Viewer.label_setup`.
+
+        """
+        return {l: [n for n, k in self._labels.items() if k == l] for l in self._labelmap.values()}
 
     def _label(self, key):
-        """ Checks event key against annotations, adds annotation to neuron
+        """Check event key against annotations, adds annotation to neuron
         and cycles to the next neuron.
         """
         if self.label_mode:
@@ -1288,7 +1293,7 @@ class Viewer:
 
 
 def on_mouse_press(event):
-    """ Manage picking on canvas. """
+    """Manage picking on canvas."""
     canvas = event.source
     viewer = canvas._wrapper
 
@@ -1322,8 +1327,9 @@ def on_mouse_press(event):
                                 open_browser='Shift' in modifiers)
             break
         # If shift modifier, add to/remove from current selection
-        elif isinstance(v, vispy.scene.visuals.VisualNode) and \
-             getattr(v, '_skeleton_id', None) and 'Shift' in modifiers:
+        elif isinstance(v, vispy.scene.visuals.VisualNode) \
+             and getattr(v, '_skeleton_id', None) \
+             and 'Shift' in modifiers:
             if v._skeleton_id not in set(viewer.selected):
                 viewer.selected = np.append(viewer.selected, v._skeleton_id)
             else:
@@ -1333,7 +1339,7 @@ def on_mouse_press(event):
 
 
 def on_key_press(event):
-    """ Manage keyboard shortcuts for canvas. """
+    """Manage keyboard shortcuts for canvas."""
 
     canvas = event.source
     viewer = canvas._wrapper
@@ -1372,7 +1378,7 @@ def on_key_press(event):
 
 
 def on_resize(event):
-    """ Keep overlay in place upon resize. """    
+    """Keep overlay in place upon resize."""
     viewer = event.source._wrapper
     viewer._shortcuts.pos = (10, event.size[1])
     viewer._picking_text.pos = (10, event.size[1] - 10)

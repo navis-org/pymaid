@@ -41,7 +41,7 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
-    """ Calculates confidence for each treenode.
+    """Calculate along-the-arbor confidence for each treenode.
 
     Calculates confidence for each treenode by walking from root to leafs
     starting with a confidence of 1. Each time a low confidence edge is
@@ -63,7 +63,6 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
     Adds ``arbor_confidence`` column in ``neuron.nodes``.
 
     """
-
     def walk_to_leafs(this_node, this_confidence=1):
         pbar.update(1)
         while True:
@@ -84,8 +83,9 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
 
     if isinstance(x, core.CatmaidNeuronList):
         if not inplace:
-            res = [arbor_confidence(
-                n, confidence=confidence, inplace=inplace) for n in x]
+            res = [arbor_confidence(n,
+                                    confidences=confidences,
+                                    inplace=inplace) for n in x]
         else:
             return core.CatmaidNeuronList([arbor_confidence(n, confidence=confidence, inplace=inplace) for n in x])
 
@@ -115,7 +115,7 @@ def _calc_dist(v1, v2):
 
 
 def _parent_dist(x, root_dist=None):
-    """ Adds ``parent_dist`` [nm] column to the treenode table.
+    """Add ``parent_dist`` [nm] column to the treenode table.
 
     Parameters
     ----------
@@ -127,8 +127,8 @@ def _parent_dist(x, root_dist=None):
     Returns
     -------
     Nothing
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuron):
         nodes = x.nodes
     elif isinstance(x, pd.DataFrame):
@@ -155,7 +155,7 @@ def _parent_dist(x, root_dist=None):
 
 
 def calc_cable(skdata, remote_instance=None, return_skdata=False):
-    """ Calculates cable length in micrometer (um).
+    """Calculate cable length in micrometer (um).
 
     Parameters
     ----------
@@ -178,10 +178,10 @@ def calc_cable(skdata, remote_instance=None, return_skdata=False):
 
     See Also
     --------
-    ``pymaid.CatmaidNeuron.cable_length``
+    :func:`~pymaid.CatmaidNeuron.cable_length`
                 Use this attribute to get the cable length of given neuron.
                 Also works with ``CatmaidNeuronList``.
-    ``pymaid.smooth_neuron``
+    :func:`~pymaid.smooth_neuron`
                 Use this function to smooth the neuron before calculating
                 cable.
 
@@ -266,7 +266,7 @@ def to_dotprops(x):
 
     See Also
     --------
-    pymaid.CatmaidNeuron.dps
+    ``pymaid.CatmaidNeuron.dps``
                 Shorthand to the dotprops representation of neuron.
 
     """
@@ -301,7 +301,7 @@ def to_dotprops(x):
 
 def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
                    min_twig_size=None):
-    """ Calculates Strahler Index (SI).
+    """Calculate Strahler Index (SI).
 
     Starts with SI of 1 at each leaf and walks to root. At forks with different
     incoming SIs, the highest index is continued. At forks with the same
@@ -496,8 +496,9 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
 
 def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
                       force_strahler_update=False, relocate_connectors=False):
-    """ Prune neuron based on `Strahler order
-    <https://en.wikipedia.org/wiki/Strahler_number>`_.
+    """Prune neuron based on Strahler Order.
+
+    See `here<https://en.wikipedia.org/wiki/Strahler_number>`_ for explanation.
 
     Parameters
     ----------
@@ -608,7 +609,7 @@ def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
 
 def split_axon_dendrite(x, method='bending', primary_neurite=True,
                         reroot_soma=True, return_point=False):
-    """ Split a neuron into axon, dendrite and primary neurite.
+    """Split a neuron into axon, dendrite and primary neurite.
 
     The result is highly dependent on the method and on your neuron's
     morphology and works best for "typical" neurons, i.e. those where the
@@ -658,7 +659,6 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True,
     >>> split.plot3d(color=split.color)
 
     """
-
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
     elif isinstance(x, core.CatmaidNeuronList):
@@ -826,8 +826,8 @@ def segregation_index(x, centrality_method='centrifugal'):
 
     if not isinstance(x, core.CatmaidNeuronList):
         # Get the branch point with highest flow centrality
-        split_point = split_axon_dendrite(
-            x, reroot_soma=True, return_point=True)
+        split_point = split_axon_dendrite(x,
+                                          reroot_soma=True, return_point=True)
 
         # Now make a virtual split (downsampled neuron to speed things up)
         temp = x.copy()
@@ -909,14 +909,13 @@ def bending_flow(x, polypre=False):
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
-                         'not {0}'.format(type(x)))
+                         'got "{}"'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
         return [bending_flow(n, mode=mode, polypre=polypre, ) for n in x]
 
     if x.soma and x.soma not in x.root:
-        logger.warning(
-            'Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
+        logger.warning('Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
 
     # We will be processing a super downsampled version of the neuron to speed
     # up calculations
@@ -1046,15 +1045,14 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
         raise ValueError('Unknown parameter for mode: {0}'.format(mode))
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise ValueError('Must pass CatmaidNeuron or CatmaidNeuronList, '
-                         'not {0}'.format(type(x)))
+        raise ValueError('Expected pass CatmaidNeuron or CatmaidNeuronList, '
+                         'got "{}"'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
         return [flow_centrality(n, mode=mode, polypre=polypre) for n in x]
 
     if x.soma and x.soma not in x.root:
-        logger.warning(
-            'Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
+        logger.warning('Neuron {} is not rooted to its soma!'.format(x.skeleton_id))
 
     # We will be processing a super downsampled version of the neuron to
     # speed up calculations
@@ -2500,7 +2498,6 @@ def break_fragments(x):
     if not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Expected CatmaidNeuron/List, got "{}"'.format(type(x)))
 
-
     # Don't do anything if not actually fragmented
     if x.n_skeletons > 1:
         # Get connected components
@@ -2585,8 +2582,8 @@ def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
         if not inplace:
             return healed
         else:
-            x.nodes = healed.nodes #update nodes
-            x.tags = healed.tags #update tags
+            x.nodes = healed.nodes  # update nodes
+            x.tags = healed.tags  # update tags
             x._clear_temp_attr()
     elif not inplace:
         return x
@@ -2640,7 +2637,7 @@ def _diff_report(a, b):
     return report
 
 
-def prune_twigs(x, size, inplace = False, recursive = False):
+def prune_twigs(x, size, inplace=False, recursive=False):
     """Prune terminal twigs under a given size.
 
     Parameters

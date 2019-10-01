@@ -39,8 +39,8 @@ __all__ = sorted(['network2nx', 'network2igraph', 'neuron2igraph',
                   'neuron2nx', 'neuron2KDTree'])
 
 
-def network2nx(x, remote_instance=None, threshold=1, group_by=None):
-    """ Generates NetworkX graph for neuron connectivity.
+def network2nx(x, threshold=1, group_by=None, remote_instance=None):
+    """Generate NetworkX graph for neuron connectivity.
 
     Parameters
     ----------
@@ -52,15 +52,14 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
                          4. CatmaidNeuronList object
                          5. Adjacency matrix (pd.DataFrame, rows=sources,
                             columns=targets)
-    remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define globally
-                        as ``remote_instance``.
     threshold :         int, optional
                         Connections weaker than this will be excluded. Must
                         not be < 1!
     group_by :          None | dict, optional
                         Provide a dictionary ``{group_name: [skid1, skid2, ...]}``
                         to collapse sets of nodes into groups.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
 
     Returns
     -------
@@ -137,8 +136,8 @@ def network2nx(x, remote_instance=None, threshold=1, group_by=None):
     return g
 
 
-def network2igraph(x, remote_instance=None, threshold=1):
-    """ Generates iGraph graph for neuron connectivity.
+def network2igraph(x, threshold=1, remote_instance=None):
+    """Generate iGraph graph for neuron connectivity.
 
     Requires iGraph to be installed.
 
@@ -152,12 +151,12 @@ def network2igraph(x, remote_instance=None, threshold=1):
                          4. CatmaidNeuronList object
                          5. Adjacency matrix (pd.DataFrame, rows=sources,
                             columns=targets)
-    remote_instance :   CATMAID instance, optional
-                        Either pass directly to function or define globally
-                        as 'remote_instance'.
     threshold :         int, optional
                         Connections weaker than this will be excluded. Must
                         not be < 1!
+    remote_instance :   CATMAID instance, optional
+                        Either pass directly to function or define globally
+                        as 'remote_instance'.
 
     Returns
     -------
@@ -226,7 +225,7 @@ def network2igraph(x, remote_instance=None, threshold=1):
 
 
 def neuron2nx(x):
-    """ Turn CatmaidNeuron into an NetworkX DiGraph.
+    """Turn CatmaidNeuron into an NetworkX DiGraph.
 
     Parameters
     ----------
@@ -239,7 +238,6 @@ def neuron2nx(x):
                 if x is multiple neurons.
 
     """
-
     if isinstance(x, (pd.DataFrame, core.CatmaidNeuronList)):
         return [neuron2nx(x.loc[i]) for i in range(x.shape[0])]
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
@@ -253,8 +251,8 @@ def neuron2nx(x):
     edges = x.nodes[~x.nodes.parent_id.isnull(
     )][['treenode_id', 'parent_id']].values
     # Collect weight
-    weights = np.sqrt(np.sum((nodes.loc[edges[:, 0], ['x', 'y', 'z']].values.astype(int)
-                              - nodes.loc[edges[:, 1], ['x', 'y', 'z']].values.astype(int)) ** 2, axis=1))
+    weights = np.sqrt(np.sum((nodes.loc[edges[:, 0], ['x', 'y', 'z']].values.astype(int) -
+                              nodes.loc[edges[:, 1], ['x', 'y', 'z']].values.astype(int)) ** 2, axis=1))
     # Generate weight dictionary
     edge_dict = np.array([{'weight': w} for w in weights])
     # Add weights to dictionary
@@ -270,7 +268,7 @@ def neuron2nx(x):
 
 
 def neuron2igraph(x):
-    """ Turns CatmaidNeuron(s) into an iGraph graph.
+    """Turn CatmaidNeuron(s) into an iGraph graph.
 
     Requires iGraph to be installed.
 
@@ -334,14 +332,14 @@ def neuron2igraph(x):
 
 
 def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
-    """ Generate neuron object from NetworkX Graph.
+    """Generate neuron object from NetworkX Graph.
 
     This function will try to generate a neuron-like tree structure from
     the Graph. Therefore the graph may not contain loops!
 
     Treenode attributes (``x``, ``y``, ``z``, ``radius``, ``confidence``) need
-    to be properties of the graph's nodes. All node property will be added to
-    the neuron's ``.nodes`` table.
+    to be properties of the graph's nodes. All node properties will be added
+    to the neuron's ``.nodes`` table.
 
     Parameters
     ----------
@@ -356,14 +354,14 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
 
     Returns
     -------
-    core.CatmaidNeuron
+    pymaid.CatmaidNeuron
 
     See Also
     --------
     pymaid.graph.nx2neuron
                 Base function with more parameters.
-    """
 
+    """
     # First some sanity checks
     if not isinstance(g, nx.Graph):
         raise TypeError('g must be NetworkX Graph, not "{}"'.format(type(g)))
@@ -434,11 +432,12 @@ def nx2neuron(g, neuron_name=None, skeleton_id=None, root=None):
 
 
 def _find_all_paths(g, start, end, mode='OUT', maxlen=None):
-    """ Find all paths between two vertices in an iGraph object. For some reason
-    this function exists in R iGraph but not Python iGraph. This is rather slow
-    and should not be used for large graphs.
-    """
+    """Find all paths between two vertices in an iGraph object.
 
+    For some reason this function exists in R iGraph but not Python iGraph.
+    This is rather slow and should not be used for large graphs.
+
+    """
     def find_all_paths_aux(adjlist, start, end, path, maxlen=None):
         path = path + [start]
         if start == end:
@@ -462,7 +461,7 @@ def _find_all_paths(g, start, end, mode='OUT', maxlen=None):
 
 
 def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
-    """ Turns a neuron into scipy KDTree.
+    """Turn neuron into scipy KDTree.
 
     Parameters
     ----------
@@ -483,7 +482,6 @@ def neuron2KDTree(x, tree_type='c', data='treenodes', **kwargs):
     ``scipy.spatial.cKDTree`` or ``scipy.spatial.KDTree``
 
     """
-
     # Rarely used, so import in function
     import scipy.spatial
 

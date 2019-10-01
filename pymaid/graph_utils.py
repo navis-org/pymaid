@@ -18,7 +18,6 @@
 representations.
 """
 
-import itertools
 import numbers
 import warnings
 
@@ -42,7 +41,7 @@ __all__ = sorted(['classify_nodes', 'cut_neuron', 'longest_neurite',
 
 
 def _generate_segments(x, weight=None):
-    """ Generate segments maximizing segment lengths.
+    """Generate segments maximizing segment lengths.
 
     Parameters
     ----------
@@ -58,7 +57,6 @@ def _generate_segments(x, weight=None):
                 Segments as list of lists containing treenode ids. List is
                 sorted by segment lengths.
     """
-
     if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
         return [_generate_segments(x.loc[i],
                                    weight=weight) for i in range(x.shape[0])]
@@ -128,7 +126,7 @@ def _generate_segments(x, weight=None):
 
 
 def _break_segments(x):
-    """ Break neuron into small segments connecting ends, branches and root.
+    """Break neuron into small segments connecting ends, branches and root.
 
     Parameters
     ----------
@@ -141,7 +139,6 @@ def _break_segments(x):
                 Segments as list of lists containing treenode IDs.
 
     """
-
     if isinstance(x, pd.DataFrame) or isinstance(x, core.CatmaidNeuronList):
         return [_break_segments(x.loc[i]) for i in range(x.shape[0])]
     elif isinstance(x, core.CatmaidNeuron):
@@ -194,8 +191,10 @@ def _break_segments(x):
 
 
 def _edge_count_to_root(x):
-    """ Return a map of nodeID vs number of edges from the first node that
-    lacks successors (aka the root).
+    """Return a map of nodeID vs number of edges.
+
+    Starts from the first node that lacks successors (aka the root).
+
     """
     if x.igraph and config.use_igraph:
         g = x.igraph
@@ -225,8 +224,7 @@ def _edge_count_to_root(x):
 
 
 def classify_nodes(x, inplace=True):
-    """ Classifies neuron's treenodes into end nodes, branches, slabs
-    or root.
+    """Classify neuron's treenodes into end nodes, branches, slabs or root.
 
     Adds ``'type'`` column to ``x.nodes``.
 
@@ -244,7 +242,6 @@ def classify_nodes(x, inplace=True):
                 Copy of original neuron. Only if ``inplace=False``.
 
     """
-
     if not inplace:
         x = x.copy()
 
@@ -255,7 +252,7 @@ def classify_nodes(x, inplace=True):
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
         # Make sure there are nodes to classify
         if x.nodes.shape[0] != 0:
-            if x.igraph and config.use_igraph:
+            if config.use_igraph and x.igraph:
                 # Get graph representation of neuron
                 vs = x.igraph.vs
                 # Get branch/end nodes based on their degree of connectivity
@@ -288,7 +285,7 @@ def classify_nodes(x, inplace=True):
 
 
 def distal_to(x, a=None, b=None):
-    """ Checks if nodes A are distal to nodes B.
+    """Check if nodes A are distal to nodes B.
 
     Important
     ---------
@@ -327,7 +324,6 @@ def distal_to(x, a=None, b=None):
     >>> df[ df[a] ].index.values
 
     """
-
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
 
@@ -399,8 +395,7 @@ def distal_to(x, a=None, b=None):
 
 
 def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
-    """ Generates geodesic ("along-the-arbor") distance matrix for treenodes
-    of given neuron.
+    """Generates geodesic ("along-the-arbor") distance matrix for treenodes.
 
     Parameters
     ----------
@@ -427,8 +422,8 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
         Check if a node A is distal to node B.
     :func:`~pymaid.dist_between`
         Get point-to-point geodesic distances.
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuronList):
         if len(x) == 1:
             x = x[0]
@@ -468,7 +463,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
 
 
 def dist_between(x, a, b):
-    """ Returns the geodesic distance between treenodes in nanometers.
+    """Return the geodesic distance between treenodes in nanometers.
 
     Parameters
     ----------
@@ -490,7 +485,6 @@ def dist_between(x, a, b):
         Get all-by-all geodesic distance matrix.
 
     """
-
     if isinstance(x, core.CatmaidNeuronList):
         if len(x) == 1:
             x = x[0]
@@ -538,7 +532,7 @@ def dist_between(x, a, b):
 
 
 def find_main_branchpoint(x, reroot_to_soma=False):
-    """ Returns the branch point at which the two largest branches converge.
+    """Return the branch point at which the two largest branches converge.
 
     Parameters
     ----------
@@ -552,7 +546,6 @@ def find_main_branchpoint(x, reroot_to_soma=False):
     treenode ID
 
     """
-
     # Make a copy
     x = x.copy()
 
@@ -582,7 +575,7 @@ def find_main_branchpoint(x, reroot_to_soma=False):
 
 
 def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
-    """ Splits neuron into fragments.
+    """Split neuron into fragments.
 
     Cuts are based on longest neurites: the first cut is made where the second
     largest neurite merges onto the largest neurite, the second cut is made
@@ -622,7 +615,6 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
                         branch points.
 
     """
-
     if isinstance(x, core.CatmaidNeuron):
         pass
     elif isinstance(x, core.CatmaidNeuronList):
@@ -696,8 +688,7 @@ def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
 
 
 def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
-    """ Returns a neuron consisting of only the longest neurite(s) based on
-    geodesic distance.
+    """Extract longest neurite(s) based on geodesic distance.
 
     Parameters
     ----------
@@ -725,7 +716,6 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
             Split neuron into fragments based on longest neurites.
 
     """
-
     if isinstance(x, core.CatmaidNeuron):
         pass
     elif isinstance(x, core.CatmaidNeuronList):
@@ -762,7 +752,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
 
 
 def reroot_neuron(x, new_root, inplace=False):
-    """ Reroot neuron to new root.
+    """Reroot neuron to new root.
 
     Parameters
     ----------
@@ -791,7 +781,6 @@ def reroot_neuron(x, new_root, inplace=False):
     >>> n2 = pymaid.reroot_neuron(n, n.soma)
 
     """
-
     if new_root is None:
         raise ValueError('New root can not be <None>')
 
@@ -916,7 +905,7 @@ def reroot_neuron(x, new_root, inplace=False):
     else:
         x.nodes.loc[path[-1], 'type'] = 'end'
     # Give the new root node type "root"
-    x.nodes.loc[path[0], 'type'] = 'root' 
+    x.nodes.loc[path[0], 'type'] = 'root'
     x.nodes.reset_index(drop=False, inplace=True)
 
     # Set new root's parent to None
@@ -935,7 +924,7 @@ def reroot_neuron(x, new_root, inplace=False):
 
 
 def cut_neuron(x, cut_node, ret='both'):
-    """ Split neuron at given point and returns two new neurons.
+    """Split neuron at given point and returns two new neurons.
 
     Split is performed between cut node and its parent node. However, cut node
     will still be present in both resulting neurons.
@@ -1070,7 +1059,7 @@ def cut_neuron(x, cut_node, ret='both'):
 
 
 def _cut_igraph(x, cut_node, ret):
-    """Uses iGraph to cut a neuron."""
+    """Use iGraph to cut a neuron."""
     # Make a copy
     g = x.igraph.copy()
 
@@ -1126,7 +1115,7 @@ def _cut_igraph(x, cut_node, ret):
 
 
 def _cut_networkx(x, cut_node, ret):
-    """Uses networkX graph to cut a neuron."""
+    """Use networkX graph to cut a neuron."""
 
     # Get subgraphs consisting of nodes distal to cut node
     dist_graph = nx.bfs_tree(x.graph, cut_node, reverse=True)
@@ -1182,7 +1171,7 @@ def _cut_networkx(x, cut_node, ret):
 
 def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
                   prevent_fragments=False, inplace=False):
-    """ Subsets a neuron to a set of treenodes.
+    """Subset a neuron to a set of treenodes.
 
     Parameters
     ----------
@@ -1300,7 +1289,7 @@ def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
 
 
 def generate_list_of_childs(x):
-    """ Returns list of childs.
+    """Generate parent->childs dictionary.
 
     Parameters
     ----------
@@ -1313,13 +1302,13 @@ def generate_list_of_childs(x):
         ``{treenode_id: [child_treenode, child_treenode, ...]}``
 
     """
-
     return {n: [e[0] for e in x.graph.in_edges(n)] for n in x.graph.nodes}
 
 
 def node_label_sorting(x):
-    """ Returns treenodes ordered by node label sorting according to Cuntz
-    et al., PLoS Computational Biology (2010).
+    """Order treenodes by node label
+
+    According to Cuntz et al., PLoS Computational Biology (2010).
 
     Parameters
     ----------
@@ -1391,7 +1380,7 @@ def _igraph_to_sparse(graph, weight_attr=None):
 
 
 def connected_subgraph(x, ss):
-    """ Returns set of nodes necessary to connect all nodes in subset ``ss``.
+    """Calculate set of nodes necessary to connect all nodes in subset ``ss``.
 
     Parameters
     ----------
@@ -1470,7 +1459,7 @@ def connected_subgraph(x, ss):
 
 
 def segment_length(x, segment):
-    """ Get length of a linear segment.
+    """Get length of a linear segment.
 
     This function is superfast but has no checks - you must provide a
     valid segment.

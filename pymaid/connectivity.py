@@ -127,7 +127,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
         if not x[x.relation == 'downstream'].empty:
             downstream = fetch.get_connectors_between(neurons,
-                                                      x[x.relation =='downstream'].skeleton_id,
+                                                      x[x.relation == 'downstream'].skeleton_id,
                                                       directional=True,
                                                       remote_instance=remote_instance)
             # Now filter connectors
@@ -242,7 +242,7 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 
 
 def cable_overlap(a, b, dist=2, method='min'):
-    """ Calculates the amount of cable of neuron A within distance of neuron B.
+    """Calculate the amount of cable of neuron A within distance of neuron B.
 
     Uses dotproduct representation of a neuron!
 
@@ -273,7 +273,6 @@ def cable_overlap(a, b, dist=2, method='min'):
                 ...
 
     """
-
     # Convert distance to nm
     dist *= 1000
 
@@ -353,7 +352,7 @@ def cable_overlap(a, b, dist=2, method='min'):
 
 def predict_connectivity(source, target, method='possible_contacts',
                          remote_instance=None, **kwargs):
-    """ Calculates potential synapses from source onto target neurons.
+    """Calculate potential synapses from source onto target neurons.
 
     Based on a concept by `Alexander Bates <https://github.com/alexanderbates/catnat>`_.
 
@@ -397,7 +396,6 @@ def predict_connectivity(source, target, method='possible_contacts',
                 ...
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not remote_instance:
@@ -490,7 +488,7 @@ def predict_connectivity(source, target, method='possible_contacts',
 
 
 def cn_table_from_connectors(x, remote_instance=None):
-    """ Generate connectivity table from neurons' connectors.
+    """Generate connectivity table from neurons' connectors.
 
     This function creates the connectivity table from scratch using just the
     neurons' connectors. This function is able to deal with non-unique
@@ -542,7 +540,6 @@ def cn_table_from_connectors(x, remote_instance=None):
     >>> cn_table.head()
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
@@ -653,7 +650,7 @@ def cn_table_from_connectors(x, remote_instance=None):
 
 
 def adjacency_from_connectors(source, target=None, remote_instance=None):
-    """ Regenerates adjacency matrices from neurons' connectors.
+    """Regenerate adjacency matrices from neurons' connectors.
 
     Notes
     -----
@@ -704,7 +701,6 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
     >>> adj.head()
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if not isinstance(source, (core.CatmaidNeuron, core.CatmaidNeuronList)):
@@ -762,7 +758,7 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
 
 def _edges_from_connectors(a, b=None, remote_instance=None):
-    """ Generates list of edges between two sets of neurons from their
+    """Generate list of edges between two sets of neurons from their
     connector data.
 
     Attention: this is UNIDIRECTIONAL (a->b)!
@@ -772,8 +768,8 @@ def _edges_from_connectors(a, b=None, remote_instance=None):
     a,b :       CatmaidNeuron | CatmaidNeuronList | skeleton IDs
                 Either a or b HAS to be a neuron object.
                 If ``b=None``, will use ``b=a``.
-    """
 
+    """
     if not isinstance(a, (core.CatmaidNeuronList, core.CatmaidNeuron)) and \
        not isinstance(b, (core.CatmaidNeuronList, core.CatmaidNeuron)):
         raise ValueError('Either neuron a or b has to be a neuron object.')
@@ -918,7 +914,6 @@ def adjacency_matrix(sources, targets=None, source_grp={}, target_grp={},
     >>> adj = pymaid.adjacency_matrix(neurons, fractions=True)
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     source_skids = utils.eval_skids(sources, remote_instance=remote_instance)
@@ -1033,7 +1028,7 @@ def adjacency_matrix(sources, targets=None, source_grp={}, target_grp={},
 
 def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
                  method='SUM', remote_instance=None):
-    """ Groups adjacency matrix into neuron groups.
+    """Groups adjacency matrix into neuron groups.
 
     Parameters
     ----------
@@ -1058,8 +1053,8 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
     Returns
     -------
     pandas.DataFrame
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance,
                                                   raise_error=False)
 
@@ -1144,7 +1139,7 @@ def group_matrix(mat, row_groups={}, col_groups={}, drop_ungrouped=False,
 
 def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
                        remote_instance=None):
-    """ Calculate connection density.
+    """Calculate connection density.
 
     Given source neuron(s) ``s`` and a target neuron ``t``, calculate the
     local density of connections as function of the geodesic distance between
@@ -1183,8 +1178,8 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
     connection density : float
                          Will return ``None`` if no connections or if only a
                          single connection between source and target.
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     source_skid = utils.eval_skids(s, remote_instance=remote_instance)
@@ -1265,7 +1260,7 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
 
 
 def sparseness(x, which='LTS'):
-    """ Calculate sparseness.
+    """Calculate sparseness.
 
     Sparseness comes in two flavors:
 
@@ -1332,7 +1327,6 @@ def sparseness(x, which='LTS'):
     >>> plt.show()
 
     """
-
     if not isinstance(x, (pd.DataFrame, np.ndarray)):
         x = np.array(x)
 
@@ -1345,14 +1339,14 @@ def sparseness(x, which='LTS'):
     if which == 'LTK':
         return np.nansum(((x - np.nanmean(x, axis=0)) / np.nanstd(x, axis=0)) ** 4, axis=0) / N - 3
     elif which == 'LTS':
-        return 1 / (1 - (1 / N)) * (1 - np.nansum(x/N, axis=0) ** 2 / np.nansum(x ** 2 / N, axis=0))
+        return 1 / (1 - (1 / N)) * (1 - np.nansum(x / N, axis=0) ** 2 / np.nansum(x ** 2 / N, axis=0))
     else:
         raise ValueError('Parameter "which" must be either "LTS" or "LTK"')
 
 
 def shared_partners(a, b, upstream=True, downstream=True, syn_threshold=None,
                     restrict_to=None, remote_instance=None):
-    """ Returns shared partners of neuron(s) A and B.
+    """Return shared partners between neuron(s) A and B.
 
     Parameters
     ----------
@@ -1379,7 +1373,6 @@ def shared_partners(a, b, upstream=True, downstream=True, syn_threshold=None,
                              2
 
     """
-
     if isinstance(a, core.CatmaidNeuron):
         a = core.CatmaidNeuronList(a)
     elif not isinstance(a, core.CatmaidNeuronList):

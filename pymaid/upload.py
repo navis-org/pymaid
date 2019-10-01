@@ -29,9 +29,7 @@ import pandas as pd
 import requests
 import seaborn as sns
 
-
 from scipy.spatial.distance import cdist
-from tqdm import tqdm
 
 from . import core, utils, morpho, config, cache, fetch, scene3d, graph_utils
 
@@ -450,7 +448,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
     for v, n, t in zip([source_id, source_url, source_project_id],
                        ['source_id', 'source_url', 'source_project_id'],
-                       [(int, np.integer), str,  (int, np.integer)]):
+                       [(int, np.integer), str, (int, np.integer)]):
         if not isinstance(v, (type(None), t)):
             raise TypeError('{} must be None or {}, got {}'.format(n, t, type(v)))
 
@@ -785,7 +783,7 @@ def replace_skeleton(x, skeleton_id=None, force_mapping=False,
                         Neuron to update.
     skeleton_id :       int, optional
                         ID of skeleton to update. If not provided will use
-                        `.skeleton_id` property of input neuron.
+                        ``.skeleton_id`` property of input neuron.
     force_mapping :     bool, optional
                         If True, will always re-connect connectors and map tags
                         onto the closest node in new skeleton regardless of
@@ -1610,7 +1608,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
 @cache.never_cache
 def add_treenode(coords, parent_id=None, radius=-1, confidence=5,
                  remote_instance=None):
-    """Create single(!) treenode at given location.
+    """Create single (!) treenode at given location.
 
     Parameters
     ----------
@@ -1925,10 +1923,10 @@ def push_new_root(new_root, no_prompt=False, remote_instance=None):
         return {r: push_new_root(r,
                                  no_prompt=no_prompt,
                                  remote_instance=remote_instance)
-                                 for r in config.tqdm(new_root,
-                                                      desc='Rerooting',
-                                                      disable=config.pbar_hide,
-                                                      leave=config.pbar_leave)}
+                for r in config.tqdm(new_root,
+                                     desc='Rerooting',
+                                     disable=config.pbar_hide,
+                                     leave=config.pbar_leave)}
 
     try:
         new_root = int(new_root)
@@ -1949,12 +1947,12 @@ def push_new_root(new_root, no_prompt=False, remote_instance=None):
     loc = fetch.get_node_location(new_root,
                                   remote_instance=remote_instance)
     n = loc.iloc[0]
-    params = {'left':   n.x-2500,
-              'right':  n.x+2500,
-              'top':    n.y-2500,
-              'bottom': n.y+2500,
+    params = {'left':   n.x - 2500,
+              'right':  n.x + 2500,
+              'top':    n.y - 2500,
+              'bottom': n.y + 2500,
               'z1':     n.z,
-              'z2':     n.z+40,
+              'z2':     n.z + 40,
               'treenode_ids[0]': int(n.node_id)}
     url = remote_instance._get_node_list_url(**params)
 
@@ -2073,12 +2071,12 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
     # For each node query a window to get its state
     urls = []
     for n in node_locs.itertuples():
-        params = {'left':   n.x-2500,
-                  'right':  n.x+2500,
-                  'top':    n.y-2500,
-                  'bottom': n.y+2500,
+        params = {'left':   n.x - 2500,
+                  'right':  n.x + 2500,
+                  'top':    n.y - 2500,
+                  'bottom': n.y + 2500,
                   'z1':     n.z,
-                  'z2':     n.z+40}
+                  'z2':     n.z + 40}
         if 'treenode' in node_type.lower():
             params['treenode_ids[0]'] = int(n.node_id)
         elif 'connector' in node_type.lower():
@@ -2137,11 +2135,11 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
         post = [{'connector_id': n,
                  'state': json.dumps({'edition_time': dt.fromtimestamp(st[-3],
                                                                        tz=timezone.utc).isoformat(),
-                                      'c_links':      [[l[-1],
-                                                      dt.fromtimestamp(l[-2],
-                                                                       tz=timezone.utc).isoformat()
-                                                        ]
-                                                       for l in st[-1]]})}
+                                      'c_links': [[l[-1],
+                                                   dt.fromtimestamp(l[-2],
+                                                                    tz=timezone.utc).isoformat()
+                                                  ]
+                                                  for l in st[-1]]})}
                  for n, st in zip(node_ids, states)]
 
         urls = [remote_instance._delete_connector_url()] * len(post)
@@ -2296,7 +2294,7 @@ def delete_tags(node_list, tags, node_type, remote_instance=None):
     See Also
     --------
     :func:`~pymaid.add_tags`
-            Function to add tags to nodes.
+                        Function to add tags to nodes.
 
     Examples
     --------
@@ -2591,7 +2589,6 @@ def add_annotations(x, annotations, remote_instance=None):
                         Delete given annotations from neurons.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)

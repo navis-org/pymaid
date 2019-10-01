@@ -33,7 +33,7 @@ __all__ = sorted(['downsample_neuron', 'resample_neuron'])
 
 def resample_neuron(x, resample_to, method='linear', inplace=False,
                     skip_errors=True):
-    """ Resamples neuron(s) to given NM resolution.
+    """Resample neuron(s) to given resolution [nm].
 
     Preserves root, leafs, branchpoints. Tags and connectors are mapped onto
     the closest new treenode. Columns "confidence" and "creator" of the
@@ -44,14 +44,14 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     This generates an entirely new set of treenode IDs! Those will be unique
     within a neuron, but you may encounter duplicates across neurons.
 
-    Also: be aware that high-resolution neurons will use A LOT of memory.
+    Also: be aware that high-resolution neurons will use a LOT of memory.
 
     Parameters
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
                         Neuron(s) to resample.
     resample_to :       int
-                        New resolution in NANOMETERS.
+                        New resolution in nanometers.
     method :            str, optional
                         See ``scipy.interpolate.interp1d`` for possible
                         options. By default, we're using linear interpolation.
@@ -61,7 +61,6 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
     skip_errors :       bool, optional
                         If True, will skip errors during interpolation and
                         only print summary.
-
 
     Returns
     -------
@@ -75,8 +74,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
                         resample to certain resolution. Useful if you are
                         just after some simplification e.g. for speeding up
                         your calculations or you want to preserve treenode IDs.
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuronList):
         results = [resample_neuron(x[i], resample_to,
                                    method=method, inplace=inplace,
@@ -163,8 +162,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
         new_coords = np.array([xnew, ynew, znew]).T.round()
 
         # Generate new ids (start and end node IDs of this segment)
-        new_ids = seg[:1] + [max_tn_id +
-                             i for i in range(len(new_coords) - 2)] + seg[-1:]
+        new_ids = seg[:1] + [max_tn_id
+                             + i for i in range(len(new_coords) - 2)] + seg[-1:]
 
         # Keep track of new nodes
         new_nodes += [[tn, pn, None, co[0], co[1], co[2], -1, 5]
@@ -248,8 +247,8 @@ def resample_neuron(x, resample_to, method='linear', inplace=False,
 
 
 def downsample_neuron(x, resampling_factor, preserve_cn_treenodes=True,
-                      preserve_tag_treenodes=False, inplace=False,):
-    """ Downsamples neuron(s) by a given factor.
+                      preserve_tag_treenodes=False, inplace=False):
+    """Downsample neuron(s) by a given factor.
 
     Preserves root, leafs, branchpoints by default. Preservation of treenodes
     with synapses can be toggled.
@@ -383,8 +382,8 @@ def downsample_neuron(x, resampling_factor, preserve_cn_treenodes=True,
     # Reassign parent_id None to root node
     new_nodes.loc[root_ix, 'parent_id'] = None
 
-    logger.debug(
-        'Nodes before/after: {}/{}'.format(len(x.nodes), len(new_nodes)))
+    logger.debug('Nodes before/after: {}/{}'.format(len(x.nodes),
+                                                    len(new_nodes)))
 
     x.nodes = new_nodes
 

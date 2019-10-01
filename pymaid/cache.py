@@ -32,9 +32,10 @@ logger = config.logger
 
 
 class Cache(OrderedDict):
-    """ Custom dictionary for handling the caching of request.responses.
+    """Custom dictionary for handling the caching of request.responses.
 
     Implements a maximum size [mb] and a time limit [s].
+
     """
     def __init__(self, *args, **kwargs):
         self.size_limit = kwargs.pop("size_limit", None)
@@ -80,10 +81,11 @@ class Cache(OrderedDict):
         return resp
 
     def get_cached_url(self, url, future, post=None, files=None):
-        """ Looks for cached url.
+        """Look for cached url.
 
         If not cached, will return request futures for fetching the data from
         server.
+
         """
         try:
             # If response is cached, return a mock future object
@@ -95,7 +97,7 @@ class Cache(OrderedDict):
                 return future.get(url, params=None, files=files)
 
     def clear_cached_url(self, url, post=None):
-        """ Clears cached url for given url. """
+        """Clear cached url for given url."""
         try:
             _ = self.pop((url, str(post)))
         except KeyError:
@@ -110,14 +112,16 @@ class Cache(OrderedDict):
             return fallback
 
     def _check_size_limit(self):
-        """ Check size limit. Pop items if size limit reached."""
+        """Check size limit. Pop items if size limit reached."""
         if self.size_limit is not None:
             while self.size > self.size_limit and len(self) > 0:
                 self.popitem(last=False)
 
     def update_responses(self, urls, posts, responses):
-        """ Update cached responses. Only overwrites reponses not already
-        cached.
+        """Update cached responses.
+
+        Only overwrites reponses not already cached.
+
         """
         if isinstance(posts, type(None)):
             posts = [posts] * len(urls)
@@ -136,7 +140,7 @@ class Cache(OrderedDict):
 
     @property
     def size(self):
-        """ Return size [mb] of cached responses."""
+        """Size [mb] of cached responses."""
         return round(sum([sys.getsizeof(r[0].content) for r in OrderedDict.values(self)]) / 1000 ** 2, 1)
 
     def save(self, filename='cache.pickle'):
@@ -146,13 +150,14 @@ class Cache(OrderedDict):
 
     @classmethod
     def load(self, filename):
-        """ Load cache from file. """
+        """Load cache from file."""
         with open(filename, 'rb') as f:
             return pickle.load(f)
 
 
 class _mock_future:
-    """ Class to emulate futures."""
+    """Class to emulate futures."""
+
     def __init__(self, response):
         self.response = response
 
@@ -161,7 +166,7 @@ class _mock_future:
 
 
 def never_cache(function):
-    """ Decorator to prevent caching of server responses. """
+    """Decorator to prevent caching of server responses."""
     @wraps(function)
     def wrapper(*args, **kwargs):
         # Get remote instance either from kwargs or global
@@ -180,10 +185,9 @@ def never_cache(function):
 
 
 def wipe_and_retry(function):
-    """ Decorator that clears the cache of all data requested by a function
+    """Decorator that clears the cache of all data requested by a function
     and retries if said function fails on the first run (only if caching is
-    enabled).
-    """
+    enabled)."""
     @wraps(function)
     def wrapper(*args, **kwargs):
         # Get remote instance either from kwargs or global
@@ -196,11 +200,11 @@ def wipe_and_retry(function):
             # Execute function the first time (make sure no new data is added
             # if exception is raised)
             res = undo_on_error(function)(*args, **kwargs)
-        except BaseException:            
+        except BaseException:
             # If caching is on, try the function without caching
-            if rm.caching:                
+            if rm.caching:
                 # If function failed without even using cached data, raise
-                if not set(rm._cache.request_log[n_queries:]) & old_cache:                                        
+                if not set(rm._cache.request_log[n_queries:]) & old_cache:
                     raise
 
                 # Remove requested data before retrying
@@ -223,7 +227,7 @@ def wipe_and_retry(function):
 
 
 def clear_url_and_retry(*to_clear):
-    """ Decorator that clears specific URL(s) from the cache and retries if a
+    """Decorator that clears specific URL(s) from the cache and retries if a
     function fails on the first run (only if caching is enabled).
 
     Parameters
@@ -232,6 +236,7 @@ def clear_url_and_retry(*to_clear):
                 Variable length list of strings. Must be a CatmaidInstance
                 URL function (e.g. `._get_annotation_list`). Upon failure,
                 these URLs are cleared from the cache.
+
     """
     def decorator(function):
         @wraps(function)
@@ -264,8 +269,9 @@ def clear_url_and_retry(*to_clear):
 
 
 def retry_no_caching(function):
-    """ Decorator that disables caching and retries if a function fails
+    """Decorator that disables caching and retries if a function fails
     on the first run (only if caching is enabled).
+
     """
     @wraps(function)
     def wrapper(*args, **kwargs):
@@ -296,7 +302,7 @@ def retry_no_caching(function):
 
 
 def undo_on_error(function):
-    """ Decorator to catch exceptions and undo caching of (potentially)
+    """Decorator to catch exceptions and undo caching of (potentially)
     erroneous data."""
     @wraps(function)
     def wrapper(*args, **kwargs):

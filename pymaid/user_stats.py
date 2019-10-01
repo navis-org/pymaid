@@ -70,8 +70,9 @@ __all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions',
 
 
 def get_user_stats(start_date=None, end_date=None, remote_instance=None):
-    """ Returns user stats similar to the pie chart statistics widget in
-    CATMAID: cable [nm], nodes created/reviewed and connector links created.
+    """Get user stats similar to the pie chart statistics widget in CATMAID.
+
+    Returns cable [nm], nodes created/reviewed and connector links created.
 
     Parameters
     ----------
@@ -118,6 +119,7 @@ def get_user_stats(start_date=None, end_date=None, remote_instance=None):
     --------
     :func:`~pymaid.get_history`
             Returns day-by-day stats.
+
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
@@ -152,7 +154,7 @@ def get_user_stats(start_date=None, end_date=None, remote_instance=None):
 
 
 def get_team_contributions(teams, neurons=None, remote_instance=None):
-    """ Get contributions by teams: nodes, reviews, connectors, time invested.
+    """Get contributions by teams (nodes, reviews, connectors, time invested).
 
     Notes
     -----
@@ -238,8 +240,8 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
     :func:`~pymaid.get_time_invested`
                            Time invested by individual users. Gives you more
                            control over how time is calculated.
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Prepare teams
@@ -415,8 +417,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
 
 def get_user_contributions(x, teams=None, remote_instance=None):
-    """ Takes a list of neurons and returns nodes and synapses contributed
-    by each user.
+    """Return number of nodes and synapses contributed by each user.
 
     This is essentially a wrapper for :func:`pymaid.get_contributor_statistics`
     - if you are also interested in e.g. construction time, review time, etc.
@@ -480,7 +481,6 @@ def get_user_contributions(x, teams=None, remote_instance=None):
                            such as total reconstruction/review time.
 
     """
-
     if not isinstance(teams, type(None)):
         # Prepare teams
         if not isinstance(teams, dict):
@@ -539,8 +539,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
 def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
                       treenodes=True, connectors=True, start_date=None,
                       end_date=None, remote_instance=None):
-    """ Calculates the time individual users have spent working on a set of
-    neurons.
+    """Calculate the time individual users worked on a set of neurons.
 
     Use ``minimum_actions`` and ``max_inactive_time`` to fine tune how time
     invested is calculated: by default, time is binned over 3 minutes in
@@ -673,7 +672,6 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     >>> stats[stats.sum(axis=1) > 20].T.cumsum(axis=0).plot()
 
     """
-
     def _extract_timestamps(ts, desc='Calc'):
         if ts.empty:
             return {}
@@ -852,8 +850,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
 
 def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
                      remote_instance=None):
-    """ Get timestamps of users' actions (creations, editions, reviews,
-    linking).
+    """Get timestamps of user actions (creations, editions, reviews, linking).
 
     Important
     ---------
@@ -911,7 +908,6 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     ...            marker='_')
 
     """
-
     if not neurons and not users and not (start_date or end_date):
         raise ValueError('Query must be restricted by at least a single '
                          'parameter!')

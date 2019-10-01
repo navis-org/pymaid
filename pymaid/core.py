@@ -626,8 +626,7 @@ class CatmaidNeuron:
         elif len(tn) == 0:
             return None
 
-        logger.warning(
-            '%s: Multiple possible somas found' % self.skeleton_id)
+        logger.warning('Multiple somas found for neuron #{}'.format(self.skeleton_id))
         return tn
 
     def _get_root(self):
@@ -1642,6 +1641,8 @@ class CatmaidNeuronList:
             data = []
             for n in self.neurons:
                 this_n = getattr(n, key)
+                # Do NOT remove this: downstream functions may depend on having
+                # this reference
                 this_n['skeleton_id'] = n.skeleton_id
                 data.append(this_n)
             return pd.concat(data, axis=0, ignore_index=True, sort=True,

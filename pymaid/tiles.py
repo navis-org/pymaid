@@ -14,7 +14,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-import requests
 import gc
 import math
 import time
@@ -40,9 +39,10 @@ except ImportError:
 
 __all__ = sorted(['crop_neuron', 'LoadTiles'])
 
+
 def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
                 remote_instance=None):
-    """ Crops and saves EM tiles following a neuron's segments.
+    """Crop and save EM tiles following a neuron's segments.
 
     Parameters
     ----------
@@ -53,11 +53,11 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
     dimensions :         tuple of int, optional
                          Dimensions of square to cut out in nanometers.
     interpolate_z_res :  int | None, optional
-                         If not none, will interpolate in Z direction to given
+                         If not None, will interpolate in Z direction to given
                          resolution. Use this to interpolate virtual nodes.
     remote_instance :    pymaid.CatmaidInstance, optional
-    """
 
+    """
     if isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
 
@@ -130,7 +130,7 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
 
 
 def _bbox_helper(coords, dimensions=(500, 500)):
-    """ Helper function to turn coordinates into bounding box(es).
+    """Helper function to turn coordinates into bounding box(es).
 
     Parameters
     ----------
@@ -143,8 +143,8 @@ def _bbox_helper(coords, dimensions=(500, 500)):
     -------
     bbox :          numpy.array
                     Bounding box(es): ``left, right, top, bottom, z``
-    """
 
+    """
     if isinstance(dimensions, int):
         dimensions = (dimensions, dimensions)
 
@@ -165,7 +165,7 @@ def _bbox_helper(coords, dimensions=(500, 500)):
 
 
 class LoadTiles:
-    """ Loads tiles from CATMAID and returns stitched image.
+    """Load tiles from CATMAID and returns stitched image.
 
     Important
     ---------
@@ -216,7 +216,6 @@ class LoadTiles:
     >>> plt.show()
 
     """
-
     # TODOs
     # -----
     # 1. Check for available image mirror automatically (make stack_mirror and stack_id superfluous) - DONE
@@ -264,7 +263,7 @@ class LoadTiles:
                     '{0:.2f} Mb'.format(memory_est))
 
     def estimate_memory(self):
-        """ Estimates memory [Mb] consumption of loading all tiles."""
+        """Estimate memory [Mb] consumption of loading all tiles."""
 
         all_tiles = []
         for j, im in enumerate(self.image_coords):
@@ -277,7 +276,7 @@ class LoadTiles:
         return (n_tiles * self.bytes_per_tile) / 10 ** 6
 
     def get_stack_info(self, image_mirror='auto'):
-        """Retrieves basic info about image stack and mirrors."""
+        """Retrieve basic info about image stack and mirrors."""
 
         # Get available stacks for the project
         available_stacks = self.remote_instance.fetch(
@@ -434,14 +433,14 @@ class LoadTiles:
                 self.image_coords.append(this_im)
 
     def _get_tiles(self, tiles):
-        """Retrieves all tiles in parallel.
+        """Retrieve all tiles in parallel.
 
         Parameters
         ----------
         tiles :     list | np.ndarray
                     Triplets of x/y/z tile indices. E.g. [ (20,10,400 ), (...) ]
-        """
 
+        """
         tiles = list(set(tiles))
 
         if self.remote_instance:
@@ -559,13 +558,16 @@ class LoadTiles:
             # to uint8
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                imageio.imwrite(fp ,cropped_img)
+                imageio.imwrite(fp, cropped_img)
 
             del cropped_img
 
     def load_in_memory(self):
-        """ Download and stitch tiles, and keep images in memory. Accessible
-        via ``.img`` attribute. """
+        """Download and stitch tiles, and keep images in memory.
+
+        Accessible via ``.img`` attribute.
+
+        """
         tiles = {}
         max_safe_tiles = int((self.mem_lim * 10**6) / self.bytes_per_tile)
 
@@ -628,7 +630,7 @@ class LoadTiles:
         self.img = np.dstack(images).astype(int)
 
     def scalebar(self, ax, size=1000, pos='lower left', label=True, line_kws={}, label_kws={}):
-        """Adds scalebar to image.
+        """Add scalebar to image.
 
         Parameters
         ----------
@@ -673,7 +675,7 @@ class LoadTiles:
                      tn_color='yellow', cn_color='none', tn_ec=None,
                      cn_ec='orange', skid_include=[], cn_include=[], tn_kws={},
                      cn_kws={}):
-        """Renders nodes onto image.
+        """Render nodes onto image.
 
         Parameters
         ----------
@@ -707,13 +709,14 @@ class LoadTiles:
         slice_info = self.image_coords[slice_ix]
 
         # Get node list
-        data = fetch.get_nodes_in_volume(
-            slice_info['nm_left'], slice_info['nm_right'],
-            slice_info['nm_top'], slice_info['nm_bot'],
-            slice_info['nm_z'] - self.resolution_z,  # get one slice up
-            slice_info['nm_z'] + self.resolution_z,  # and one slice down
-            remote_instance=self.remote_instance,
-            coord_format='NM')
+        data = fetch.get_nodes_in_volume(slice_info['nm_left'],
+                                         slice_info['nm_right'],
+                                         slice_info['nm_top'],
+                                         slice_info['nm_bot'],
+                                         slice_info['nm_z'] - self.resolution_z,  # get one slice up
+                                         slice_info['nm_z'] + self.resolution_z,  # and one slice down
+                                         remote_instance=self.remote_instance,
+                                         coord_format='NM')
 
         # Interpolate virtual
         self.nodes = self._make_virtual_nodes(data[0])
@@ -739,7 +742,7 @@ class LoadTiles:
              slice_info['nm_bot'])
         ]
 
-        logger.debug('Retrieved {0} treenodes and {1} connectors'.format(
+        logger.debug('Retrieved {} treenodes and {} connectors'.format(
             self.nodes.shape[0],
             self.connectors.shape[0]
         ))
@@ -753,7 +756,7 @@ class LoadTiles:
             self.connectors = self.connectors[self.connectors.skeleton_id.isin(
                 cn_include)]
 
-        logger.debug('{0} treenodes and {1} connectors after filtering'.format(
+        logger.debug('{} treenodes and {} connectors after filtering'.format(
             self.nodes.shape[0],
             self.connectors.shape[0]
         ))
@@ -831,7 +834,9 @@ class LoadTiles:
 
     def _to_x_index(self, x, enforce_bounds=True):
         """Convert a real world position to a x pixel position.
+
         Also, makes sure the value is in bounds.
+
         """
         zero_zoom = x / self.resolution_x
         if enforce_bounds:
@@ -840,7 +845,9 @@ class LoadTiles:
 
     def _to_y_index(self, y, enforce_bounds=True):
         """Convert a real world position to a y pixel position.
+
         Also, makes sure the value is in bounds.
+
         """
         zero_zoom = y / self.resolution_y
         if enforce_bounds:
@@ -849,7 +856,9 @@ class LoadTiles:
 
     def _to_z_index(self, z, enforce_bounds=True):
         """Convert a real world position to a slice/section number.
+
         Also, makes sure the value is in bounds.
+
         """
         section = z / self.resolution_z + 0.5
         if enforce_bounds:
@@ -857,8 +866,11 @@ class LoadTiles:
         return int(section)
 
     def _make_virtual_nodes(self, nodes):
-        """ Generates virtual nodes. Currently, this simply adds new nodes
-        to the table but does NOT rewire the neurons accordingly!
+        """Generate virtual nodes.
+
+        Currently, this simply adds new nodes to the table but does NOT rewire
+        the neurons accordingly!
+
         """
         # Get nodes that have a parent in our list
         has_parent = nodes[nodes.parent_id.isin(nodes.treenode_id)]
