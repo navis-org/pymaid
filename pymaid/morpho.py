@@ -912,7 +912,7 @@ def bending_flow(x, polypre=False):
                          'got "{}"'.format(type(x)))
 
     if isinstance(x, core.CatmaidNeuronList):
-        return [bending_flow(n, mode=mode, polypre=polypre, ) for n in x]
+        return [bending_flow(n, polypre=polypre, ) for n in x]
 
     if x.soma and x.soma not in x.root:
         logger.warning('Neuron {0} is not rooted to its soma!'.format(x.skeleton_id))
