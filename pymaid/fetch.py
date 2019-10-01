@@ -348,26 +348,45 @@ class CatmaidInstance:
         else:
             logger.info('Global CATMAID instance set. Caching is OFF.')
 
-    def fetch(self, url, post=None, desc='Fetching', callback=None, files=None,
+    def fetch(self, url, post=None, files=None, on_error='raise', desc='Fetching',
               disable_pbar=False, leave_pbar=True, return_type='json'):
-        """ Requires the url to connect to and the variables for POST,
-        if any, in a dictionary.
+        """Fetch data from given URL(s).
 
         Parameters
         ----------
+        url :           str, list of str
+                        URL or list of URLs to fetch data from.
+        post :          None | dict | list of dict
+                        If provided, will send POST request. Must provide one
+                        dictionary for each url.
+        files :         str, optional
+                        Files to be sent alongside POST request.
+        on_error :      "raise" | "log" | "pass"
+                        What to do if request returns an error code: raise
+                        an exception, log the error but continue or silently
+                        pass.
+        desc :          str, optional
+                        Message for progress bar.
+        disable_pbar :  bool, optional
+                        If True, won't show progress bar.
+        leave_pbar :    bool, optional
+                        If True, will not remove pbar after finishing.
         return_type :   "json" | "raw" | "request"
-                        Defines returned data.
+                        Set how to return data::
+
+                          json: return json parsed data (default)
+                          raw: return unparsed response content
+                          request: return request object
 
         """
+        assert on_error in ['raise', 'log', 'pass']
+        assert return_type in ['json', 'raw', 'request']
 
-        # Keep track of if a single response is expected
-        if not utils._is_iterable(url):
-            was_single = True
-            url = utils._make_iterable(url)
-            if not isinstance(post, (type(None), list)):
-                post = [post]
-        else:
-            was_single = False
+        # Make sure url and post are iterables
+        was_single = isinstance(url, str)
+        url = utils._make_iterable(url)
+        # Do not use _make_iterable here as it will turn dictionaries into keys
+        post = [post] * len(url) if isinstance(post, (type(None), dict, bool)) else post
 
         # Warn if many individual queries with caching activated
         if len(url) > 1e4 and self.caching:
@@ -376,24 +395,22 @@ class CatmaidInstance:
                            'cache could notably slow down fetching of the '
                            'data. Consider deactivating caching.')
 
-        # Prepare futures
-        if not isinstance(post, type(None)):
-            if len(url) != len(post):
-                raise ValueError('POST needs to be provided for each url.')
+        if len(url) != len(post):
+            raise ValueError('POST needs to be provided for each url.')
+
+        # Generate futures
+        futures = []
+        for u, p in zip(url, post):
+            # Try getting url from cache
             if self.caching:
-                futures = [self._cache.get_cached_url(u, self._future_session,
-                                                      post=p,
-                                                      files=files) for u, p in zip(url, post)]
+                f = self._cache.get_cached_url(u, self._future_session,
+                                               post=p, files=files)
+            # If no caching, generate request
+            elif not isinstance(p, type(None)):
+                f = self._future_session.post(u, data=p, files=files)
             else:
-                futures = [self._future_session.post(u,
-                                                     data=p,
-                                                     files=files) for u, p in zip(url, post)]
-        else:
-            if self.caching:
-                futures = [self._cache.get_cached_url(u, self._future_session,
-                                                      post=None) for u in url]
-            else:
-                futures = [self._future_session.get(u, params=None) for u in url]
+                f = self._future_session.get(u, params=None)
+            futures.append(f)
 
         # Get the responses
         resp = [f.result() for f in config.tqdm(futures,
@@ -403,9 +420,35 @@ class CatmaidInstance:
                                                          or len(futures) == 1),
                                                 leave=leave_pbar & config.pbar_leave)]
 
-        # Make sure all responses returned data
-        for r in resp:
-            r.raise_for_status()
+        # Check responses for errors
+        errors = []
+        details = []
+        if on_error in ['raise', 'log']:
+            for r in resp:
+                # Skip if all is well
+                if r.status_code == 200:
+                    continue
+                # CATMAID internal server errors return useful error messages
+                if str(r.status_code).startswith('5'):
+                    errors.append('{} Server Error: {} for url: {}'.format(r.status_code,
+                                                                           r.json().get('error', 'No error message.'),
+                                                                           r.url))
+                    details.append(r.json().get('detail', 'No details provided.'))
+                # Parse all other errors
+                else:
+                    errors.append('{} Server Error: {} for url: {}'.format(r.status_code,
+                                                                           r.reason,
+                                                                           r.url))
+                    details.append('')
+
+        if errors:
+            if on_error == 'raise':
+                raise HTTPError('{} errors encountered: {}'.format(len(errors),
+                                                                   '\n'.join(errors)))
+            else:
+                for e, d in zip(errors, details):
+                    logger.error(e)
+                    logger.debug('{}. Details: {}'.format(e, d))
 
         # Add new responses to cache
         if self.caching:
@@ -431,18 +474,13 @@ class CatmaidInstance:
                     raise
         elif return_type.lower() == 'raw':
             parsed = [r.content for r in resp]
-        elif return_type.lower() == 'request':
+        else:
             parsed = resp
-        else:
-            raise ValueError('Unknown return_type "{}"'.format(return_type))
 
-        if was_single:
-            return parsed[0]
-        else:
-            return parsed
+        return parsed[0] if was_single else parsed
 
     def make_url(self, *args, **GET):
-        """ Generates URL.
+        """Generates URL.
 
         Parameters
         ----------
@@ -462,6 +500,7 @@ class CatmaidInstance:
         Returns
         -------
         url :       str
+
         """
         # Generate the URL
         url = self.server
