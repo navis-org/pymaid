@@ -346,16 +346,19 @@ def plot2d(x, method='2d', **kwargs):
     linestyle = kwargs.get('linestyle', kwargs.get('ls', '-'))
     autoscale = kwargs.get('autoscale', True)
 
-    remote_instance = utils._eval_remote_instance(
-        remote_instance, raise_error=False)
+    remote_instance = utils._eval_remote_instance(remote_instance,
+                                                  raise_error=False)
 
     # Keep track of limits if necessary
     lim = []
 
     if skids:
-        skdata += fetch.get_neuron(skids, remote_instance, connector_flag=1,
-                                   tag_flag=0, get_history=False,
-                                   get_abutting=True)
+        skdata += fetch.get_neuron(skids,
+                                   with_connectors=True,
+                                   with_tags=False,
+                                   with_history=False,
+                                   with_abutting=True,
+                                   remote_instance=remote_instance)
 
     # Generate the colormaps
     neuron_cmap, dotprop_cmap = _prepare_colormap(color,
@@ -1484,11 +1487,12 @@ def plot3d(x, **kwargs):
                                                   raise_error=False)
 
     if skids and remote_instance:
-        skdata += fetch.get_neuron(skids, remote_instance,
-                                   connector_flag=1,
-                                   tag_flag=0,
-                                   get_history=False,
-                                   get_abutting=True)
+        skdata += fetch.get_neuron(skids,
+                                   with_connectors=True,
+                                   with_tags=False,
+                                   with_history=False,
+                                   with_abutting=True,
+                                   remote_instance=remote_instance)
     elif skids and not remote_instance:
         raise BaseException('You need to provide a CATMAID remote instance.')
 
@@ -1498,10 +1502,10 @@ def plot3d(x, **kwargs):
         if isinstance(v, str):
             if not remote_instance:
                 logger.error('Unable to add volumes - please also pass a '
-                             'Catmaid Instance using <remote_instance = ... >')
+                             'CatmaidInstance using <remote_instance = ... >')
                 return
             else:
-                v = fetch.get_volume(v, remote_instance)
+                v = fetch.get_volume(v, remote_instance=remote_instance)
 
         volumes_data[v.name] = {'verts': v.vertices,
                                 'faces': v.faces,

@@ -309,8 +309,8 @@ def neuron2py(neuron, convert_to_nm=False, remote_instance=None):
     # Nat function may return neuron objects that have ONLY nodes - no
     # connectors, skeleton_id, name or tags!
     if 'skid' in neuron and remote_instance:
-        neuron_names = fetch.get_names(
-            [n[0] for n in neuron.skid.tolist()], remote_instance)
+        neuron_names = fetch.get_names([n[0] for n in neuron.skid.tolist()],
+                                       remote_instance=remote_instance)
     elif 'skid' in neuron and not remote_instance:
         neuron_names = None
         logger.info(
@@ -813,7 +813,7 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
                          '<remote_instance> parameter. See help(rmaid.nblast) '
                          'for details.')
             return
-        rn = neuron2r(fetch.get_neuron(query, remote_instance),
+        rn = neuron2r(fetch.get_neuron(query, remote_instance=remote_instance),
                       convert_to_um=False)
     else:
         logger.error('Unable to intepret <neuron> parameter provided. See '

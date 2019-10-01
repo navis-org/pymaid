@@ -104,7 +104,7 @@ def upload_volume(x, name, comments=None, remote_instance=None):
 
     url = remote_instance._upload_volume_url()
 
-    response = remote_instance.fetch(url, postdata)
+    response = remote_instance.fetch(url, post=postdata)
 
     if 'success' in response and response['success'] is True:
         pass
@@ -871,7 +871,7 @@ def replace_skeleton(x, skeleton_id=None, force_mapping=False,
     if isinstance(skeleton_id, type(None)):
         skeleton_id = x.skeleton_id
 
-    if not fetch.neuron_exists(skeleton_id):
+    if not fetch.neuron_exists(skeleton_id, remote_instance=remote_instance):
         raise ValueError('Neuron with skeleton ID "{}" does not exist'.format(skeleton_id))
 
     # Get current skeleton that is should be replaced
@@ -1247,7 +1247,7 @@ def join_nodes(winner_node, looser_node, no_prompt=False, tag_nodes=True,
                  'edition_times': json.dumps([[n, edition_times[n]] for n in [winner_node, looser_node]]),
                  'sampler_handling': 'domain-end'}
 
-    resp = remote_instance.fetch(join_url, join_post)
+    resp = remote_instance.fetch(join_url, post=join_post)
     if 'error' in resp:
         logger.error('Error joining nodes {} and {}. See response for details.'.format(winner_node, looser_node))
         return resp
@@ -1344,7 +1344,8 @@ def link_connector(links, remote_instance=None):
                   'state': json.dumps([[n, edition_times[str(n)]] for n in l[:2]]),
                   'link_type': l[2]} for l in links]
 
-    resp = remote_instance.fetch(create_link_url, link_post, desc='Linking connectors')
+    resp = remote_instance.fetch(create_link_url, post=link_post,
+                                 desc='Linking connectors')
 
     if any(['error' in r for r in resp]):
         logger.error('Error creating link(s)! Check server response')
@@ -1408,7 +1409,8 @@ def update_node_confidence(confidences, to_connector=False, remote_instance=None
                   'state': json.dumps({'edition_time': edition_times[str(n)]}),
                   'to_connector': to_connector} for n in all_ids]
 
-    resp = remote_instance.fetch(update_conf_url, conf_post, desc='Updating confidences')
+    resp = remote_instance.fetch(update_conf_url, post=conf_post,
+                                 desc='Updating confidences')
 
     if any(['error' in r for r in resp]):
         logger.error('Error changing confidences! Check server response')
@@ -1494,7 +1496,7 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
         # it to requests as "post" will fuck this up otherwise
         update_post['state'] = json.dumps(update_post['state'])
 
-        this_resp = remote_instance.fetch(update_radii_url, update_post)
+        this_resp = remote_instance.fetch(update_radii_url, post=update_post)
 
         # Merge responses
         for r, v in this_resp.items():
@@ -1570,7 +1572,7 @@ def rename_neurons(x, new_names, remote_instance=None, no_prompt=False):
         raise ValueError('Need a name for every single neuron to rename.')
 
     if not no_prompt:
-        old_names = fetch.get_names(x)
+        old_names = fetch.get_names(x, remote_instance=remote_instance)
         df = pd.DataFrame(data=[[old_names[n], new_names[i], n] for i, n in enumerate(x)],
                           columns=['Current name', 'New name', 'Skeleton ID']
                           )
@@ -2403,7 +2405,8 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
         key = 'annotations[%i]' % i
         add_annotations_postdata[key] = str(x)
 
-    resp = remote_instance.fetch(add_annotations_url, add_annotations_postdata)
+    resp = remote_instance.fetch(add_annotations_url,
+                                 post=add_annotations_postdata)
 
     if 'error' in resp:
         logger.error('Error adding annotation. See server response for details.')
@@ -2467,7 +2470,8 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
         key = 'annotation_ids[%i]' % i
         remove_annotations_postdata[key] = str(x)
 
-    resp = remote_instance.fetch(add_annotations_url, remove_annotations_postdata)
+    resp = remote_instance.fetch(add_annotations_url,
+                                 post=remove_annotations_postdata)
 
     if 'error' in resp:
         logger.error('Error adding annotation. See server response for details.')
@@ -2512,7 +2516,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     annotations = utils._make_iterable(annotations)
 
     # Translate into annotations ID
-    an_list = fetch.get_annotation_list().set_index('annotation')
+    an_list = fetch.get_annotation_list(remote_instance=remote_instance).set_index('annotation')
 
     an_ids = []
     for a in annotations:
@@ -2542,7 +2546,7 @@ def remove_annotations(x, annotations, remote_instance=None):
         return
 
     resp = remote_instance.fetch(remove_annotations_url,
-                                 remove_annotations_postdata)
+                                 post=remove_annotations_postdata)
 
     an_list = an_list.reset_index().set_index('annotation_id')
 
@@ -2609,7 +2613,7 @@ def add_annotations(x, annotations, remote_instance=None):
         add_annotations_postdata[key] = str(annotations[i])
 
     resp = remote_instance.fetch(add_annotations_url,
-                                 add_annotations_postdata)
+                                 post=add_annotations_postdata)
 
     if 'error' in resp:
         logger.error("Error adding annotations. See server response for details.")

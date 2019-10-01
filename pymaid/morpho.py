@@ -186,11 +186,11 @@ def calc_cable(skdata, remote_instance=None, return_skdata=False):
                 cable.
 
     """
-
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(skdata, int) or isinstance(skdata, str):
-        skdata = fetch.get_neuron([skdata], remote_instance).loc[0]
+        skdata = fetch.get_neuron([skdata],
+                                  remote_instance=remote_instance).loc[0]
 
     if isinstance(skdata, pd.Series) or isinstance(skdata, core.CatmaidNeuron):
         df = skdata
@@ -340,14 +340,17 @@ def strahler_index(x, inplace=True, method='standard', fix_not_a_branch=False,
                         ``strahler_index``.
 
     """
-
     if isinstance(x, core.CatmaidNeuronList):
         if x.shape[0] == 1:
             x = x[0]
         else:
             res = []
             for n in config.tqdm(x):
-                res.append(strahler_index(n, inplace=inplace, method=method))
+                res.append(strahler_index(n,
+                                          inplace=inplace,
+                                          method=method,
+                                          fix_not_a_branch=fix_not_a_branch,
+                                          min_twig_size=min_twig_size))
 
             if not inplace:
                 return core.CatmaidNeuronList(res)
@@ -526,14 +529,16 @@ def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
                     Pruned neuron(s).
 
     """
-
     if isinstance(x, core.CatmaidNeuron):
         neuron = x
     elif isinstance(x, core.CatmaidNeuronList):
-        temp = [prune_by_strahler(
-            n, to_prune=to_prune, inplace=inplace) for n in x]
+        temp = [prune_by_strahler(n,
+                                  to_prune=to_prune,
+                                  reroot_soma=reroot_soma,
+                                  relocate_connectors=relocate_connectors,
+                                  inplace=inplace) for n in x]
         if not inplace:
-            return core.CatmaidNeuronList(temp, x._remote_instance)
+            return core.CatmaidNeuronList(temp, remote_instance=x._remote_instance)
         else:
             return
 
@@ -923,8 +928,8 @@ def bending_flow(x, polypre=False):
 
     if polypre:
         # Get details for all presynapses
-        cn_details = fetch.get_connector_details(
-            y.connectors[y.connectors.relation == 0])
+        cn_details = fetch.get_connector_details(y.connectors[y.connectors.relation == 0],
+                                                 remote_instance=y._remote_instance)
 
     # Get list of nodes with pre/postsynapses
     pre_node_ids = y.connectors[y.connectors.relation == 0].treenode_id.values
@@ -1064,14 +1069,12 @@ def flow_centrality(x, mode='centrifugal', polypre=False):
 
     if polypre:
         # Get details for all presynapses
-        cn_details = fetch.get_connector_details(
-            y.connectors[y.connectors.relation == 0])
+        cn_details = fetch.get_connector_details(y.connectors[y.connectors.relation == 0],
+                                                 remote_instance=y._remote_instance)
 
     # Get list of nodes with pre/postsynapses
-    pre_node_ids = y.connectors[y.connectors.relation ==
-                                0].treenode_id.unique()
-    post_node_ids = y.connectors[y.connectors.relation ==
-                                 1].treenode_id.unique()
+    pre_node_ids = y.connectors[y.connectors.relation == 0].treenode_id.unique()
+    post_node_ids = y.connectors[y.connectors.relation == 1].treenode_id.unique()
     total_pre = len(pre_node_ids)
     total_post = len(post_node_ids)
 
@@ -1757,7 +1760,9 @@ def tortuosity(x, seg_length=10, skip_remainder=False):
     if isinstance(x, core.CatmaidNeuronList):
         if not isinstance(seg_length, (list, np.ndarray, tuple)):
             seg_length = [seg_length]
-        df = pd.DataFrame([tortuosity(n, seg_length) for n in config.tqdm(x, desc='Tortuosity', disable=config.pbar_hide, leave=config.pbar_leave)],
+        df = pd.DataFrame([tortuosity(n,
+                                      seg_length=seg_length,
+                                      skip_remainder=skip_remainder) for n in config.tqdm(x, desc='Tortuosity', disable=config.pbar_hide, leave=config.pbar_leave)],
                           index=x.skeleton_id, columns=seg_length).T
         df.index.name = 'seg_length'
         return df
@@ -2025,7 +2030,11 @@ def despike_neuron(x, sigma=5, max_spike_length=1, inplace=False,
 
         for n in config.tqdm(x, desc='Despiking', disable=config.pbar_hide,
                              leave=config.pbar_leave):
-            despike_neuron(n, sigma=sigma, inplace=True)
+            despike_neuron(n,
+                           sigma=sigma,
+                           max_spike_length=max_spike_length,
+                           reverse=reverse,
+                           inplace=True)
 
         if not inplace:
             return x
@@ -2321,7 +2330,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
                                                        leave=config.pbar_leave)])
 
     if not isinstance(x, core.CatmaidNeuron):
-        x = fetch.get_neuron(x)
+        x = fetch.get_neuron(x, remote_instance=remote_instance)
 
     if not inplace:
         x = x.copy()
@@ -2553,7 +2562,9 @@ def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
     if isinstance(x, core.CatmaidNeuronList):
         if not inplace:
             x = x.copy()
-        healed = [heal_fragmented_neuron(n, min_size=min_size, method=method,
+        healed = [heal_fragmented_neuron(n,
+                                         min_size=min_size,
+                                         method=method,
                                          inplace=True)
                                 for n in config.tqdm(x,
                                                      desc='Healing',

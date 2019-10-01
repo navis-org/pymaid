@@ -553,7 +553,7 @@ def cn_table_from_connectors(x, remote_instance=None):
 
     # Get connector details for all neurons
     all_cn = x.connectors.connector_id.values
-    cn_details = fetch.get_connector_details(all_cn)
+    cn_details = fetch.get_connector_details(all_cn, remote_instance=remote_instance)
 
     # Remove connectors for which there are either no pre- or no postsynaptic
     # neurons
@@ -635,7 +635,8 @@ def cn_table_from_connectors(x, remote_instance=None):
     cn_table.columns = ['skeleton_id'] + list(cn_table.columns[1:])
 
     # Add names
-    names = fetch.get_names(cn_table.skeleton_id.values)
+    names = fetch.get_names(cn_table.skeleton_id.values,
+                            remote_instance=remote_instance)
     cn_table['neuron_name'] = [names[str(s)] for s in cn_table.skeleton_id.values]
     cn_table['total'] = cn_table[x.skeleton_id].sum(axis=1)
 
@@ -728,7 +729,8 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
     # Get connector details for all neurons
     all_cn = list(set(np.append(source.connectors.connector_id.values,
                                 target.connectors.connector_id.values)))
-    cn_details = fetch.get_connector_details(all_cn)
+    cn_details = fetch.get_connector_details(all_cn,
+                                             remote_instance=remote_instance)
 
     # Now go over all source neurons and process connections
     for i, s in enumerate(config.tqdm(source, desc='Processing',
@@ -946,7 +948,7 @@ def adjacency_matrix(sources, targets=None, source_grp={}, target_grp={},
     # {'source_skid': {'target_skid': {'count': int,
     #                                  'locations': {connector_id: {'pos': [x, y, z],
     #                                                               'count: int'}}}}}
-    data = remote_instance.fetch(url, post)
+    data = remote_instance.fetch(url, post=post)
 
     # Check which connectors to keep
     if use_connectors or bool(volume_filter):

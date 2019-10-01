@@ -285,16 +285,18 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
         elif isinstance(neurons, core.CatmaidNeuronList):
             pass
         else:
-            neurons = fetch.get_neurons(neurons)
+            neurons = fetch.get_neurons(neurons,
+                                        remote_instance=remote_instance)
     else:
         all_dates = [d.date() for t in teams for u in teams[t] for d in teams[t][u]]
         neurons = fetch.find_neurons(users=all_users,
                                      from_date=min(all_dates),
-                                     to_date=max(all_dates))
+                                     to_date=max(all_dates),
+                                     remote_instance=remote_instance)
         neurons.get_skeletons()
 
     # Get user list
-    user_list = fetch.get_user_list(remote_instance).set_index('login')
+    user_list = fetch.get_user_list(remote_instance=remote_instance).set_index('login')
 
     for u in all_users:
         if u not in user_list.index:
@@ -305,7 +307,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
                                               remote_instance=remote_instance)
 
     # Get connector links
-    link_details = fetch.get_connector_links(neurons)
+    link_details = fetch.get_connector_links(neurons, remote_instance=remote_instance)
 
     # link_details contains all links. We have to subset this to existing
     # connectors in case the input neurons have been pruned
@@ -495,10 +497,11 @@ def get_user_contributions(x, teams=None, remote_instance=None):
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = utils.eval_skids(x, remote_instance)
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
 
-    cont = fetch.get_contributor_statistics(
-        skids, remote_instance, separate=False)
+    cont = fetch.get_contributor_statistics(skids,
+                                            remote_instance=remote_instance,
+                                            separate=False)
 
     all_users = set(list(cont.node_contributors.keys()) + list(cont.pre_contributors.keys()) + list(cont.post_contributors.keys()))
 
@@ -688,7 +691,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    skids = utils.eval_skids(x, remote_instance)
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
 
     # Maximal inactive time is simply translated into binning
     # We need this later for pandas.TimeGrouper() anyway
@@ -699,7 +702,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     # actions/minute
     minimum_actions *= interval
 
-    user_list = fetch.get_user_list(remote_instance).set_index('id')
+    user_list = fetch.get_user_list(remote_instance=remote_instance).set_index('id')
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         x = fetch.get_neuron(skids, remote_instance=remote_instance)
@@ -725,12 +728,13 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
             connector_ids += n.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = fetch.get_node_details(
-        node_ids + connector_ids, remote_instance=remote_instance)
+    node_details = fetch.get_node_details(node_ids + connector_ids,
+                                          remote_instance=remote_instance)
 
     if connectors:
         # Get details for links
-        link_details = fetch.get_connector_links(skdata)
+        link_details = fetch.get_connector_links(skdata,
+                                                 remote_instance=remote_instance)
 
         # link_details contains all links. We have to subset this to existing
         # connectors in case the input neurons have been pruned
@@ -927,7 +931,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
         # Get skeletons
         neurons.get_skeletons()
     elif not isinstance(neurons, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        neurons = fetch.get_neuron(neurons)
+        neurons = fetch.get_neuron(neurons, remote_instance=remote_instance)
 
     if not isinstance(end_date, (datetime.date, type(None))):
         end_date = datetime.date(*end_date)
@@ -939,11 +943,12 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     connector_ids = neurons.connectors.connector_id.tolist()
 
     # Get node details
-    node_details = fetch.get_node_details(
-        node_ids + connector_ids, remote_instance=remote_instance)
+    node_details = fetch.get_node_details(node_ids + connector_ids,
+                                          remote_instance=remote_instance)
 
     # Get details for links
-    link_details = fetch.get_connector_links(neurons)
+    link_details = fetch.get_connector_links(neurons,
+                                             remote_instance=remote_instance)
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
     creation_timestamps = node_details[['creator', 'creation_time']]

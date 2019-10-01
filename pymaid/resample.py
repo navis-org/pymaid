@@ -287,7 +287,11 @@ def downsample_neuron(x, resampling_factor, preserve_cn_treenodes=True,
 
     """
     if isinstance(x, core.CatmaidNeuronList):
-        return core.CatmaidNeuronList([downsample_neuron(n, resampling_factor, inplace=inplace) for n in x])
+        return core.CatmaidNeuronList([downsample_neuron(n,
+                                                         resampling_factor=resampling_factor,
+                                                         preserve_cn_treenodes=preserve_cn_treenodes,
+                                                         preserve_tag_treenodes=preserve_tag_treenodes,
+                                                         inplace=inplace) for n in x])
     elif isinstance(x, core.CatmaidNeuron):
         if not inplace:
             x = x.copy()
