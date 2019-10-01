@@ -39,9 +39,10 @@ setup(
         'Programming Language :: Python :: 3.6',
     ],
     install_requires=requirements,
-    extras_require={'extras': ['fuzzywuzzy[speedup]==0.17.0',
-                               'pyoctree==0.2.10',
-                               'trimesh==2.35.2']},
+    extras_require={'extras': ['fuzzywuzzy[speedup]~=0.17.0',
+                               'pyoctree~=0.2.10',
+                               'ujson~=1.35',
+                               'trimesh~=2.35.2']},
     python_requires='>=3.5',
     zip_safe=False
 )
