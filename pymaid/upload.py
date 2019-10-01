@@ -1217,6 +1217,9 @@ def join_nodes(winner_node, looser_node, no_prompt=False, tag_nodes=True,
     winner_name = names[str(winner_skid)]
     looser_name = names[str(looser_skid)]
 
+    n_samplers = fetch.get_sampler_counts([winner_skid, looser_skid],
+                                          remote_instance=remote_instance)
+
     # Get annotations
     annotations = fetch.get_annotation_details([winner_skid, looser_skid],
                                                remote_instance=remote_instance)
@@ -1232,6 +1235,12 @@ def join_nodes(winner_node, looser_node, no_prompt=False, tag_nodes=True,
                                                        winner_name,
                                                        winner_skid))
         print('Skeleton ID {} will cease to exist'.format(looser_skid))
+
+        n_loosing_samplers = n_samplers[str(looser_skid)]
+        if n_loosing_samplers:
+            print('Loosing skeleton has {}'.format(n_loosing_samplers),
+                  'sampler(s) that will be lost on merge!')
+
         answer = ""
         while answer not in ["y", "n"]:
             answer = input("Proceed? [Y/N] ").lower()
