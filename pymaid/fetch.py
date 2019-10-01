@@ -67,12 +67,11 @@ except BaseException:
     raise
 
 __all__ = sorted(['CatmaidInstance',
-                  'get_3D_skeleton', 'get_3D_skeletons',
                   'get_annotation_details', 'get_annotation_id',
                   'get_annotation_list', 'get_annotations', 'get_arbor',
                   'get_connector_details', 'get_connectors',
                   'get_contributor_statistics', 'get_edges', 'get_history',
-                  'get_logs', 'get_names', 'get_neuron', 'get_neuron_list',
+                  'get_logs', 'get_names', 'get_neuron',
                   'get_neurons', 'get_neurons_in_bbox',
                   'get_neurons_in_volume', 'get_node_tags', 'get_node_details',
                   'get_nodes_in_volume', 'get_partners',
@@ -3685,152 +3684,10 @@ def get_contributor_statistics(x, separate=False, max_threads=500,
 
 
 @cache.undo_on_error
-def get_neuron_list(remote_instance=None, user=None, node_count=1,
-                    start_date=[], end_date=[], reviewed_by=None,
-                    minimum_cont=None):
-    """ Retrieves a list of all skeletons that fit given parameters.
-
-    If no parameters are provided, all existing skeletons are returned!
-
-    Parameters
-    ----------
-    remote_instance :   CatmaidInstance, optional
-                        If not passed directly, will try using global.
-    user :              int | str | list, optional
-                        User ID(s) (int) or login(s) (str).
-    minimum_cont :      int, optional
-                        Minimum contribution (in nodes) to a neuron in order
-                        for it to be counted. Only applicable if ``user`` is
-                        provided. If multiple users are provided contribution
-                        is calculated across all users. Minimum contribution
-                        does NOT take start and end dates into account!
-    node_count :        int, optional
-                        Minimum size of returned neuron (number of nodes).
-    start_date :        datetime | list of integers, optional
-                        If list: ``[year, month, day]``
-                        Only consider neurons created after.
-    end_date :          datetime | list of integers, optional
-                        If list: ``[year, month, day]``
-                        Only consider neurons created before.
-    reviewed_by :       int | str | list, optional
-                        User ID(s) (int) or login name(s) (str) of reviewer.
-
-    Returns
-    -------
-    list
-                        ``[skid, skid, skid, ... ]``
-
-    Examples
-    --------
-    Get all neurons a given users have worked on in the last week. This example
-    assumes that you have already set up a CatmaidInstance.
-
-    >>> # We are using user IDs but you can also use login names
-    >>> import datetime
-    >>> last_week = datetime.date.today() - datetime.date.timedelta(days=7)
-    >>> skids = pymaid.get_neuron_list(user=[16, 20],
-    ...                                start_date=last_week)
-
-    """
-
-    def _contribution_helper(skids):
-        """ Helper to test if users have contributed more than X nodes to
-        neuron.
-
-        Returns
-        -------
-        Filtered list of skeleton IDs
-        """
-        nl = get_neuron(skids, remote_instance=remote_instance, return_df=True)
-        return [n.skeleton_id for n in nl.itertuples() if n.nodes[n.nodes.creator_id.isin(user)].shape[0] > minimum_cont]
-
-    remote_instance = utils._eval_remote_instance(remote_instance)
-
-    get_skeleton_list_GET_data = {'nodecount_gt': node_count}
-
-    if user:
-        user = utils.eval_user_ids(
-            user, user_list=None, remote_instance=remote_instance)
-    if reviewed_by:
-        reviewed_by = utils.eval_user_ids(
-            reviewed_by, user_list=None, remote_instance=remote_instance)
-
-    if not isinstance(user, type(None)) or not isinstance(reviewed_by,
-                                                          type(None)):
-        user_list = get_user_list(
-            remote_instance=remote_instance).set_index('login')
-
-    if not isinstance(user, type(None)):
-        if utils._is_iterable(user):
-            skid_list = list()
-            for u in config.tqdm(user, desc='Get user',
-                                 disable=config.pbar_hide,
-                                 leave=config.pbar_leave):
-                skid_list += get_neuron_list(remote_instance=remote_instance,
-                                             user=u,
-                                             node_count=node_count,
-                                             start_date=start_date,
-                                             end_date=end_date,
-                                             reviewed_by=reviewed_by,
-                                             minimum_cont=None)
-
-            if minimum_cont:
-                skid_list = _contribution_helper(
-                    list(set(skid_list)))
-
-            return list(set(skid_list))
-        else:
-            if isinstance(user, str):
-                user = user_list.loc[user, 'id']
-            get_skeleton_list_GET_data['created_by'] = user
-
-    if not isinstance(reviewed_by, type(None)):
-        if utils._is_iterable(reviewed_by):
-            skid_list = list()
-            for u in config.tqdm(reviewed_by, desc='Get revs',
-                                 disable=config.pbar_hide,
-                                 leave=config.pbar_leave):
-                skid_list += get_neuron_list(remote_instance=remote_instance,
-                                             user=user,
-                                             node_count=node_count,
-                                             start_date=start_date,
-                                             end_date=end_date,
-                                             reviewed_by=u,
-                                             minimum_cont=None)
-
-            return list(set(skid_list))
-        else:
-            if isinstance(reviewed_by, str):
-                reviewed_by = user_list.loc[reviewed_by, 'id']
-            get_skeleton_list_GET_data['reviewed_by'] = reviewed_by
-
-    if start_date and not end_date:
-        today = datetime.date.today()
-        end_date = (today.year, today.month, today.day)
-
-    if isinstance(start_date, datetime.date):
-        start_date = [start_date.year, start_date.month, start_date.day]
-
-    if isinstance(end_date, datetime.date):
-        end_date = [end_date.year, end_date.month, end_date.day]
-
-    if start_date and end_date:
-        get_skeleton_list_GET_data['from'] = ''.join(
-            [str(d) for d in start_date])
-        get_skeleton_list_GET_data['to'] = ''.join([str(d) for d in end_date])
-
-    remote_get_list_url = remote_instance._get_list_skeletons_url()
-    remote_get_list_url += '?%s' % urllib.parse.urlencode(
-        get_skeleton_list_GET_data)
-    skid_list = remote_instance.fetch(remote_get_list_url)
-
-    if minimum_cont and user:
-        skid_list = _contribution_helper(
-            list(set(skid_list)))
-
-    return list(set(skid_list))
-
-
+def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).isoformat(),
+                end_date=datetime.date.today().isoformat(), split=True,
+                remote_instance=None):
+    """Retrieves CATMAID project history.
 
     If the time window is too large, the connection might time out which will
     result in an error! Make sure ``split=True`` to avoid that.

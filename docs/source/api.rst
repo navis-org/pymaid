@@ -22,7 +22,6 @@ Functions related to searching for neurons and fetching their 3D skeletons:
     pymaid.get_neuron
     pymaid.get_neuron_id
     pymaid.get_neurons_in_volume
-    pymaid.get_neuron_list
     pymaid.get_origin
     pymaid.get_skids_by_annotation
     pymaid.get_skids_by_name
