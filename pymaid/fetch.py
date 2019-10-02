@@ -3998,7 +3998,10 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
     annotations :       str | list of str
                         Annotation(s) to search for.
     volumes :           str | core.Volume | list of either
-                        CATMAID volume(s) to look into.
+                        CATMAID volume(s) to look into. This uses
+                        :func:`~pymaid.get_neurons_in_volumes` and will look
+                        for neurons within the **bounding box** of given
+                        volume(s).
     users :             int | str | list of either, optional
                         User ID(s) (int) or login(s) (str).
     reviewed_by :       int | str | list of either, optional
@@ -4012,10 +4015,10 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                         before this date. This works ONLY if also querying by
                         ``users`` or ``reviewed_by``!
     skids :             list of skids, optional
-                        Can be a list of skids or pandas object with
-                        "skeleton_id" columns.
+                        Can be a list of skids, a CatmaidNeuronList or pandas
+                        DataFrame with "skeleton_id" column.
     intersect :         bool, optional
-                        If multiple search critera are provided, neurons have
+                        If multiple search criteria are provided, neurons have
                         to meet all of them in order to be returned. This
                         is first applied WITHIN search criteria (works for
                         multiple ``annotations``, ``volumes``, ``users`` and
@@ -4397,7 +4400,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
 @cache.undo_on_error
 def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
                         remote_instance=None, **kwargs):
-    """Retrieves neurons with processes within a defined box volume.
+    """Retrieve neurons with processes within a defined box volume.
 
     Parameters
     ----------
