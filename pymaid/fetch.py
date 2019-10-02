@@ -1096,8 +1096,11 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
     # Generate DataFrame with all neurons
     df = pd.DataFrame([[names[str(x[i])],  # neuron name
                         str(x[i]),  # skeleton ID
-                        pd.DataFrame(n[0], columns=node_cols),  # nodes
-                        pd.DataFrame(n[1], columns=cn_cols),  # connectors
+                        pd.DataFrame(n[0],  # nodes
+                                     columns=node_cols,
+                                     dtype=object), # do NOT remove this dtype 
+                        pd.DataFrame(n[1], # connectors
+                                     columns=cn_cols),
                         n[2]  # tags as dictionary
                         ] for i, n in enumerate(skdata)],
                       columns=['neuron_name', 'skeleton_id',
