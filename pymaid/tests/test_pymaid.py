@@ -157,11 +157,6 @@ class TestFetch(unittest.TestCase):
             config_test.test_skids, remote_instance=self.rm), dict)
 
     @try_conditions
-    def test_get_neuron_list(self):
-        self.assertIsInstance(pymaid.get_neuron_list(
-            node_count=20000, remote_instance=self.rm), list)
-
-    @try_conditions
     def test_get_user_list(self):
         self.assertIsInstance(pymaid.get_user_list(
             remote_instance=self.rm), pd.DataFrame)
