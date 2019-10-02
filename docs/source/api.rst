@@ -279,6 +279,7 @@ Methods common to both CatmaidNeurons and CatmaidNeuronLists:
     pymaid.CatmaidNeuron.prune_distal_to
     pymaid.CatmaidNeuron.prune_proximal_to
     pymaid.CatmaidNeuron.prune_by_longest_neurite
+    pymaid.CatmaidNeuron.prune_twigs
     pymaid.CatmaidNeuron.reroot
     pymaid.CatmaidNeuron.reload
     pymaid.CatmaidNeuron.resample
