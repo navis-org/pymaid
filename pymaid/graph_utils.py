@@ -455,11 +455,13 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
         tn_indices = None
         ix = nodeList
 
+    # This oddly enough does not return a sparse matrix
     dmat = csgraph.dijkstra(m,
                             directed=directed, indices=tn_indices)
 
-    return pd.SparseDataFrame(dmat, columns=nodeList, index=ix,
-                              default_fill_value=float('inf'))
+    return pd.DataFrame(dmat,
+                       columns=nodeList,
+                       index=ix)
 
 
 def dist_between(x, a, b):
