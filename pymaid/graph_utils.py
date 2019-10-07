@@ -1252,10 +1252,9 @@ def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
         raise TypeError('Can only subset to list, set, numpy.ndarray or \
                          networkx.Graph, not "{0}"'.format(type(subset)))
 
+    new_roots = None
     if prevent_fragments:
-        subset, new_root = connected_subgraph(x, subset)
-    else:
-        new_root = None
+        subset, new_roots = connected_subgraph(x, subset)
 
     # Make a copy of the neuron
     if not inplace:
@@ -1297,8 +1296,9 @@ def subset_neuron(x, subset, clear_temp=True, keep_disc_cn=False,
     x.nodes.reset_index(inplace=True, drop=True)
     x.connectors.reset_index(inplace=True, drop=True)
 
-    if new_root:
-        x.reroot(new_root, inplace=True)
+    if new_roots:
+        for r in new_roots:
+            x.reroot(r, inplace=True)
 
     # Clear temporary attributes
     if clear_temp:
