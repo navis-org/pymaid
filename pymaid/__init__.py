@@ -1,4 +1,4 @@
-__version__ = "0.105"
+__version__ = "0.106"
 
 from . import config
 
