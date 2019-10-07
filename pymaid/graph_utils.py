@@ -552,7 +552,12 @@ def find_main_branchpoint(x, reroot_to_soma=False):
     x = x.copy()
 
     if isinstance(x, core.CatmaidNeuronList) and len(x) > 1:
-        return np.array([find_main_branchpoint(n, reroot_to_soma=reroot_to_soma) for n in x])
+        return np.array([find_main_branchpoint(n,
+                                               reroot_to_soma=reroot_to_soma)
+                         for n in config.tqdm(x,
+                                              desc='Searching',
+                                              disable=config.pbar_hide,
+                                              leave=config.pbar_leave)])
     elif isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
         x = x[0]
     elif not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
@@ -695,7 +700,7 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     Parameters
     ----------
     x :                 CatmaidNeuron | CatmaidNeuronList
-                        Must be a single neuron.
+                        Neuron(s) to prune.
     n :                 int | slice, optional
                         Number of longest neurites to preserve. For example:
                          - ``n=1`` keeps the longest neurites
@@ -721,10 +726,22 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     if isinstance(x, core.CatmaidNeuron):
         pass
     elif isinstance(x, core.CatmaidNeuronList):
-        if x.shape[0] == 1:
-            x = x[0]
+        if not inplace:
+            x = x.copy()
+
+        res = [longest_neurite(i,
+                               n=n,
+                               inplace=True,
+                               reroot_to_soma=reroot_to_soma)
+               for i in config.tqdm(x,
+                                    desc='Pruning',
+                                    disable=config.pbar_hide,
+                                    leave=config.pbar_leave)]
+
+        if not inplace:
+            return x
         else:
-            raise ValueError('Please provide only a single neuron.')
+            return
     else:
         raise TypeError('Unable to process data of type "{0}"'.format(type(x)))
 
