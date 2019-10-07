@@ -1422,6 +1422,8 @@ def connected_subgraph(x, ss):
     elif not isinstance(x, core.CatmaidNeuron):
         raise TypeError('Input must be a single CatmaidNeuron.')
 
+    ss = np.array(ss)
+
     missing = set(ss) - set(x.nodes.treenode_id.values)
     if missing:
         raise ValueError('Nodes not found: {}'.format(','.join(missing)))
@@ -1432,49 +1434,58 @@ def connected_subgraph(x, ss):
     disconnected = x.nodes[(~x.nodes.treenode_id.isin(ss)) & (x.nodes.parent_id.isin(ss))]
     leafs = np.append(leafs, disconnected.parent_id.values)
 
-    # Walk from each node to root and keep track of path
-    g = x.graph
-    paths = []
-    for n in leafs:
-        this_path = []
-        while n:
-            this_path.append(n)
-            n = next(g.successors(n), None)
-        paths.append(this_path)
-
-    # Find the nodes that all paths have in common
-    common = set.intersection(*[set(p) for p in paths])
-
-    # Now find the first (most distal from root) common node
-    longest_path = sorted(paths, key=lambda x: len(x))[-1]
-    first_common = sorted(common, key=lambda x: longest_path.index(x))[0]
-
-    # Now go back to paths and collect all nodes until this first common node
+    # Run this for each connected component of the neuron
     include = set()
-    for p in paths:
-        it = iter(p)
-        n = next(it, None)
-        while n:
-            if n in include:
-                break
-            if n == first_common:
-                include.add(n)
-                break
-            include.add(n)
+    new_roots = []
+    for cc in nx.connected_components(x.graph.to_undirected()):
+        # Walk from each node to root and keep track of path
+        g = x.graph
+        paths = []
+        for n in leafs[np.isin(leafs, list(cc))]:
+            this_path = []
+            while n:
+                this_path.append(n)
+                n = next(g.successors(n), None)
+            paths.append(this_path)
+
+        # If none of these cc in subset there won't be paths
+        if not paths:
+            continue
+
+        # Find the nodes that all paths have in common
+        common = set.intersection(*[set(p) for p in paths])
+
+        # Now find the first (most distal from root) common node
+        longest_path = sorted(paths, key=lambda x: len(x))[-1]
+        first_common = sorted(common, key=lambda x: longest_path.index(x))[0]
+
+        # Now go back to paths and collect all nodes until this first common node
+        for p in paths:
+            it = iter(p)
             n = next(it, None)
+            while n:
+                if n in include:
+                    break
+                if n == first_common:
+                    include.add(n)
+                    break
+                include.add(n)
+                n = next(it, None)
 
-    # In cases where there are even more distal common ancestors
-    # (first common will typically be a branch point)
-    if set(ss) - set(include):
-        # Make sure the new root is set correctly
-        new_root = sorted(set(ss) - set(include),
-                          key=lambda x: longest_path.index(x))[-1]
-        # Add those nodes to be included
-        include = set.union(include, ss)
-    else:
-        new_root = first_common
+        # In cases where there are even more distal common ancestors
+        # (first common will typically be a branch point)
+        this_ss = ss[np.isin(ss, list(cc))]
+        if set(this_ss) - set(include):
+            # Make sure the new root is set correctly
+            nr = sorted(set(this_ss) - set(include),
+                        key=lambda x: longest_path.index(x))[-1]
+            new_roots.append(nr)
+            # Add those nodes to be included
+            include = set.union(include, this_ss)
+        else:
+            new_roots.append(first_common)
 
-    return np.array(list(include)), new_root
+    return np.array(list(include)), new_roots
 
 
 def segment_length(x, segment):
