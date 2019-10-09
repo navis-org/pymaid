@@ -1763,12 +1763,10 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
     df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
     if convert_ts:
-        df['creation_time'] = [datetime.datetime.strptime(
-            d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
-        df['edition_time'] = [datetime.datetime.strptime(
-            d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
-        df['review_times'] = [[datetime.datetime.strptime(
-            d[:16], '%Y-%m-%dT%H:%M') for d in lst] for lst in df['review_times'].values]
+        df['creation_time'] = pd.to_datetime(df.creation_time)
+        df['edition_time'] = pd.to_datetime(df.edition_time)
+        df['review_times'] = df.review_times.apply(lambda x: [pd.to_datetime(d)
+                                                            for d in x])
 
     return df
 
@@ -2205,10 +2203,8 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
         df = df[df.connector_id.isin(x.connectors.connector_id)]
 
     # Convert to timestamps
-    df['creation_time'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['creation_time'].values]
-    df['edition_time'] = [datetime.datetime.strptime(
-        d[:16], '%Y-%m-%dT%H:%M') for d in df['edition_time'].values]
+    df['creation_time'] =  pd.to_datetime(df.creation_time)
+    df['edition_time'] = pd.to_datetime(df.edition_time)
 
     if with_tags:
         return df, tags
