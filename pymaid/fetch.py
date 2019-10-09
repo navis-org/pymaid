@@ -2131,7 +2131,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
          1
          2
          ...
-           creator_id  treenode_id  creation_time  edition_time
+           creator  treenode_id  creation_time  edition_time
          0
          1
          2
@@ -2178,7 +2178,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
             data = [pd.DataFrame(r['links'],
                                  columns=['skeleton_id', 'connector_id',
                                           'x', 'y', 'z', 'confidence',
-                                          'creator_id', 'treenode_id',
+                                          'creator', 'treenode_id',
                                           'creation_time', 'edition_time']
                                  ) for r in responses]
 
