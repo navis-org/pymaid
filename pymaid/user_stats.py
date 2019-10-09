@@ -14,8 +14,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-""" This module contains functions to retrieve user statistics for sets of
-neurons.
+"""This module contains functions to retrieve user statistics.
 
 Examples
 --------
@@ -337,7 +336,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
         # Extract connector creation
         cn_creation = node_details.loc[node_details.node_id.isin(cn_ids),
-                                         ['creator', 'creation_time']].values
+                                       ['creator', 'creation_time']].values
         cn_creation = np.c_[cn_creation, ['cn_creation'] * cn_creation.shape[0]]
 
         # Extract edition times (treenodes + connectors)
@@ -346,7 +345,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
         # Link creation
         link_creation = link_details.loc[link_details.connector_id.isin(cn_ids),
-                                         ['creator_id', 'creation_time']].values
+                                         ['creator', 'creation_time']].values
         link_creation = np.c_[link_creation, ['link_creation'] * link_creation.shape[0]]
 
         # Extract review times
@@ -362,8 +361,10 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
                                          node_edits]),
                               columns=['user', 'timestamp', 'type'])
 
+        return all_ts
+
         # Add column with just the date and make it the index
-        all_ts['date'] = [v for v in all_ts.timestamp.astype('datetime64[D]').values]
+        all_ts['date'] = all_ts.timestamp.values.astype('datetime64[D]')
         all_ts.index = pd.to_datetime(all_ts.date)
 
         # Fill in teams for each timestamp based on user + date
@@ -410,7 +411,8 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
     stats = pd.DataFrame(stats, columns=cols)
 
     cols_ordered = ['skeleton_id'] + ['{}_{}'.format(t, v) for v in
-                    ['nodes', 'connectors', 'reviews', 'time']for t in ['total'] + list(teams)]
+                                      ['nodes', 'connectors',
+                                       'reviews', 'time'] for t in ['total'] + list(teams)]
     stats = stats[cols_ordered]
 
     return stats
@@ -758,7 +760,7 @@ def get_time_invested(x, mode='SUM', by='USER', minimum_actions=10,
         # connectors in case the input neurons have been pruned
         link_details = link_details[link_details.connector_id.isin(connector_ids)]
     else:
-        link_details = pd.DataFrame([], columns=['creator_id', 'creation_time'])
+        link_details = pd.DataFrame([], columns=['creator', 'creation_time'])
 
     # Remove timestamps outside of date range (if provided)
     if start_date:
@@ -1119,7 +1121,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     edition_timestamps.columns = ['user', 'timestamp', 'action']
 
     # DataFrame for linking
-    linking_timestamps = link_details[['creator_id', 'creation_time']]
+    linking_timestamps = link_details[['creator', 'creation_time']]
     linking_timestamps['action'] = 'linking'
     linking_timestamps.columns = ['user', 'timestamp', 'action']
 
