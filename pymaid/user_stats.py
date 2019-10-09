@@ -527,7 +527,7 @@ def get_user_contributions(x, teams=None, remote_instance=None):
                            stats['nodes_reviewed'][u]] for u in all_users],
                          columns=['user', 'nodes', 'presynapses',
                                   'postsynapses', 'nodes_reviewed']
-                        ).sort_values('nodes', ascending=False).reset_index(drop=True)
+                         ).sort_values('nodes', ascending=False).reset_index(drop=True)
 
     if isinstance(teams, type(None)):
         return stats
@@ -536,15 +536,16 @@ def get_user_contributions(x, teams=None, remote_instance=None):
     return stats.groupby('team').sum()
 
 
-def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
-                      treenodes=True, connectors=True, start_date=None,
-                      end_date=None, remote_instance=None):
-    """Calculate the time individual users worked on a set of neurons.
+def get_time_invested(x, mode='SUM', by='USER', minimum_actions=10,
+                      max_inactive_time=3, treenodes=True, connectors=True,
+                      links=True, start_date=None, end_date=None,
+                      remote_instance=None):
+    """Calculate the time spent working on a set of neurons.
 
     Use ``minimum_actions`` and ``max_inactive_time`` to fine tune how time
     invested is calculated: by default, time is binned over 3 minutes in
-    which a given user has to perform 3x10 actions for that interval to be
-    counted as active.
+    which a user has to perform 3x10 actions for that interval to be
+    counted towards the time spent tracing.
 
     Important
     ---------
@@ -581,13 +582,19 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
                         this to get time spent reconstructing in given
                         compartment of a neurons, e.g. by pruning it to a
                         volume before passing it to ``get_time_invested``.
-    mode :              'SUM' | 'OVER_TIME' | 'ACTIONS', optional
+    mode :              'SUM' | 'SUM2' | 'OVER_TIME' | 'ACTIONS', optional
                         (1) 'SUM' will return total time invested (in minutes)
-                            per user.
-                        (2) 'OVER_TIME' will return minutes invested/day over
+                            broken down by creation, edition and review.
+                        (2) 'SUM2' will return total time invested (in
+                            minutes) broken down by `treenodes`, `connectors`
+                            and `links`.
+                        (3) 'OVER_TIME' will return minutes invested/day over
                             time.
-                        (3) 'ACTIONS' will return actions
+                        (4) 'ACTIONS' will return actions
                             (node/connectors placed/edited) per day.
+    by :                'USER' | 'NEURON', optional
+                        Determines whether the stats are broken down by user or
+                        by neuron.
     minimum_actions :   int, optional
                         Minimum number of actions per minute to be counted as
                         active.
@@ -598,8 +605,9 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     treenodes :         bool, optional
                         If False, treenodes will not be taken into account.
     connectors :        bool, optional
-                        If False, connectors and connector links will not be
-                        taken into account.
+                        If False, connectors will not be taken into account.
+    links :             bool, optional
+                        If False, connector links will not be taken into account.
     start_date :        iterable | datetime.date | numpy.datetime64, optional
                         Restricts time invested to window. Applies to creation
                         but not edition time! If iterable, must be year, month
@@ -615,6 +623,14 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
         If ``mode='SUM'``, values represent minutes invested::
 
                  total  creation  edition  review
+          user1
+          user2
+          ..
+          .
+
+        If ``mode='SUM2'``, values represent minutes invested::
+
+                 total  treenodes  connectors  links
           user1
           user2
           ..
@@ -672,20 +688,23 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     >>> stats[stats.sum(axis=1) > 20].T.cumsum(axis=0).plot()
 
     """
-    def _extract_timestamps(ts, desc='Calc'):
+    def _extract_timestamps(ts, restrict_groups, desc='Calc'):
         if ts.empty:
             return {}
         grouped = ts.set_index('timestamp',
-                               drop=False).groupby(['user',
+                               drop=False).groupby(['group',
                                                     pd.Grouper(freq=bin_width)]).count() >= minimum_actions
         temp_stats = {}
-        for u in config.tqdm(set(ts.user.unique()) & set(relevant_users),
+        for g in config.tqdm(set(ts.group.unique()) & set(restrict_groups),
                              desc=desc, disable=config.pbar_hide, leave=False):
-            temp_stats[u] = sum(grouped.loc[u].values)[0] * interval
+            temp_stats[g] = sum(grouped.loc[g].values)[0] * interval
         return temp_stats
 
-    if mode not in ['SUM', 'OVER_TIME', 'ACTIONS']:
-        raise ValueError('Unknown mode "%s"' % str(mode))
+    if mode not in ['SUM', 'SUM2', 'OVER_TIME', 'ACTIONS']:
+        raise ValueError('Unknown mode "{}"'.format(mode))
+
+    if by not in ['NEURON', 'USER']:
+        raise ValueError('Unknown by "{}"'.format(by))
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
@@ -701,6 +720,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     minimum_actions *= interval
 
     user_list = fetch.get_user_list(remote_instance=remote_instance).set_index('id')
+    user_dict = user_list.login.to_dict()
 
     if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         x = fetch.get_neuron(skids, remote_instance=remote_instance)
@@ -729,8 +749,8 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     node_details = fetch.get_node_details(node_ids + connector_ids,
                                           remote_instance=remote_instance)
 
-    if connectors:
-        # Get details for links
+    # Get details for links
+    if links:
         link_details = fetch.get_connector_links(skdata,
                                                  remote_instance=remote_instance)
 
@@ -748,66 +768,208 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
         node_details = node_details[node_details.creation_time <= np.datetime64(end_date)]
         link_details = link_details[link_details.creation_time <= np.datetime64(end_date)]
 
+    # If we want to group by neuron, we need to add a "skeleton ID" column and
+    # make check if we need to duplicate rows with connectors
+    if by == 'NEURON':
+        # Need to add a column with the skeleton ID
+        node_details['skeleton_id'] = None
+        node_details['node_type'] = 'connector'
+        col_name = 'skeleton_id'
+
+        for n in skdata:
+            cond = node_details.node_id.isin(n.nodes.treenode_id.values.astype(str))
+            node_details.loc[cond, 'skeleton_id'] = n.skeleton_id
+            node_details.loc[cond, 'node_type'] = 'treenode'
+
+        # Connectors can show up in more than one neuron -> we need to duplicate
+        # those rows for each of the associated neurons
+        cn_details = []
+        for n in skdata:
+            cond1 = node_details.node_type == 'connector'
+            cond2 = node_details.node_id.isin(n.connectors.connector_id.values.astype(str))
+            node_details.loc[cond1 & cond2, 'skeleton_id'] = n.skeleton_id
+            this_cn = node_details.loc[cond1 & cond2]
+            cn_details.append(this_cn)
+        cn_details = pd.concat(cn_details, axis=0)
+
+        # Merge the node details again
+        cond1 = node_details.node_type == 'treenode'
+        node_details = pd.concat([node_details.loc[cond1], cn_details],
+                                 axis=0).reset_index(drop=True)
+
+        # Note that link_details already has a "skeleton_id" column
+        # but we need to make sure it's strings
+        link_details['skeleton_id'] = link_details.skeleton_id.astype(str)
+
+        create_group = edit_group = 'skeleton_id'
+    else:
+        create_group = 'creator'
+        edit_group = 'editor'
+        col_name = 'user'
+
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = np.append(node_details[['creator', 'creation_time']].values,
-                                    link_details[['creator_id', 'creation_time']].values,
+    creation_timestamps = np.append(node_details[[create_group,
+                                                  'creation_time']].values,
+                                    link_details[[create_group,
+                                                  'creation_time']].values,
                                     axis=0)
     creation_timestamps = pd.DataFrame(creation_timestamps,
-                                       columns=['user', 'timestamp'])
+                                       columns=['group', 'timestamp'])
 
     # Dataframe for edition times - can't use links as there is no editor
-    edition_timestamps = node_details[['editor', 'edition_time']]
-    edition_timestamps.columns = ['user', 'timestamp']
+    # Because creation of a node counts as an edit, we are removing
+    # timestamps where creation and edition time are less than 100ms apart
+    is_edit = (node_details.edition_time - node_details.creation_time) > np.timedelta64(200, 'ms')
+    edition_timestamps = node_details.loc[is_edit, [edit_group, 'edition_time']]
+    edition_timestamps.columns = ['group', 'timestamp']
 
-    # Generate dataframe for reviews
-    reviewers = [u for l in node_details.reviewers.values for u in l]
+    # Generate dataframe for reviews -> here we have to unpack
+    if by == 'USER':
+        groups = [u for l in node_details.reviewers.values for u in l]
+    else:
+        groups = [s for l, s in zip(node_details.review_times.values,
+                                    node_details.skeleton_id.values) for ts in l]
     timestamps = [ts for l in node_details.review_times.values for ts in l]
-    review_timestamps = pd.DataFrame([[u, ts] for u, ts in zip(
-        reviewers, timestamps)], columns=['user', 'timestamp'])
+    review_timestamps = pd.DataFrame([groups, timestamps]).T
+    review_timestamps.columns = ['group', 'timestamp']
+
+    # Change user ID to login
+    if by == 'USER':
+        if mode == 'SUM2':
+            node_details['creator'] = node_details.creator.map(user_dict)
+            node_details['editor'] = node_details.editor.map(user_dict)
+
+            link_details['creator'] = link_details.creator.map(user_dict)
+
+        creation_timestamps['group'] = creation_timestamps.group.map(user_dict)
+        edition_timestamps['group'] = edition_timestamps.group.map(user_dict)
+        review_timestamps['group'] = review_timestamps.group.map(user_dict)
 
     # Merge all timestamps
-    all_timestamps = pd.concat(
-        [creation_timestamps, edition_timestamps, review_timestamps], axis=0)
+    all_timestamps = pd.concat([creation_timestamps,
+                                edition_timestamps,
+                                review_timestamps],
+                               axis=0)
 
     all_timestamps.sort_values('timestamp', inplace=True)
 
-    relevant_users = all_timestamps.groupby('user').count()
-    relevant_users = relevant_users[relevant_users.timestamp >= minimum_actions].index.values
+    if by == 'USER':
+        # Extract the users that are relevant for us
+        relevant_users = all_timestamps.groupby('group').count()
+        groups = relevant_users[relevant_users.timestamp >= minimum_actions].index.values
+    else:
+        groups = skdata.skeleton_id
 
     if mode == 'SUM':
-        stats = {
-            'total': {u: 0 for u in relevant_users},
-            'creation': {u: 0 for u in relevant_users},
-            'edition': {u: 0 for u in relevant_users},
-            'review': {u: 0 for u in relevant_users}
-        }
+        # This breaks it down by time spent on creation, edition and review
+        stats = {k: {g: 0 for g in groups} for k in ['total',
+                                                     'creation',
+                                                     'edition',
+                                                     'review']}
+
         stats['total'].update(_extract_timestamps(all_timestamps,
+                                                  groups,
                                                   desc='Calc total'))
         stats['creation'].update(_extract_timestamps(creation_timestamps,
+                                                     groups,
                                                      desc='Calc creation'))
         stats['edition'].update(_extract_timestamps(edition_timestamps,
+                                                    groups,
                                                     desc='Calc edition'))
         stats['review'].update(_extract_timestamps(review_timestamps,
+                                                   groups,
                                                    desc='Calc review'))
 
-        return pd.DataFrame([[user_list.loc[u, 'login'],
-                              stats['total'][u],
-                              stats['creation'][u],
-                              stats['edition'][u],
-                              stats['review'][u]] for u in relevant_users],
-                            columns=['user', 'total', 'creation', 'edition', 'review']).sort_values('total', ascending=False).reset_index(drop=True).set_index('user')
+        return pd.DataFrame([[g,
+                              stats['total'][g],
+                              stats['creation'][g],
+                              stats['edition'][g],
+                              stats['review'][g]] for g in groups],
+                            columns=[col_name, 'total',
+                                     'creation', 'edition',
+                                     'review']
+                            ).sort_values('total',
+                                          ascending=False
+                                          ).reset_index(drop=True).set_index(col_name)
+
+    elif mode == 'SUM2':
+        # This breaks it down by time spent on nodes, connectors and links
+        stats = {k: {g: 0 for g in groups} for k in ['total',
+                                                     'treenodes',
+                                                     'connectors',
+                                                     'links']}
+
+        stats['total'].update(_extract_timestamps(all_timestamps,
+                                                  groups,
+                                                  desc='Calc total'))
+
+        # We need to construct separate DataFrames for nodes, connectors + links
+        # Note that we are using only edits that do not stem from the creation
+        is_tn = node_details.node_id.astype(int).isin(node_ids)
+        conc = np.concatenate([node_details.loc[is_tn,
+                                                [create_group, 'creation_time']
+                                                ].values,
+                               node_details.loc[is_edit & is_tn,
+                                                [edit_group, 'edition_time']
+                                                ].values
+                               ],
+                              axis=0)
+        treenode_timestamps = pd.DataFrame(conc, columns=['group', 'timestamp'])
+
+        stats['treenodes'].update(_extract_timestamps(treenode_timestamps,
+                                                      groups,
+                                                      desc='Calc treenodes'))
+
+        # Now connectors
+        # Note that we are using only edits that do not stem from the creation
+        is_cn = node_details.node_id.astype(int).isin(connector_ids)
+        conc = np.concatenate([node_details.loc[is_cn,
+                                                [create_group, 'creation_time']
+                                                ].values,
+                               node_details.loc[is_edit & is_cn,
+                                                [edit_group, 'edition_time']
+                                                ].values
+                               ],
+                              axis=0)
+        connector_timestamps = pd.DataFrame(conc, columns=['group', 'timestamp'])
+
+        stats['connectors'].update(_extract_timestamps(connector_timestamps,
+                                                       groups,
+                                                       desc='Calc connectors'))
+
+        # Now links
+        link_timestamps = pd.DataFrame(link_details[[create_group,
+                                                     'creation_time']].values,
+                                       columns=['group', 'timestamp'])
+
+        stats['links'].update(_extract_timestamps(link_timestamps,
+                                                  groups,
+                                                  desc='Calc links'))
+
+        return pd.DataFrame([[g,
+                              stats['total'][g],
+                              stats['treenodes'][g],
+                              stats['connectors'][g],
+                              stats['links'][g]] for g in groups],
+                            columns=[col_name, 'total',
+                                     'treenodes', 'connectors',
+                                     'links']
+                            ).sort_values('total', ascending=False
+                                          ).reset_index(drop=True
+                                                        ).set_index(col_name)
 
     elif mode == 'ACTIONS':
-        all_ts = all_timestamps.set_index('timestamp', drop=False).timestamp.groupby(
-            pd.Grouper(freq='1d')).count().to_frame()
-        all_ts.columns = ['all_users']
+        all_ts = all_timestamps.set_index('timestamp', drop=False
+                                          ).timestamp.groupby(pd.Grouper(freq='1d')
+                                                              ).count().to_frame()
+        all_ts.columns = ['all_groups']
         all_ts = all_ts.T
         # Get total time spent
-        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total',
+        for g in config.tqdm(all_timestamps.group.unique(), desc='Calc. total',
                              disable=config.pbar_hide, leave=False):
-            this_ts = all_timestamps[all_timestamps.user == u].set_index(
+            this_ts = all_timestamps[all_timestamps.group == g].set_index(
                 'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq='1d')).count().to_frame()
-            this_ts.columns = [user_list.loc[u, 'login']]
+            this_ts.columns = [g]
 
             all_ts = pd.concat([all_ts, this_ts.T])
 
@@ -816,9 +978,9 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
     elif mode == 'OVER_TIME':
         # Go over all users and collect time invested
         all_ts = []
-        for u in config.tqdm(all_timestamps.user.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
+        for g in config.tqdm(all_timestamps.group.unique(), desc='Calc. total', disable=config.pbar_hide, leave=False):
             # First count all minutes with minimum number of actions
-            minutes_counting = (all_timestamps[all_timestamps.user == u].set_index(
+            minutes_counting = (all_timestamps[all_timestamps.group == g].set_index(
                 'timestamp', drop=False).timestamp.groupby(pd.Grouper(freq=bin_width)).count().to_frame() >= minimum_actions)
             # Then remove the minutes that have less than minimum actions
             minutes_counting = minutes_counting[minutes_counting.timestamp]
@@ -827,7 +989,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
             this_ts = minutes_counting.groupby(pd.Grouper(freq='1d')).count()
 
             # Rename columns to user login
-            this_ts.columns = [user_list.loc[u, 'login']]
+            this_ts.columns = [g]
 
             # Append if an and move on
             if not this_ts.empty:
@@ -841,7 +1003,7 @@ def get_time_invested(x, mode='SUM', minimum_actions=10, max_inactive_time=3,
 
         # Add all users column
         all_users = all_ts.sum(axis=0)
-        all_users.name = 'all_users'
+        all_users.name = 'all_groups'
 
         all_ts = pd.concat([all_users, all_ts.T], axis=1).T
 
