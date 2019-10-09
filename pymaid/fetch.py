@@ -2853,7 +2853,7 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
 
     if not isinstance(treenode_ids, type(None)):
         treenode_ids = utils._make_iterable(treenode_ids)
-        post.update({'label_names[{}]'.format(i): t for i, t in enumerate(treenode_ids)})
+        post.update({'treenode_ids[{}]'.format(i): t for i, t in enumerate(treenode_ids)})
 
     if not isinstance(skeleton_ids, type(None)):
         skeleton_ids = utils.eval_skids(skeleton_ids, remote_instance=remote_instance)
