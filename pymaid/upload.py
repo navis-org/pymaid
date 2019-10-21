@@ -2390,13 +2390,13 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
     # Get annotation IDs
     to_annotate = utils._make_iterable(to_annotate)
     an = fetch.get_annotation_list(remote_instance=remote_instance)
-    an = an[an.annotation.isin(to_annotate)]
+    an = an[an.name.isin(to_annotate)]
 
     if an.shape[0] != len(to_annotate):
-        missing = set(to_annotate).difference(an.annotation.values)
+        missing = set(to_annotate).difference(an.name.values)
         raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
 
-    an_ids = an.annotation_id.values
+    an_ids = an.id.values
 
     to_add = utils._make_iterable(to_add)
 
@@ -2451,19 +2451,19 @@ def remove_meta_annotations(remove_from, to_remove, remote_instance=None):
 
     # Get annotation IDs
     remove_from = utils._make_iterable(remove_from)
-    rm = an[an.annotation.isin(remove_from)]
+    rm = an[an.name.isin(remove_from)]
     if rm.shape[0] != len(remove_from):
-        missing = set(remove_from).difference(rm.annotation.values)
+        missing = set(remove_from).difference(rm.name.values)
         raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
-    an_ids = rm.annotation_id.values
+    an_ids = rm.id.values
 
     # Get meta-annotation IDs
     to_remove = utils._make_iterable(to_remove)
-    rm = an[an.annotation.isin(to_remove)]
+    rm = an[an.name.isin(to_remove)]
     if rm.shape[0] != len(to_remove):
-        missing = set(to_remove).difference(rm.annotation.values)
+        missing = set(to_remove).difference(rm.name.values)
         raise ValueError('Meta-annotation(s) not found: {}'.format(','.join(missing)))
-    rm_ids = rm.annotation_id.values
+    rm_ids = rm.id.values
 
     add_annotations_url = remote_instance._get_remove_annotations_url()
 
@@ -2523,7 +2523,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     annotations = utils._make_iterable(annotations)
 
     # Translate into annotations ID
-    an_list = fetch.get_annotation_list(remote_instance=remote_instance).set_index('annotation')
+    an_list = fetch.get_annotation_list(remote_instance=remote_instance).set_index('name')
 
     an_ids = []
     for a in annotations:
@@ -2531,7 +2531,7 @@ def remove_annotations(x, annotations, remote_instance=None):
             logger.warning(
                 'Annotation {0} not found. Skipping.'.format(a))
             continue
-        an_ids.append(an_list.loc[a, 'annotation_id'])
+        an_ids.append(an_list.loc[a, 'id'])
 
     remove_annotations_url = remote_instance._get_remove_annotations_url()
 
@@ -2555,7 +2555,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     resp = remote_instance.fetch(remove_annotations_url,
                                  post=remove_annotations_postdata)
 
-    an_list = an_list.reset_index().set_index('annotation_id')
+    an_list = an_list.reset_index().set_index('id')
 
     if 'error' in resp:
         logger.error('Error deleting annotation(s). See server response for details.')
@@ -2563,7 +2563,7 @@ def remove_annotations(x, annotations, remote_instance=None):
         logger.info('No annotations removed.')
     else:
         for a in resp['deleted_annotations']:
-            logger.info('Removed "{}" from {} entities ({} uses left)'.format(an_list.loc[int(a), 'annotation'],
+            logger.info('Removed "{}" from {} entities ({} uses left)'.format(an_list.loc[int(a), 'name'],
                                                                               len(resp['deleted_annotations'][a]['targetIds']),
                                                                               resp['left_uses'][a]))
     return resp
