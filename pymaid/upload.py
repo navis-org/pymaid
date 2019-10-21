@@ -2392,8 +2392,8 @@ def add_meta_annotations(to_annotate, to_add, remote_instance=None):
     an = fetch.get_annotation_list(remote_instance=remote_instance)
     an = an[an.name.isin(to_annotate)]
 
-    if an.shape[0] != len(to_annotate):
-        missing = set(to_annotate).difference(an.name.values)
+    missing = set(to_annotate).difference(an.name.values)
+    if missing:
         raise ValueError('Annotation(s) not found: {}'.format(','.join(missing)))
 
     an_ids = an.id.values
