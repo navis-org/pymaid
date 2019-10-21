@@ -4925,13 +4925,16 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
 
 
 @cache.undo_on_error
-def get_node_location(x, remote_instance=None):
+def get_node_location(x, sort=True, remote_instance=None):
     """Retrieves location for a set of tree- or connector nodes.
 
     Parameters
     ----------
     x :                 int | list of int
                         Node ID(s).
+    sort :              bool, optional
+                        If True, will sort returned DataFrame to be in the same
+                        order as input data.
     remote_instance :   CatmaidInstance, optional
                         If not provided, will search for globally defined
                         remote instance.
@@ -4956,6 +4959,9 @@ def get_node_location(x, remote_instance=None):
 
     data = remote_instance.fetch(url, post=post)
     df = pd.DataFrame(data, columns=['node_id', 'x', 'y', 'z'])
+
+    if sort:
+        df = df.set_index('node_id').loc[x].reset_index(drop=False)
 
     return df
 
