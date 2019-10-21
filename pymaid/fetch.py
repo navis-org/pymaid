@@ -2939,7 +2939,7 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
 
 @cache.undo_on_error
 def get_annotated(x, include_sub_annotations=False, raise_not_found=True,
-                  allow_partial=True, remote_instance=None):
+                  allow_partial=False, remote_instance=None):
     """Retrieve entities (neurons + annotations) with given annotation(s).
 
     This works similar to CATMAID's neuron search widget: multiple annotations
