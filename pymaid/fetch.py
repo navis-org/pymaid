@@ -4804,7 +4804,7 @@ def get_annotation_list(remote_instance=None):
     pandas DataFrame
             DataFrame in which each row represents an annotation::
 
-                annotation_id   annotation   users
+                name   id   users
              0
              1
              ...
@@ -4816,7 +4816,6 @@ def get_annotation_list(remote_instance=None):
         'annotations']
 
     df = pd.DataFrame.from_dict(an)
-    df.columns = ['annotation_id', 'annotation', 'users']
 
     return df
 
