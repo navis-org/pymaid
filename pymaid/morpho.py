@@ -2637,7 +2637,7 @@ def _diff_report(a, b):
     return report
 
 
-def prune_twigs(x, size, inplace=False, recursive=False):
+def prune_twigs(x, size, exclude_tags=None, inplace=False, recursive=False):
     """Prune terminal twigs under a given size.
 
     Parameters
@@ -2645,6 +2645,9 @@ def prune_twigs(x, size, inplace=False, recursive=False):
     x :             CatmaidNeuron/List
     size :          int | float
                     Twigs shorter than this length [um] will be pruned.
+    exclude_tags :  str | list | None, optional
+                    Tag or list thereof. Twigs where the terminal node has any
+                    of the provided tags will be excluded from pruning.
     inplace :       bool, optional
                     If False, pruning is performed on copy of original neuron
                     which is then returned.
@@ -2671,13 +2674,13 @@ def prune_twigs(x, size, inplace=False, recursive=False):
     True
 
     """
-
     if isinstance(x, core.CatmaidNeuronList):
         if not inplace:
             x = x.copy()
 
         [prune_twigs(n,
                      size=size,
+                     exclude_tags=exclude_tags,
                      inplace=True,
                      recursive=recursive) for n in x]
 
@@ -2703,6 +2706,13 @@ def prune_twigs(x, size, inplace=False, recursive=False):
 
     # Find terminal nodes
     leafs = neuron.nodes[neuron.nodes.type == 'end'].treenode_id.values
+
+    # Exclude if tagged
+    if not isinstance(exclude_tags, type(None)):
+        exclude_tags = utils._make_iterable(exclude_tags)
+        exclude_leafs = [n for t in exclude_tags for n in neuron.tags.get(t, [])]
+
+        leafs = set(leafs) - set(exclude_leafs)
 
     # Find terminal segments
     segs = graph_utils._break_segments(neuron)
