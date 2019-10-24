@@ -438,10 +438,17 @@ class CatmaidInstance:
                     continue
                 # CATMAID internal server errors return useful error messages
                 if str(r.status_code).startswith('5'):
+                    # Try extracting error:
+                    try:
+                        msg = r.json().get('error', 'No error message.')
+                        det = r.json().get('detail', 'No details provided.')
+                    except BaseException:
+                        msg = r.reason
+                        det = 'No details provided.'
                     errors.append('{} Server Error: {} for url: {}'.format(r.status_code,
-                                                                           r.json().get('error', 'No error message.'),
+                                                                           msg,
                                                                            r.url))
-                    details.append(r.json().get('detail', 'No details provided.'))
+                    details.append(det)
                 # Parse all other errors
                 else:
                     errors.append('{} Server Error: {} for url: {}'.format(r.status_code,
