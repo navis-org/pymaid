@@ -93,7 +93,8 @@ __all__ = sorted(['CatmaidInstance',
                   'get_connectivity_counts',
                   'get_import_info',
                   'get_origin', 'get_skids_by_origin',
-                  'get_sampler', 'get_sampler_domains', 'get_sampler_counts'])
+                  'get_sampler', 'get_sampler_domains', 'get_sampler_counts',
+                  'get_skeleton_change'])
 
 # Set up logging
 logger = config.logger
@@ -948,6 +949,10 @@ class CatmaidInstance:
     def _get_sampler_counts_url(self, **GET):
         """Generate url for fetching domains for given sampler."""
         return self.make_url(self.project_id, 'skeletons', 'sampler-count', **GET)
+
+    def _get_skeleton_change_url(self, **GET):
+        """Generate url for fetching skeleton change history."""
+        return self.make_url(self.project_id, 'skeletons', 'change-history', **GET)
 
 
 @cache.undo_on_error
@@ -5521,5 +5526,38 @@ def get_sampler_counts(x, remote_instance=None):
     post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
 
     resp = remote_instance.fetch(url, post=post)
+
+    return resp
+
+
+@cache.undo_on_error
+def get_skeleton_change(x, remote_instance=None):
+    """Get split and merge history of skeletons.
+
+    Parameters
+    ----------
+    x :                     list-like | CatmaidNeuron/List | None, optional
+                            Skeleton IDs for which to get split/merge history.
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    list
+                            List of unique skeleton paths in historic order,
+                            newest last::
+
+                              [[skid1, skid2, ..., skidN],  ...]
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    skids = utils.eval_skids(x, remote_instance=remote_instance)
+
+    get = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
+
+    url = remote_instance._get_skeleton_change_url(**get)
+
+    resp = remote_instance.fetch(url)
 
     return resp
