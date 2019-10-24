@@ -5538,13 +5538,16 @@ def get_sampler_counts(x, remote_instance=None):
 
 
 @cache.undo_on_error
-def get_skeleton_change(x, remote_instance=None):
+def get_skeleton_change(x, chunk_size=50, remote_instance=None):
     """Get split and merge history of skeletons.
 
     Parameters
     ----------
     x :                     list-like | CatmaidNeuron/List | None, optional
                             Skeleton IDs for which to get split/merge history.
+    chunk_size :            int, optional
+                            Change history will be queried in chunks. Reduce
+                            the number if you experience problems.
     remote_instance :       CatmaidInstance, optional
                             If not passed directly, will try using global.
 
@@ -5561,10 +5564,21 @@ def get_skeleton_change(x, remote_instance=None):
 
     skids = utils.eval_skids(x, remote_instance=remote_instance)
 
-    get = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(skids)}
+    change = []
+    with config.tqdm(desc='Fetching change', total=len(skids),
+                     disable=config.pbar_hide,
+                     leave=config.pbar_leave) as pbar:
+        chunks = [skids[i:i + chunk_size] for i in range(0, len(skids), chunk_size)]
+        for ch in chunks:
+            # Generate URLs
+            GET = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(ch)}
+            url = remote_instance._get_skeleton_change_url(**GET)
 
-    url = remote_instance._get_skeleton_change_url(**get)
+            # Fetch data
+            resp = remote_instance.fetch(url, disable_pbar=True)
+            change += resp
 
-    resp = remote_instance.fetch(url)
+            # Update progress bar
+            pbar.update(len(ch))
 
-    return resp
+    return change
