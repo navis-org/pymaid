@@ -938,9 +938,9 @@ class TestTiles(unittest.TestCase):
     def test_tiles(self):
         from pymaid import tiles
         # Generate the job
-        job = tiles.LoadTiles([119000, 119500, 36000, 36500, 4050],
-                              stack_id=5,
-                              coords='PIXEL')
+        job = tiles.TileLoader([119000, 119500, 36000, 36500, 4050],
+                               stack_id=5,
+                               coords='PIXEL')
         # Load, stich and crop the required EM image tiles
         job.load_in_memory()
         # Render image
