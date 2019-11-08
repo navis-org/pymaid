@@ -3974,13 +3974,18 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
                                'x', 'y', 'z', 'confidence',
                                'radius', 'skeleton_id',
                                'edition_time', 'user_id'])
-    tn['edition_time'] = pd.to_datetime(tn.edition_time)
+    # Fix parent ID
+    tn.loc[tn.parent_id.isnull(), 'parent_id'] = -1
+    tn['parent_id'] = tn.parent_id.astype(int).astype(object)
+    tn.loc[tn.parent_id < 0, 'parent_id'] = None
+
+    tn['edition_time'] = pd.to_datetime(tn.edition_time, unit='s', utc=True)
 
     cn = pd.DataFrame(node_data[1],
                       columns=['connector_id', 'x', 'y', 'z',
                                'confidence', 'edition_time',
                                'user_id', 'partners'])
-    cn['edition_time'] = pd.to_datetime(cn.edition_time)
+    cn['edition_time'] = pd.to_datetime(cn.edition_time, unit='s', utc=True)
 
     node_limit_reached = node_data[3]
 
