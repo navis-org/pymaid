@@ -2500,6 +2500,7 @@ def remove_annotations(x, annotations, remote_instance=None):
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
+                        5. ``None`` to remove annotation(s) from all neurons.
     annotations :       list
                         Annotation(s) to remove from neurons.
     remote_instance :   CatmaidInstance, optional
@@ -2528,8 +2529,7 @@ def remove_annotations(x, annotations, remote_instance=None):
     an_ids = []
     for a in annotations:
         if a not in an_list.index:
-            logger.warning(
-                'Annotation {0} not found. Skipping.'.format(a))
+            logger.warning('Annotation {} not found. Skipping.'.format(a))
             continue
         an_ids.append(an_list.loc[a, 'id'])
 
@@ -2537,12 +2537,29 @@ def remove_annotations(x, annotations, remote_instance=None):
 
     remove_annotations_postdata = {}
 
-    neuron_ids = fetch.get_neuron_id(x, remote_instance=remote_instance)
+    if not isinstance(x, type(None)):
+        neuron_ids = fetch.get_neuron_id(x, remote_instance=remote_instance)
+        # Turn from skid -> ID into list of IDs
+        neuron_ids = list(neuron_ids.values())
+    else:
+        an = fetch.get_annotated(annotations, remote_instance=remote_instance)
+        neuron_ids = an.loc[an.type == 'neuron', 'id'].values
 
-    for i, s in enumerate(x):
+        # Now prompt
+        answer = ""
+        q = 'Please confirm removal of {} annotation(s) from {} neuron(s) ' \
+            '[Y/N] '
+        q = q.format(len(annotations), len(neuron_ids))
+        while answer not in ["y", "n"]:
+            answer = input(q).lower()
+
+        if answer != 'y':
+            return
+
+    for i, s in enumerate(neuron_ids):
         # This requires neuron IDs
         key = 'entity_ids[%i]' % i
-        remove_annotations_postdata[key] = neuron_ids[str(s)]
+        remove_annotations_postdata[key] = s
 
     for i in range(len(an_ids)):
         key = 'annotation_ids[%i]' % i
