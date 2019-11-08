@@ -1641,12 +1641,21 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
 
 def _eval_color(x, color_range=255):
     """Evaluate color and force to r/g/b tuple."""
-
     if color_range not in [1, 255]:
         raise ValueError('color_range must be 1 or 255')
 
     if isinstance(x, str):
-        c = mcl.to_rgb(x)
+        # Check if named color
+        if mcl.is_color_like(x):
+            c = mcl.to_rgb(x)
+        # Assume it's a matplotlib color map
+        else:
+            try:
+                c = plt.get_cmap(x)
+            except ValueError:
+                raise ValueError('Unable to interpret color "{}"'.format(x))
+            except BaseException:
+                raise
     elif isinstance(x, dict):
         return {k: _eval_color(v, color_range=color_range) for k, v in x.items()}
     elif isinstance(x, (list, tuple, np.ndarray)):
@@ -1661,13 +1670,15 @@ def _eval_color(x, color_range=255):
         raise TypeError('Unable to interpret color of type '
                         '"{}"'.format(type(x)))
 
-    # Check if we need to convert
-    if not any([v > 1 for v in c]) and color_range == 255:
-        c = [int(v * 255) for v in c]
-    elif any([v > 1 for v in c]) and color_range == 1:
-        c = [v / 255 for v in c]
+    if not isinstance(c, mcl.Colormap):
+        # Check if we need to convert
+        if not any([v > 1 for v in c]) and color_range == 255:
+            c = [int(v * 255) for v in c]
+        elif any([v > 1 for v in c]) and color_range == 1:
+            c = [v / 255 for v in c]
+        c = tuple(c)
 
-    return tuple(c)
+    return c
 
 
 def plot_network(x, **kwargs):
