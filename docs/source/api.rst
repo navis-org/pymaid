@@ -138,7 +138,7 @@ top level but has to be imported explicitly::
 .. autosummary::
     :toctree: generated/
 
-    pymaid.tiles.LoadTiles
+    pymaid.tiles.TileLoader
     pymaid.tiles.crop_neuron
 
 .. _api_misc:
@@ -384,6 +384,8 @@ Change neuron morphology:
     pymaid.heal_fragmented_neuron
     pymaid.longest_neurite
     pymaid.prune_by_strahler
+    pymaid.prune_twigs
+    pymaid.prune_by_length
     pymaid.reroot_neuron
     pymaid.remove_tagged_branches
     pymaid.smooth_neuron

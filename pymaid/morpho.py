@@ -37,7 +37,8 @@ __all__ = sorted(['calc_cable', 'strahler_index', 'prune_by_strahler',
                   'to_dotprops', 'average_neurons', 'tortuosity',
                   'remove_tagged_branches', 'despike_neuron', 'guess_radius',
                   'smooth_neuron', 'time_machine', 'heal_fragmented_neuron',
-                  'break_fragments', 'union_neurons', 'prune_twigs'])
+                  'break_fragments', 'union_neurons', 'prune_twigs',
+                  'prune_by_length'])
 
 
 def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
@@ -2741,6 +2742,104 @@ def prune_twigs(x, size, exclude_tags=None, inplace=False, recursive=False):
         if recursive:
             recursive -= 1
             prune_twigs(neuron, size=size, inplace=True, recursive=recursive)
+
+    if not inplace:
+        return neuron
+    else:
+        return None
+
+
+def prune_by_length(x, min_length=0, max_length=float('inf'), inplace=False):
+    """Remove segments of given length.
+
+    This uses :func:`pymaid.graph_utils._generate_segments` to generate
+    segments that maximize segment lengths.
+
+    Parameters
+    ----------
+    x :             CatmaidNeuron/List
+    min_length :    int | float
+                    Twigs shorter than this length [um] will be pruned.
+    max_length :    int | float
+                    Segments longer than this length [um] will be pruned.
+    inplace :       bool, optional
+                    If False, pruning is performed on copy of original neuron
+                    which is then returned.
+
+    Returns
+    -------
+    CatmaidNeuron/List
+                    Pruned neuron(s).
+
+    See Also
+    --------
+    :func:`pymaid.longest_neurite`
+                    If you want to keep/remove just the N longest neurites
+                    instead of using a length cut-off.
+    :func:`pymaid.prune_twigs`
+                    Use if you are looking to remove only terminal branches of
+                    a given size.
+
+    Examples
+    --------
+    >>> import pymaid
+    >>> n = pymaid.get_neurons(16)
+    >>> # Remove neurites longer than 100mirons
+    >>> n_pr = pymaid._prune_by_length(n,
+    ...                                min_length=0,
+    ...                                max_length=100,
+    ...                                inplace=False)
+    >>> n.n_nodes > n_pr.n_nodes
+    True
+
+    """
+    if isinstance(x, core.CatmaidNeuronList):
+        if not inplace:
+            x = x.copy()
+
+        [prune_by_length(n,
+                         min_length=min_length,
+                         max_length=max_length,
+                         inplace=True) for n in config.tqdm(x, desc='Pruning',
+                                                            disable=config.pbar_hide,
+                                                            leave=config.pbar_leave)]
+
+        if not inplace:
+            return x
+        else:
+            return None
+    elif isinstance(x, core.CatmaidNeuron):
+        neuron = x
+    else:
+        raise TypeError('Expected CatmaidNeuron/List, got {}'.format(type(x)))
+
+    # Make a copy if necessary before making any changes
+    if not inplace:
+        neuron = neuron.copy()
+
+    # Convert units to nanometres
+    min_length *= 1000
+    max_length *= 1000
+
+    # Find terminal segments
+    segs = graph_utils._generate_segments(neuron, weight='weight')
+    segs = np.array(segs)
+
+    # Get segment lengths
+    seg_lengths = np.array([graph_utils.segment_length(neuron, s) for s in segs])
+
+    # Find out which to delete
+    segs_to_delete = segs[(seg_lengths < min_length) | (seg_lengths > max_length)]
+
+    if segs_to_delete.any():
+        # Unravel the into list of node IDs -> skip the last parent
+        nodes_to_delete = [n for s in segs_to_delete for n in s[:-1]]
+
+        # Subset neuron
+        nodes_to_keep = neuron.nodes[~neuron.nodes.treenode_id.isin(nodes_to_delete)].treenode_id.values
+        graph_utils.subset_neuron(neuron,
+                                  nodes_to_keep,
+                                  inplace=True)
 
     if not inplace:
         return neuron

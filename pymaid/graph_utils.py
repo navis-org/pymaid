@@ -721,6 +721,12 @@ def longest_neurite(x, n=1, reroot_to_soma=False, inplace=False):
     --------
     :func:`~pymaid.split_into_fragments`
             Split neuron into fragments based on longest neurites.
+    :func:`pymaid.prune_by_length`
+            If you are looking to remove segments over/under a given size
+            threshold.
+    :func:`pymaid.prune_twigs`
+            Use if you are looking to remove only terminal branches of
+            a given size.
 
     """
     if isinstance(x, core.CatmaidNeuron):
