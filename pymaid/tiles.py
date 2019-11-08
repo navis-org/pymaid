@@ -37,7 +37,7 @@ try:
 except ImportError:
     logger.error('Unable to import imageio. Please make sure library is installed!')
 
-__all__ = sorted(['crop_neuron', 'LoadTiles'])
+__all__ = sorted(['crop_neuron', 'TileLoader', 'make_bvox'])
 
 
 def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
@@ -121,7 +121,7 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
         bboxes += list(bbox)
 
     # Generate tile job
-    job = LoadTiles(bboxes,
+    job = TileLoader(bboxes,
                     zoom_level=0,
                     coords='NM',
                     remote_instance=remote_instance)
@@ -164,8 +164,8 @@ def _bbox_helper(coords, dimensions=(500, 500)):
     return bbox
 
 
-class LoadTiles:
-    """Load tiles from CATMAID and returns stitched image.
+class TileLoader:
+    """Load tiles from CATMAID, stitch into image and render output.
 
     Important
     ---------
@@ -175,9 +175,10 @@ class LoadTiles:
     Parameters
     ----------
     bbox :          list | numpy.array
-                    Window to crop: ``left, right, top, bottom, z1, z2``. Can
-                    be single or list/array of bounding boxes. ``z2`` can be
-                    omitted, in which case ``z2 = z1``.
+                    Window to crop: ``left, right, top, bottom, z1, [z2, stepsize]``.
+                    Can be single or list/array of bounding boxes. ``z2`` can be
+                    omitted, in which case ``z2 = z1``. Optionally you can
+                    provide a 7th ``stepsize`` parameter.
     stack_id :      int
                     ID of EM image stack to use.
     zoom_level :    int, optional
@@ -199,12 +200,12 @@ class LoadTiles:
     Examples
     --------
     >>> # Generate the job
-    >>> job = pymaid.tiles.LoadTiles([119000, 124000,
+    >>> job = pymaid.tiles.TileLoader([119000, 124000,
     ...                               36000, 42000,
     ...                               4050],
     ...                               stack_id=5,
     ...                               coords='PIXEL')
-    >>> # Load, stich and crop the required EM image tiles
+    >>> # Load, stitch and crop the required EM image tiles
     >>> job.load_in_memory()
     >>> # Render image
     >>> ax = job.render_im(slider=False, figsize=(12, 12))
@@ -216,6 +217,7 @@ class LoadTiles:
     >>> plt.show()
 
     """
+
     # TODOs
     # -----
     # 1. Check for available image mirror automatically (make stack_mirror and stack_id superfluous) - DONE
@@ -304,8 +306,9 @@ class LoadTiles:
         if image_mirror == 'auto':
             # Get fastest image mirror
             match = sorted(info['mirrors'],
-                          key=lambda x: test_response_time(x['image_base'],
-                                                           calls=2))
+                           key=lambda x: test_response_time(x['image_base'],
+                                                            calls=2),
+                           reverse=False)
         elif isinstance(image_mirror, int):
             match = [m for m in info['mirrors'] if m['id'] == image_mirror]
         elif isinstance(image_mirror, str):
@@ -337,13 +340,18 @@ class LoadTiles:
         self.image_coords = []
 
         for bbox in self.bboxes:
-            if len(bbox) not in [5, 6]:
-                raise ValueError(
-                    'Need 5 or 6 coordinates (top, left, bottom, right, z1, [z2]), got {0}'.format(len(bbox)))
+            if len(bbox) not in [5, 6, 7]:
+                raise ValueError('Need 5-7 coordinates (top, left, bottom, '
+                                 'right, z1, [z2, stepsize]), got {0}'.format(len(bbox)))
 
             # If z2 not given, add z2 = z1
             if len(bbox) == 5:
-                np.append(bbox, bbox[-1])
+                np.append(bbox, bbox[4])
+
+            if len(bbox) == 7:
+                stepsize = int(bbox[6])
+            else:
+                stepsize = 1
 
             # Make sure we have left/right, top/bot, z1, z2 in correct order
             left = min(bbox[0:2])
@@ -393,7 +401,9 @@ class LoadTiles:
             border_bot = (tile_bot * self.tile_width) - px_bot
 
             # Generate a single entry for each z slice in this bbox
-            for px_z, nm_z in zip(range(px_z1, px_z2 + 1), np.arange(nm_z1, nm_z2 + self.resolution_z, self.resolution_z)):
+            for px_z, nm_z in zip(range(px_z1, px_z2 + 1)[::stepsize],
+                                  np.arange(nm_z1, nm_z2 + self.resolution_z,
+                                            self.resolution_z)[::stepsize]):
                 # Tile we will have to load for this image
                 this_tiles = []
                 for i, ix_x in enumerate(range(tile_left, tile_right)):
@@ -463,7 +473,7 @@ class LoadTiles:
 
         return data
 
-    def _stich_tiles(self, im, tiles):
+    def _stitch_tiles(self, im, tiles):
         """Stitch tiles into final image."""
         # Generate empty array
         im_dim = np.array([
@@ -517,7 +527,6 @@ class LoadTiles:
                 raise ValueError('Number of filenames must match number of '
                                  'images ({})'.format(len(self.image_coords)))
 
-
         tiles = {}
         max_safe_tiles = int((self.mem_lim * 10**6) / self.bytes_per_tile)
         for l, f, im in zip(range(len(self.image_coords)),
@@ -549,23 +558,25 @@ class LoadTiles:
                 # Get missing tiles
                 tiles.update(self._get_tiles(tiles_to_get))
 
-            cropped_img = self._stich_tiles(im, tiles)
+            # Generate image
+            cropped_img = self._stitch_tiles(im, tiles)
 
             # Save image
             fp = os.path.join(filepath, f)
 
             # This prevents a User Warning regarding conversion from int64
             # to uint8
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                imageio.imwrite(fp, cropped_img)
+            try:
+                imageio.imwrite(fp, cropped_img.astype('uint8'))
+            except BaseException as err:
+                logger.error('Error saving {}: {}'.format(f, str(err)))
 
             del cropped_img
 
     def load_in_memory(self):
         """Download and stitch tiles, and keep images in memory.
 
-        Accessible via ``.img`` attribute.
+        Data accessible via ``.img`` attribute.
 
         """
         tiles = {}
@@ -600,7 +611,7 @@ class LoadTiles:
                 # Get missing tiles
                 tiles.update(self._get_tiles(tiles_to_get))
 
-            cropped_img = self._stich_tiles(im, tiles)
+            cropped_img = self._stitch_tiles(im, tiles)
 
             # Add slice
             images.append(cropped_img)
@@ -617,8 +628,8 @@ class LoadTiles:
 
         # Get standard deviation to check if they are all the same
         if sum(np.std(dims, axis=0)) != 0:
-            logger.warning(
-                'Varying image dimensions detected. Cropping everything to the smallest image size: {0}'.format(min_dims))
+            logger.warning('Varying image dimensions detected. Cropping '
+                           'everything to the smallest image size: {0}'.format(min_dims))
 
             # Crop images to the smallest common dimension
             for im in images:
@@ -949,7 +960,52 @@ def test_response_time(url, calls=5):
                 return float('inf')
             if err.code == 401:
                 resp_times.append(time.time() - start)
-        except BaseException:
+        except BaseException as err:
+            if 'SSL: CERTIFICATE_VERIFY_FAILED' in str(err):
+                msg = 'SSL: CERTIFICATE_VERIFY_FAILED error while ' + \
+                      'accessing "{}". Try fixing SSL or set up unverified ' + \
+                      'context:\n' + \
+                      '>>> import ssl\n' + \
+                      '>>> ssl._create_default_https_context = ssl._create_unverified_context\n'
+                logger.warning(msg.format(url))
             return float('inf')
 
     return np.mean(resp_times)
+
+
+def make_bvox(arr, fp):
+    """Save image array as Blender Voxel.
+
+    Can be loaded as volumetric texture.
+
+    Parameters
+    ----------
+    arr :       numpy.ndarray
+                (Nz, Nx, Ny) array of gray values (0-1 or 0-255).
+    fp :        str
+                Path + filename. Will force `.bvox` file extension.
+
+    Returns
+    -------
+    Nothing
+
+    """
+    assert isinstance(arr, np.ndarray)
+    assert isinstance(fp, str)
+    assert arr.ndim == 3
+
+    fp = fp + '.bvox' if not fp.endswith('.bvox') else fp
+
+    nx, ny, nz = arr.shape
+    nframes = 1
+    header = np.array([nz, ny, nx, nframes])
+
+    pointdata = arr.flatten()
+
+    # We will assume that if any value > 1 it's 0-255
+    if np.any(pointdata > 1):
+        pointdata = pointdata / 255
+
+    with open(fp, 'wb') as binfile:
+         header.astype('<i4').tofile(binfile)
+         pointdata.astype('<f4').tofile(binfile)
