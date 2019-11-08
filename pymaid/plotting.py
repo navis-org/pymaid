@@ -295,6 +295,12 @@ def plot2d(x, method='2d', **kwargs):
     ``figsize`` (tuple, default = (8, 8))
       Sets figure size.
 
+    ``soma`` (bool, default = True)
+      Whether to plot somata.
+
+    ``volume_outlines`` (bool, default=True)
+      If True will plot volume outline with no fill.
+
     See Also
     --------
     :func:`pymaid.plot3d`
@@ -307,7 +313,8 @@ def plot2d(x, method='2d', **kwargs):
                         'cn_mesh_colors', 'linewidth', 'cn_size',
                         'group_neurons', 'scatter_kws', 'figsize', 'linestyle',
                         'alpha', 'depth_coloring', 'autoscale', 'depth_scale',
-                        'use_neuron_color', 'ls', 'lw']
+                        'use_neuron_color', 'ls', 'lw', 'soma',
+                        'volume_outlines']
     wrong_kwargs = [a for a in kwargs if a not in _ACCEPTED_KWARGS]
     if wrong_kwargs:
         raise KeyError('Unknown kwarg(s): {0}. Currently accepted: {1}'.format(
@@ -347,9 +354,6 @@ def plot2d(x, method='2d', **kwargs):
 
     remote_instance = utils._eval_remote_instance(remote_instance,
                                                   raise_error=False)
-
-    # Keep track of limits if necessary
-    lim = []
 
     if skids:
         skdata += fetch.get_neuron(skids,
@@ -393,15 +397,12 @@ def plot2d(x, method='2d', **kwargs):
         if method in ['3d', '3d_complex']:
             if ax.name != '3d':
                 raise TypeError('Axis must be 3d.')
-
-            # Add existing limits to ax
-            lim += np.array((ax.get_xlim3d(),
-                             ax.get_zlim3d(),
-                             ax.get_ylim3d())
-                            ).T.tolist()
         elif method == '2d':
             if ax.name == '3d':
                 raise TypeError('Axis must be 2d.')
+
+    # Keep track of whether ax already has data
+    ax_had_data = ax.has_data()
 
     # Prepare some stuff for depth coloring
     if depth_coloring and method == '3d_complex':
@@ -422,10 +423,20 @@ def plot2d(x, method='2d', **kwargs):
                 c = np.array(c)
                 c[:3] = np.array(c[:3]) / 255
 
+            if len(c) == 4:
+                this_alpha = c[3]
+            else:
+                this_alpha = 1
+
+            if kwargs.get('volume_outlines', False):
+                fill, lw, fc, ec = False, 1, 'none', c
+            else:
+                fill, lw, fc, ec = True, 0, c, 'none'
+
             if method == '2d':
-                vpatch = mpatches.Polygon(
-                    v.to_2d(view='{0}{1}'.format(axis1, axis2), invert_y=True),
-                    closed=True, lw=0, fill=True, fc=c, alpha=1)
+                verts = v.to_2d(view='{0}{1}'.format(axis1, axis2), invert_y=True)
+                vpatch = mpatches.Polygon(verts, closed=True, lw=lw, fill=fill,
+                                          fc=fc, ec=ec, alpha=this_alpha, zorder=0)
                 ax.add_patch(vpatch)
             elif method in ['3d', '3d_complex']:
                 verts = np.vstack(v.vertices)
@@ -438,9 +449,9 @@ def plot2d(x, method='2d', **kwargs):
                                      verts[:, 1], label=v.name,
                                      color=c)
                 ts.set_gid(v.name)
-                # Keep track of limits
-                lim.append(verts.max(axis=0))
-                lim.append(verts.min(axis=0))
+                ax_had_data = _update_axes3d_bounds(ax,
+                                                    verts[:, [0, 2, 1]],
+                                                    had_data=ax_had_data)
 
     # Create lines from segments
     line3D_collections = []
@@ -458,7 +469,6 @@ def plot2d(x, method='2d', **kwargs):
             continue
 
         if not connectors_only:
-
             # Now make traces (invert y axis)
             coords = _segments_to_coords(
                 neuron, neuron.segments, modifier=(1, -1, 1))
@@ -524,7 +534,12 @@ def plot2d(x, method='2d', **kwargs):
                                           linestyle=linestyle)
                     if group_neurons:
                         lc.set_gid(neuron.neuron_name)
+                    # Need to get this before adding data
                     ax.add_collection3d(lc)
+                    # Update data bounds
+                    ax_had_data = _update_axes3d_bounds(ax,
+                                                        neuron.nodes[['x', 'z', 'y']].values * [1, 1, -1],
+                                                        had_data=ax_had_data)
                     line3D_collections.append(lc)
 
                 # For complex scenes, add each segment as a single collection
@@ -539,10 +554,11 @@ def plot2d(x, method='2d', **kwargs):
                         if group_neurons:
                             lc.set_gid(neuron.neuron_name)
                         ax.add_collection3d(lc)
+                    ax_had_data = _update_axes3d_bounds(ax,
+                                                        neuron.nodes[['x', 'z', 'y']].values * [1, 1, -1],
+                                                        had_data=ax_had_data)
 
                 coords = np.vstack(coords)
-                lim.append(coords.max(axis=0))
-                lim.append(coords.min(axis=0))
 
                 surf3D_collections.append([])
                 if neuron.soma and kwargs.get('soma', True):
@@ -585,12 +601,13 @@ def plot2d(x, method='2d', **kwargs):
                            alpha=this_alpha)
                 ax.get_children(
                 )[-1].set_gid('CN_{0}'.format(neuron.neuron_name))
+                # Update data bounds
+                ax_had_data = _update_axes3d_bounds(ax,
+                                                    all_cn[['x', 'z', 'y']].values * [1, 1, -1],
+                                                    had_data=ax_had_data)
 
             coords = neuron.connectors[['x', 'y', 'z']].values
             coords[:, 1] *= -1
-            lim.append(coords.max(axis=0))
-            lim.append(coords.min(axis=0))
-
     for i, neuron in enumerate(config.tqdm(dotprops.itertuples(),
                                            desc='Plt dotprops',
                                            total=dotprops.shape[0],
@@ -656,6 +673,9 @@ def plot2d(x, method='2d', **kwargs):
                 if group_neurons:
                     lc.set_gid(neuron.gene_name)
                 ax.add_collection3d(lc)
+                ax_had_data = _update_axes3d_bounds(ax,
+                                                    coords[:, [0, 2, 1]],
+                                                    had_data=ax_had_data)
 
             # For complex scenes, add each segment as a single collection
             # -> help preventing Z-order errors
@@ -669,9 +689,9 @@ def plot2d(x, method='2d', **kwargs):
                     if group_neurons:
                         lc.set_gid(neuron.gene_name)
                     ax.add_collection3d(lc)
-
-            lim.append(coords.max(axis=0))
-            lim.append(coords.min(axis=0))
+                ax_had_data = _update_axes3d_bounds(ax,
+                                                    coords[:, [0, 2, 1]],
+                                                    had_data=ax_had_data)
 
             resolution = 20
             u = np.linspace(0, 2 * np.pi, resolution)
@@ -712,29 +732,33 @@ def plot2d(x, method='2d', **kwargs):
                 ax.scatter(p[:, 0], p[:, 2], p[:, 1] * -1,
                            **default_settings
                            )
+                ax_had_data = _update_axes3d_bounds(ax,
+                                                    p[:, [0, 2, 1]] * [1, 1, -1],
+                                                    had_data=ax_had_data)
 
             coords = p
             coords[:, 1] *= -1
-            lim.append(coords.max(axis=0))
-            lim.append(coords.min(axis=0))
 
     if autoscale:
         if method == '2d':
-            ax.autoscale()
+            ax.autoscale(tight=True)
         elif method in ['3d', '3d_complex']:
-            lim = np.vstack(lim)
-            lim_min = lim.min(axis=0)
-            lim_max = lim.max(axis=0)
-
-            center = lim_min + (lim_max - lim_min) / 2
-            max_dim = (lim_max - lim_min).max()
+            # First autoscale
+            ax.autoscale()
+            # Now we need to set equal aspect manually
+            lim = np.array([ax.get_xlim(),
+                            ax.get_ylim(),
+                            ax.get_zlim()])
+            dim = lim[:, 1] - lim[:, 0]
+            center = lim[:, 0] + dim / 2
+            max_dim = dim.max()
 
             new_min = center - max_dim / 2
             new_max = center + max_dim / 2
 
             ax.set_xlim(new_min[0], new_max[0])
-            ax.set_ylim(new_min[2], new_max[2])
-            ax.set_zlim(new_min[1], new_max[1])
+            ax.set_ylim(new_min[1], new_max[1])
+            ax.set_zlim(new_min[2], new_max[2])
 
     if scalebar is not None:
         # Convert sc size to nm
@@ -840,6 +864,30 @@ def plot2d(x, method='2d', **kwargs):
 
     return fig, ax
 
+
+def _update_axes3d_bounds(ax, points, had_data=False):
+    """Update axis bounds and remove default points (0,0,0) and (1,1,1)"""
+    if not isinstance(points, np.ndarray):
+        points = np.ndarray(points)
+
+    # If this is the first set of points, we need to overwrite the defaults
+    # That should happen automatically but for some reason doesn't for 3d axes
+    if not had_data:
+        mn = points.min(axis=0)
+        mx = points.max(axis=0)
+        new_xybounds = np.array([[mn[0], mn[1]],
+                                  [mx[0], mx[1]]])
+        new_zzbounds = np.array([[mn[2], mn[2]],
+                                  [mx[2], mx[2]]])
+        ax.xy_dataLim.set_points(new_xybounds)
+        ax.zz_dataLim.set_points(new_zzbounds)
+    else:
+        ax.auto_scale_xyz(points[:, 0].tolist(),
+                          points[:, 1].tolist(),
+                          points[:, 2].tolist(),
+                          had_data=True)
+
+    return True
 
 def _fix_default_dict(x):
     """Fix duplicate settings.
