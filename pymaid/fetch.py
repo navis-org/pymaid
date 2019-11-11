@@ -965,7 +965,8 @@ class CatmaidInstance:
 @cache.undo_on_error
 def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
                with_merge_history=False, with_abutting=False, return_df=False,
-               fetch_kwargs={}, init_kwargs={}, remote_instance=None):
+               fetch_kwargs={}, init_kwargs={}, raise_missing=True,
+               remote_instance=None):
     """Retrieve 3D skeleton data as CatmaidNeuron/List.
 
     Parameters
@@ -1013,6 +1014,9 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
     init_kwargs :       dict, optional
                         Keyword arguments passed when initializing
                         ``CatmaidNeuron``/``CatmaidNeuronList``.
+    raise_missing :     bool, optional
+                        If True and any of the queried neurons can not be
+                        found, raise an exception. Else just log a warning.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
@@ -1105,22 +1109,30 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
         node_cols += ['last_modified', 'creation_date', 'still_on_skeleton']
         cn_cols += ['last_modified', 'creation_date']
 
+    missing = [s for s, d in zip(x, skdata) if not d[0]]
+    if missing:
+        msg = 'The following skeleton ID(s) could not be found: {}'.format(', '.join(missing))
+        if raise_missing:
+            raise ValueError(msg)
+        else:
+            logger.warning(msg)
+
     # Generate DataFrame with all neurons
     df = pd.DataFrame([[names[str(x[i])],  # neuron name
                         str(x[i]),  # skeleton ID
                         pd.DataFrame(n[0],  # nodes
                                      columns=node_cols,
-                                     dtype=object), # do NOT remove this dtype 
-                        pd.DataFrame(n[1], # connectors
+                                     dtype=object),  # do NOT remove this dtype
+                        pd.DataFrame(n[1],  # connectors
                                      columns=cn_cols),
                         n[2]  # tags as dictionary
-                        ] for i, n in enumerate(skdata)],
+                        ] for i, n in enumerate(skdata) if n[0]],
                       columns=['neuron_name', 'skeleton_id',
                                'nodes', 'connectors', 'tags'])
 
     # Convert data to respective dtypes
     dtypes = {'treenode_id': int,
-              'parent_id': object, # This must not be int because root's parent is None
+              'parent_id': object,  # This must not be int because root's parent is None
               'creator_id': int,
               'relation': int,
               'connector_id': int,
@@ -1139,10 +1151,9 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
     if return_df:
         return df
 
-    if df.shape[0] > 1:
-        return core.CatmaidNeuronList(df, remote_instance=remote_instance, **init_kwargs)
-    else:
-        return core.CatmaidNeuron(df.iloc[0], remote_instance=remote_instance, **init_kwargs)
+    nl = core.CatmaidNeuronList(df, remote_instance=remote_instance, **init_kwargs)
+
+    return nl[0] if len(nl) == 1 and len(x) == 1 else nl
 
 
 # This is for legacy reasons -> will remove eventually
@@ -2971,7 +2982,7 @@ def get_annotated(x, include_sub_annotations=False, raise_not_found=True,
                               work on `NOT` search conditions.
     allow_partial :           bool, optional
                               If True, partially matching annotations are
-                              searched to.
+                              searched too.
     raise_not_found :         bool, optional
                               If True raise Exception if no match for any of the
                               query annotations is found. Else log warning.
@@ -3006,6 +3017,7 @@ def get_annotated(x, include_sub_annotations=False, raise_not_found=True,
         pos_ids = get_annotation_id(pos, allow_partial=allow_partial,
                                     raise_not_found=raise_not_found,
                                     remote_instance=remote_instance)
+
         post.update({'annotated_with[{}]'.format(i): n for i, n in enumerate(pos_ids.values())})
         if include_sub_annotations:
             post.update({'sub_annotated_with[{}]'.format(i): n for i, n in enumerate(pos_ids.values())})
@@ -3013,6 +3025,7 @@ def get_annotated(x, include_sub_annotations=False, raise_not_found=True,
         neg_ids = get_annotation_id(neg, allow_partial=allow_partial,
                                     raise_not_found=raise_not_found,
                                     remote_instance=remote_instance)
+
         post.update({'not_annotated_with[{}]'.format(i): n for i, n in enumerate(neg_ids.values())})
 
     logger.info('Searching for: {}'.format(','.join([str(s) for s in pos_ids])))
