@@ -5235,8 +5235,8 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
         bbox = np.array(bbox)
 
     if unit == 'PIXEL':
-        bbox[[0, 1]:] *= kwargs.get('xy_res', 3.8)
-        bbox[[2]:] *= kwargs.get('z_res', 35)
+        bbox[[0, 1], :] = bbox[[0, 1], :] * kwargs.get('xy_res', 4)
+        bbox[[2], :] = bbox[[2], :] * kwargs.get('z_res', 40)
 
     url = remote_instance._get_connector_in_bbox_url()
 
