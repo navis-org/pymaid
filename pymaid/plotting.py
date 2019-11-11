@@ -1608,6 +1608,10 @@ def _prepare_colormap(colors, skdata=None, dotprops=None,
                                    _eval_color(config.default_color,
                                                color_range))
                         for s in dotprops.gene_name.values]
+    elif isinstance(colors, mcl.Colormap):
+        # We will try to get the skid first as str, then as int
+        neuron_cmap = [colors(i/len(skdata)) for i in range(len(skdata))]
+        dotprop_cmap = [colors(i/len(skdata)) for i in range(len(dotprops.gene_name.values))]
     # If list of colors
     elif isinstance(colors, (list, tuple, np.ndarray)):
         colors_required = skdata.shape[0] + dotprops.shape[0]
