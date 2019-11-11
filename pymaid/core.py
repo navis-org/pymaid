@@ -458,6 +458,11 @@ class CatmaidNeuron:
         x = CatmaidNeuron(self.skeleton_id)
         x.__dict__ = {k: copy.copy(v) for k, v in self.__dict__.items()}
 
+        # Remote instance is excluded from copy -> otherwise we are *silently*
+        # creating a new CatmaidInstance that will be identical to the original
+        # but will have it's own cache!
+        x._remote_instance = self._remote_instance
+
         if 'graph' in self.__dict__:
             x.graph = self.graph.copy(as_view=deepcopy is not True)
         if 'igraph' in self.__dict__:
