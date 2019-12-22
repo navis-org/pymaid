@@ -1114,7 +1114,9 @@ def cut_neuron(x, cut_node, ret='both'):
                                  'double check!'.format(x.skeleton_id, cn))
             cn_ids += x.tags[cn]
         elif cn not in x.nodes.treenode_id.values:
-            raise ValueError('No treenode with ID "{}" found.'.format(cn))
+            raise ValueError('No treenode with ID {} found.'.format(cn))
+        elif cn in x.root:
+            raise ValueError('Unable to cut at treenode {} - node is root.'.format(cn))
         else:
             cn_ids.append(cn)
 
