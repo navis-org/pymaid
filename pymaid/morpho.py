@@ -2686,7 +2686,10 @@ def prune_twigs(x, size, exclude_tags=None, inplace=False, recursive=False):
                      size=size,
                      exclude_tags=exclude_tags,
                      inplace=True,
-                     recursive=recursive) for n in x]
+                     recursive=recursive) for n in config.tqdm(x,
+                                                               desc='Pruning',
+                                                               disable=config.pbar_hide,
+                                                               leave=config.pbar_leave)]
 
         if not inplace:
             return x
