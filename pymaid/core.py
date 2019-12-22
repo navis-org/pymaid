@@ -2530,6 +2530,12 @@ class CatmaidNeuronList:
 
         """
 
+        # This makes sure nobody accidentally forgets brackets around
+        # multiple annotations
+        for v in [intersect, partial, raise_not_found]:
+            if not isinstance(v, bool):
+                raise TypeError('Expected boolean, got {}'.format(type(v)))
+
         inc, exc = utils._eval_conditions(x)
 
         if not inc and not exc:
