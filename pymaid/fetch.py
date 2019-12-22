@@ -4729,7 +4729,7 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
 
     all_vols = pd.DataFrame(response['data'], columns=response['columns'])
 
-    if not volume_name:
+    if isinstance(volume_name, type(None)):
         return all_vols
 
     req_vols = all_vols[(all_vols.name.isin(volume_names)) |
