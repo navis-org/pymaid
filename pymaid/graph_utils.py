@@ -1501,7 +1501,8 @@ def connected_subgraph(x, ss):
     ss = np.array(ss)
 
     missing = set(ss) - set(x.nodes.treenode_id.values)
-    if missing:
+    missing = np.array(list(missing)).astype(str)  # do NOT remove the list() here
+    if any(missing):
         raise ValueError('Nodes not found: {}'.format(','.join(missing)))
 
     # Find leaf nodes in subset (real leafs and simply disconnected slabs)
