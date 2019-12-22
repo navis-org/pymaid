@@ -538,7 +538,10 @@ def prune_by_strahler(x, to_prune, reroot_soma=True, inplace=False,
                                   to_prune=to_prune,
                                   reroot_soma=reroot_soma,
                                   relocate_connectors=relocate_connectors,
-                                  inplace=inplace) for n in x]
+                                  inplace=inplace) for n in config.tqdm(x,
+                                                                        desc='Pruning',
+                                                                        disable=config.pbar_hide,
+                                                                        leave=config.pbar_leave)]
         if not inplace:
             return core.CatmaidNeuronList(temp, remote_instance=x._remote_instance)
         else:
