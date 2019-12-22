@@ -204,6 +204,7 @@ Edit treenodes:
     pymaid.delete_nodes
     pymaid.join_nodes
     pymaid.move_nodes
+    pymaid.set_nodes_reviewed
     pymaid.update_node_confidence
 
 Connectivity

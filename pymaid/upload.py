@@ -46,7 +46,7 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'differential_upload', 'move_nodes',
                   'push_new_root', 'add_treenode',
                   'update_node_confidence',
-                  'delete_volume'])
+                  'delete_volume', 'set_nodes_reviewed'])
 
 # Set up logging
 logger = config.logger
@@ -2640,5 +2640,36 @@ def add_annotations(x, annotations, remote_instance=None):
 
     if 'error' in resp:
         logger.error("Error adding annotations. See server response for details.")
+
+    return resp
+
+
+@cache.never_cache
+def set_nodes_reviewed(x, remote_instance=None):
+    """Set a list of nodes as reviewed.
+
+    Parameters
+    ----------
+    x :                 int | list-like of int | CatmaidNeuron/List
+                        Node(s) to set to reviewed.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    -------
+    dict
+                        Server response.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    node_ids = utils.eval_node_ids(x, connectors=False, treenodes=True)
+
+    urls = [remote_instance._set_nodes_reviewed_url(n) for n in node_ids]
+
+    resp = remote_instance.fetch(urls)
+
+    if 'error' in resp:
+        logger.error("Error setting nodes reviewed. See server response for details.")
 
     return resp

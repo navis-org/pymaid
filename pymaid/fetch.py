@@ -961,6 +961,10 @@ class CatmaidInstance:
         """Generate url for fetching skeleton change history."""
         return self.make_url(self.project_id, 'skeletons', 'change-history', **GET)
 
+    def _set_nodes_reviewed_url(self, node_id, **GET):
+        """Generate url for fetching skeleton change history."""
+        return self.make_url(self.project_id, 'node', node_id, 'reviewed', **GET)
+
 
 @cache.undo_on_error
 def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
