@@ -2277,7 +2277,7 @@ def smooth_neuron(x, window=5, inplace=False):
 
 
 def time_machine(x, target, inplace=False, remote_instance=None):
-    """ Reverses time and make neurons young again!
+    """Reverses time and make neurons young again!
 
     Prunes a neuron back to it's state at a given date. Here is what we can
     reverse:
@@ -2315,8 +2315,8 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     --------
     >>> n = pymaid.get_neuron(16)
     >>> previous_n = pymaid.time_machine(n, '2016-12-1')
-    """
 
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     if isinstance(x, core.CatmaidNeuronList):
@@ -2324,7 +2324,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
                                                     inplace=inplace,
                                                     remote_instance=remote_instance)
                                   for n in config.tqdm(x,
-                                                       'Rejuvenating',
+                                                       'Traveling time',
                                                        disable=config.pbar_hide,
                                                        leave=config.pbar_leave)])
 
@@ -2371,7 +2371,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     annotations = pd.DataFrame(data[4], columns=['annotation_id',
                                                  'annotated_timestamp'])
     an_list = fetch.get_annotation_list(remote_instance=remote_instance)
-    annotations['annotation'] = annotations.annotation_id.map(an_list.set_index('annotation_id').annotation.to_dict())
+    annotations['annotation'] = annotations.annotation_id.map(an_list.set_index('id').name.to_dict())
 
     # Convert stuff to timestamps
     for ts in ['creation_timestamp', 'modified_timestamp']:
@@ -2408,9 +2408,9 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     before_tags = {t: [e[0] for e in tags[t] if e[1] <= target] for t in tags}
     before_tags = {t: before_tags[t] for t in before_tags if before_tags[t]}
 
-    x.nodes = before_nodes
-    x.connectors = before_connectors
-    x.annotations = before_annotations
+    x.nodes = before_nodes.copy()
+    x.connectors = before_connectors.copy()
+    x.annotations = before_annotations.copy()
     x.tags = before_tags
 
     # We might end up with multiple disconnected pieces - I don't yet know why
@@ -2451,8 +2451,8 @@ def time_machine(x, target, inplace=False, remote_instance=None):
 
     # Take care of connectors where the treenode might exist but was not yet linked
     links = fetch.get_connector_links(x.skeleton_id)
-    localize = lambda x: pd.Timestamp.tz_localize(x, 'UTC')
-    links.creation_time = links.creation_time.map(localize)
+    #localize = lambda x: pd.Timestamp.tz_localize(x, 'UTC')
+    #links['creation_time'] = links.creation_time.map(localize)
     links = links[links.creation_time <= target]
     links['connector_id'] = links.connector_id.astype(int)
     links['treenode_id'] = links.treenode_id.astype(int)
