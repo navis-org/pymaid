@@ -27,7 +27,7 @@ import networkx as nx
 
 from scipy.sparse import csgraph, csr_matrix
 
-from . import graph, core, utils, config
+from . import graph, core, utils, config, morpho
 
 # Set up logging
 logger = config.logger
@@ -37,7 +37,7 @@ __all__ = sorted(['classify_nodes', 'cut_neuron', 'longest_neurite',
                   'dist_between', 'find_main_branchpoint',
                   'generate_list_of_childs', 'geodesic_matrix',
                   'subset_neuron', 'node_label_sorting',
-                  'segment_length'])
+                  'segment_length', 'find_first_branchpoint'])
 
 
 def _generate_segments(x, weight=None):
@@ -413,7 +413,7 @@ def geodesic_matrix(x, tn_ids=None, directed=False, weight='weight'):
 
     Returns
     -------
-    pd.SparseDataFrame
+    pd.DataFrame
                 Geodesic distance matrix. Distances in nanometres.
 
     See Also
@@ -545,12 +545,15 @@ def find_main_branchpoint(x, reroot_to_soma=False):
 
     Returns
     -------
-    treenode ID
+    treenode ID(s)
+
+    See Also
+    --------
+    :func:`~pymaid.find_first_branchpoint`
+                        Use this is you are just interested in the very first
+                        branch point regardless of the size of the branches.
 
     """
-    # Make a copy
-    x = x.copy()
-
     if isinstance(x, core.CatmaidNeuronList) and len(x) > 1:
         return np.array([find_main_branchpoint(n,
                                                reroot_to_soma=reroot_to_soma)
@@ -563,6 +566,9 @@ def find_main_branchpoint(x, reroot_to_soma=False):
     elif not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         raise TypeError(
             'Must provide CatmaidNeuron/List, not "{0}"'.format(type(x)))
+
+    if reroot_to_soma and not isinstance(x.soma, type(None)):
+        x.reroot(x.soma)
 
     g = graph.neuron2nx(x)
 
@@ -579,6 +585,70 @@ def find_main_branchpoint(x, reroot_to_soma=False):
     bp = list(x.graph.successors(sc_longest[-1]))[0]
 
     return bp
+
+
+def find_first_branchpoint(x, min_size=None, reroot_to_soma=False):
+    """Return the first branch point from root.
+
+    Parameters
+    ----------
+    x :                 CatmaidNeuron | CatmaidNeuronList
+                        May contain multiple neurons.
+    min_size :          int, optional
+                        Minimum size of branches distal to first branch
+                        point. Use this to disregard small twigs.
+    reroot_to_soma :    bool, optional
+                        If True, neuron will be rerooted to soma.
+
+    Returns
+    -------
+    treenode ID(s)
+
+    See Also
+    --------
+    :func:`~pymaid.find_main_branchpoint`
+                        Use this is you are interested in finding the
+                        branch point between the two largest branches.
+
+    """
+    if isinstance(x, core.CatmaidNeuronList) and len(x) > 1:
+        return np.array([find_first_branchpoint(n,
+                                                min_size=min_size,
+                                                reroot_to_soma=reroot_to_soma)
+                         for n in config.tqdm(x,
+                                              desc='Searching',
+                                              disable=config.pbar_hide,
+                                              leave=config.pbar_leave)])
+    elif isinstance(x, core.CatmaidNeuronList) and len(x) == 1:
+        x = x[0]
+    elif not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
+        raise TypeError(
+            'Must provide CatmaidNeuron/List, not "{0}"'.format(type(x)))
+
+    if reroot_to_soma and not isinstance(x.soma, type(None)):
+        x.reroot(x.soma)
+
+    if min_size:
+        x = morpho.prune_twigs(x, min_size,
+                               exclude_tags=None,
+                               inplace=False,
+                               recursive=False)
+
+    # Get graph
+    g = graph.neuron2nx(x)
+
+    # Search until we have the first branch point:
+    n = x.root[0]
+    # Find the first branch point
+    while g.in_degree(n) <= 1:
+        try:
+            n = next(g.predecessors(n))
+        except StopIteration:
+            raise ValueError('No branchpoint found on neuron {}'.format(x.skeleton_id))
+        except BaseException:
+            raise
+
+    return n
 
 
 def split_into_fragments(x, n=2, min_size=None, reroot_to_soma=False):
