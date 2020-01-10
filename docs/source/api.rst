@@ -620,7 +620,7 @@ Bundle of functions to use R libraries.
     :toctree: generated/
     pymaid.rmaid.data2py
     pymaid.rmaid.dotprops2py
-    pymaid.rmaid.get_neuropil
+    pymaid.rmaid.get_brain_volume
     pymaid.rmaid.init_rcatmaid
     pymaid.rmaid.nblast
     pymaid.rmaid.nblast_allbyall

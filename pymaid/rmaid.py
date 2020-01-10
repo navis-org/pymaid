@@ -86,7 +86,7 @@ except BaseException:
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
                   'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall',
-                  'get_neuropil', 'neuron2dps'])
+                  'get_brain_volume', 'neuron2dps'])
 
 
 def init_rcatmaid(**kwargs):
@@ -1066,6 +1066,63 @@ class NBLASTresults:
             logger.error('Unable to intepret entries provided. See '
                          'help(NBLASTresults.plot3d) for details.')
             return None
+
+
+def get_brain_volume(template, neuropil=None):
+    """Fetches given surface model (or neuropil contained within).
+
+    Parameters
+    ----------
+    template :      str
+                    Name of (template) brain. For example 'FCWB.surf' or
+                    'FCWBNP.surf'.
+    neuropil :      str | list, optional
+                    Name(s) of the subregion(s) to extract. For example 'LH_R'.
+
+    Returns
+    -------
+    pymaid.Volume
+
+    Examples
+    --------
+    >>> from pymaid import rmaid
+    >>> fcwb = rmaid.get_brain_volume('FCWB.surf')
+    >>> fcwb.plot3d()
+    >>> fcwb_lh = rmaid.get_volume('FCWBNP.surf', region='LH_R')
+    """
+
+    # Convert to Python data
+    data = data2py(robjects.r('{}'.format(template)))
+
+    # Extract vertices (and make sure they are c-contiguous)
+    verts = data['Vertices'][['X', 'Y', 'Z']].values
+    verts = np.ascontiguousarray(verts)
+
+    # Get list of regions
+    regions = data['RegionList']
+
+    if isinstance(neuropil, type(None)):
+        faces = pd.concat([data['Regions'][r] for r in regions]) - 1
+    else:
+        neuropil = utils._make_iterable(neuropil)
+        for n in neuropil:
+            if n not in regions:
+                raise ValueError('Neuropil "{}" not found in template'.format(n))
+        # Subset regions to these neuropils
+        regions = neuropil
+
+        # Extract the relevant faces
+        faces = pd.concat([data['Regions'][r] for r in regions]) - 1
+
+        # We need to discard unused vertices
+        used = np.unique(faces.values.flatten())
+        verts = verts[used]
+
+        # Now we need to change face indices
+        new_map = dict(zip(used, np.arange(0, len(used), dtype=int)))
+        faces = faces.applymap(lambda x : new_map[x])
+
+    return core.Volume(verts.astype(float), faces.values.astype(int))
 
 
 def neuron2dps(x, resample=1, convert_to_um=True):
