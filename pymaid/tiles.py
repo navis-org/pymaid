@@ -19,7 +19,6 @@ import math
 import time
 import urllib
 import os
-import warnings
 
 import pandas as pd
 import numpy as np
@@ -226,7 +225,8 @@ class TileLoader:
     # 4. Add second mode that loads sections sequentially, saves them and discards tiles: slower but memory efficient
 
     def __init__(self, bbox, stack_id, zoom_level=0, coords='NM',
-                 image_mirror='auto', mem_lim=4000, remote_instance=None):
+                 image_mirror='auto', mem_lim=4000, remote_instance=None,
+                 **fetch_kwargs):
         """Initialise class."""
         if coords not in ['PIXEL', 'NM']:
             raise ValueError('Coordinates need to be "PIXEL" or "NM".')
@@ -254,6 +254,7 @@ class TileLoader:
         self.coords = coords
         self.stack_id = int(stack_id)
         self.mem_lim = mem_lim
+        self.fetch_kwargs = fetch_kwargs
 
         self.get_stack_info(image_mirror=image_mirror)
 
@@ -459,7 +460,7 @@ class TileLoader:
             future_session = FuturesSession(max_workers=30)
 
         urls = [self._get_tile_url(*c) for c in tiles]
-        futures = [future_session.get(u, params=None) for u in urls]
+        futures = [future_session.get(u, params=None, **self.fetch_kwargs) for u in urls]
         resp = [f.result() for f in config.tqdm(futures,
                                                 desc='Loading tiles',
                                                 disable=config.pbar_hide or len(futures) == 1,
@@ -917,7 +918,8 @@ class TileLoader:
         virtual_nodes = pd.DataFrame(virtual_nodes,
                                      columns=['x', 'y', 'z', 'skeleton_id'])
 
-        return pd.concat([nodes, virtual_nodes], axis=0, ignore_index=True)
+        return pd.concat([nodes, virtual_nodes], axis=0,
+                         ignore_index=True, sort=True)
 
     def render_im(self, slider=False, ax=None, **kwargs):
         """Draw image slices with a slider."""
