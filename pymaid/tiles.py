@@ -326,9 +326,14 @@ class TileLoader:
 
         self.img_mirror = match[0]
 
+        self.tile_source_type = self.img_mirror['tile_source_type']
         self.tile_width = self.img_mirror['tile_width']
+        self.tile_height = self.img_mirror['tile_height']
         self.mirror_url = self.img_mirror['image_base']
         self.file_ext = self.img_mirror['file_extension']
+
+        if not self.mirror_url.endswith('/'):
+            self.mirror_url += '/'
 
         # Memory size per tile in byte
         self.bytes_per_tile = self.tile_width ** 2 * 8
@@ -837,12 +842,66 @@ class TileLoader:
 
     def _get_tile_url(self, x, y, z):
         """Return tile url."""
-        return '{0}{1}/{2}/{3}/{4}.{5}'.format(self.mirror_url,
-                                               self.zoom_level,
-                                               z,
-                                               y,
-                                               x,
-                                               self.file_ext)
+
+        if self.tile_source_type in [1, 4, 5, 9]:
+            if self.tile_source_type == 1:
+                # File-based image stack
+                url = '{sourceBaseUrl}{pixelPosition_z}/{row}_{col}_{zoomLevel}.{fileExtension}'
+            elif self.tile_source_type == 4:
+                # File-based image stack with zoom level directories
+                url = '{sourceBaseUrl}{pixelPosition_z}/{zoomLevel}/{row}_{col}.{fileExtension}'
+            elif self.tile_source_type == 5:
+                # Directory-based image stack
+                url = '{sourceBaseUrl}{zoomLevel}/{pixelPosition_z}/{row}/{col}.{fileExtension}'
+            elif self.tile_source_type == 9:
+                url = '{sourceBaseUrl}{pixelPosition_z}/{row}_{col}_{zoomLevel}.{fileExtension}'
+            url = url.format(sourceBaseUrl=self.mirror_url,
+                             pixelPosition_z=z,
+                             row=y,
+                             col=x,
+                             zoomLevel=self.zoom_level,
+                             fileExtension=self.file_ext)
+        elif self.tile_source_type == 2:
+            # Request query-based image stack
+            GET = dict(x=x * self.tile_width,
+                       y=y * self.tile_height,
+                       z=z,
+                       width=self.tile_width,
+                       height=self.tile_height,
+                       scale=self.zoom_level,
+                       row=y,
+                       col=x)
+            url = self.mirror_url
+            url += '?{}'.format(urllib.parse.urlencode(GET))
+        elif self.tile_source_type == 3:
+            # HDF5 via CATMAID backend
+            url = self.remote_instance.server
+            if not url.endswith('/'):
+                url += '/'
+            url += '{project_id}/stack/{stack_id}/tile'
+            url = url.format(project_id=self.remote_instance.project,
+                             stack_id=self.stack_id)
+
+            GET = dict(x=x * self.tile_width,
+                       y=y * self.tile_height,
+                       z=z,
+                       width=self.tile_width,
+                       height=self.tile_height,
+                       scale=self.zoom_level,
+                       row=y,
+                       col=x,
+                       file_extension=self.file_ext,
+                       basename=self.mirror_url,
+                       type='all')
+
+            url += '?{}'.format(urllib.parse.urlencode(GET))
+
+        else:
+            msg = 'Tile source type "{}" not implement'.format(self.tile_source_type)
+            raise NotImplementedError(msg)
+
+        return url
+
 
     def _to_x_index(self, x, enforce_bounds=True):
         """Convert a real world position to a x pixel position.
