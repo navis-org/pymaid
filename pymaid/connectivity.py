@@ -374,7 +374,7 @@ def predict_connectivity(source, target, method='possible_contacts',
     -----
     Method ``possible_contacts``:
         1. Calculating harmonic mean of distances ``d`` (connector->treenode)
-            at which onnections between neurons A and neurons B occur.
+           at which onnections between neurons A and neurons B occur.
         2. For all presynapses of neurons A, check if they are within
            ``n_irq`` (default=2) interquartile range  of ``d`` of a
            neuron B treenode.
@@ -424,33 +424,33 @@ def predict_connectivity(source, target, method='possible_contacts',
                           index=source.skeleton_id,
                           columns=target.skeleton_id)
 
-    # First let's calculate at what distance synapses are being made
-    cn_between = fetch.get_connectors_between(source, target,
-                                              remote_instance=remote_instance)
-
     if kwargs.get('dist', None):
-        distances = kwargs.get('dist')
-    elif cn_between.shape[0] > 0:
-        cn_locs = np.vstack(cn_between.connector_loc.values)
-        tn_locs = np.vstack(cn_between.treenode2_loc.values)
-
-        distances = np.sqrt(np.sum((cn_locs - tn_locs) ** 2, axis=1))
-
-        logger.info('Average connector->treenode distances: '
-                    '{:.2f} +/- {:.2f} nm'.format(distances.mean(),
-                                                  distances.std()))
+        dist_threshold = kwargs.get('dist')
     else:
-        logger.warning('No existing connectors to calculate average'
-                       'connector->treenode distance found. Falling'
-                       'back to default of 1um. Use <stdev> argument'
-                       'to set manually.')
-        distances = [1000]
+        # First let's calculate at what distance synapses are being made
+        cn_between = fetch.get_connectors_between(source, target,
+                                                  remote_instance=remote_instance)
+        if cn_between.shape[0] > 0:
+            cn_locs = np.vstack(cn_between.connector_loc.values)
+            tn_locs = np.vstack(cn_between.treenode2_loc.values)
 
-    # Calculate distances threshold
-    n_irq = kwargs.get('n_irq', 2)
-    # We use the median because some very large connector->treenode
-    # distances can massively skew the average
-    dist_threshold = scipy.stats.hmean(distances) + n_irq * scipy.stats.iqr(distances)
+            distances = np.sqrt(np.sum((cn_locs - tn_locs) ** 2, axis=1))
+
+            logger.info('Average connector->treenode distances: '
+                        '{:.2f} +/- {:.2f} nm'.format(distances.mean(),
+                                                      distances.std()))
+        else:
+            logger.warning('No existing connectors to calculate average'
+                           'connector->treenode distance found. Falling'
+                           'back to default of 1um. Use <dist> argument'
+                           'to set manually.')
+            distances = [1000]
+
+        # Calculate distances threshold
+        n_irq = kwargs.get('n_irq', 2)
+        # We use the median because some very large connector->treenode
+        # distances can massively skew the average
+        dist_threshold = scipy.stats.hmean(distances) + n_irq * scipy.stats.iqr(distances)
 
     with config.tqdm(total=len(target), desc='Predicting',
                      disable=config.pbar_hide,
