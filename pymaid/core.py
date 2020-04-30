@@ -214,12 +214,14 @@ class CatmaidNeuron:
                             Any additional data to attach to neuron.
         """
         if isinstance(x, (pd.DataFrame, CatmaidNeuronList)):
-            if x.shape[0] == 1:
-                x = x.ix[0]
-            else:
+            if x.shape[0] != 1:
                 raise Exception('Unable to construct CatmaidNeuron from data '
                                 'containing multiple neurons. Try '
                                 'CatmaidNeuronList instead.')
+            if isinstance(x, pd.DataFrame):
+                x = x.iloc[0]
+            else:
+                x = x[0]
 
         if not isinstance(x, (str, int, np.int64, pd.Series, CatmaidNeuron)):
             raise TypeError('Unable to construct CatmaidNeuron from data '
@@ -1520,7 +1522,7 @@ class CatmaidNeuronList:
                     self.neurons[n[2]] = CatmaidNeuron(n[0], remote_instance=remote_instance)
 
         # Add indexer class
-        self.ix = _IXIndexer(self.neurons)
+        self.iloc = _IXIndexer(self.neurons)
 
         # Add skeleton ID indexer class
         self.skid = _SkidIndexer(self.neurons)
@@ -2740,7 +2742,7 @@ class CatmaidNeuronList:
 
         # We have to reassign the Indexer classes here
         # For some reason the neuron list does not propagate
-        x.ix = _IXIndexer(x.neurons)
+        x.iloc = _IXIndexer(x.neurons)
         x.skid = _SkidIndexer(x.neurons)
 
         if not inplace:
@@ -2749,7 +2751,7 @@ class CatmaidNeuronList:
 
 class _IXIndexer():
     """ Location based indexer added to CatmaidNeuronList objects to allow
-    indexing similar to pandas DataFrames using df.ix[0]. This is really
+    indexing similar to pandas DataFrames using df.iloc[0]. This is really
     just a helper to allow code to operate on CatmaidNeuron the same way
     it would on DataFrames.
     """

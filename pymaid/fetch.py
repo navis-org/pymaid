@@ -3764,7 +3764,7 @@ def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).
     >>> hist.cable.sum(0).plot()
     >>> plt.show()
     >>> # Plot single users cable (index by user login name)
-    >>> hist.cable.ix['schlegelp'].T.plot()
+    >>> hist.cable.loc['schlegelp'].T.plot()
     >>> plt.show()
     >>> # Sum up cable created this week by all users
     >>> hist.cable.values.sum()
@@ -4517,7 +4517,7 @@ def get_user_list(remote_instance=None):
     >>> user_list = pymaid.get_user_list()
     >>> # To search for e.g. user ID 22
     >>> user_list.set_index('id', inplace=True)
-    >>> user_list.ix[ 22 ]
+    >>> user_list.loc[22]
     id                                  22
     login                      mustermannm
     full_name          Michaela Mustermann

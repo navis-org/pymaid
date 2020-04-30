@@ -435,8 +435,8 @@ def neuron2r(neuron, convert_to_um=False):
 
         nlist = {}
         for i in range(neuron.shape[0]):
-            nlist[neuron.ix[i].skeleton_id] = neuron2r(
-                neuron.ix[i], convert_to_um=convert_to_um)
+            nlist[neuron.iloc[i].skeleton_id] = neuron2r(
+                neuron.iloc[i], convert_to_um=convert_to_um)
 
         nlist = robjects.ListVector(nlist)
         nlist.rownames = neuron.skeleton_id.tolist()
@@ -803,8 +803,8 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
     elif isinstance(query, pd.DataFrame) or isinstance(query, core.CatmaidNeuronList):
         if query.shape[0] > 1:
             logger.warning('You provided more than a single neuron. Blasting '
-                           'only against the first: %s' % query.ix[0].neuron_name)
-        rn = neuron2r(query.ix[0], convert_to_um=False)
+                           'only against the first: %s' % query.iloc[0].neuron_name)
+        rn = neuron2r(query.iloc[0], convert_to_um=False)
     elif isinstance(query, pd.Series) or isinstance(query, core.CatmaidNeuron):
         rn = neuron2r(query, convert_to_um=False)
     elif isinstance(query, str) or isinstance(query, int):
@@ -997,10 +997,10 @@ class NBLASTresults:
         n_py = neuron2py(self.neuron)
         # We have to bring the soma radius down to um -> this may mess
         # up soma detection elsewhere, so be carefull!
-        n_py.ix[0].nodes.radius /= 1000
+        n_py[0].nodes.radius /= 1000
 
         # Create colormap with the query neuron being black
-        cmap = {n_py.ix[0].skeleton_id: (0, 0, 0)}
+        cmap = {n_py[0].skeleton_id: (0, 0, 0)}
 
         colors = np.linspace(0, 1, len(nl) + 1)
         colors = np.array([hsv_to_rgb(c, 1, 1) for c in colors])
@@ -1054,12 +1054,12 @@ class NBLASTresults:
         """
 
         if isinstance(entries, int):
-            return self.db.rx(robjects.StrVector(self.results.ix[:entries - 1].gene_name.tolist()))
+            return self.db.rx(robjects.StrVector(self.results.iloc[:entries - 1].gene_name.tolist()))
         elif isinstance(entries, str):
             return self.db.rx(entries)
         elif isinstance(entries, (list, np.ndarray)):
             if isinstance(entries[0], int):
-                return self.db.rx(robjects.StrVector(self.results.ix[entries].gene_name.tolist()))
+                return self.db.rx(robjects.StrVector(self.results.iloc[entries].gene_name.tolist()))
             elif isinstance(entries[0], str):
                 return self.db.rx(robjects.StrVector(entries))
         else:

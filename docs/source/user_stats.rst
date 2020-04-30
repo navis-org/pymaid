@@ -34,7 +34,7 @@ This comes in handy e.g. when deciding who to include in the author list.
 >>> nl = pymaid.find_neurons(annotations='glomerulus DA1')
 >>> # Get contributions in number of nodes/links/reviews
 >>> cont = pymaid.get_user_contributions( nl )
->>> # Note that I've scrambled the user column 
+>>> # Note that I've scrambled the user column
 >>> cont.head()
        user  nodes  presynapses  postsynapses
 0  aaaaaaaa  47880         3854          1911
@@ -61,7 +61,7 @@ looking at the time invested makes more sense:
 >>> inv = pymaid.get_time_invested( nl )
 >>> inv.head()
               total  creation  edition  review
-user                                          
+user
 aaaaaaaa       3033      2250     1620     243
 eeeeeee         627       183      180     333
 ffffffffffff    381       108       15     144
@@ -69,11 +69,11 @@ bbbbbb          357       219      189       0
 cccccccc        333       147       72     126
 >>> # Create bar plot for top 10 contributors
 >>> import matplotlib.pyplot as plt
->>> ax = inv.ix[:10].plot.bar()
+>>> ax = inv.iloc[:10].plot.bar()
 >>> plt.show()
 
 Please note that all time-related metrics are always in "CATMAID time" which
-is generally about 2-3x less than real-time! 
+is generally about 2-3x less than real-time!
 
 
 Reference
@@ -82,7 +82,7 @@ Reference
 .. autosummary::
     :toctree: generated/
 
-	~pymaid.get_user_contributions 
+	~pymaid.get_user_contributions
 	~pymaid.get_time_invested
 	~pymaid.get_history
 	~pymaid.get_logs
@@ -91,4 +91,3 @@ Reference
 	~pymaid.get_user_actions
 	~pymaid.get_transactions
     ~pymaid.get_team_contributions
-    

@@ -248,7 +248,7 @@ def classify_nodes(x, inplace=True):
     # If more than one neuron
     if isinstance(x, (pd.DataFrame, core.CatmaidNeuronList)):
         for i in config.trange(x.shape[0], desc='Classifying'):
-            classify_nodes(x.ix[i], inplace=True)
+            classify_nodes(x.iloc[i], inplace=True)
     elif isinstance(x, (pd.Series, core.CatmaidNeuron)):
         # Make sure there are nodes to classify
         if x.nodes.shape[0] != 0:
