@@ -113,11 +113,10 @@ class TestFetch(unittest.TestCase):
     """Test pymaid.fetch """
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
@@ -170,6 +169,12 @@ class TestFetch(unittest.TestCase):
     def test_get_annotated_skids(self):
         self.assertIsInstance(pymaid.get_skids_by_annotation(
             config_test.test_annotations[0], remote_instance=self.rm), list)
+
+    @try_conditions
+    def test_get_annotated(self):
+        self.assertIsInstance(pymaid.get_annotated(
+            config_test.test_annotations[0], remote_instance=self.rm),
+                                                   pd.DataFrame)
 
     @try_conditions
     def test_get_annotations(self):
@@ -362,11 +367,10 @@ class TestCore(unittest.TestCase):
         return wrapper
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
         self.nl = pymaid.get_neuron('annotation:%s' % config_test.test_annotations[
             0], remote_instance=self.rm)
@@ -511,11 +515,10 @@ class TestMorpho(unittest.TestCase):
         return wrapper
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
         self.nl = pymaid.get_neuron(config_test.test_skids,
                                     remote_instance=self.rm)
@@ -634,11 +637,10 @@ class TestGraphs(unittest.TestCase):
         return wrapper
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
         self.nl = pymaid.get_neuron(config_test.test_skids[0:2],
                                     remote_instance=self.rm)
@@ -731,11 +733,10 @@ class TestConnectivity(unittest.TestCase):
         return wrapper
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
         self.n = pymaid.get_neuron(config_test.test_skids[0],
                                    remote_instance=self.rm)
@@ -833,11 +834,10 @@ class TestCluster(unittest.TestCase):
         return wrapper
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
     @try_conditions
     def test_connectivity_cluster(self):
@@ -880,11 +880,10 @@ class TestPlot(unittest.TestCase):
         return wrapper
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
         self.nl = pymaid.get_neuron(config_test.test_skids,
                                     remote_instance=self.rm)
@@ -930,10 +929,10 @@ class TestTiles(unittest.TestCase):
     """Test pymaid.tiles """
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(config_test.server_url,
-                                         config_test.http_user,
-                                         config_test.http_pw,
-                                         config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
     def test_tiles(self):
         from pymaid import tiles
@@ -960,11 +959,10 @@ class TestUserStats(unittest.TestCase):
     """Test pymaid.user_stats """
 
     def setUp(self):
-        self.rm = pymaid.CatmaidInstance(
-            config_test.server_url,
-            config_test.http_user,
-            config_test.http_pw,
-            config_test.token)
+        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
+                                         http_user=config_test.http_user,
+                                         http_password=config_test.http_pw,
+                                         api_token=config_test.token)
 
         self.n = pymaid.get_neuron(config_test.test_skids[0],
                                    remote_instance=self.rm)
