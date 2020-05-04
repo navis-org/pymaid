@@ -10,6 +10,10 @@ What's new?
    * - Version
      - Date
      -
+     * - 1.1.0
+       - 4/4/20
+       - - changed argument names, types and order for :class:`CATMAIDInstance` to facilitate connecting to public Catmaid servers
+         - was: ``(server, authname, authpassword, authtoken, ...)``, now is ``(server_url, token, http_user=None, http_pw=None, ...)``
    * - 1.0.1
      - 23/1/20
      - - changed to semantic versioning: `major.minor.patch`
