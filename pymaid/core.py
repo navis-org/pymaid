@@ -85,7 +85,7 @@ import scipy.spatial
 import scipy.cluster.hierarchy
 
 from . import (graph, morpho, fetch, graph_utils, resample, intersect,
-               utils, config)
+               utils, config, client)
 
 try:
     import trimesh
@@ -1092,15 +1092,15 @@ class CatmaidNeuron:
         elif not remote_instance:
             remote_instance = self._remote_instance
 
-        n = fetch.get_neuron(
-            self.skeleton_id, remote_instance=remote_instance)
+        n = fetch.get_neuron(self.skeleton_id,
+                             remote_instance=remote_instance)
         self.__init__(n, self._remote_instance, self.meta_data)
 
         # Clear temporary attributes
         self._clear_temp_attr()
 
-    def set_remote_instance(self, remote_instance=None, server_url=None,
-                            http_user=None, http_pw=None, auth_token=None):
+    def set_remote_instance(self, remote_instance=None, api_token=None,
+                            server_url=None, http_user=None, http_password=None):
         """Assign remote_instance to neuron.
 
         Provide either existing CatmaidInstance OR your credentials.
@@ -1109,9 +1109,9 @@ class CatmaidNeuron:
         ----------
         remote_instance :       pymaid.CatmaidInstance, optional
         server_url :            str, optional
+        api_token :             str, optional
         http_user :             str, optional
-        http_pw :               str, optional
-        auth_token :            str, optional
+        http_password :         str, optional
 
         See Also
         --------
@@ -1120,12 +1120,12 @@ class CatmaidNeuron:
         """
         if remote_instance:
             self._remote_instance = remote_instance
-        elif server_url and auth_token:
-            self._remote_instance = fetch.CatmaidInstance(server_url,
-                                                          http_user,
-                                                          http_pw,
-                                                          auth_token
-                                                          )
+        elif server_url and api_token:
+            self._remote_instance = client.CatmaidInstance(server=server_url,
+                                                           api_token=api_token,
+                                                           http_user=http_user,
+                                                           http_password=http_password
+                                                           )
         else:
             raise Exception('Provide either CatmaidInstance or credentials.')
 
@@ -2423,7 +2423,7 @@ class CatmaidNeuronList:
                 n._clear_temp_attr()
 
     def set_remote_instance(self, remote_instance=None, server_url=None,
-                            http_user=None, http_pw=None, auth_token=None):
+                            api_token=None, http_user=None, http_password=None):
         """Assign remote_instance to all neurons.
 
         Provide either existing CatmaidInstance OR your credentials.
@@ -2432,18 +2432,17 @@ class CatmaidNeuronList:
         ----------
         remote_instance :       pymaid.CatmaidInstance, optional
         server_url :            str, optional
+        api_token :             str, optional
         http_user :             str, optional
-        http_pw :               str, optional
-        auth_token :            str, optional
+        http_password :         str, optional
+
 
         """
-
-        if not remote_instance and server_url and auth_token:
-            remote_instance = fetch.CatmaidInstance(server_url,
-                                                    http_user,
-                                                    http_pw,
-                                                    auth_token
-                                                    )
+        if not remote_instance and server_url and api_token:
+            remote_instance = client.CatmaidInstance(server_url,
+                                                     api_token=api_token,
+                                                     http_user=http_user,
+                                                     http_password=http_password)
         elif not remote_instance:
             raise Exception('Provide either CatmaidInstance or credentials.')
 

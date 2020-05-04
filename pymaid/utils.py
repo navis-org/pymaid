@@ -32,7 +32,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import vispy.visuals
 
-from . import core, fetch, config
+from . import core, fetch, config, client
 
 # Set up logging
 logger = config.logger
@@ -357,7 +357,7 @@ def _eval_remote_instance(remote_instance, raise_error=True):
                                 '`help(pymaid.CatmaidInstance) for details.')
             else:
                 logger.warning('No global remote instance found.')
-    elif not isinstance(remote_instance, fetch.CatmaidInstance):
+    elif not isinstance(remote_instance, client.CatmaidInstance):
         error = 'Expected None or CatmaidInstance, got {}'.format(type(remote_instance))
         if raise_error:
             raise TypeError(error)

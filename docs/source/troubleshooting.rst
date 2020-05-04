@@ -5,7 +5,7 @@ You've encountered a problem? See if you can find it in below table. If not,
 please get in touch via `issues <https://github.com/schlegelp/PyMaid/issues>`_
 on Github.
 
-.. list-table:: 
+.. list-table::
    :widths: 40 60
    :header-rows: 1
 
@@ -14,11 +14,13 @@ on Github.
    * - **Installation**
      -
    * - PyOctree fails compiling because of ``fopenmp``.
-     -  1. Download and extract the PyOctree Github `repository <https://github.com/mhogg/pyoctree>`_. 
+     -  1. Download and extract the PyOctree Github `repository <https://github.com/mhogg/pyoctree>`_.
         2. Open ``setup.py`` and set ``BUILD_ARGS['mingw32'] = [ ]`` and ``LINK_ARGS['unix'] = [ ]``
         3. Open a terminal, navigate to the directory containing ``setup.py`` and run ``python setup.py install`` (if your default Python is 2.7, use ``python3``)
+   * - Installing PyOctree for Blender fails with "Python.h" not found.
+     - Manually download and copy required files into Blender's Python directory. Follow the instructions `here <https://blender.stackexchange.com/questions/81740/python-h-missing-in-blender-python>`_.        
    * - **Fetching data**
-     -        
+     -
    * - Fetching any data throws an exception ``<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate very failed>``.
      - Have a look at this `blog post <http://www.cdotson.com/2017/01/sslerror-with-python-3-6-x-on-macos-sierra/>`_.
    * - **Plotting**
@@ -51,5 +53,5 @@ on Github.
      -
    * - Instead of a progress bar, I get some odd message (e.g. ``Hbox(children=...``) when using pymaid in a Jupyter notebook.
      - You probably have `ipywidgets <ipywidgets.readthedocs.io>`_ not installed or not configured properly. One work-around is to force pymaid to use standard progress bars using :func:`pymaid.set_pbars`::
-        
+
          pymaid.set_pbars(jupyter=False)

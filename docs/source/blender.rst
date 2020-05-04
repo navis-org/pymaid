@@ -51,7 +51,8 @@ manipulate neurons from within :red:`Blender's Python console`:
 First, import and set up pymaid like you are used to.
 
 >>> import pymaid
->>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
+>>> # You can omit http user and password if your server does not require it
+>>> rm = pymaid.CatmaidInstance('server_url', 'token', 'http_user', 'http_password')
 >>> # Fetch a bunch of neurons
 >>> nl = pymaid.get_neuron('annotation: glomerulus DA1')
 
@@ -136,5 +137,3 @@ Selections
     pymaid.b3d.object_list.delete
 
     pymaid.b3d.object_list.to_json
-
-

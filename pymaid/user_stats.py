@@ -20,9 +20,9 @@ Examples
 --------
 >>> import pymaid
 >>> myInstance = pymaid.CatmaidInstance('https://www.your.catmaid-server.org',
-...                                     'HTTP_USER' ,
-...                                     'HTTP_PASSWORD',
-...                                     'TOKEN')
+...                                     api_token='YOURTOKEN',
+...                                     http_user='HTTP_PASSWORD', # omit if not required
+...                                     http_password='TOKEN')
 >>> skeleton_ids = pymaid.get_skids_by_annotation('Hugin')
 >>> cont = pymaid.get_user_contributions(skeleton_ids)
 >>> cont

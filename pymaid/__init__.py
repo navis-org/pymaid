@@ -11,7 +11,12 @@ except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.fetch:\n' + str(error))
 
-# Flatten namespace by importing contents of all modules of pymaid
+try:
+    from .client import *
+except Exception as error:
+    logger.warning(str(error))
+    logger.warning('Error importing pymaid.client:\n' + str(error))
+
 try:
     from .upload import *
 except Exception as error:

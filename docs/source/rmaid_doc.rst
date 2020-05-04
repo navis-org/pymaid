@@ -4,7 +4,7 @@ R and PyMaid
 ************
 
 Python over R? R over Python? Why not R *and* Python!? Turns out, they play
-together very nicely - see this brilliant 
+together very nicely - see this brilliant
 `blog post <https://blog.jupyter.org/i-python-you-r-we-julia-baf064ca1fb6>`_.
 
 This section will teach you the basics of how to use R and pymaid. But first,
@@ -13,7 +13,7 @@ we have to make sure you are all set:
 Setting up
 ==========
 
-Using R from within Python requires `rpy2 <https://rpy2.readthedocs.io>`_. 
+Using R from within Python requires `rpy2 <https://rpy2.readthedocs.io>`_.
 `rpy2 <https://rpy2.readthedocs.io>`_ is **not** automatically installed
 alongside pymaid. That's because it fails to install if R is not already
 installed on your system. Here is what you need to do:
@@ -26,7 +26,7 @@ installed on your system. Here is what you need to do:
         You can either install just <a href="https://www.r-project.org">R</a>
         or install it along with <a href="https://www.rstudio.com">R Studio</a>
         (recommended).
-      </li>      
+      </li>
       <li>
         <strong>Install rpy2</strong><br>
         This should do the trick:
@@ -39,7 +39,7 @@ installed on your system. Here is what you need to do:
         ecosystem by <a href="https://github.com/jefferis">Greg Jefferis</a>.
         Please make sure to install:
           <ol type="i">
-              <li>                
+              <li>
                 <a href="http://jefferis.github.io/nat/">nat</a> - core package for morphological analysis of neurons
               </li>
               <li>
@@ -65,7 +65,7 @@ installed on your system. Here is what you need to do:
     </ol>
 
 
-You ar ready to go! On a fundamental level, you can now use every single
+You are ready to go! On a fundamental level, you can now use every single
 R function from within Python - check out the rpy2
 `documentation <https://rpy2.readthedocs.io>`_. Let's explore some
 more CATMAID specific examples.
@@ -82,14 +82,15 @@ Quickstart
 >>> nat = importr('nat')
 
 >>> # Initialize connection to Catmaid server
->>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
+>>> # Omit http user and password if your server does not require that
+>>> rm = pymaid.CatmaidInstance('server_url', 'api_token', 'http_user', 'http_password')
 
 >>> # Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
 >>> n = pymaid.get_neuron(skeleton_id)
 
 >>> # Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
->>> n_R = rmaid.neuron2r(n.ix[0])
+>>> n_R = rmaid.neuron2r(n[0])
 
 >>> # Use nat to prune the neuron
 >>> n_pruned = nat.prune_by_strahler(n_R)
@@ -125,7 +126,8 @@ R catmaid
 >>> from pymaid import rmaid
 
 >>> # Initialize connection to Catmaid server
->>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
+>>> # Omit http user and password if your server does not require it
+>>> rm = pymaid.CatmaidInstance('server_url', 'api_token', 'http_user', 'http_password')
 
 >>> # Initialize R's rcatmaid with Python instance
 >>> rcat = rmaid.init_rcatmaid(rm)
@@ -162,7 +164,8 @@ Nblasting
 
 >>> from pymaid import rmaid, CatmaidInstance
 >>> # Initialize connection to Catmaid server
->>> rm = CatmaidInstance('url', 'http_user', 'http_pw', 'token')
+>>> # Omit http user and password if not required
+>>> rm = CatmaidInstance('server_url', 'api_token', 'http_user', 'http_password')
 
 >>> # Blast a neuron against default (FlyCircuit) database
 >>> skeleton_id = 16
@@ -197,4 +200,3 @@ Reference
 	pymaid.rmaid.neuron2py
 	pymaid.rmaid.neuron2r
     pymaid.rmaid.NBLASTresults
-

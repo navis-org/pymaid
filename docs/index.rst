@@ -5,7 +5,7 @@ pymaid: neuron analysis toolbox
 
    <div class="container-fluid">
       <div class="row">
-         <div class="col-md-6">
+         <div class="col-lg-6">
 
 Pymaid is a Python library for **visualisation** and **analysis** of **neuron data**
 generated with `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_. It allows you to
@@ -20,7 +20,7 @@ For a brief introduction to the library, you can read the
 :ref:`tutorial <tutorial>`. Visit the
 :ref:`installation page <installing>` page to see how to download the
 package. You can browse the :ref:`example gallery <example_gallery>` and
-:ref:`API reference <api>`  to see what you can do with pymaid.
+:ref:`API reference <api>` to see what you can do with pymaid.
 
 Pymaid is licensed under the GNU GPL v3+ license. The source code is hosted
 at `Github <https://github.com/schlegelp/PyMaid>`_. Feedback, feature requests
@@ -32,7 +32,7 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
 .. raw:: html
 
          </div>
-         <div class="col-md-3">
+         <div class="col-lg-3">
             <div class="panel panel-default">
                <div class="panel-heading">
                   <h3 class="panel-title">Contents</h3>
@@ -55,7 +55,7 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
                </div>
             </div>
          </div>
-         <div class="col-md-3">
+         <div class="col-lg-3">
             <div class="panel panel-default">
                <div class="panel-heading">
                   <h3 class="panel-title">Features</h3>

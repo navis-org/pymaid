@@ -31,7 +31,8 @@ import seaborn as sns
 
 from scipy.spatial.distance import cdist
 
-from . import core, utils, morpho, config, cache, fetch, scene3d, graph_utils
+from . import (core, utils, morpho, config, cache, fetch,
+               scene3d, graph_utils, client)
 
 __all__ = sorted(['add_annotations', 'remove_annotations',
                   'add_tags', 'delete_tags',
@@ -229,10 +230,10 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
     """
     # TODOs:
     # - move node confidences
-    if not isinstance(source_instance, fetch.CatmaidInstance):
+    if not isinstance(source_instance, client.CatmaidInstance):
         raise TypeError('"source_instance" must be CatmaidInstance not "{}"'.format(type(source_instance)))
 
-    if not isinstance(target_instance, fetch.CatmaidInstance):
+    if not isinstance(target_instance, client.CatmaidInstance):
         raise TypeError('"target_instance" must be CatmaidInstance not "{}"'.format(type(target_instance)))
 
     if source_instance == target_instance:

@@ -202,8 +202,8 @@ def watch_network(x, sleep=3, n_circles=1, min_pre=2, min_post=2, layout=None,
 
     >>> import pymaid
     >>> import pymaid.cytoscape as cytomaid
-    >>> rm = pymaid.CatmaidInstance('server_url', 'http_user',
-    ...                             'http_pw', 'auth_token')
+    >>> rm = pymaid.CatmaidInstance('server_url', 'api_token', 'http_user',
+    ...                             'http_password')
     >>> # Don't forget to start Cytoscape!
     >>> cytomaid.watch_network('annotation:glomerulus DA1', min_pre=5,
     ...                         min_post=-1, sleep=5)

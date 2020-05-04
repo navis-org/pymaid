@@ -30,14 +30,14 @@ Examples
 >>> # Load nat as module
 >>> nat = importr('nat')
 >>> # Initialise CatmaidInstance
->>> rm = pymaid.CatmaidInstance('server_url', 'http_user', 'http_pw', 'token')
+>>> rm = pymaid.CatmaidInstance('server_url', 'api_token', 'http_user', 'http_pw')
 >>> # Fetch a neuron in Python CATMAID
 >>> skeleton_id = 123456
 >>> n = pymaid.get_neuron( skeleton_id )
 >>> # Initialize R's rcatmaid
 >>> rcatmaid = rmaid.init_rcatmaid( rm )
 >>> # Convert pymaid neuron to R neuron (works with neuron + neuronlist objects)
->>> n_r = rmaid.neuron2r( n.ix[0] )
+>>> n_r = rmaid.neuron2r( n[0] )
 >>> # Use nat to prune the neuron
 >>> n_pruned = nat.prune_strahler( n_r )
 >>> # Convert back to pymaid object
@@ -81,8 +81,7 @@ try:
     flycircuit = importr('flycircuit')
     elmr = importr('elmr')
 except BaseException:
-    logger.error(
-        'R library "nat" not found! Please install from within R.')
+    logger.error('R library "nat" not found! Please install from within R.')
 
 __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
                   'data2py', 'NBLASTresults', 'nblast', 'nblast_allbyall',
@@ -90,7 +89,7 @@ __all__ = sorted(['neuron2r', 'neuron2py', 'init_rcatmaid', 'dotprops2py',
 
 
 def init_rcatmaid(**kwargs):
-    """ Initialize the R catmaid package.
+    """Initialize the R catmaid package.
 
     R package by Greg Jefferis: https://github.com/jefferis/rcatmaid
 
@@ -101,29 +100,29 @@ def init_rcatmaid(**kwargs):
                         extract credentials. Overrides other credentials
                         provided!
     server :            str, optional
-                        Use this to set server URL if no remote_instance is
-                        provided
-    authname :          str, optional
-                        Use this to set http user if no remote_instance is
-                        provided
-    authpassword :      str, optional
-                        Use this to set http password if no remote_instance
-                        is provided
-    authtoken :         str, optional
-                        Use this to set user token if no remote_instance is
-                        provided
+                        Use this to set server URL if no global remote_instance
+                        is set or you want to override its parameters.
+    http_user :         str, optional
+                        Use this to set http user if no global remote_instance
+                        is set.
+    http_password :     str, optional
+                        Use this to set http password if no global remote_instance
+                        is set.
+    api_token :         str, optional
+                        Your CATMAID token. Use this to set user token if no
+                        global remote_instance is set.
 
     Returns
     -------
     catmaid :           R library
                         R object representing the rcatmaid library
-    """
 
+    """
     remote_instance = kwargs.get('remote_instance', None)
     server = kwargs.get('server', None)
-    authname = kwargs.get('authname', None)
-    authpassword = kwargs.get('authpassword', None)
-    authtoken = kwargs.get('authtoken', None)
+    http_user = kwargs.get('http_user', None)
+    http_password = kwargs.get('http_password', None)
+    api_token = kwargs.get('api_token', None)
 
     if remote_instance is None:
         if 'remote_instance' in sys.modules:
@@ -133,12 +132,12 @@ def init_rcatmaid(**kwargs):
 
     if remote_instance:
         server = remote_instance.server
-        authname = remote_instance.authname
-        authpassword = remote_instance.authpassword
-        authtoken = remote_instance.authtoken
-    elif not remote_instance and None in (server, authname, authpassword, authtoken):
+        http_user = remote_instance.http_user
+        http_password = remote_instance.http_password
+        api_token = remote_instance.api_token
+    elif not remote_instance and None in (server, api_token):
         logger.error('Unable to initialize. Missing credentials: %s' % ''.join(
-            [n for n in ['server', 'authname', 'authpassword', 'authtoken'] if n not in kwargs]))
+            [n for n in ['server', 'api_token'] if n not in kwargs]))
         return None
 
     # Import R Catmaid
@@ -151,9 +150,9 @@ def init_rcatmaid(**kwargs):
 
     # Use remote_instance's credentials
     catmaid.server = server
-    catmaid.authname = authname
-    catmaid.authpassword = authpassword
-    catmaid.token = authtoken
+    catmaid.authname = http_user
+    catmaid.authpassword = http_password
+    catmaid.token = api_token
 
     # Create the connection
     con = catmaid.catmaid_connection(server=catmaid.server,
@@ -618,7 +617,8 @@ def nblast_allbyall(x, target=None, normalize=True, n_cores=os.cpu_count(),
     >>> import pymaid
     >>> import matplotlib.pyplot as plt
     >>> # Initialize connection to Catmaid server
-    >>> rm = pymaid.CatmaidInstance(url, http_user, http_pw, token)
+    >>> # Omit http user and password if not required
+    >>> rm = pymaid.CatmaidInstance('server_url', 'api_token', 'http_user', 'http_pw')
     >>> # Get a bunch of neurons
     >>> nl = pymaid.get_neuron('annotation:glomerulus DA1')
     >>> # NBlast against each other
@@ -738,7 +738,8 @@ def nblast(query, db=None, n_cores=os.cpu_count(),
     --------
     >>> import pymaid
     >>> # Initialize connection to Catmaid server
-    >>> rm = pymaid.CatmaidInstance( url, http_user, http_pw, token )
+    >>> # Omit http user and password if not required
+    >>> rm = pymaid.CatmaidInstance('server_url', 'api_token', 'http_user', 'http_pw')
     >>> # Blast a neuron against default (FlyCircuit) database
     >>> nbl = rmaid.nblast(16)
     >>> # See contents of nblast_res object
@@ -1126,7 +1127,7 @@ def get_brain_volume(template, neuropil=None):
 
 
 def neuron2dps(x, resample=1, convert_to_um=True):
-    """ Converts neuron(s) into R dotprops.
+    """Convert neuron(s) into R dotprops.
 
     Parameters
     ----------
@@ -1141,8 +1142,8 @@ def neuron2dps(x, resample=1, convert_to_um=True):
     Returns
     -------
     ``nat.dotprops``
-    """
 
+    """
     # First convert x to R neurons
     if 'rpy2' in str(type(x)):
         rn = x
