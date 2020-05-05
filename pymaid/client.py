@@ -139,6 +139,16 @@ class CatmaidInstance:
         self._api_token = api_token
         self.__max_threads = max_threads
 
+        # Make some sanity checks - this is also to catch issues with
+        # users using the old order of arguments
+        if len(self._api_token) < 20:
+            logger.warning("The provided API token looks suspiciously "
+                           "short: '" + self._api_token + "'\nPlease note "
+                           "that the name and order of arguments in "
+                           "CatmaidInstance's signature has changed in "
+                           "version 1.1.0 and is now `CatmaidInstance(server, "
+                           "api_token, http_user=None, http_password=None, ...)`")
+
         self.caching = caching
         self._cache = cache.Cache(size_limit=128)
 
