@@ -1725,7 +1725,10 @@ def add_connector(coords, check_existing=True, remote_instance=None):
         raise ValueError('Expected x/y/z coordinates, got {}'.format(coords.shape[1]))
     if check_existing:
         for coord in coords:
-            existing_connector = fetch.get_connectors_in_bbox([[coord[0],coord[0]+1],[coord[1],coord[1]+1],[coord[2],coord[2]+1]], ret='IDS',remote_instance=remote_instance)    
+            existing_connector = fetch.get_connectors_in_bbox([[coord[0], coord[0]+1],
+                                                               [coord[1], coord[1]+1],
+                                                               [coord[2], coord[2]+1]],
+                                                              ret='IDS', remote_instance=remote_instance)    
             
             if len(existing_connector) == 0:
                 url = [remote_instance._create_connector_url()] 
