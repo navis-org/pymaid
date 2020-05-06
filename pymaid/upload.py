@@ -1730,8 +1730,6 @@ def add_connector(coords, check_existing=True, remote_instance=None):
     """
     remote_instance = utils._eval_remote_instance(remote_instance)    
     resp = []
-    url = []
-    post = []
     if not utils._is_iterable(coords[0]):
         coords = [coords]
 
@@ -1747,15 +1745,15 @@ def add_connector(coords, check_existing=True, remote_instance=None):
                                                               ret='IDS', remote_instance=remote_instance)    
             
             if len(existing_connector) == 0:
-                url.extend([remote_instance._create_connector_url()]) 
-                post.extend([{'pid': remote_instance.project_id, 
+                url = [remote_instance._create_connector_url()] 
+                post = [{'pid': remote_instance.project_id, 
                         'confidence': 5,
                         'x': coord[0],
                         'y': coord[1],
-                        'z': coord[2]}])               
+                        'z': coord[2]}]
+                resp.extend(remote_instance.fetch(url, post=post, desc='Creating connectors'))
             else:
                 resp.extend([{'connector_id':existing_connector[0][0]}])
-        resp.extend(remote_instance.fetch(url, post=post, desc='Creating connectors'))
     else:
         url = [remote_instance._create_connector_url()] * coords.shape[0]
 
