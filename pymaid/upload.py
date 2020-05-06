@@ -298,9 +298,10 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
 
 @cache.never_cache
 def upload_neuron(x, import_tags=False, import_annotations=False,
-                  import_connectors=False, skeleton_id=None, neuron_id=None,
-                  force_id=False, source_id=None, source_project_id=None,
-                  source_url=None, source_type=None, remote_instance=None, check_existing=True):
+                  import_connectors=False, reuse_existing_connectors=True,
+                  skeleton_id=None, neuron_id=None, force_id=False,
+                  source_id=None, source_project_id=None,
+                  source_url=None, source_type=None, remote_instance=None):
     """Export (upload) neurons to CatmaidInstance.
 
     Note that skeleton, treenode and connector IDs will change (see server
@@ -317,6 +318,14 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                          If True will upload annotations from ``x.annotations``.
     import_connectors :  bool, optional
                          If True will upload connectors from ``x.connectors``.
+    reuse_existing_connectors : bool, optional
+                         Only matters when import_connetors is True.
+                         If True will look in the remote_instance at the
+                         location of each of ``x``'s connectors, and if
+                         present, ``x`` will be linked to that existing
+                         connector instead of a new (duplicate) connector being
+                         created at that location. If False all of
+                         ``x.connectors`` are uploaded as new.
     skeleton_id :        int, optional
                          Use this to set the Id of the new skeleton(s). If not
                          provided will will generate a new ID upon export.
@@ -557,8 +566,8 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
         # First create new connectors
         cn_resp = add_connector(connectors_no_duplicates[['x', 'y', 'z']].values,
-                                remote_instance=remote_instance,
-                                check_existing=check_existing)
+                                check_existing=reuse_existing_connectors,
+                                remote_instance=remote_instance)
 
         resp['connector_response'] = cn_resp
 
@@ -1698,6 +1707,11 @@ def add_connector(coords, check_existing=True, remote_instance=None):
     coords :            list-like
                         Either single or list of [x, y, z] coordinates at which
                         to create new connectors.
+    check_existing :    bool, optional
+                        If True will search the remote_instance at the location
+                        of each connector to be uploaded, and if a connector is
+                        already present, a new connector will not be created,
+                        instead the existing connector's ID will be returned.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
