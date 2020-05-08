@@ -557,7 +557,6 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
         # First create new connectors
         cn_resp = add_connector(connectors_no_duplicates[['x', 'y', 'z']].values,
-                                check_existing=reuse_existing_connectors,
                                 remote_instance=remote_instance)
 
         resp['connector_response'] = cn_resp
