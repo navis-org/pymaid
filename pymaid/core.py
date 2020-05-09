@@ -136,6 +136,8 @@ class CatmaidNeuron:
                         Timestamp of data retrieval.
     tags :              dict
                         Treenode tags.
+    connector_tags :    dict
+                        Connector tags.
     annotations :       list
                         This neuron's annotations.
     graph :             ``network.DiGraph``
@@ -295,6 +297,7 @@ class CatmaidNeuron:
                           'nodes', 'annotations', 'partners', 'review_status',
                           'connectors', 'presynapses', 'postsynapses',
                           'gap_junctions', 'soma', 'root', 'tags',
+                          'connector_tags',
                           'n_presynapses', 'n_postsynapses', 'n_connectors',
                           'bbox']
 
@@ -353,6 +356,9 @@ class CatmaidNeuron:
         elif key == 'tags':
             self.get_skeleton()
             return self.tags
+        elif key == 'connector_tags':
+            self.get_connector_tags()
+            return self.connector_tags
         elif key == 'sampling_resolution':
             return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
@@ -523,19 +529,20 @@ class CatmaidNeuron:
 
 
     def get_connector_tags(self, remote_instance=None, **fetch_kwargs):
+        """
+        TODO
+        """
         if not remote_instance and not self._remote_instance:
-            raise Exception('Get_skeleton - Unable to connect to server '
-                            'without remote_instance. See '
+            raise Exception('get_connector_tags - Unable to connect to '
+                            'server without remote_instance. See '
                             'help(core.CatmaidNeuron) to learn how to '
                             'assign.')
         elif not remote_instance:
             remote_instance = self._remote_instance
+
         logger.info('Retrieving connector tags...')
-        connector_tags = fetch.get_connector_tags(self.skeleton_id,
-                                                  remote_instance=remote_instance,
-                                                  return_df=True,
-                                                  fetch_kwargs=fetch_kwargs).iloc[0]
-        self.connector_tags = connector_tags  # I doubt this will work
+        self.connector_tags = fetch.get_connector_tags(self,
+                                                       remote_instance=remote_instance)
 
         return
 

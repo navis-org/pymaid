@@ -1450,14 +1450,15 @@ def get_connector_tags(x, remote_instance=None):
 
     remote_get_node_labels_url = remote_instance._get_node_labels_url()
 
-    POST = {key: ','.join([str(tn) for tn in connector_ids])}
+    POST = {'connector_ids': ','.join([str(tn) for tn in connector_ids])}
 
-    response = remote_instance.fetch(remote_get_node_labels_url, post=POST)
+    resp = remote_instance.fetch(remote_get_node_labels_url, post=POST)
 
-    #TODO flip repsonse dict from {connector_id: [tag1, tag2]} to like this:
-    # {'motor connection: [list, of, connector_ids, with, that, tag']}
-    connector_tags = response #TODO change this
-    return connector_tags
+    cn_tags = {}
+    for cnid in resp:
+        cn_tags.update({tag: cn_tags.get(tag, []) + [cnid] for tag in resp[cnid]})
+
+    return cn_tags
 
 
 @cache.undo_on_error
