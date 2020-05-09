@@ -591,8 +591,6 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         resp['link_response'] = ln_resp
 
         if import_tags and getattr(x, 'connector_tags', {}):
-            #print(cn_map)
-            #print(x.connector_tags.items())
             # Map old to new connectors
             cn_tags = {t: [cn_map[n] for n in v] for t, v in x.connector_tags.items()}
             # Invert connector tag dictionary: map connctor ID -> list of tags
@@ -603,6 +601,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
             resp['connector_tags'] = add_tags(list(ctags.keys()),
                                               ctags,
                                               'CONNECTOR',
+                                              override_existing=True,
                                               remote_instance=remote_instance)
 
     return resp
