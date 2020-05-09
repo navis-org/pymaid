@@ -1456,7 +1456,7 @@ def get_connector_tags(x, remote_instance=None):
 
     cn_tags = {}
     for cnid in resp:
-        cn_tags.update({tag: cn_tags.get(tag, []) + [cnid] for tag in resp[cnid]})
+        cn_tags.update({tag: cn_tags.get(tag, []) + [int(cnid)] for tag in resp[cnid]})
 
     return cn_tags
 
