@@ -58,6 +58,7 @@ from .intersect import in_volume
 __all__ = sorted(['get_annotation_details', 'get_annotation_id',
                   'get_annotation_list', 'get_annotations', 'get_arbor',
                   'get_connector_details', 'get_connectors',
+                  'get_connector_tags',
                   'get_contributor_statistics', 'get_edges', 'get_history',
                   'get_logs', 'get_names', 'get_neuron',
                   'get_neurons', 'get_neurons_in_bbox',
@@ -1435,6 +1436,28 @@ def get_connector_details(x, remote_instance=None):
                       )
 
     return df
+
+
+@cache.undo_on_error
+def get_connector_tags(x, remote_instance=None):
+
+    #TODO DOCSTRING
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    connector_ids = utils.eval_node_ids(x, connectors=True, treenodes=False)
+
+    connector_ids = list(set(connector_ids))
+
+    remote_get_node_labels_url = remote_instance._get_node_labels_url()
+
+    POST = {key: ','.join([str(tn) for tn in connector_ids])}
+
+    response = remote_instance.fetch(remote_get_node_labels_url, post=POST)
+
+    #TODO flip repsonse dict from {connector_id: [tag1, tag2]} to like this:
+    # {'motor connection: [list, of, connector_ids, with, that, tag']}
+    connector_tags = response #TODO change this
+    return connector_tags
 
 
 @cache.undo_on_error

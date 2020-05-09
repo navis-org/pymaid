@@ -521,6 +521,25 @@ class CatmaidNeuron:
 
         return
 
+
+    def get_connector_tags(self, remote_instance=None, **fetch_kwargs):
+        if not remote_instance and not self._remote_instance:
+            raise Exception('Get_skeleton - Unable to connect to server '
+                            'without remote_instance. See '
+                            'help(core.CatmaidNeuron) to learn how to '
+                            'assign.')
+        elif not remote_instance:
+            remote_instance = self._remote_instance
+        logger.info('Retrieving connector tags...')
+        connector_tags = fetch.get_connector_tags(self.skeleton_id,
+                                                  remote_instance=remote_instance,
+                                                  return_df=True,
+                                                  fetch_kwargs=fetch_kwargs).iloc[0]
+        self.connector_tags = connector_tags  # I doubt this will work
+
+        return
+
+
     def _clear_temp_attr(self, exclude=[]):
         """Clear temporary attributes."""
         temp_att = ['igraph', 'graph', 'segments', 'small_segments',
