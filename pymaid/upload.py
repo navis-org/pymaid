@@ -551,14 +551,18 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                                               remote_instance=remote_instance)
 
     if import_connectors and not x.connectors.empty:
+        #Connectors that make multiple links onto the neuron will be listed more than once,
+        #but only want to upload them once
+        connectors_no_duplicates = x.connectors.drop_duplicates(subset=['connector_id'])
+
         # First create new connectors
-        cn_resp = add_connector(x.connectors[['x', 'y', 'z']].values,
+        cn_resp = add_connector(connectors_no_duplicates[['x', 'y', 'z']].values,
                                 remote_instance=remote_instance)
 
         resp['connector_response'] = cn_resp
 
         # Create old to new IDs map
-        cn_map = {old: new['connector_id'] for old, new in zip(x.connectors.connector_id.values,
+        cn_map = {old: new['connector_id'] for old, new in zip(connectors_no_duplicates.connector_id.values,
                                                                cn_resp)}
 
         # Add map to server response
