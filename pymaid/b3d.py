@@ -563,12 +563,13 @@ class handler:
 
             mat = bpy.data.materials.get(mat_name,
                                          bpy.data.materials.new(mat_name))
-            mat.diffuse_color = self.cn_dict[i]['color']
             ob.active_material = mat
 
             if blender_version >= 2.8:
+                mat.diffuse_color = self.cn_dict[i]['color']
                 bpy.context.scene.collection.objects.link(ob)
             else:
+                mat.diffuse_color = self.cn_dict[i]['color'][:3]
                 bpy.context.scene.objects.link(ob)
 
         return
