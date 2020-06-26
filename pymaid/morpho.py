@@ -2665,6 +2665,15 @@ def prune_twigs(x, size, exclude_tags=None, inplace=False, recursive=False):
     CatmaidNeuron/List
                     Pruned neuron(s).
 
+    See Also
+    --------
+    :func:`pymaid.longest_neurite`
+                    If you want to keep/remove just the N longest neurites
+                    instead of using a length cut-off.
+    :func:`pymaid.prune_by_length`
+                    If you are looking to remove segments over/under a given
+                    size threshold.
+
     Examples
     --------
     >>> import pymaid
