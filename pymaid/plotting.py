@@ -1383,6 +1383,11 @@ def plot3d(x, **kwargs):
                     continue
             elif not volumes_data[v]['verts']:
                 continue
+
+            c = volumes_data[v]['color']
+            if len(c) == 3:
+                c = (c[0], c[1], c[2], .5)
+
             trace_data.append(go.Mesh3d(
                 x=[-v[0] for v in volumes_data[v]['verts']],
                 # y and z are switched
@@ -1394,7 +1399,7 @@ def plot3d(x, **kwargs):
                 k=[f[2] for f in volumes_data[v]['faces']],
 
                 opacity=.5,
-                color='rgb' + str(volumes_data[v]['color']),
+                color='rgba' + str(c),
                 name=v,
                 hoverinfo='none'
             )
