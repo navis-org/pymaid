@@ -141,7 +141,7 @@ class CatmaidInstance:
 
         # Make some sanity checks - this is also to catch issues with
         # users using the old order of arguments
-        if len(self._api_token) < 20:
+        if self._api_token and len(self._api_token) < 20:
             logger.warning("The provided API token looks suspiciously "
                            "short: '" + self._api_token + "'\nPlease note "
                            "that the name and order of arguments in "
