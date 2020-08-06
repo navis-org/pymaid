@@ -439,16 +439,30 @@ def plot2d(x, method='2d', **kwargs):
                                           fc=fc, ec=ec, alpha=this_alpha, zorder=0)
                 ax.add_patch(vpatch)
             elif method in ['3d', '3d_complex']:
-                verts = np.vstack(v.vertices)
-                # Invert y-axis
-                verts[:, 1] *= -1
-                # Add alpha
-                if len(c) == 3:
-                    c = (c[0], c[1], c[2], .1)
-                ts = ax.plot_trisurf(verts[:, 0], verts[:, 2], v.faces,
-                                     verts[:, 1], label=v.name,
-                                     color=c)
-                ts.set_gid(v.name)
+                if kwargs.get('volume_outlines', False):
+                    # Generate outline - note that we are already inverting y
+                    verts = v.to_2d(view='{0}{1}'.format(axis1, axis2), invert_y=True)
+                    # Add the center of the volume as Z axis
+                    verts = np.hstack((verts,
+                                       np.full((len(verts), 1),
+                                               v.vertices.mean(axis=0)[2])))
+                    # Generate and add polygon                    
+                    poly = Poly3DCollection([verts[:, [0, 2, 1]]],
+                                            lw=lw,
+                                            fc=(1, 1, 1, 0),  # this must not be "none"
+                                            ec=c)
+                    ax.add_collection3d(poly)
+                else:
+                    verts = np.vstack(v.vertices)
+                    # Invert y-axis
+                    verts[:, 1] *= -1
+                    # Add alpha
+                    if len(c) == 3:
+                        c = (c[0], c[1], c[2], .1)
+                    ts = ax.plot_trisurf(verts[:, 0], verts[:, 2], v.faces,
+                                         verts[:, 1], label=v.name,
+                                         color=c)
+                    ts.set_gid(v.name)
                 ax_had_data = _update_axes3d_bounds(ax,
                                                     verts[:, [0, 2, 1]],
                                                     had_data=ax_had_data)
@@ -558,8 +572,6 @@ def plot2d(x, method='2d', **kwargs):
                                                         neuron.nodes[['x', 'z', 'y']].values * [1, 1, -1],
                                                         had_data=ax_had_data)
 
-                coords = np.vstack(coords)
-
                 surf3D_collections.append([])
                 if neuron.soma and kwargs.get('soma', True):
                     for s in utils._make_iterable(neuron.soma):
@@ -606,8 +618,6 @@ def plot2d(x, method='2d', **kwargs):
                                                     all_cn[['x', 'z', 'y']].values * [1, 1, -1],
                                                     had_data=ax_had_data)
 
-            coords = neuron.connectors[['x', 'y', 'z']].values
-            coords[:, 1] *= -1
     for i, neuron in enumerate(config.tqdm(dotprops.itertuples(),
                                            desc='Plt dotprops',
                                            total=dotprops.shape[0],
@@ -652,7 +662,7 @@ def plot2d(x, method='2d', **kwargs):
                                 zorder=4, edgecolor='none')
             ax.add_patch(s)
         elif method in ['3d', '3d_complex']:
-                # Combine coords by weaving starts and ends together
+            # Combine coords by weaving starts and ends together
             coords = np.empty((starts.shape[0] * 2, 3), dtype=starts.dtype)
             coords[0::2] = starts
             coords[1::2] = ends
@@ -735,9 +745,6 @@ def plot2d(x, method='2d', **kwargs):
                 ax_had_data = _update_axes3d_bounds(ax,
                                                     p[:, [0, 2, 1]] * [1, 1, -1],
                                                     had_data=ax_had_data)
-
-            coords = p
-            coords[:, 1] *= -1
 
     if autoscale:
         if method == '2d':
