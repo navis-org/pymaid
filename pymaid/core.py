@@ -1677,8 +1677,8 @@ class CatmaidNeuronList:
             to_retrieve = [
                 n.skeleton_id for n in self.neurons if 'annotations' not in n.__dict__]
             if to_retrieve:
-                re = fetch.get_annotations(
-                    to_retrieve, remote_instance=self._remote_instance)
+                re = fetch.get_annotations(to_retrieve,
+                                           remote_instance=self._remote_instance)
                 for n in [n for n in self.neurons if 'annotations' not in n.__dict__]:
                     n.annotations = re.get(str(n.skeleton_id), [])
             return np.array([n.annotations for n in self.neurons])
@@ -1841,6 +1841,14 @@ class CatmaidNeuronList:
                                      make_copy=self.copy_on_subset)
         else:
             return NotImplemented
+
+    def append(self, v):
+        """Add CatmaidNeuron/Lists to this list."""
+        if isinstance(v, CatmaidNeuron):
+            self.neurons.append(v)
+        elif isinstance(v, CatmaidNeuronList):
+            self.neurons += v.neurons
+        raise NotImplementedError
 
     def sum(self):
         """Returns sum numeric and boolean values over all neurons. """
