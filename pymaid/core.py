@@ -2921,6 +2921,9 @@ class Volume:
         if isinstance(x, dict):
             x = list(x.values())
 
+        if not isinstance(name, str):
+            raise TypeError('name must be string, got "{}"'.format(type(name)))
+
         if not utils._is_iterable(x):
             x = [x]
 
