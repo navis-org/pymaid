@@ -1293,7 +1293,7 @@ class CatmaidNeuron:
         return utils.to_swc(self, filename, **kwargs)
 
     @classmethod
-    def from_graph(self, g, **kwargs):
+    def from_graph(cls, g, **kwargs):
         """ Generate neuron object from NetworkX Graph.
 
         This function will try to generate a neuron-like tree structure from
@@ -1322,7 +1322,7 @@ class CatmaidNeuron:
         return graph.nx2neuron(g, **kwargs)
 
     @classmethod
-    def from_swc(self, filename, neuron_name=None, neuron_id=None):
+    def from_swc(cls, filename, neuron_name=None, neuron_id=None):
         """ Generate neuron object from SWC file.
 
         This import is following format specified `here
