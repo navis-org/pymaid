@@ -168,7 +168,7 @@ def _make_iterable(x, force_type=None):
     if not isinstance(x, collections.Iterable) or isinstance(x, six.string_types):
         x = [x]
 
-    if isinstance(x, dict):
+    if isinstance(x, dict) or isinstance(x, set):
         x = list(x)
 
     if force_type:
