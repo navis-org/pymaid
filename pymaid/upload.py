@@ -1765,6 +1765,8 @@ def add_connector(coords, check_existing=True, remote_instance=None):
                         'x': coord[0],
                         'y': coord[1],
                         'z': coord[2]}]
+                # TODO run one API call for all connectors that need to be uploaded, instead of
+                # one call per connector. Single calls for many connectors are much faster.
                 resp.extend(remote_instance.fetch(url, post=post, desc='Creating connectors'))
             else:
                 resp.extend([{'connector_id':existing_connector[0][0]}])

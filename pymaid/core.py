@@ -530,7 +530,9 @@ class CatmaidNeuron:
 
     def get_connector_tags(self, remote_instance=None, **fetch_kwargs):
         """
-        TODO
+        Get/update tags on connectors of a neuron. After running,
+        neuron.connector_tags will store a list of tag-node mappings
+        similar to neuron.tags.
         """
         if not remote_instance and not self._remote_instance:
             raise Exception('get_connector_tags - Unable to connect to '

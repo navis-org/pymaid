@@ -1440,8 +1440,21 @@ def get_connector_details(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_connector_tags(x, remote_instance=None):
+    """Retrieve tags on sets of connectors.
 
-    #TODO DOCSTRING
+    Parameters
+    ----------
+    x :                 list of connector IDs | CatmaidNeuron | CatmaidNeuronList
+                        Connector ID(s) to retrieve details for. If
+                        CatmaidNeuron/List, will use their connectors.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    ---------
+    dict
+                        ``{tag1: [connector1_id, connector2_id, ...], tag2: [ ... ], ...}``
+    """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     connector_ids = utils.eval_node_ids(x, connectors=True, treenodes=False)
