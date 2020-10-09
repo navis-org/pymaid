@@ -319,7 +319,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
     import_connectors :  bool, optional
                          If True will upload connectors from ``x.connectors``.
     reuse_existing_connectors : bool, optional
-                         Only matters when import_connetors is True.
+                         Only matters when import_connectors is True.
                          If True will look in the remote_instance at the
                          location of each of ``x``'s connectors, and if
                          present, ``x`` will be linked to that existing
