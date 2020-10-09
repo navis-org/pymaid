@@ -24,7 +24,7 @@ as environment variables or in a config_test.py file
     # Test CATMAID volume
     test_volume = ''
 
-If you use environmental variables, give lists as comma-separated string.
+If you use environmental variables, give lists as comma-separated strings.
 
 
 Examples
@@ -52,9 +52,12 @@ mpl.use('template')
 import matplotlib.pyplot as plt
 
 import unittest
+import doctest
+
 import datetime
 
 import pymaid
+import navis as ns
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -101,9 +104,7 @@ class TestModules(unittest.TestCase):
     """Test individual module import. """
 
     def test_imports(self):
-        mods = ['morpho', 'core', 'plotting', 'graph', 'graph_utils', 'core',
-                'connectivity', 'user_stats', 'cluster', 'resample',
-                'intersect', 'fetch', 'scene3d']
+        mods = ['core', 'connectivity', 'user_stats', 'cluster', 'fetch']
 
         for m in mods:
             _ = importlib.import_module('pymaid.{}'.format(m))
@@ -123,12 +124,12 @@ class TestFetch(unittest.TestCase):
         are always the same."""
 
         def wrapper(self, *args, **kwargs):
-            pymaid.config.use_igraph = False
+            ns.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
-            # if igraph:
-            #    pymaid.config.use_igraph = True
-            #    res2 = func(self, *args, **kwargs)
-            #    self.assertEqual(res1, res2)
+            if igraph:
+                ns.config.use_igraph = True
+                res2 = func(self, *args, **kwargs)
+                self.assertEqual(res1, res2)
             return res1
         return wrapper
 
@@ -150,20 +151,22 @@ class TestFetch(unittest.TestCase):
 
     @try_conditions
     def test_neuron_exists(self):
-        self.assertIsInstance(pymaid.neuron_exists(
-            config_test.test_skids[0], remote_instance=self.rm), bool)
-        self.assertIsInstance(pymaid.neuron_exists(
-            config_test.test_skids, remote_instance=self.rm), dict)
+        self.assertIsInstance(pymaid.neuron_exists(config_test.test_skids[0],
+                                                   remote_instance=self.rm),
+                              bool)
+        self.assertIsInstance(pymaid.neuron_exists(config_test.test_skids,
+                                                   remote_instance=self.rm),
+                              dict)
 
     @try_conditions
     def test_get_user_list(self):
-        self.assertIsInstance(pymaid.get_user_list(
-            remote_instance=self.rm), pd.DataFrame)
+        self.assertIsInstance(pymaid.get_user_list(remote_instance=self.rm),
+                              pd.DataFrame)
 
     @try_conditions
     def test_get_history(self):
-        self.assertIsInstance(pymaid.get_history(
-            remote_instance=self.rm), pd.Series)
+        self.assertIsInstance(pymaid.get_history(remote_instance=self.rm),
+                              pd.Series)
 
     @try_conditions
     def test_get_annotated_skids(self):
@@ -195,8 +198,8 @@ class TestFetch(unittest.TestCase):
             config_test.test_skids[0], remote_instance=self.rm), pd.DataFrame)
 
     @try_conditions
-    def test_get_treenode_table(self):
-        self.assertIsInstance(pymaid.get_treenode_table(
+    def test_get_node_table(self):
+        self.assertIsInstance(pymaid.get_node_table(
             config_test.test_skids, remote_instance=self.rm), pd.DataFrame)
 
     @try_conditions
@@ -207,7 +210,7 @@ class TestFetch(unittest.TestCase):
     @try_conditions
     def test_get_volume(self):
         self.assertIsInstance(pymaid.get_volume(
-            config_test.test_volume, remote_instance=self.rm), pymaid.Volume)
+            config_test.test_volume, remote_instance=self.rm), ns.Volume)
 
     @try_conditions
     def test_get_logs(self):
@@ -260,13 +263,13 @@ class TestFetch(unittest.TestCase):
     @try_conditions
     def test_node_details(self):
         n = pymaid.get_neuron(config_test.test_skids[0])
-        self.assertIsInstance(pymaid.get_node_details(n.nodes.sample(100).treenode_id.values),
+        self.assertIsInstance(pymaid.get_node_details(n.nodes.sample(100).node_id.values),
                               pd.DataFrame)
 
     @try_conditions
-    def test_skid_from_treenode(self):
+    def test_skid_from_node(self):
         n = pymaid.get_neuron(config_test.test_skids[0])
-        self.assertIsInstance(pymaid.get_skid_from_treenode(n.nodes.iloc[0].treenode_id),
+        self.assertIsInstance(pymaid.get_skid_from_node(n.nodes.iloc[0].node_id),
                               dict)
 
     @try_conditions
@@ -292,16 +295,16 @@ class TestFetch(unittest.TestCase):
                               dict)
 
     @try_conditions
-    def test_treenode_info(self):
+    def test_node_info(self):
         n = pymaid.get_neuron(config_test.test_skids[0])
-        self.assertIsInstance(pymaid.get_treenode_info(n.nodes.treenode_id.values[0:50]),
+        self.assertIsInstance(pymaid.get_node_info(n.nodes.node_id.values[0:50]),
                               pd.DataFrame)
 
     @try_conditions
-    def test_treenode_tags(self):
+    def test_node_tags(self):
         n = pymaid.get_neuron(config_test.test_skids[0])
-        self.assertIsInstance(pymaid.get_node_tags(n.nodes.treenode_id.values[0:50],
-                                                   node_type='TREENODE'),
+        self.assertIsInstance(pymaid.get_node_tags(n.nodes.node_id.values[0:50],
+                                                   node_type='NODE'),
                               dict)
 
     @try_conditions
@@ -318,10 +321,8 @@ class TestFetch(unittest.TestCase):
     def test_get_paths(self):
         paths, g = pymaid.get_paths(
             config_test.test_skids[0], config_test.test_skids[1], return_graph=True)
-        self.assertIsInstance(g,
-                              nx.Graph)
-        self.assertIsInstance(paths,
-                              list)
+        self.assertIsInstance(g, nx.Graph)
+        self.assertIsInstance(paths, list)
 
     @try_conditions
     def test_annotation_list(self):
@@ -357,10 +358,10 @@ class TestCore(unittest.TestCase):
         are always the same."""
 
         def wrapper(self, *args, **kwargs):
-            pymaid.config.use_igraph = False
+            ns.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
             if igraph:
-                pymaid.config.use_igraph = True
+                ns.config.use_igraph = True
                 res2 = func(self, *args, **kwargs)
                 self.assertEqual(res1, res2)
             return res1
@@ -446,7 +447,7 @@ class TestCore(unittest.TestCase):
     @try_conditions
     def test_neuron_functions(self):
         n = self.nl[0]
-        slab = n.nodes[n.nodes.type == 'slab'].sample(1).iloc[0].treenode_id
+        slab = n.nodes[n.nodes.type == 'slab'].sample(1).iloc[0].node_id
 
         self.assertIsInstance(n.prune_distal_to(slab, inplace=False),
                               pymaid.CatmaidNeuron)
@@ -505,10 +506,10 @@ class TestMorpho(unittest.TestCase):
         are always the same."""
 
         def wrapper(self, *args, **kwargs):
-            pymaid.config.use_igraph = False
+            ns.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
             if igraph:
-                pymaid.config.use_igraph = True
+                ns.config.use_igraph = True
                 res2 = func(self, *args, **kwargs)
                 self.assertEqual(res1, res2)
             return res1
@@ -541,54 +542,50 @@ class TestMorpho(unittest.TestCase):
 
     @try_conditions
     def test_axon_dendrite_split(self):
-        self.assertIsInstance(pymaid.split_axon_dendrite(self.nl[0]),
+        self.assertIsInstance(ns.split_axon_dendrite(self.nl[0]),
                               pymaid.CatmaidNeuronList)
 
     @try_conditions
     def test_segregation_index(self):
-        self.assertIsInstance(pymaid.segregation_index(self.nl[0]),
+        self.assertIsInstance(ns.segregation_index(self.nl[0]),
                               float)
 
     @try_conditions
     def test_bending_flow(self):
-        self.assertIsInstance(pymaid.bending_flow(self.nl[0]),
+        self.assertIsInstance(ns.bending_flow(self.nl[0]),
                               type(None))
 
     @try_conditions
     def test_flow_centrality(self):
-        self.assertIsInstance(pymaid.flow_centrality(self.nl[0]),
+        self.assertIsInstance(ns.flow_centrality(self.nl[0]),
                               type(None))
 
     @try_conditions
     def test_stitching(self):
-        self.assertIsInstance(pymaid.stitch_neurons(self.nl[:2],
-                                                    method='NONE'),
+        self.assertIsInstance(ns.stitch_neurons(self.nl[:2],
+                                                method='NONE'),
                               pymaid.CatmaidNeuron)
-        self.assertIsInstance(pymaid.stitch_neurons(self.nl[:2],
-                                                    method='LEAFS'),
+        self.assertIsInstance(ns.stitch_neurons(self.nl[:2],
+                                                method='LEAFS'),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_averaging(self):
-        self.assertIsInstance(pymaid.average_neurons(self.nl[:2]),
+        self.assertIsInstance(ns.average_neurons(self.nl[:2]),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_tortuosity(self):
-        self.assertIsInstance(pymaid.tortuosity(self.nl[0]),
+        self.assertIsInstance(ns.tortuosity(self.nl[0]),
                               float)
-        self.assertIsInstance(pymaid.tortuosity(self.nl),
+        self.assertIsInstance(ns.tortuosity(self.nl),
                               pd.DataFrame)
 
     @try_conditions
     def test_arbor_confidence(self):
-        self.assertIsInstance(pymaid.arbor_confidence(self.nl[0],
-                                                      inplace=False),
+        self.assertIsInstance(ns.arbor_confidence(self.nl[0],
+                                                  inplace=False),
                               pymaid.CatmaidNeuron)
-
-    @try_conditions
-    def test_calc_cable(self):
-        self.assertIsNotNone(pymaid.calc_cable(self.nl[0]))
 
     @try_conditions
     def test_remove_branches(self):
@@ -608,29 +605,29 @@ class TestMorpho(unittest.TestCase):
 
     @try_conditions
     def test_despike_neuron(self):
-        self.assertIsInstance(pymaid.despike_neuron(self.nl[0],
-                                                    inplace=False),
+        self.assertIsInstance(ns.despike_neuron(self.nl[0],
+                                                inplace=False),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_guess_radius(self):
-        self.assertIsInstance(pymaid.guess_radius(self.nl[0],
-                                                  inplace=False),
+        self.assertIsInstance(ns.guess_radius(self.nl[0],
+                                              inplace=False),
                               pymaid.CatmaidNeuron)
 
 
 class TestGraphs(unittest.TestCase):
-    """Test pymaid.graph and pymaid.graph_utils """
+    """Test graph functions."""
 
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
         are always the same."""
 
         def wrapper(self, *args, **kwargs):
-            pymaid.config.use_igraph = False
+            ns.config.use_igraph = False
             res1 = func(self, *args, **kwargs)
             if igraph:
-                pymaid.config.use_igraph = True
+                ns.config.use_igraph = True
                 res2 = func(self, *args, **kwargs)
                 self.assertEqual(res1, res2)
             return res1
@@ -650,9 +647,9 @@ class TestGraphs(unittest.TestCase):
 
         # Get some random leaf node
         self.leaf_id = self.n.nodes[self.n.nodes.type == 'end'].sample(
-            1).iloc[0].treenode_id
+            1).iloc[0].node_id
         self.slab_id = self.n.nodes[self.n.nodes.type == 'slab'].sample(
-            1).iloc[0].treenode_id
+            1).iloc[0].node_id
 
     @try_conditions
     def test_reroot(self):
@@ -666,7 +663,7 @@ class TestGraphs(unittest.TestCase):
 
     @try_conditions
     def test_distance(self):
-        leaf_id = self.n.nodes[self.n.nodes.type == 'end'].iloc[0].treenode_id
+        leaf_id = self.n.nodes[self.n.nodes.type == 'end'].iloc[0].node_id
 
         self.assertIsNotNone(pymaid.dist_between(self.n,
                                                  leaf_id,
@@ -863,7 +860,7 @@ class TestCluster(unittest.TestCase):
 
 
 class TestPlot(unittest.TestCase):
-    """Test pymaid.plotting """
+    """Test plotting."""
 
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
@@ -944,8 +941,8 @@ class TestTiles(unittest.TestCase):
         job.load_in_memory()
         # Render image
         ax = job.render_im(slider=False, figsize=(12, 12))
-        # Add treenodes
-        job.render_nodes(ax, treenodes=True, connectors=False)
+        # Add nodes
+        job.render_nodes(ax, nodes=True, connectors=False)
         # Add scalebar
         job.scalebar(size=1000, ax=ax, label=False)
         # Show
@@ -1000,13 +997,35 @@ class TestUserStats(unittest.TestCase):
         last_week = datetime.date.today() - datetime.timedelta(days=7)
         h = pymaid.get_history(start_date=last_week,
                                end_date=datetime.date.today())
-        u = h.treenodes.loc[h.treenodes.sum(axis=1) > 10].sample(1).index[0]
+        u = h.nodes.loc[h.nodes.sum(axis=1) > 10].sample(1).index[0]
 
         user_actions = pymaid.get_user_actions(users=u, start_date=last_week,
                                                end_date=datetime.date.today())
 
         self.assertIsInstance(user_actions, pd.DataFrame)
 
+
+"""
+class TestExamples(unittest.TestCase):
+    """Test pymaid.tiles """
+
+    def setUp(self):
+        self.rm = pymaid.CatmaidInstance(config_test.server_url,
+                                         config_test.http_user,
+                                         config_test.http_pw,
+                                         config_test.token)
+
+    def test_fetch_examples(self):
+        for func in pymaid.fetch.__all__:
+            # Some functions have dangerous examples!
+            f = getattr(pymaid.fetch, func)
+            doctest.run_docstring_examples(f, globals(), name=f)
+
+    def test_user_stats_examples(self):
+        for func in pymaid.user_stats.__all__:
+            f = getattr(pymaid.user_stats, func)
+            doctest.run_docstring_examples(f, globals(), name=f)
+"""
 
 if __name__ == '__main__':
     unittest.main()
