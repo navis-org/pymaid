@@ -321,7 +321,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
     for n in config.tqdm(neurons, desc='Processing',
                          disable=config.pbar_hide, leave=config.pbar_leave):
         # Get node details
-        tn_ids = n.nodes.treenode_id.values.astype(str)
+        tn_ids = n.nodes.node_id.values.astype(str)
         cn_ids = n.connectors.connector_id.values.astype(str)
 
         current_status = config.pbar_hide
@@ -743,7 +743,7 @@ def get_time_invested(x, mode='SUM', by='USER', minimum_actions=10,
     connector_ids = []
     for n in skdata.itertuples():
         if treenodes:
-            node_ids += n.nodes.treenode_id.tolist()
+            node_ids += n.nodes.node_id.tolist()
         if connectors:
             connector_ids += n.connectors.connector_id.tolist()
 
@@ -779,7 +779,7 @@ def get_time_invested(x, mode='SUM', by='USER', minimum_actions=10,
         col_name = 'skeleton_id'
 
         for n in skdata:
-            cond = node_details.node_id.isin(n.nodes.treenode_id.values.astype(str))
+            cond = node_details.node_id.isin(n.nodes.node_id.values.astype(str))
             node_details.loc[cond, 'skeleton_id'] = n.skeleton_id
             node_details.loc[cond, 'node_type'] = 'treenode'
 
@@ -1099,7 +1099,7 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
     if not isinstance(start_date, (datetime.date, type(None))):
         start_date = datetime.date(*start_date)
 
-    node_ids = neurons.nodes.treenode_id.tolist()
+    node_ids = neurons.nodes.node_id.tolist()
     connector_ids = neurons.connectors.connector_id.tolist()
 
     # Get node details

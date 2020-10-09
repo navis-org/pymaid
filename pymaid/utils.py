@@ -15,12 +15,9 @@
 #    along
 
 import collections
-import csv
-from glob import glob
 import itertools
 import json
 import os
-import random
 import six
 import sys
 import warnings
@@ -37,7 +34,7 @@ from . import core, fetch, config, client
 # Set up logging
 logger = config.logger
 
-__all__ = ['neuron2json', 'json2neuron', 'from_swc', 'to_swc',
+__all__ = ['neuron2json', 'json2neuron',
            'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache',
            'shorten_name']
 
@@ -521,8 +518,8 @@ def eval_user_ids(x, user_list=None, remote_instance=None):
     return user_ids
 
 
-def eval_node_ids(x, connectors=True, treenodes=True):
-    """Extract treenode or connector IDs.
+def eval_node_ids(x, connectors=True, nodes=True):
+    """Extract node or connector IDs.
 
     Parameters
     ----------
@@ -534,8 +531,8 @@ def eval_node_ids(x, connectors=True, treenodes=True):
                        to extract node IDs
     connectors :    bool, optional
                     If True will return connector IDs from neuron objects
-    treenodes :     bool, optional
-                    If True will return treenode IDs from neuron objects
+    nodes :         bool, optional
+                    If True will return node IDs from neuron objects
 
     Returns
     -------
@@ -556,7 +553,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         ids = []
         for e in x:
             temp = eval_node_ids(e, connectors=connectors,
-                                 treenodes=treenodes)
+                                 nodes=nodes)
             if isinstance(temp, (list, np.ndarray)):
                 ids += temp
             else:
@@ -566,7 +563,7 @@ def eval_node_ids(x, connectors=True, treenodes=True):
         return list(set(ids))
     elif isinstance(x, core.CatmaidNeuron):
         to_return = []
-        if treenodes:
+        if nodes:
             to_return += x.nodes.treenode_id.tolist()
         if connectors:
             to_return += x.connectors.connector_id.tolist()
@@ -574,30 +571,28 @@ def eval_node_ids(x, connectors=True, treenodes=True):
     elif isinstance(x, core.CatmaidNeuronList):
         to_return = []
         for n in x:
-            if treenodes:
+            if nodes:
                 to_return += n.nodes.treenode_id.tolist()
             if connectors:
                 to_return += n.connectors.connector_id.tolist()
         return to_return
     elif isinstance(x, (pd.DataFrame, pd.Series)):
         to_return = []
-        if treenodes and 'treenode_id' in x:
-            to_return += x.treenode_id.tolist()
+        if nodes and 'node_id' in x:
+            to_return += x.node_id.tolist()
         if connectors and 'connector_id' in x:
             to_return += x.connector_id.tolist()
 
-        if 'connector_id' not in x and 'treenode_id' not in x:
+        if 'connector_id' not in x and 'node_id' not in x:
             to_return = x.tolist()
 
         return to_return
     else:
-        raise TypeError(
-            'Unable to extract node IDs from type %s' % str(type(x)))
+        raise TypeError(f'Unable to extract node IDs from type {type(x)}')
 
 
 def _unpack_neurons(x, raise_on_error=True):
     """Unpack neurons and returns a list of individual neurons."""
-
     neurons = []
 
     if isinstance(x, (list, np.ndarray, tuple)):
@@ -688,375 +683,6 @@ def _parse_objects(x, remote_instance=None):
     points = dataframes + arrays
 
     return skids, skdata, dotprops, volumes, points, visuals
-
-
-def from_swc(f, neuron_name=None, neuron_id=None, import_labels=True,
-             pre_label=None, post_label=None, soma_label=1,
-             include_subdirs=False):
-    """Generate neuron object from SWC file/DataFrame.
-
-    This import is following format specified
-    `here <http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html>`_
-
-    Important
-    ---------
-    Soma is inferred from radius (>0), not the label.
-
-    Parameters
-    ----------
-    f :                 str | pandas.DataFrame | iterable
-                        SWC string, filename, folder or DataFrame. If folder,
-                        will import all ``.swc`` files.
-    neuronname :        str, optional
-                        Name to use for the neuron. If not provided, will use
-                        filename minus extension.
-    neuron_id :         int | func, optional
-                        Unique identifier (essentially skeleton ID). If not
-                        provided, will use filename (if numeric) or generate
-                        one from scratch. If function, must accept filename
-                        and return ``str``.
-    import_labels :     bool, optional
-                        If True, will import label column as ``.tags``
-                        property of neuron.
-    pre/post_label :    bool | int, optional
-                        If not ``None``, will try to extract pre-/postsynapses
-                        from label column.
-    soma_label :        bool | int, optional
-                        If not ``None``, will try to extract soma and place
-                        appropriate tags on the neuron.
-    include_subdirs :   bool, optional
-                        If True and ``f`` is a folder, will also search
-                        subdirectories for ``.swc`` files.
-
-    Returns
-    -------
-    CatmaidNeuron/List
-
-    See Also
-    --------
-    :func:`pymaid.to_swc`
-                        Export neurons as SWC files.
-
-    """
-    if _is_iterable(f):
-        return core.CatmaidNeuronList([from_swc(x,
-                                                neuron_name=neuron_name,
-                                                neuron_id=neuron_id,
-                                                pre_label=pre_label,
-                                                post_label=post_label,
-                                                soma_label=soma_label,
-                                                include_subdirs=include_subdirs,
-                                                )
-                                       for x in config.tqdm(f, desc='Importing',
-                                                            disable=config.pbar_hide,
-                                                            leave=config.pbar_leave)])
-
-    header = []
-    cols = ['treenode_id', 'label', 'x', 'y', 'z', 'radius', 'parent_id']
-    if isinstance(f, pd.DataFrame):
-        # Replace 'node_id' column with 'treenode_id'
-        if 'node_id' in f.columns and 'treenode_id' not in f.columns:
-            f.columns = [c.replace('node_id', 'treenode_id') for c in f.columns]
-
-        missing = [c for c in cols if c not in f.columns]
-        if missing:
-            raise ValueError('SWC DataFrame is missing required columns: '
-                             '{}'.format(','.join(missing)))
-        nodes = f
-        f = 'SWC'
-    elif os.path.isdir(f):
-        if not include_subdirs:
-            swc = [os.path.join(f, x) for x in os.listdir(f) if
-                   os.path.isfile(os.path.join(f, x)) and x.endswith('.swc')]
-        else:
-            swc = [y for x in os.walk(f) for y in glob(os.path.join(x[0], '*.swc'))]
-
-        if not swc:
-            raise ValueError('No .swc files found in folder "{}"'.format(f))
-
-        return core.CatmaidNeuronList([from_swc(x,
-                                                neuron_name=neuron_name,
-                                                neuron_id=neuron_id,
-                                                pre_label=pre_label,
-                                                soma_label=soma_label,
-                                                post_label=post_label)
-            for x in config.tqdm(swc,
-                                 desc='Reading {}'.format(f.split('/')[-1]),
-                                 disable=config.pbar_hide,
-                                 leave=config.pbar_leave)])
-    else:
-        data = []
-        with open(f) as file:
-            reader = csv.reader(file, delimiter=' ')
-            for row in reader:
-                # skip empty rows
-                if not row:
-                    continue
-                # skip comments
-                if not row[0].startswith('#'):
-                    data.append(row)
-                else:
-                    header.append(' '.join(row))
-
-        # Remove empty entries and generate nodes DataFrame
-        nodes = pd.DataFrame([[to_float(e) for e in row if e != ''] for row in data],
-                             columns=cols,
-                             dtype=object)
-
-    # Get filename
-    fname = os.path.splitext(os.path.basename(f))[0]
-
-    if not neuron_id:
-        # If filename is numeric use it as skeleton ID
-        if fname.isnumeric():
-            neuron_id = int(fname)
-        else:
-            # Use 30 bit - 32bit raises error when converting to R StrVector
-            neuron_id = random.getrandbits(30)
-    elif callable(neuron_id):
-        neuron_id = neuron_id(fname)
-
-    if not neuron_name:
-        neuron_name = fname
-
-    # Try converting labels to int (otherwise might end up float)
-    nodes.label = nodes.label.astype(int, errors='ignore')
-
-    # If any invalid nodes are found
-    if any(nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull()):
-        # Remove nodes without coordinates
-        nodes = nodes.loc[~nodes[['treenode_id', 'parent_id', 'x', 'y', 'z']].isnull().any(axis=1)]
-
-        # Because we removed nodes, we'll have to run a more complicated root
-        # detection
-        nodes.loc[~nodes.parent_id.isin(nodes.treenode_id), 'parent_id'] = None
-    else:
-        # Root node will have parent=-1 -> set this to None
-        nodes.loc[nodes.parent_id < 0, 'parent_id'] = None
-
-    connectors = pd.DataFrame([], columns=['treenode_id', 'connector_id',
-                                           'relation', 'x', 'y', 'z'],
-                              dtype=object)
-
-    if pre_label:
-        pre = nodes[nodes.label == pre_label][['treenode_id', 'x', 'y', 'z']]
-        pre['connector_id'] = None
-        pre['relation'] = 0
-        connectors = pd.concat([connectors, pre], axis=0)
-
-    if post_label:
-        post = nodes[nodes.label == post_label][['treenode_id', 'x', 'y', 'z']]
-        post['connector_id'] = None
-        post['relation'] = 1
-        connectors = pd.concat([connectors, post], axis=0)
-
-    df = pd.DataFrame([[
-        neuron_name,
-        str(neuron_id),
-        nodes,
-        connectors,
-        {},
-    ]],
-        columns=['neuron_name', 'skeleton_id',
-                 'nodes', 'connectors', 'tags'],
-        dtype=object
-    )
-
-    # Add confidences and creator (this is to prevent errors in other
-    # functions)
-    for i in range(df.shape[0]):
-        df.loc[i, 'nodes']['confidence'] = 5
-        df.loc[i, 'nodes']['creator_id'] = 0
-
-    # Placeholder for graph representations of neurons
-    df['igraph'] = None
-    df['graph'] = None
-
-    # Convert data to respective dtypes
-    dtypes = {'treenode_id': int, 'parent_id': object, 'label': str,
-              'creator_id': int, 'relation': int,
-              'connector_id': object, 'x': float, 'y': float, 'z': float,
-              'radius': float, 'confidence': int}
-
-    for k, v in dtypes.items():
-        for t in ['nodes', 'connectors']:
-            for i in range(df.shape[0]):
-                if k in df.loc[i, t]:
-                    df.loc[i, t][k] = df.loc[i, t][k].astype(v, errors='ignore')
-
-    # Generate neuron
-    n = core.CatmaidNeuron(df)
-
-    # Import labels as tags
-    if import_labels:
-        n.tags = n.nodes.groupby('label').treenode_id.apply(list).to_dict()
-
-    # Make sure soma is correctly tagged (notice force convert to str)
-    if soma_label:
-        n.tags['soma'] = n.nodes[n.nodes.label==str(soma_label)].treenode_id.tolist()
-
-    #n.nodes.drop('label', axis=1, inplace=True)
-
-    # Add folder and filename to the neuron
-    n.filename = fname
-    n.filepath = os.path.dirname(fname)
-    n.swc_header = '\n'.join(header)
-
-    return n
-
-
-def _generate_swc_table(x, export_synapses=False, min_radius=0):
-    """Generate SWC table for given neuron.
-
-    Parameters
-    ----------
-    x :             CatmaidNeuron
-
-    Returns
-    -------
-    swc :           pandas.DataFrame
-                    SWC node table
-    tn2ix :         dict
-                    Dictionary mapping treenode IDs to new node indices.
-
-    """
-    # Make copy of nodes and reorder such that the parent is always before a
-    # treenode
-    nodes_ordered = [n for seg in x.segments for n in seg[::-1]]
-    this_tn = x.nodes.set_index('treenode_id').loc[nodes_ordered]
-
-    # Because the last treenode ID of each segment is a duplicate
-    # (except for the first segment ), we have to remove them
-    this_tn = this_tn[~this_tn.index.duplicated(keep='first')]
-
-    # Add an index column (must start with "1", not "0")
-    this_tn['index'] = list(range(1, this_tn.shape[0] + 1))
-
-    # Make a dictionary treenode_id -> index
-    tn2ix = this_tn['index'].to_dict()
-
-    # Make parent index column
-    this_tn['parent_ix'] = this_tn.parent_id.map(lambda x: tn2ix.get(x, -1))
-
-    # Set Label column to 0 (undefined)
-    this_tn['label'] = 0
-    # Add end/branch labels
-    this_tn.loc[this_tn.type == 'branch', 'label'] = 5
-    this_tn.loc[this_tn.type == 'end', 'label'] = 6
-    # Add soma label
-    if x.soma:
-        this_tn.loc[x.soma, 'label'] = 1
-    if export_synapses:
-        # Add synapse label
-        this_tn.loc[x.presynapses.treenode_id.values, 'label'] = 7
-        this_tn.loc[x.postsynapses.treenode_id.values, 'label'] = 8
-
-    # Make sure we don't have too small radii
-    if not isinstance(min_radius, type(None)):
-        this_tn.loc[this_tn.radius < min_radius, 'radius'] = min_radius
-
-    # Generate table consisting of PointNo Label X Y Z Radius Parent
-    # .copy() is to prevent pandas' chaining warnings
-    swc = this_tn[['index', 'label', 'x', 'y', 'z',
-                   'radius', 'parent_ix']].copy()
-
-    # Adjust column titles
-    swc.columns = ['PointNo', 'Label', 'X', 'Y', 'Z', 'Radius', 'Parent']
-
-    return swc, tn2ix
-
-
-def to_swc(x, filename=None, export_synapses=False, min_radius=0):
-    """Generate SWC file from neuron(s).
-
-    Follows the format specified
-    `here <http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html>`_.
-
-    Important
-    ---------
-    Node IDs will be remapped to be continuous 1 -> ``len(x.nodes)``.
-
-    Parameters
-    ----------
-    x :                 CatmaidNeuron | CatmaidNeuronList
-                        If multiple neurons, will generate a single SWC file
-                        for each neurons (see also ``filename``).
-    filename :          None | str | list, optional
-                        If ``None``, will use "neuron_{skeletonID}.swc". Pass
-                        filenames as list when processing multiple neurons.
-    export_synapses :   bool, optional
-                        If True, will label nodes with pre- ("7") and
-                        postsynapse ("8"). Because only one label can be given
-                        this might drop synapses (i.e. in case of multiple
-                        pre- or postsynapses on a single treenode)!
-    min_radius :        int, optional
-                        By default, nodes in CATMAID have a radius of -1. To
-                        prevent this from causing problems in other
-                        applications, set a minimum radius [nm].
-
-    Returns
-    -------
-    dict
-                        Mapping of old -> new node IDs.
-
-    See Also
-    --------
-    :func:`pymaid.from_swc`
-                        Import SWC files.
-
-    """
-    if isinstance(x, core.CatmaidNeuronList):
-        if not _is_iterable(filename):
-            filename = [filename] * len(x)
-
-        for n, f in zip(x, filename):
-            to_swc(n, f,
-                   export_synapses=export_synapses,
-                   min_radius=min_radius)
-
-        return
-
-    if not isinstance(x, core.CatmaidNeuron):
-        raise ValueError('Can only process CatmaidNeurons, '
-                         'got "{}"'.format(type(x)))
-
-    # If not specified, generate generic filename
-    if isinstance(filename, type(None)):
-        filename = 'neuron_{}.swc'.format(x.skeleton_id)
-
-    # Check if filename is of correct type
-    if not isinstance(filename, str):
-        raise ValueError('Filename must be str or None, '
-                         'got "{}"'.format(type(filename)))
-
-    # Make sure file ending is correct
-    if os.path.isdir(filename):
-        filename += 'neuron_{}.swc'.format(x.skeleton_id)
-    elif not filename.endswith('.swc'):
-        filename += '.swc'
-
-    swc, tn2ix = _generate_swc_table(x,
-                                     export_synapses=export_synapses,
-                                     min_radius=min_radius)
-
-    with open(filename, 'w') as file:
-        # Write header
-        file.write('# SWC format file\n')
-        file.write('# based on specifications at http://research.mssm.edu/cnic/swc.html\n')
-        file.write('# Created by pymaid (https://github.com/schlegelp/PyMaid)\n')
-        file.write('# PointNo Label X Y Z Radius Parent\n')
-        file.write('# Labels:\n')
-        for l in ['0 = undefined', '1 = soma', '5 = fork point', '6 = end point']:
-            file.write('# {}\n'.format(l))
-        if export_synapses:
-            for l in ['7 = presynapse', '8 = postsynapse']:
-                file.write('# {}\n'.format(l))
-        # file.write('\n')
-
-        writer = csv.writer(file, delimiter=' ')
-        writer.writerows(swc.astype(str).values)
-
-    return tn2ix
 
 
 def __guess_sentiment(x):
@@ -1197,5 +823,7 @@ def to_float(x):
     """Convert input to float."""
     try:
         return float(x)
-    except:
+    except ValueError:
         return None
+    except BaseException:
+        raise

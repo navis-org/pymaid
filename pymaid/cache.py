@@ -120,7 +120,7 @@ class Cache(OrderedDict):
     def update_responses(self, urls, posts, responses):
         """Update cached responses.
 
-        Only overwrites reponses not already cached.
+        Only overwrites responses not already cached.
 
         """
         if isinstance(posts, type(None)):

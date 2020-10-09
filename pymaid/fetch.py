@@ -47,6 +47,7 @@ import re
 import urllib
 import webbrowser
 
+import navis as ns
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -65,15 +66,15 @@ __all__ = sorted(['get_annotation_details', 'get_annotation_id',
                   'get_nodes_in_volume', 'get_partners',
                   'get_partners_in_volume', 'get_paths', 'get_review',
                   'get_review_details', 'get_skids_by_annotation',
-                  'get_skids_by_name', 'get_treenode_info',
-                  'get_treenode_table', 'get_user_annotations',
+                  'get_skids_by_name', 'get_node_info',
+                  'get_node_table', 'get_user_annotations',
                   'get_user_list', 'get_volume', 'has_soma', 'neuron_exists',
                   'get_segments',
                   'get_connectors_between', 'url_to_coordinates',
                   'get_label_list', 'find_neurons',
-                  'get_skid_from_treenode', 'get_transactions',
+                  'get_skid_from_node', 'get_transactions',
                   'get_connector_links',
-                  'get_nth_partners', 'find_treenodes',
+                  'get_nth_partners', 'find_nodes',
                   'get_node_location', 'get_annotated',
                   'get_neuron_id',
                   'get_connectors_in_bbox',
@@ -161,15 +162,15 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
 
         neuron_name :           str
         skeleton_id :           str
-        nodes / connectors :    pandas.DataFrames containing treenode/connector
+        nodes / connectors :    pandas.DataFrames containing node/connector
                                 ID, coordinates, parent nodes, etc.
-        tags :                  dict containing the treenode tags:
-                                ``{'tag': [treenode_id, treenode_id, ...]}``
+        tags :                  dict containing the node tags:
+                                ``{'tag': [node_id, node_id, ...]}``
 
     Dataframe column titles for ``nodes`` and ``connectors`` should be
     self-explanatory with the exception of ``relation`` in connector table.
     This columns describes the connection ("relation") from the neuron's
-    treenode TO the connector::
+    node TO the connector::
 
         connectors['relation']
 
@@ -228,9 +229,9 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
     names = get_names(x, remote_instance=remote_instance)
 
     # Parse column names
-    node_cols = ['treenode_id', 'parent_id', 'creator_id', 'x', 'y', 'z',
+    node_cols = ['node_id', 'parent_id', 'creator_id', 'x', 'y', 'z',
                  'radius', 'confidence']
-    cn_cols = ['treenode_id', 'connector_id', 'relation', 'x', 'y', 'z']
+    cn_cols = ['node_id', 'connector_id', 'relation', 'x', 'y', 'z']
     if with_history:
         node_cols += ['last_modified', 'creation_date', 'still_on_skeleton']
         cn_cols += ['last_modified', 'creation_date']
@@ -247,8 +248,7 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
     df = pd.DataFrame([[names[str(x[i])],  # neuron name
                         str(x[i]),  # skeleton ID
                         pd.DataFrame(n[0],  # nodes
-                                     columns=node_cols,
-                                     dtype=object),  # do NOT remove this dtype
+                                     columns=node_cols).fillna(-1),  # do NOT remove this dtype
                         pd.DataFrame(n[1],  # connectors
                                      columns=cn_cols),
                         n[2]  # tags as dictionary
@@ -257,16 +257,16 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
                                'nodes', 'connectors', 'tags'])
 
     # Convert data to respective dtypes
-    dtypes = {'treenode_id': int,
-              'parent_id': object,  # This must not be int because root's parent is None
-              'creator_id': int,
-              'relation': int,
-              'connector_id': int,
-              'x': int,
-              'y': int,
-              'z': int,
-              'radius': int,
-              'confidence': int}
+    dtypes = {'node_id': np.int64,
+              'parent_id': np.int64,
+              'creator_id': np.int32,
+              'relation': np.int32,
+              'connector_id': np.int64,
+              'x': np.float32,
+              'y': np.float32,
+              'z': np.float32,
+              'radius': np.float32,
+              'confidence': np.int32}
 
     for k, v in dtypes.items():
         for t in ['nodes', 'connectors']:
@@ -293,8 +293,7 @@ def get_arbor(x, node_flag=1, connector_flag=1, tag_flag=1, remote_instance=None
     Similar to :func:`pymaid.get_neuron` but the connector data includes
     the whole chain::
 
-        treenode1 -> (link_confidence) -> connector -> (link_confidence)
-        -> treenode2
+        node1 -> (link_confidence) -> connector -> (link_confidence) -> node2
 
     This means that connectors can shop up multiple times (i.e. if they have
     multiple postsynaptic targets). Does include connector ``x, y, z``
@@ -330,12 +329,12 @@ def get_arbor(x, node_flag=1, connector_flag=1, tag_flag=1, remote_instance=None
     Notes
     -----
     - nodes and connectors are pandas.DataFrames themselves
-    - tags is a dict: ``{ 'tag' : [ treenode_id, treenode_id, ... ] }``
+    - tags is a dict: ``{'tag': [node_id, node_id, ...]}``
 
     Dataframe (df) column titles should be self explanatory with these exception:
 
-    - ``df['relation_1']`` describes treenode_1 to/from connector
-    - ``df['relation_2']`` describes treenode_2 to/from connector
+    - ``df['relation_1']`` describes node1 to/from connector
+    - ``df['relation_2']`` describes node2 to/from connector
     - ``relation`` can be: ``0`` (presynaptic), ``1`` (postsynaptic), ``2`` (gap junction)
 
     """
@@ -363,11 +362,11 @@ def get_arbor(x, node_flag=1, connector_flag=1, tag_flag=1, remote_instance=None
     df = pd.DataFrame([[
         names[str(x[i])],
         str(x[i]),
-        pd.DataFrame(n[0], columns=['treenode_id', 'parent_id', 'creator_id',
+        pd.DataFrame(n[0], columns=['node_id', 'parent_id', 'creator_id',
                                     'x', 'y', 'z', 'radius', 'confidence']),
-        pd.DataFrame(n[1], columns=['treenode_1', 'link_confidence',
+        pd.DataFrame(n[1], columns=['node_1', 'link_confidence',
                                     'connector_id', 'link_confidence',
-                                    'treenode_2', 'other_skeleton_id',
+                                    'node_2', 'other_skeleton_id',
                                     'relation_1', 'relation_2']),
         n[2]]
         for i, n in enumerate(skdata)
@@ -397,7 +396,7 @@ def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
                         2. list of neuron name(s) (str, exact match)
                         3. an annotation: e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
-    volume :            str | list of str | core.Volume
+    volume :            str | list of str | navis.Volume
                         Name of the CATMAID volume to test OR volume dict with
                         {'vertices':[],'faces':[]} as returned by e.g.
                         :func:`~pymaid.get_volume()`.
@@ -464,9 +463,9 @@ def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
     # Now reconstruct connectivity table from connector details
 
     # Some connectors may be connected to the same neuron multiple times
-    # In those cases there will be more treenode IDs in "postsynaptic_to_node"
+    # In those cases there will be more node IDs in "postsynaptic_to_node"
     # than there are skeleton IDs in "postsynaptic_to". Then we need to map
-    # treenode IDs to neurons
+    # node IDs to neurons
     mismatch = cn_details[cn_details.postsynaptic_to.apply(
         len) < cn_details.postsynaptic_to_node.apply(len)]
     match = cn_details[cn_details.postsynaptic_to.apply(
@@ -475,8 +474,8 @@ def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
     if not mismatch.empty:
         logger.info('Retrieving additional details for {0} '
                     'connectors'.format(mismatch.shape[0]))
-        tn_to_skid = get_skid_from_treenode([tn for l in mismatch.postsynaptic_to_node.values for tn in l],
-                                            remote_instance=remote_instance)
+        tn_to_skid = get_skid_from_node([tn for l in mismatch.postsynaptic_to_node.values for tn in l],
+                                        remote_instance=remote_instance)
     else:
         tn_to_skid = []
 
@@ -846,13 +845,13 @@ def get_names(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None):
-    """Retrieve detailed info for treenodes and/or connectors.
+    """Retrieve detailed info for nodes and/or connectors.
 
     Parameters
     ----------
     x :                 list | CatmaidNeuron | CatmaidNeuronList
-                        List of node ids: can be treenode or connector ids!
-                        If CatmaidNeuron/List will get both, treenodes and
+                        List of node ids: can be node or connector IDs!
+                        If CatmaidNeuron/List will get both, nodes and
                         connectors!
     chunk_size :        int, optional
                         Querying large number of nodes will result in server
@@ -866,7 +865,7 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a treenode::
+        DataFrame in which each row represents a node::
 
             node_id  creation_time  creator  edition_time ...
          0
@@ -877,7 +876,7 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
 
     """
     if isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        node_ids = np.append(x.nodes.treenode_id.values,
+        node_ids = np.append(x.nodes.node_id.values,
                              x.connectors.connector_id.values)
     elif not isinstance(x, (list, tuple, np.ndarray)):
         node_ids = [x]
@@ -921,43 +920,41 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
 
 
 @cache.undo_on_error
-def get_skid_from_treenode(treenode_ids, remote_instance=None):
+def get_skid_from_node(node_ids, remote_instance=None):
     """Retrieve skeleton IDs from a list of nodes.
 
     Parameters
     ----------
-    treenode_ids :      int | list of int
-                        Treenode ID(s) to retrieve skeleton IDs for.
+    node_ids :          int | list of int
+                        Node ID(s) to retrieve skeleton IDs for.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
     Returns
     -------
     dict
-            ``{treenode_ID: skeleton_ID, ...}``. If treenode does not
-            exists, ``skeleton_ID`` will be ``None``.
+            ``{node_id: skeleton_ID, ...}``. If node does not exists,
+            ``skeleton_ID`` will be ``None``.
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    treenode_ids = utils.eval_node_ids(
-        treenode_ids, connectors=False, treenodes=True)
+    node_ids = utils.eval_node_ids(node_ids, connectors=False, nodes=True)
 
-    if not isinstance(treenode_ids, (list, np.ndarray)):
-        treenode_ids = [treenode_ids]
+    if not isinstance(node_ids, (list, np.ndarray)):
+        node_ids = [node_ids]
 
-    urls = [remote_instance._get_skid_from_tnid(tn) for tn in treenode_ids]
+    urls = [remote_instance._get_skid_from_tnid(tn) for tn in node_ids]
 
     data = remote_instance.fetch(urls, desc='Fetch skids')
 
-    return {treenode_ids[i]: d.get('skeleton_id',
-                                   None) for i, d in enumerate(data)}
+    return {node_ids[i]: d.get('skeleton_id', None) for i, d in enumerate(data)}
 
 
 @cache.undo_on_error
-def get_treenode_table(x, include_details=True, convert_ts=True,
+def get_node_table(x, include_details=True, convert_ts=True,
                        remote_instance=None):
-    """Retrieve treenode table(s) for a list of neurons.
+    """Retrieve node table(s) for a list of neurons.
 
     Parameters
     ----------
@@ -981,9 +978,9 @@ def get_treenode_table(x, include_details=True, convert_ts=True,
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a treenode::
+        DataFrame in which each row represents a node::
 
-           skeleton_id  treenode_id  parent_id  confidence  x  y  z  ...
+           skeleton_id  node_id  parent_id  confidence  x  y  z  ...
          0
          1
          2
@@ -998,7 +995,7 @@ def get_treenode_table(x, include_details=True, convert_ts=True,
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    logger.info('Retrieving {} treenode table(s)...'.format(len(x)))
+    logger.info('Retrieving {} node table(s)...'.format(len(x)))
 
     user_list = get_user_list(remote_instance=remote_instance)
     user_dict = user_list.set_index('id').login.to_dict()
@@ -1011,7 +1008,7 @@ def get_treenode_table(x, include_details=True, convert_ts=True,
 
     node_list = remote_instance.fetch(urls, desc='Get tables')
 
-    logger.info('{} treenodes retrieved. Creating table..'
+    logger.info('{} nodes retrieved. Creating table..'
                 '.'.format(sum([len(nl[0]) for nl in node_list])))
 
     all_tables = []
@@ -1022,7 +1019,7 @@ def get_treenode_table(x, include_details=True, convert_ts=True,
                                        disable=config.pbar_hide)):
 
         this_df = pd.DataFrame(nl[0],
-                               columns=['treenode_id', 'parent_node_id',
+                               columns=['node_id', 'parent_node_id',
                                         'confidence', 'x', 'y', 'z', 'radius',
                                         'creator', 'last_edited'],
                                dtype=object
@@ -1038,8 +1035,8 @@ def get_treenode_table(x, include_details=True, convert_ts=True,
             for r in nl[1]:
                 reviewer_dict[r[0]] = reviewer_dict.get(r[0], []) + [user_dict[r[1]]]
 
-            this_df['reviewers'] = this_df.treenode_id.map(reviewer_dict)
-            this_df['tags'] = this_df.treenode_id.map(tag_dict)
+            this_df['reviewers'] = this_df.node_id.map(reviewer_dict)
+            this_df['tags'] = this_df.node_id.map(tag_dict)
 
         all_tables.append(this_df)
 
@@ -1168,8 +1165,8 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
         If you need to find the connectors between sets of neurons.
     :func:`~pymaid.get_connector_links`
         If you ned details about links for each connector.
-    :func:`pymaid.find_treenodes`
-            Function to get treenodes by tags, IDs or skeleton.
+    :func:`pymaid.find_nodes`
+            Function to get nodes by tags, IDs or skeleton.
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
@@ -1280,7 +1277,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
          1
          2
          ...
-           creator  treenode_id  creation_time  edition_time
+           creator  node_id  creation_time  edition_time
          0
          1
          2
@@ -1327,7 +1324,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
             data = [pd.DataFrame(r['links'],
                                  columns=['skeleton_id', 'connector_id',
                                           'x', 'y', 'z', 'confidence',
-                                          'creator', 'treenode_id',
+                                          'creator', 'node_id',
                                           'creation_time', 'edition_time']
                                  ) for r in responses]
 
@@ -1398,7 +1395,7 @@ def get_connector_details(x, remote_instance=None):
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    connector_ids = utils.eval_node_ids(x, connectors=True, treenodes=False)
+    connector_ids = utils.eval_node_ids(x, connectors=True, nodes=False)
 
     connector_ids = list(set(connector_ids))
 
@@ -1448,7 +1445,7 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
     Notes
     -----
     A connector can show up multiple times if it is connecting to more than one
-    treenodes of the same neuron.
+    nodes of the same neuron.
 
     Parameters
     ----------
@@ -1470,17 +1467,17 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
     pandas.DataFrame
         DataFrame in which each row represents a connector::
 
-           connector_id  connector_loc  treenode1_id  source_neuron  ...
+           connector_id  connector_loc  node1_id  source_neuron  ...
          0
          1
          2
          ...
-           confidence1  creator1 treenode1_loc treenode2_id  target_neuron  ...
+           confidence1  creator1 node1_loc node2_id  target_neuron  ...
          0
          1
          2
          ...
-          confidence2  creator2  treenode2_loc
+          confidence2  creator2  node2_loc
          0
          1
          2
@@ -1516,11 +1513,11 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
         data += remote_instance.fetch(url, post=post)
 
     df = pd.DataFrame(data,
-                      columns=['connector_id', 'connector_loc', 'treenode1_id',
+                      columns=['connector_id', 'connector_loc', 'node1_id',
                                'source_neuron', 'confidence1', 'creator1',
-                               'treenode1_loc', 'treenode2_id',
+                               'node1_loc', 'node2_id',
                                'target_neuron', 'confidence2', 'creator2',
-                               'treenode2_loc'])
+                               'node2_loc'])
 
     # Get user list and replace IDs with logins
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
@@ -1924,9 +1921,9 @@ def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
 
 
 @cache.undo_on_error
-def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
+def find_nodes(tags=None, node_ids=None, skeleton_ids=None,
                    remote_instance=None):
-    """Get treenodes by tag (label), ID or associated skeleton.
+    """Get nodes by tag (label), ID or associated skeleton.
 
     Search intersected (logical AND) across parameters but additive (logical OR)
     within each parameter (see examples).
@@ -1935,7 +1932,7 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
     ----------
     tags :              str | list of str
                         Use to restrict to nodes with given tags.
-    treenode_ids :      int | list of int
+    node_ids :      int | list of int
                         Use to restrict to nodes with given IDs.
     skeleton_ids :      str | int | CatmaidNeuron/List, optional
                         Use to restrict to a set of neurons. Can be:
@@ -1950,9 +1947,9 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
     Returns
     -------
     pandas.DataFrame
-        DataFrame in which each row represents a treenode::
+        DataFrame in which each row represents a node::
 
-           skeleton_id  treenode_id  parent_id   x  y  z  confidence ...
+           skeleton_id  node_id  parent_id   x  y  z  confidence ...
          0
          1
          2
@@ -1972,23 +1969,23 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
     --------
     Get all nodes with a given tag
 
-    >>> tagged = pymaid.find_treenodes(tags='SCHLEGEL_LH')
+    >>> tagged = pymaid.find_nodes(tags='SCHLEGEL_LH')
 
     Get all nodes of a set of neurons with either of two tags
 
-    >>> tagged = pymaid.find_treenodes(tags=['SCHLEGEL_LH', 'SCHLEGEL_AL'],
-                                             skeleton_ids='annotation:glomerulus DA1')
+    >>> tagged = pymaid.find_nodes(tags=['SCHLEGEL_LH', 'SCHLEGEL_AL'],
+                                         skeleton_ids='annotation:glomerulus DA1')
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    url = remote_instance._get_treenode_table_url()
+    url = remote_instance._get_node_table_url()
 
-    if all([isinstance(x, type(None)) for x in [tags, skeleton_ids, treenode_ids]]):
+    if all([isinstance(x, type(None)) for x in [tags, skeleton_ids, node_ids]]):
         answer = ""
         while answer not in ["y", "n"]:
             answer = input("Your search parameters will retrieve ALL "
-                           "treenodes in the dataset. Proceed? "
+                           "nodes in the dataset. Proceed? "
                            "[Y/N] ").lower()
 
             if answer != 'y':
@@ -2000,9 +1997,9 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
         tags = utils._make_iterable(tags)
         post.update({'label_names[{}]'.format(i): t for i, t in enumerate(tags)})
 
-    if not isinstance(treenode_ids, type(None)):
-        treenode_ids = utils._make_iterable(treenode_ids)
-        post.update({'treenode_ids[{}]'.format(i): t for i, t in enumerate(treenode_ids)})
+    if not isinstance(node_ids, type(None)):
+        node_ids = utils._make_iterable(node_ids)
+        post.update({'treenode_ids[{}]'.format(i): t for i, t in enumerate(node_ids)})
 
     if not isinstance(skeleton_ids, type(None)):
         skeleton_ids = utils.eval_skids(skeleton_ids, remote_instance=remote_instance)
@@ -2014,12 +2011,12 @@ def find_treenodes(tags=None, treenode_ids=None, skeleton_ids=None,
     # Format is [[ID, parent ID, x, y, z, confidence, radius, skeleton_id,
     # edition_time, user_id], ...]
     df = pd.DataFrame(resp,
-                      columns=['treenode_id', 'parent_id', 'x', 'y', 'z', 'confidence',
+                      columns=['node_id', 'parent_id', 'x', 'y', 'z', 'confidence',
                                'radius', 'skeleton_id', 'edition_time',
                                'creator_id'])
 
     # Reorder and return
-    return df[['skeleton_id', 'treenode_id', 'parent_id', 'x', 'y', 'z',
+    return df[['skeleton_id', 'node_id', 'parent_id', 'x', 'y', 'z',
                'confidence', 'radius', 'edition_time', 'creator_id']]
 
 
@@ -2043,7 +2040,7 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
     min_rad :           int, optional
                         Minimum radius of soma.
     return_ids :        bool, optional
-                        If True, will return treenode IDs of soma(s) found
+                        If True, will return node IDs of soma(s) found
                         instead of simply if a soma has been found.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
@@ -2057,18 +2054,18 @@ def has_soma(x, tag='soma', min_rad=500, return_ids=False,
 
                         If ``return_ids=True``::
 
-                          {skid1: [treenode_id], skid2: [treenode_id], ...}
+                          {skid1: [node_id], skid2: [node_id], ...}
 
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     x = utils.eval_skids(x, remote_instance=remote_instance)
 
-    url = remote_instance._get_treenode_table_url()
+    url = remote_instance._get_node_table_url()
     post = {'label_names[0]': tag}
     post.update({'skeleton_ids[{}]'.format(i): s for i, s in enumerate(x)})
 
-    # Fetch  only treenodes that have the soma label
+    # Fetch  only nodes that have the soma label
     resp = remote_instance.fetch(url, post=post)
 
     # Format is [[ID, parent ID, x, y, z, confidence, radius, skeleton_id,
@@ -2359,23 +2356,23 @@ def neuron_exists(x, remote_instance=None):
 
 
 @cache.undo_on_error
-def get_treenode_info(x, remote_instance=None):
-    """Retrieve info for a set of treenodes.
+def get_node_info(x, remote_instance=None):
+    """Retrieve info for a set of nodes.
 
     Parameters
     ----------
-    x                   CatmaidNeuron | CatmaidNeuronList | list of treenode IDs
-                        Single or list of treenode IDs. If CatmaidNeuron/List,
-                        details for all it's treenodes are requested.
+    x                   CatmaidNeuron | CatmaidNeuronList | list of node IDs
+                        Single or list of node IDs. If CatmaidNeuron/List,
+                        details for all it's nodes are requested.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
     Returns
     -------
     pandas DataFrame
-                DataFrame in which each row represents a queried treenode::
+                DataFrame in which each row represents a queried node::
 
-                   treenode_id  neuron_name  skeleton_id  skeleton_name  neuron_id
+                   node_id  neuron_name  skeleton_id  skeleton_name  neuron_id
                  0
                  1
                  ...
@@ -2383,14 +2380,14 @@ def get_treenode_info(x, remote_instance=None):
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    treenode_ids = utils.eval_node_ids(x, connectors=False, treenodes=True)
+    node_ids = utils.eval_node_ids(x, connectors=False, nodes=True)
 
-    urls = [remote_instance._get_treenode_info_url(tn) for tn in treenode_ids]
+    urls = [remote_instance._get_node_info_url(tn) for tn in node_ids]
 
     data = remote_instance.fetch(urls, desc='Get info')
 
-    df = pd.DataFrame([[treenode_ids[i]] + list(n.values()) for i, n in enumerate(data)],
-                      columns=['treenode_id'] + list(data[0].keys())
+    df = pd.DataFrame([[node_ids[i]] + list(n.values()) for i, n in enumerate(data)],
+                      columns=['node_id'] + list(data[0].keys())
                       )
 
     return df
@@ -2398,13 +2395,13 @@ def get_treenode_info(x, remote_instance=None):
 
 @cache.undo_on_error
 def get_node_tags(node_ids, node_type, remote_instance=None):
-    """Retrieve tags for a set of treenodes.
+    """Retrieve tags for a set of nodes OR connectors.
 
     Parameters
     ----------
     node_ids
-                        Single or list of treenode or connector IDs.
-    node_type :         'TREENODE' | 'CONNECTOR'
+                        Single or list of node or connector IDs.
+    node_type :         'NODE' | 'CONNECTOR'
                         Set which node type of IDs you have provided as they
                         use different API endpoints!
     remote_instance :   CatmaidInstance, optional
@@ -2419,7 +2416,7 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
     Examples
     --------
     >>> pymaid.get_node_tags(['6626578', '6633237']
-    ...                       'TREENODE',
+    ...                       'NODE',
     ...                       remote_instance)
     {'6633237': ['ends'], '6626578': ['ends']}
 
@@ -2441,12 +2438,12 @@ def get_node_tags(node_ids, node_type, remote_instance=None):
 
     url = remote_instance._get_node_labels_url()
 
-    if node_type in ['TREENODE', 'TREENODES']:
+    if node_type in ['TREENODE', 'TREENODES', 'NODES', 'NODE']:
         key = 'treenode_ids'
     elif node_type in ['CONNECTOR', 'CONNECTORS']:
         key = 'connector_ids'
     else:
-        raise TypeError('Unknown node_type parameter: %s' % str(node_type))
+        raise TypeError(f'Unknown node_type parameter: {node_type}')
 
     POST = {key: ','.join([str(tn) for tn in node_ids])}
 
@@ -2472,7 +2469,7 @@ def get_segments(x, remote_instance=None):
     Returns
     -------
     list
-                List of treenode IDs, ordered by length. If multiple neurons
+                List of node IDs, ordered by length. If multiple neurons
                 are requested, returns a dict ``{skid: [], ...}``.
 
     See Also
@@ -2525,7 +2522,7 @@ def get_review_details(x, remote_instance=None):
     pandas DataFrame
         DataFrame in which each row respresents a node::
 
-            treenode_id  skeleton_id  reviewer1  reviewer2  reviewer 3
+            node_id  skeleton_id  reviewer1  reviewer2  reviewer 3
           0    12345       12345123     datetime    NaT      datetime
           1
           ...
@@ -2566,11 +2563,11 @@ def get_review_details(x, remote_instance=None):
     df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(np.nan)
     df.columns = user_list.loc[df.columns, 'login'].values
     df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.values]
-    df.index.name = 'treenode_id'
+    df.index.name = 'node_id'
     df = df.reset_index(drop=False)
 
-    # Make sure we didn't count treenodes twice
-    df = df[~df.duplicated('treenode_id')]
+    # Make sure we didn't count nodes twice
+    df = df[~df.duplicated('node_id')]
 
     return df
 
@@ -2873,7 +2870,7 @@ def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).
             reviewed :          DataFrame containing nodes reviewed.
                                 Rows = users, columns = dates
             user_details :      user-list (see pymaid.get_user_list())
-            treenodes :         DataFrame containing nodes created by user.
+            nodes :             DataFrame containing nodes created by user.
             }
 
     Examples
@@ -2960,11 +2957,9 @@ def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).
 
         remote_get_history_url = remote_instance._get_history_url()
 
-        remote_get_history_url += '?%s' % urllib.parse.urlencode(
-            get_history_GET_data)
+        remote_get_history_url += f'?{urllib.parse.urlencode(get_history_GET_data)}'
 
-        logger.debug(
-            'Retrieving user history from %s to %s ' % (r[0], r[1]))
+        logger.debug(f'Retrieving user history from {r[0]} to {r[1]}.')
 
         data.append(remote_instance.fetch(remote_get_history_url))
 
@@ -2996,7 +2991,7 @@ def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         user_list.reset_index(drop=True)
     ],
-        index=['cable', 'treenodes', 'connector_links',
+        index=['cable', 'nodes', 'connector_links',
                'reviewed', 'user_details']
     )
 
@@ -3006,7 +3001,7 @@ def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).
 @cache.undo_on_error
 def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
                         remote_instance=None):
-    """Retrieve treenodes and connectors in given bounding box.
+    """Retrieve nodes and connectors in given bounding box.
 
     Please note that there is a cap on the number of nodes returned that is
     hard wired into the CATMAID server's settings.
@@ -3034,10 +3029,10 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
 
     Returns
     -------
-    treenodes :     pandas.DataFrame
-                    DataFrame in which each row is a treenode::
+    nodes :         pandas.DataFrame
+                    DataFrame in which each row is a node::
 
-                    treenode_id  parent_id  x  y  z  confidence  radius  skeleton_id  edition_time  user_id
+                    node_id  parent_id  x  y  z  confidence  radius  skeleton_id  edition_time  user_id
                  0
                  1
                  2
@@ -3052,7 +3047,7 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
 
                     ``partners`` are lists of::
 
-                    [treenode_id, relation_id, link_confidence, link_edition_time, link_id]
+                    [node_id, relation_id, link_confidence, link_edition_time, link_id]
 
     truncated :     bool
                     If True, lists are truncated due to node limit reached.
@@ -3071,7 +3066,7 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if isinstance(x[0], core.Volume):
+    if isinstance(x[0], ns.Volume):
         x = x[0].bbox
 
     # Flatten the list of coordinates
@@ -3109,7 +3104,7 @@ def get_nodes_in_volume(*x,  coord_format='NM', resolution=(4, 4, 50),
                                       post=node_list_postdata)
 
     tn = pd.DataFrame(node_data[0],
-                      columns=['treenode_id', 'parent_id',
+                      columns=['node_id', 'parent_id',
                                'x', 'y', 'z', 'confidence',
                                'radius', 'skeleton_id',
                                'edition_time', 'user_id'])
@@ -3152,7 +3147,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
                         Neuron name(s) to search for.
     annotations :       str | list of str
                         Annotation(s) to search for.
-    volumes :           str | core.Volume | list of either
+    volumes :           str | navis.Volume | list of either
                         CATMAID volume(s) to look into. This uses
                         :func:`~pymaid.get_neurons_in_volumes` and will look
                         for neurons within the **bounding box** of given
@@ -3360,7 +3355,7 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         for v in config.tqdm(volumes, desc='Get by vols',
                              disable=config.pbar_hide,
                              leave=config.pbar_leave):
-            if not isinstance(v, core.Volume):
+            if not isinstance(v, ns.Volume):
                 vol = get_volume(v, remote_instance)
             else:
                 vol = v
@@ -3427,7 +3422,6 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         skids = set.intersection(set(skids), neurons_by_size)
 
     nl = core.CatmaidNeuronList(list(skids), remote_instance=remote_instance)
-    nl.get_names()
 
     if only_soma:
         hs = has_soma(nl, return_ids=False, remote_instance=remote_instance)
@@ -3442,8 +3436,8 @@ def find_neurons(names=None, annotations=None, volumes=None, users=None,
         logger.warning(
             'No neurons matching the search parameters were found')
     else:
-        logger.info(
-            'Found {0} neurons matching the search parameters'.format(len(nl)))
+        logger.info(f'Found {len(nl)} neurons matching the search parameters')
+        nl.get_names()
 
     return nl
 
@@ -3465,7 +3459,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
 
     Parameters
     ----------
-    volumes :               str | core.Volume | list of either
+    volumes :               str | navis.Volume | list of either
                             Single or list of CATMAID volumes.
     min_nodes :             int, optional
                             Minimum node count for a neuron within given
@@ -3518,7 +3512,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
         volumes = [volumes]
 
     for i, v in enumerate(volumes):
-        if not isinstance(v, core.Volume):
+        if not isinstance(v, ns.Volume):
             volumes[i] = get_volume(v)
 
     neurons = []
@@ -3587,7 +3581,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if isinstance(bbox, core.Volume):
+    if isinstance(bbox, ns.Volume):
         bbox = bbox.bbox
 
     if isinstance(bbox, dict):
@@ -3775,8 +3769,7 @@ def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
     response = list(set(response))
 
     # Turn neurons into an NetworkX graph
-    g = graph.network2nx(
-        response, remote_instance=remote_instance, threshold=min_synapses)
+    g = graph.network2nx(response, threshold=min_synapses)
 
     # Get all paths between sources and targets
     all_paths = [p for s in sources for t in targets for p in
@@ -3822,7 +3815,7 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
 
     Returns
     -------
-    :class:`~pymaid.Volume`
+    navis.Volume
             If ``volume_name`` is list of volumes, returns a dictionary of
             Volumes: ``{name1: Volume1, name2: Volume2, ...}``
 
@@ -3931,11 +3924,11 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
         logger.debug('# of vertices after clean-up: %i' % len(final_vertices))
         logger.debug('# of faces after clean-up: %i' % len(final_faces))
 
-        v = core.Volume(name=mesh_name,
-                        volume_id=mesh_id,
-                        vertices=final_vertices,
-                        faces=final_faces,
-                        color=color)
+        v = ns.Volume(name=mesh_name,
+                      volume_id=mesh_id,
+                      vertices=final_vertices,
+                      faces=final_faces,
+                      color=color)
 
         volumes[mesh_name] = v
 
@@ -3992,7 +3985,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     active_skeleton_id :    int | list/array of ints, optional
                             Skeleton ID of the neuron that should be selected.
     active_node_id :        int | list/array of ints, optional
-                            Treenode/Connector ID of the node that should be
+                            Node/Connector ID of the node that should be
                             active.
     zoom :                  int, optional
     tool :                  str, optional
@@ -4016,7 +4009,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
     >>> low_c = n.nodes.loc[n.nodes.confidence < 5]
     >>> urls = pymaid.url_to_coordinates(low_c[['x', 'y', 'z']].values,
     ...                                  stack_id=5,
-    ...                                  active_node_id=low_c.treenode_id.values)
+    ...                                  active_node_id=low_c.node_id.values)
 
     """
     def gen_url(c, stid, nid, sid):
@@ -4082,7 +4075,7 @@ def url_to_coordinates(coords, stack_id, active_skeleton_id=None,
 
 @cache.undo_on_error
 def get_node_location(x, sort=True, remote_instance=None):
-    """Retrieves location for a set of tree- or connector nodes.
+    """Retrieves location for a set of nodes or connectors.
 
     Parameters
     ----------
@@ -4108,7 +4101,7 @@ def get_node_location(x, sort=True, remote_instance=None):
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    x = utils.eval_node_ids(x, connectors=True, treenodes=True)
+    x = utils.eval_node_ids(x, connectors=True, nodes=True)
 
     url = remote_instance._get_node_location_url()
     post = {'node_ids[{}]'.format(i): n for i, n in enumerate(x)}
@@ -4124,7 +4117,7 @@ def get_node_location(x, sort=True, remote_instance=None):
 
 @cache.undo_on_error
 def get_label_list(remote_instance=None):
-    """Retrieves all labels (TREENODE tags only) in a project.
+    """Retrieves all labels (node tags only) in a project.
 
     Parameters
     ----------
@@ -4137,7 +4130,7 @@ def get_label_list(remote_instance=None):
     pandas.DataFrame
             DataFrame in which each row represents a label::
 
-                label_id  tag  skeleton_id  treenode_id
+                label_id  tag  skeleton_id  node_id
              0
              1
              ...
@@ -4147,7 +4140,7 @@ def get_label_list(remote_instance=None):
     >>> # Get all labels
     >>> labels = pymaid.get_label_list()
     >>> # Get all nodes with a given tag
-    >>> treenodes = labels[ labels.tag == 'my_label' ].treenode_id
+    >>> nodes = labels[labels.tag == 'my_label'].node_id
     >>> # Get neuron that have at least a single node with a given tag
     >>> neurons = labels[ labels.tag == 'my_label' ].skeleton_id.unique()
 
@@ -4157,7 +4150,7 @@ def get_label_list(remote_instance=None):
     labels = remote_instance.fetch(remote_instance._get_label_list_url())
 
     return pd.DataFrame(labels, columns=['label_id', 'tag', 'skeleton_id',
-                                         'treenode_id'])
+                                         'node_id'])
 
 
 @cache.undo_on_error
@@ -4337,7 +4330,7 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
              1
              ..
 
-               .. connected_treenode creation_time edition_time relation_id
+               .. connected_node creation_time edition_time relation_id
              0
              1
              ..
@@ -4348,7 +4341,7 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
 
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    if isinstance(bbox, core.Volume):
+    if isinstance(bbox, ns.Volume):
         bbox = bbox.bbox
 
     if isinstance(bbox, dict):
@@ -4397,7 +4390,7 @@ def get_connectors_in_bbox(bbox, unit='NM', limit=None, restrict_to=False,
         data.columns = ['connector_id', 'x', 'y', 'z']
     else:
         data.columns = ['connector_id', 'x', 'y', 'z', 'skeleton',
-                        'confidence', 'creator_id', 'connected_treenode',
+                        'confidence', 'creator_id', 'connected_node',
                         'creation_time', 'edition_time', 'relation_id']
 
     return data
@@ -4467,14 +4460,14 @@ def get_connectivity_counts(x, source_relations=['presynaptic_to'],
 
 
 @cache.undo_on_error
-def get_import_info(x, with_treenodes=False, chunk_size=500, remote_instance=None):
+def get_import_info(x, with_nodes=False, chunk_size=500, remote_instance=None):
     """Get count of imported nodes for given neuron(s).
 
     Parameters
     ----------
     x :                 list-like | CatmaidNeuron/List
                         Skeleton IDs for which to get import info.
-    with_treenodes :    bool, optional
+    with_nodes :        bool, optional
                         Whether to include IDs of all imported nodes.
     chunk_size :        int, optional
                         Retrieves data in chunks of this size.
@@ -4497,7 +4490,7 @@ def get_import_info(x, with_treenodes=False, chunk_size=500, remote_instance=Non
                            desc='Fetching info'):
         chunk = skids[i: i + chunk_size]
         post = {'skeleton_ids[{}]'.format(i): s for i, s in enumerate(chunk)}
-        post['with_treenodes'] = with_treenodes
+        post['with_treenodes'] = with_nodes
 
         resp = remote_instance.fetch(url, post=post)
         info.update(resp)

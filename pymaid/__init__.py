@@ -29,6 +29,7 @@ except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.cluster:\n' + str(error))
 
+"""
 try:
     from .morpho import *
 except Exception as error:
@@ -48,7 +49,7 @@ try:
 except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.scene3d:\n' + str(error))
-
+"""
 try:
     from .user_stats import *
 except Exception as error:
@@ -60,7 +61,7 @@ try:
 except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.core:\n' + str(error))
-
+"""
 try:
     from .graph import *
 except Exception as error:
@@ -90,9 +91,16 @@ try:
 except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.connectivity:\n' + str(error))
-
+"""
 try:
     from .utils import *
 except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.utils:\n' + str(error))
+"""
+try:
+    from .snapshot import *
+except Exception as error:
+    logger.warning(str(error))
+    logger.warning('Error importing pymaid.snapshot:\n' + str(error))
+"""

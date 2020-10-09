@@ -21,12 +21,13 @@ import math
 
 import numpy as np
 import pandas as pd
+import navis as ns
 import scipy.cluster.hierarchy
 import scipy.spatial
 
 from concurrent.futures import ThreadPoolExecutor
 
-from . import fetch, core, plotting, utils, config
+from . import fetch, core, utils, config
 
 # Set up logging
 logger = config.logger
@@ -41,7 +42,7 @@ def cluster_by_connectivity(x, similarity='vertex_normalized',
                             exclude_skids=None, min_nodes=2,
                             connectivity_table=None, cluster_kws={},
                             skip_missing=True, remote_instance=None):
-    """Cluster neurons based on connectivity.
+    r"""Cluster neurons based on connectivity.
 
     This functions offers a selection of metrics to compare connectivity:
 
@@ -1035,7 +1036,7 @@ class ClustResults:
 
         kwargs.update({'color': cmap})
 
-        return plotting.plot3d(self.neurons, **kwargs)
+        return ns.plot3d(self.neurons, **kwargs)
 
     def to_selection(self, fname='cluster.json', k=5, criterion='maxclust'):
         """Convert clustered neurons into json file.

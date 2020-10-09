@@ -84,11 +84,13 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
 
     if isinstance(x, core.CatmaidNeuronList):
         if not inplace:
-            res = [arbor_confidence(n,
-                                    confidences=confidences,
-                                    inplace=inplace) for n in x]
+            _ = [arbor_confidence(n,
+                                  confidences=confidences,
+                                  inplace=inplace) for n in x]
         else:
-            return core.CatmaidNeuronList([arbor_confidence(n, confidence=confidence, inplace=inplace) for n in x])
+            return core.CatmaidNeuronList([arbor_confidence(n,
+                                                            confidences=confidences,
+                                                            inplace=inplace) for n in x])
 
     if not inplace:
         x = x.copy()
@@ -705,8 +707,8 @@ def split_axon_dendrite(x, method='bending', primary_neurite=True,
     x = x.copy()
 
     # Now get the node point with the highest flow centrality.
-    cut = x.nodes[x.nodes.flow_centrality ==
-                  x.nodes.flow_centrality.max()].treenode_id.values
+    cut = x.nodes[x.nodes.flow_centrality
+                  == x.nodes.flow_centrality.max()].treenode_id.values
 
     # If there is more than one point we need to get one closest to the soma
     # (root)
@@ -1440,8 +1442,8 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False,
     >>> branches.skeleton_id = 17
     >>> # Now put both back together using union
     >>> union = pymaid.union_neurons(backbone, branches, limit=2)
-
     """
+
     allowed = ['raise', 'stitch', 'skip']
     if non_overlap.lower() not in allowed:
         msg = 'Unexpected value for non_overlap "{}". Please use either:'
@@ -1864,9 +1866,8 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
 
 
     """
-
     def _find_next_remaining_parent(tn):
-        """ Helper function that walks from a treenode to the neurons root and
+        """Helper function that walks from a treenode to the neurons root and
         returns the first parent that will not be removed.
         """
         this_nodes = x.nodes.set_index('treenode_id')
@@ -2130,7 +2131,7 @@ def guess_radius(x, method='linear', limit=None, smooth=True, inplace=False):
         if not inplace:
             x = x.copy()
 
-        for n in config.tqdm(x, desc='Guessing', disable=config.pbar_hide,
+        for n in config.tqdm(x, desc='Guessing radii', disable=config.pbar_hide,
                              leave=config.pbar_leave):
             guess_radius(n, method=method, limit=limit, smooth=smooth,
                          inplace=True)
@@ -2476,7 +2477,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
 
 
 def break_fragments(x):
-    """ Break neuron into continuous fragments.
+    """Break neuron into continuous fragments.
 
     Neurons can consists of several disconnected fragments. This function
     breaks neuron(s) into disconnected components.
@@ -2500,7 +2501,7 @@ def break_fragments(x):
         x = x[0]
 
     if not isinstance(x, core.CatmaidNeuron):
-        raise TypeError('Expected CatmaidNeuron/List, got "{}"'.format(type(x)))
+        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(x)))
 
     # Don't do anything if not actually fragmented
     if x.n_skeletons > 1:
@@ -2518,7 +2519,7 @@ def break_fragments(x):
 
 
 def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
-    """ Heal fragmented neuron(s).
+    """Heal fragmented neuron(s).
 
     Tries to heal a fragmented neuron (i.e. a neuron with multiple roots)
     using a minimum spanning tree.
@@ -2591,54 +2592,6 @@ def heal_fragmented_neuron(x, min_size=0, method='LEAFS', inplace=False):
             x._clear_temp_attr()
     elif not inplace:
         return x
-
-
-def _diff_report(a, b):
-    """Compare neurons ``a`` and ``b`` and report on differences.
-
-    This relies on treenode IDs!
-
-    Parameters
-    ----------
-    a,b :       CatmaidNeuron
-                Neurons to compare.
-
-    Returns
-    -------
-    dict
-                Report with differences::
-
-                    {'nodes_mutual':    [nodeA, nodeB, ...],
-                     'nodes_a_only':    [nodeC, ...],
-                     'nodes_by_only':   [nodeD, ...],
-                     'nodes_moved':     [nodeB, ...]}
-
-    """
-    if not isinstance(a, core.CatmaidNeuron):
-        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(a)))
-
-    if not isinstance(b, core.CatmaidNeuron):
-        raise TypeError('Expected CatmaidNeuron, got "{}"'.format(type(b)))
-
-    nA = set(a.nodes.treenode_id.values)
-    nB = set(b.nodes.treenode_id.values)
-
-    report = {}
-
-    report['nodes_mutual'] = list(nA & nB)
-    report['nodes_a_only'] = list(nA - nB)
-    report['nodes_b_only'] = list(nB - nA)
-
-    posA = a.nodes.set_index('treenode_id').loc[report['nodes_mutual'],
-                                                ['x', 'y', 'z']].values
-    posB = b.nodes.set_index('treenode_id').loc[report['nodes_mutual'],
-                                                ['x', 'y', 'z']].values
-    diff = posA - posB
-    moved = np.any(diff > 0, axis=1)
-
-    report['nodes_moved'] = list(np.array(report['nodes_mutual'])[moved])
-
-    return report
 
 
 def prune_twigs(x, size, exclude_tags=None, inplace=False, recursive=False):
