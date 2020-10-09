@@ -151,6 +151,7 @@ class CatmaidInstance:
 
         self.caching = caching
         self._cache = cache.Cache(size_limit=128)
+        self.pickle_cache = False
 
         self._session = requests.Session()
         self._future_session = FuturesSession(session=self._session,
@@ -160,6 +161,32 @@ class CatmaidInstance:
 
         if make_global:
             self.make_global()
+
+    def __getstate__(self):
+        """Get state (used e.g. for pickling).
+
+        Note that by default we clear the cache on purpose to speed up
+        pickling. This is particularly relevant as remote instances are often
+        attached to neurons which produces a lot of overhead.
+
+        """
+        state = {k: v for k, v in self.__dict__.items() if not callable(v)}
+
+        # Empty cache (or rather replace cache with empty Cache)
+        if not getattr(self, 'pickle_cache', False):
+            if '_cache' in state:
+                state['_cache'] = cache.Cache(size_limit=128)
+
+        return state
+
+    def __setstate__(self, d):
+        """Set state (used e.g. for pickling)."""
+        self.__dict__ = d
+
+        # There are issues with pickling/copying the FutureSession and we have
+        # to effectively re-create it from scratch. 
+        self._future_session = FuturesSession(session=self._session,
+                                              max_workers=self.max_threads)
 
     def update_credentials(self):
         """Update session headers."""
