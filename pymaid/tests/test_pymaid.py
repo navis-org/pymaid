@@ -742,7 +742,7 @@ class TestConnectivity(unittest.TestCase):
                                             remote_instance=self.rm)
 
         # Must be downstream for predict_connectivity
-        self.nB = pymaid.get_neuron(self.cn_table[self.cn_table.relation=='downstream'].iloc[0].skeleton_id,
+        self.nB = pymaid.get_neuron(self.cn_table[self.cn_table.relation == 'downstream'].iloc[0].skeleton_id,
                                     remote_instance=self.rm)
 
         self.adj = pymaid.adjacency_matrix(
@@ -1007,7 +1007,7 @@ class TestUserStats(unittest.TestCase):
 
 """
 class TestExamples(unittest.TestCase):
-    """Test pymaid.tiles """
+    Test pymaid.tiles
 
     def setUp(self):
         self.rm = pymaid.CatmaidInstance(config_test.server_url,
