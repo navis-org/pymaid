@@ -464,7 +464,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         resp = add_node(coords=node[['x', 'y', 'z']].values,
                         parent_id=None,
                         radius=node.radius,
-                        confidence=node.confidence,
+                        confidence=node.confidence if node.confidence else None,
                         remote_instance=remote_instance)
 
         # If error is returned
@@ -493,7 +493,10 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         f = os.path.join(tempfile.gettempdir(), 'temp.swc')
 
         # Keep SWC node map
-        swc_map = ns.to_swc(x, filename=f, export_connectors=False,
+        swc_map = ns.to_swc(x,
+                            filename=f,
+                            export_connectors=False,
+                            labels=False,
                             return_node_map=True)
 
         with open(f, 'rb') as file:
@@ -1509,7 +1512,8 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
         # it to requests as "post" will fuck this up otherwise
         update_post['state'] = json.dumps(update_post['state'])
 
-        this_resp = remote_instance.fetch(update_radii_url, post=update_post)
+        this_resp = remote_instance.fetch(update_radii_url, post=update_post,
+                                          on_error='pass')
 
         # Merge responses
         for r, v in this_resp.items():
@@ -1659,6 +1663,11 @@ def add_node(coords, parent_id=None, radius=-1, confidence=5, remote_instance=No
 
     url = remote_instance._create_node_url()
 
+    if confidence is np.nan:
+        confidence = None
+    if radius is np.nan:
+        radius = None
+
     post = {'confidence': confidence,
             'radius': radius,
             'useneuron': -1,
@@ -1680,7 +1689,7 @@ def add_node(coords, parent_id=None, radius=-1, confidence=5, remote_instance=No
 
     post['state'] = json.dumps(state)
 
-    resp = remote_instance.fetch(url, post=post)
+    resp = remote_instance.fetch(url, post=post, on_error='pass')
 
     if 'error' in resp:
         logger.error('Error adding node. See server response for details.')
