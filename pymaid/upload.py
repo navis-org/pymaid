@@ -1502,11 +1502,11 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
                            leave=config.pbar_leave):
         this_chunk = {n: radii[n] for n in tn_ids[i: i + chunk_size]}
 
-        update_post = {"node_ids[{}]".format(i): k for i, k in enumerate(this_chunk.keys())}
-        update_post.update({"node_radii[{}]".format(i): k for i, k in enumerate(this_chunk.values())})
+        update_post = {"treenode_ids[{}]".format(i): k for i, k in enumerate(this_chunk.keys())}
+        update_post.update({"treenode_radii[{}]".format(i): k for i, k in enumerate(this_chunk.values())})
 
         # State has to be provided as {'state': [(node_id, edition_time), ..]}
-        update_post.update({"state": [(str(k), edition_times[str(k)]) for k in this_chunk]})
+        update_post.update({"state": [(k, edition_times[str(k)]) for k in this_chunk]})
 
         # We have to explicitly convert the state in a json string because passing
         # it to requests as "post" will fuck this up otherwise
