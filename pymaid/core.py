@@ -203,10 +203,6 @@ class CatmaidNeuron(navis.TreeNeuron):
     EQ_ATTRIBUTES = ['n_nodes', 'n_connectors', 'soma', 'root', 'skeleton_id',
                      'n_branches', 'n_leafs', 'cable_length', 'name']
 
-    #: Temporary attributes that need to be regenerated when data changes.
-    TEMP_ATTR = ['_igraph', '_graph_nx', 'segments', 'small_segments',
-                 '_geodesic_matrix', 'dps', 'centrality_method', '_simple']
-
     #: Attributes used for neuron summary
     SUMMARY_PROPS = ['type', 'name', 'n_nodes', 'n_connectors',
                      'n_branches', 'n_leafs', 'cable_length', 'soma', 'units']
