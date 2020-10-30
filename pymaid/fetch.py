@@ -231,7 +231,7 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
     # Parse column names
     node_cols = ['node_id', 'parent_id', 'creator_id', 'x', 'y', 'z',
                  'radius', 'confidence']
-    cn_cols = ['node_id', 'connector_id', 'relation', 'x', 'y', 'z']
+    cn_cols = ['node_id', 'connector_id', 'type', 'x', 'y', 'z']
     if with_history:
         node_cols += ['last_modified', 'creation_date', 'still_on_skeleton']
         cn_cols += ['last_modified', 'creation_date']
@@ -244,35 +244,42 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
         else:
             logger.warning(msg)
 
-    # Generate DataFrame with all neurons
+    # Convert data to appropriate dtypes
+    node_dtypes = {'node_id': np.int64,
+                   'parent_id': np.int64,
+                   'creator_id': 'category',
+                   'x': np.float32,
+                   'y': np.float32,
+                   'z': np.float32,
+                   'radius': np.float32,
+                   'confidence': 'category'}
+
+    cn_dtypes = {'node_id': np.int64,
+                 'type': 'category',
+                 'connector_id': np.int64,
+                 'x': np.float32,
+                 'y': np.float32,
+                 'z': np.float32}
+
+    def make_node_table(x):
+        """Generate node table (incl. correct data types)."""
+        df = pd.DataFrame(x,  columns=node_cols).fillna(-1)  # do not remove fillna
+        return df.astype(node_dtypes)
+
+    def make_cn_table(x):
+        """Generate connector table (incl. correct data types)."""
+        df = pd.DataFrame(x,  columns=cn_cols)
+        return df.astype(cn_dtypes)
+
+    # Generate DataFrame containing all neurons
     df = pd.DataFrame([[names[str(x[i])],  # neuron name
                         str(x[i]),  # skeleton ID
-                        pd.DataFrame(n[0],  # nodes
-                                     columns=node_cols).fillna(-1),  # do NOT remove this dtype
-                        pd.DataFrame(n[1],  # connectors
-                                     columns=cn_cols),
+                        make_node_table(n[0]),  # nodes
+                        make_cn_table(n[1]),  # connectors
                         n[2]  # tags as dictionary
                         ] for i, n in enumerate(skdata) if n[0]],
                       columns=['neuron_name', 'skeleton_id',
                                'nodes', 'connectors', 'tags'])
-
-    # Convert data to respective dtypes
-    dtypes = {'node_id': np.int64,
-              'parent_id': np.int64,
-              'creator_id': np.int32,
-              'relation': np.int32,
-              'connector_id': np.int64,
-              'x': np.float32,
-              'y': np.float32,
-              'z': np.float32,
-              'radius': np.float32,
-              'confidence': np.int32}
-
-    for k, v in dtypes.items():
-        for t in ['nodes', 'connectors']:
-            for i in range(df.shape[0]):
-                if k in df.loc[i, t]:
-                    df.loc[i, t][k] = df.loc[i, t][k].astype(v)
 
     if return_df:
         return df
