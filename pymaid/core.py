@@ -1658,9 +1658,8 @@ class CatmaidNeuronList:
             return (self.__len__(),)
         elif key in ['n_nodes', 'n_connectors', 'n_presynapses',
                      'n_postsynapses', 'n_open_ends', 'n_end_nodes',
-                     'cable_length', 'tags', 'igraph', 'soma', 'root',
+                     'cable_length', 'igraph', 'soma', 'root',
                      'segments', 'graph', 'n_branch_nodes', 'dps',
-                     'connector_tags',
                      'sampling_resolution']:
             self.get_skeletons(skip_existing=True)
             return np.array([getattr(n, key) for n in self.neurons])
