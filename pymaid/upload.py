@@ -1752,24 +1752,42 @@ def add_connector(coords, check_existing=True, remote_instance=None):
     if coords.shape[1] != 3:
         raise ValueError('Expected x/y/z coordinates, got {}'.format(coords.shape[1]))
     if check_existing:
+        already_existing = []  # list of bool, order corresponds to 'coord' argument
+        existing_resp = []  # building return values for existing connectors
+        # Preparing for upload of new connectors
+        create_connector_url = remote_instance._create_connector_url()
+        create_urls = []
+        create_post = []
+
         for coord in coords:
-            existing_connector = fetch.get_connectors_in_bbox([[coord[0], coord[0]+1],
-                                                               [coord[1], coord[1]+1],
-                                                               [coord[2], coord[2]+1]],
-                                                              ret='IDS', remote_instance=remote_instance)    
+            existing_connector = fetch.get_connectors_in_bbox(
+                [[coord[0], coord[0]+1],
+                 [coord[1], coord[1]+1],
+                 [coord[2], coord[2]+1]],
+                ret='IDS',
+                remote_instance=remote_instance
+            )
             
             if len(existing_connector) == 0:
-                url = [remote_instance._create_connector_url()] 
-                post = [{'pid': remote_instance.project_id, 
-                        'confidence': 5,
-                        'x': coord[0],
-                        'y': coord[1],
-                        'z': coord[2]}]
-                # TODO run one API call for all connectors that need to be uploaded, instead of
-                # one call per connector. Single calls for many connectors are much faster.
-                resp.extend(remote_instance.fetch(url, post=post, desc='Creating connectors'))
+                already_existing.append(False)
+                create_urls.append(create_connector_url)
+                create_post.append({'pid': remote_instance.project_id, 
+                                    'confidence': 5,
+                                    'x': coord[0],
+                                    'y': coord[1],
+                                    'z': coord[2]})
             else:
-                resp.extend([{'connector_id':existing_connector[0][0]}])
+                already_existing.append(True)
+                existing_resp.append({'connector_id': existing_connector[0][0]})
+
+        # Create only the connectors that didn't already exist. Save server response
+        created_resp = remote_instance.fetch(create_urls, post=create_post,
+                                             desc='Creating connectors')
+
+        # Interleave existing_resp and created_resp to make a complete server resp
+        # with an order that matches the input 'coord' argument
+        resp = [existing_resp.pop(0) if e else created_resp.pop(0)
+                for e in already_existing]
     else:
         url = [remote_instance._create_connector_url()] * coords.shape[0]
 
