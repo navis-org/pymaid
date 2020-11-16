@@ -451,8 +451,15 @@ def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
     cn_data = get_connectors(x, remote_instance=remote_instance)
 
     # Find out which connectors are in the volume of interest
-    iv = in_volume(cn_data[['x', 'y', 'z']], volume,
-                   remote_instance=remote_instance)
+    if isinstance(volume, str):
+        volume = get_volume(volume, remote_instance=remote_instance)
+    elif isinstance(volume, (list, np.ndarray)):
+        for i in range(len(volume)):
+            if isinstance(volume[i], str):
+                volume[i] = get_volume(volume[i],
+                                       remote_instance=remote_instance)
+
+    iv = in_volume(cn_data[['x', 'y', 'z']], volume)
 
     # Get the subset of connectors within the volume
     cn_in_volume = cn_data[iv].copy()
@@ -1085,7 +1092,7 @@ def get_edges(x, remote_instance=None):
     pandas.DataFrame
         DataFrame in which each row represents an edge::
 
-           source_skid     target_skid     weight
+           source     target     weight
          1
          2
          3
@@ -1107,7 +1114,7 @@ def get_edges(x, remote_instance=None):
     edges = remote_instance.fetch(remote_get_edges_url, post=get_edges_postdata)
 
     df = pd.DataFrame([[e[0], e[1], sum(e[2])] for e in edges['edges']],
-                      columns=['source_skid', 'target_skid', 'weight']
+                      columns=['source', 'target', 'weight']
                       )
 
     return df
@@ -2389,7 +2396,7 @@ def get_node_info(x, remote_instance=None):
 
     node_ids = utils.eval_node_ids(x, connectors=False, nodes=True)
 
-    urls = [remote_instance._get_node_info_url(tn) for tn in node_ids]
+    urls = [remote_instance._get_single_node_info_url(tn) for tn in node_ids]
 
     data = remote_instance.fetch(urls, desc='Get info')
 
@@ -3526,7 +3533,7 @@ def get_neurons_in_volume(volumes, min_nodes=2, min_cable=1, intersect=False,
 
     for v in volumes:
         logger.info('Retrieving neurons in volume {0}'.format(v.name))
-        temp = get_neurons_in_bbox(v.bbox, min_nodes=min_nodes,
+        temp = get_neurons_in_bbox(v, min_nodes=min_nodes,
                                    min_cable=min_cable,
                                    remote_instance=remote_instance)
 
@@ -3560,7 +3567,7 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
 
     Parameters
     ----------
-    bbox :                  list-like | dict | pymaid.Volume
+    bbox :                  list-like | dict | navis.Volume
                             Coordinates of the bounding box. Can be either:
 
                               1. List/np.array: ``[[left, right], [top, bottom], [z1, z2]]``
@@ -3568,9 +3575,9 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
     unit :                  'NM' | 'PIXEL'
                             Unit of your coordinates. Attention:
                             'PIXEL' will also assume that Z1/Z2 is in slices.
-                            By default, a X/Y resolution of 3.8nm and a Z
-                            resolution of 35nm is assumed. Pass 'xy_res' and
-                            'z_res' as ``**kwargs`` to override this.
+                            By default, xyz resolution of 4x4x40nm per pixel
+                            is assumed. Pass e.g. ``res=[8, 8, 40]`` as keyword
+                            argument to override this.
     min_nodes :             int, optional
                             Minimum node count for a neuron within given
                             bounding box.
@@ -3597,12 +3604,14 @@ def get_neurons_in_bbox(bbox, unit='NM', min_nodes=1, min_cable=1,
                          [bbox['z1'], bbox['z2']]
                          ])
 
-    if not isinstance(bbox, np.ndarray):
-        bbox = np.array(bbox)
+    bbox = np.asarray(bbox)
+
+    if bbox.shape == (2, 3):
+        bbox = bbox.T
 
     if unit == 'PIXEL':
-        bbox[[0, 1]:] *= kwargs.get('xy_res', 3.8)
-        bbox[[2]:] *= kwargs.get('z_res', 35)
+        res = np.asarray(kwargs.get('res', [4, 4, 40])).reshape(3, 1)
+        bbox *= res
 
     url = remote_instance._get_skeletons_in_bbox(minx=min(bbox[0]),
                                                  maxx=max(bbox[0]),

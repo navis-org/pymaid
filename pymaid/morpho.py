@@ -89,7 +89,7 @@ def arbor_confidence(x, confidences=(1, 0.9, 0.6, 0.4, 0.2), inplace=True):
 
     x.nodes['arbor_confidence'] = [None] * x.nodes.shape[0]
 
-    nodes = x.nodes.set_index('treenode_id')
+    nodes = x.nodes.set_index('node_id')
     nodes.loc[x.root, 'arbor_confidence'] = 1
 
     with config.tqdm(total=len(x.segments), desc='Calc confidence', disable=config.pbar_hide, leave=config.pbar_leave) as pbar:
