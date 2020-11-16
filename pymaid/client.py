@@ -30,10 +30,56 @@ except ImportError:
 except BaseException:
     raise
 
-__all__ = sorted(['CatmaidInstance'])
+__all__ = sorted(['CatmaidInstance', 'connect_catmaid'])
 
 # Set up logging
 logger = config.logger
+
+
+def connect_catmaid(**kwargs):
+    """Connect to CATMAID server using environmental variables.
+
+    Pulls credentials from environmental variables and feeds them to
+    :class:`~pymaid.CatmaidInstance`.
+      - ``CATMAID_SERVER`` for ``server`` (required)
+      - ``CATMAID_HTTP_USER`` for ``http_user`` (optional)
+      - ``CATMAID_HTTP_PASSWORD`` for ``http_password`` (optional)
+      - ``CATMAID_API_TOKEN`` for ``api_token`` (optional)
+
+    User ``**kwargs`` to override those.
+
+    Parameters
+    ----------
+    **kwargs
+                Keyword arguments passed to CatmaidInstance.
+
+    Returns
+    -------
+    CatmaidInstance
+
+    Examples
+    --------
+    This assumes you have stored credentials as environment variables
+    >>> import pymaid
+    >>> # Initialize connection with stored credentials
+    >>> con1 = pymaid.connect_catmaid()
+    >>> # Different server, same credentials 
+    >>> con2 = pymaid.connect_catmaid(server="https://other.catmaid.server")
+
+    """
+    if 'server' not in kwargs:
+        kwargs['server'] = os.environ['CATMAID_SERVER']
+
+    if 'http_user' not in kwargs and 'CATMAID_HTTP_USER' in os.environ:
+        kwargs['http_user'] = os.environ['CATMAID_HTTP_USER']
+
+    if 'http_password' not in kwargs and 'CATMAID_HTTP_PASSWORD' in os.environ:
+        kwargs['http_password'] = os.environ['CATMAID_HTTP_PASSWORD']
+
+    if 'api_token' not in kwargs and 'CATMAID_API_TOKEN' in os.environ:
+        kwargs['api_token'] = os.environ['CATMAID_API_TOKEN']
+
+    return CatmaidInstance(**kwargs)
 
 
 class CatmaidInstance:
@@ -198,7 +244,7 @@ class CatmaidInstance:
         self.__dict__ = d
 
         # There are issues with pickling/copying the FutureSession and we have
-        # to effectively re-create it from scratch. 
+        # to effectively re-create it from scratch.
         self._future_session = FuturesSession(session=self._session,
                                               max_workers=self.max_threads)
 
