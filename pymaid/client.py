@@ -63,7 +63,7 @@ def connect_catmaid(**kwargs):
     >>> import pymaid
     >>> # Initialize connection with stored credentials
     >>> con1 = pymaid.connect_catmaid()
-    >>> # Different server, same credentials 
+    >>> # Different server, same credentials
     >>> con2 = pymaid.connect_catmaid(server="https://other.catmaid.server")
 
     """
@@ -614,8 +614,8 @@ class CatmaidInstance:
         """Generate URL to get list of available image stacks for the project."""
         return self.make_url(self.project_id, 'stacks', **GET)
 
-    def _get_node_info_url(self, tn_id, **GET):
-        """Generate url for retrieving skeleton info from nodes."""
+    def _get_single_node_info_url(self, tn_id, **GET):
+        """Generate url for retrieving skeleton info for a single node."""
         return self.make_url(self.project_id, 'treenodes', tn_id, 'info',
                              **GET)
 
@@ -783,7 +783,7 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'node', 'list', **GET)
 
     def _get_node_info_url(self, **GET):
-        """Generate url for retrieving user info on a single node (POST)."""
+        """Generate url for retrieving user info on nodes (POST)."""
         return self.make_url(self.project_id, 'node', 'user-info', **GET)
 
     def _node_add_tag_url(self, node_id, **GET):
