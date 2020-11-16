@@ -12,7 +12,6 @@
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 
-
 """ This module contains functions to push data to a Catmaid server.
 """
 
@@ -32,7 +31,7 @@ import seaborn as sns
 
 from scipy.spatial.distance import cdist
 
-from . import (core, utils, config, cache, fetch, graph_utils, client)
+from . import (core, utils, config, cache, fetch, client)
 
 __all__ = sorted(['add_annotations', 'remove_annotations',
                   'add_tags', 'delete_tags',
@@ -493,11 +492,11 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         f = os.path.join(tempfile.gettempdir(), 'temp.swc')
 
         # Keep SWC node map
-        swc_map = ns.to_swc(x,
-                            filename=f,
-                            export_connectors=False,
-                            labels=False,
-                            return_node_map=True)
+        swc_map = ns.write_swc(x,
+                               filename=f,
+                               export_connectors=False,
+                               labels=False,
+                               return_node_map=True)
 
         with open(f, 'rb') as file:
             # Large files can cause a 504 Gateway timeout. In that case, we want
@@ -691,8 +690,7 @@ def differential_upload(x, skeleton_id=None, no_prompt=False, remote_instance=No
     # Next add additional nodes
     if report['nodes_a_only']:
         # Generate a neuron consisting only of nodes to be added
-        x_ss = graph_utils.subset_neuron(x, report['nodes_a_only'],
-                                         inplace=False)
+        x_ss = ns.subset_neuron(x, report['nodes_a_only'], inplace=False)
         # Turn disconnected trees into separate neurons
         frags = ns.break_fragments(x_ss)
 

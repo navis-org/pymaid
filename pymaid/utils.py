@@ -16,7 +16,6 @@
 
 import collections
 import itertools
-import json
 import os
 import six
 import sys
@@ -34,9 +33,7 @@ from . import core, fetch, config, client
 # Set up logging
 logger = config.logger
 
-__all__ = ['neuron2json', 'json2neuron',
-           'set_loggers', 'set_pbars', 'eval_skids', 'clear_cache',
-           'shorten_name']
+__all__ = ['set_loggers', 'set_pbars', 'eval_skids', 'clear_cache', 'shorten_name']
 
 
 def clear_cache():
@@ -204,122 +201,6 @@ def _eval_conditions(x):
     x = _make_iterable(x, force_type=str)
 
     return [i for i in x if not i.startswith('~')], [i[1:] for i in x if i.startswith('~')]
-
-
-def neuron2json(x, **kwargs):
-    """Generate JSON formatted ``str`` respresentation of CatmaidNeuron/List.
-
-    Nodes and connectors are serialised using pandas' ``to_json()``. Most
-    other items in the neuron's __dict__ are serialised using
-    ``json.dumps()``. Properties not serialised: `._remote_instance`,
-    `.graph`, `.igraph`.
-
-    Important
-    ---------
-    For safety, the :class:`~pymaid.CatmaidInstance` is not serialised as
-    this would expose your credentials. Parameters attached to a neuronlist
-    are currently not preserved.
-
-    Parameters
-    ----------
-    x :         CatmaidNeuron | CatmaidNeuronList
-    **kwargs
-                Parameters passed to ``json.dumps()`` and
-                ``pandas.DataFrame.to_json()``.
-
-    Returns
-    -------
-    str
-
-    See Also
-    --------
-    :func:`~pymaid.json2neuron`
-                Read json back into pymaid neurons.
-
-    """
-
-    if not isinstance(x, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise TypeError('Unable to convert data of type "{0}"'.format(type(x)))
-
-    if isinstance(x, core.CatmaidNeuron):
-        x = core.CatmaidNeuronList([x])
-
-    data = []
-    for n in x:
-        this_data = {'skeleton_id': n.skeleton_id}
-
-        if 'nodes' in n.__dict__:
-            this_data['nodes'] = n.nodes.to_json()
-
-        if 'connectors' in n.__dict__:
-            this_data['connectors'] = n.connectors.to_json(**kwargs)
-
-        for k in n.__dict__:
-            if k in ['nodes', 'connectors', 'graph', 'igraph', '_remote_instance',
-                     'segments', 'small_segments', 'nodes_geodesic_distance_matrix',
-                     'dps', 'simple']:
-                continue
-            try:
-                this_data[k] = n.__dict__[k]
-            except:
-                logger.error('Lost attribute "{0}"'.format(k))
-
-        data.append(this_data)
-
-    return json.dumps(data, **kwargs)
-
-
-def json2neuron(s, **kwargs):
-    """Load neuron from JSON string.
-
-    Parameters
-    ----------
-    s :         str
-                JSON-formatted string.
-    **kwargs
-                Parameters passed to ``json.loads()`` and
-                ``pandas.DataFrame.read_json()``.
-
-    Returns
-    -------
-    :class:`~pymaid.CatmaidNeuronList`
-
-    See Also
-    --------
-    :func:`~pymaid.neuron2json`
-                Turn neuron into json.
-
-    """
-    if not isinstance(s, str):
-        raise TypeError('Need str, got "{0}"'.format(type(s)))
-
-    data = json.loads(s, **kwargs)
-
-    nl = core.CatmaidNeuronList([])
-
-    for n in data:
-        # Make sure we have all we need
-        REQUIRED = ['skeleton_id']
-
-        missing = [p for p in REQUIRED if p not in n]
-
-        if missing:
-            raise ValueError('Missing data: {0}'.format(','.join(missing)))
-
-        cn = core.CatmaidNeuron(int(n['skeleton_id']))
-
-        if 'nodes' in n:
-            cn.nodes = pd.read_json(n['nodes'])
-            cn.connectors = pd.read_json(n['connectors'])
-
-        for key in n:
-            if key in ['skeleton_id', 'nodes', 'connectors']:
-                continue
-            setattr(cn, key, n[key])
-
-        nl += cn
-
-    return nl
 
 
 def _eval_remote_instance(remote_instance, raise_error=True):

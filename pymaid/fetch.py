@@ -12,7 +12,7 @@
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 
-""" This module contains functions to request data from Catmaid server.
+"""This module contains functions to request data from Catmaid server.
 
 Examples
 --------
@@ -52,8 +52,8 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 
-from . import core, graph, utils, config, cache
-from .intersect import in_volume
+from . import core, utils, config, cache
+from navis import in_volume
 
 
 __all__ = sorted(['get_annotation_details', 'get_annotation_id',
@@ -245,8 +245,8 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
             logger.warning(msg)
 
     # Convert data to appropriate dtypes
-    node_dtypes = {'node_id': np.int64,
-                   'parent_id': np.int64,
+    node_dtypes = {'node_id': np.int32,
+                   'parent_id': np.int32,
                    'creator_id': 'category',
                    'x': np.float32,
                    'y': np.float32,
@@ -254,9 +254,9 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
                    'radius': np.float32,
                    'confidence': 'category'}
 
-    cn_dtypes = {'node_id': np.int64,
+    cn_dtypes = {'node_id': np.int32,
                  'type': 'category',
-                 'connector_id': np.int64,
+                 'connector_id': np.int32,
                  'x': np.float32,
                  'y': np.float32,
                  'z': np.float32}
@@ -3776,7 +3776,7 @@ def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
     response = list(set(response))
 
     # Turn neurons into an NetworkX graph
-    g = graph.network2nx(response, threshold=min_synapses)
+    g = ns.network2nx(response, threshold=min_synapses)
 
     # Get all paths between sources and targets
     all_paths = [p for s in sources for t in targets for p in

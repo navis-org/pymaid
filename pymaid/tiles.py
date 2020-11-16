@@ -10,9 +10,6 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along
 
 import gc
 import math
@@ -121,9 +118,9 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
 
     # Generate tile job
     job = TileLoader(bboxes,
-                    zoom_level=0,
-                    coords='NM',
-                    remote_instance=remote_instance)
+                     zoom_level=0,
+                     coords='NM',
+                     remote_instance=remote_instance)
 
     return job
 
@@ -229,7 +226,7 @@ class TileLoader:
                  **fetch_kwargs):
         """Initialise class."""
         if coords not in ['PIXEL', 'NM']:
-            raise ValueError('Coordinates need to be "PIXEL" or "NM".')
+            raise ValueError('Coordinates need to be "PIXEL" or "NM", got "{}"'.format(coords))
 
         # Convert single bbox to multiple bounding boxes
         if isinstance(bbox, np.ndarray):
@@ -741,8 +738,8 @@ class TileLoader:
 
         # Filter to only this Z
         self.nodes = self.nodes[self.nodes.z == slice_info['nm_z']]
-        self.connectors = self.connectors[self.connectors.z ==
-                                          slice_info['nm_z']]
+        self.connectors = self.connectors[self.connectors.z
+                                          == slice_info['nm_z']]
 
         # Filter to fit bounding box
         self.nodes = self.nodes[
@@ -901,7 +898,6 @@ class TileLoader:
             raise NotImplementedError(msg)
 
         return url
-
 
     def _to_x_index(self, x, enforce_bounds=True):
         """Convert a real world position to a x pixel position.

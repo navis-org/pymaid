@@ -10,10 +10,6 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along
-
 
 """ This module contains functions to analyse connectivity.
 """
@@ -25,7 +21,9 @@ import numpy as np
 import scipy.spatial
 import scipy.stats
 
-from . import fetch, core, intersect, utils, config, graph_utils
+from navis import graph_utils, intersect
+
+from . import fetch, core, utils, config
 
 # Set up logging
 logger = config.logger
