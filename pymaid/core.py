@@ -65,6 +65,7 @@ also allow quick access to other PyMaid functions:
 """
 
 import datetime
+import functools
 import hashlib
 import json
 import navis
@@ -86,6 +87,24 @@ __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
 # Set up logging
 logger = config.logger
+
+
+def inject_connection(func):
+    """Raise error if no local or global connection."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        self = args[0]
+        remote_instance = kwargs.get('remote_instance')
+        if not remote_instance:
+            if not self._remote_instance:
+                raise Exception(f"{func.__name__}: Need CatmaidInstance to "
+                                "fetch data. Either pass to function as "
+                                "`remote_instance` or use neuron's "
+                                "`set_remote_instance()` method.")
+            remote_instance = self._remote_instance
+        kwargs['remote_instance'] = remote_instance
+        return func(*args, **kwargs)
+    return wrapper
 
 
 class CatmaidNeuron(navis.TreeNeuron):
@@ -451,6 +470,7 @@ class CatmaidNeuron(navis.TreeNeuron):
 
         return x
 
+    @inject_connection
     def get_skeleton(self, remote_instance=None, **fetch_kwargs):
         """Get/update skeleton data for neuron.
 
@@ -472,14 +492,6 @@ class CatmaidNeuron(navis.TreeNeuron):
                     Function called to get skeleton information
 
         """
-        if not remote_instance:
-            if not self._remote_instance:
-                raise Exception('Get_skeleton - Unable to connect to server '
-                                'without remote_instance. See '
-                                'help(pymaid.CatmaidNeuron) to learn how to '
-                                'assign.')
-            remote_instance = self._remote_instance
-
         func = cache.never_cache(fetch.get_neuron)
         skeleton = func(self.skeleton_id,
                         remote_instance=remote_instance,
@@ -539,65 +551,40 @@ class CatmaidNeuron(navis.TreeNeuron):
 
         return tn.node_id.values
 
+    @inject_connection
     def get_partners(self, remote_instance=None):
         """Get connectivity table for this neuron."""
-        if not remote_instance and not self._remote_instance:
-            logger.error('Get_partners: Unable to connect to server. Please '
-                         'provide CatmaidInstance as <remote_instance>.')
-            return None
-        elif not remote_instance:
-            remote_instance = self._remote_instance
-
         # Get partners
         func = cache.never_cache(fetch.get_partners)
         self._partners = func(self.skeleton_id, remote_instance=remote_instance)
 
         return self.partners
 
+    @inject_connection
     def get_review(self, remote_instance=None):
         """Get/Update review status for neuron."""
-        if not remote_instance and not self._remote_instance:
-            logger.error('Get_review: Unable to connect to server. Please '
-                         'provide CatmaidInstance as <remote_instance>.')
-            return None
-        elif not remote_instance:
-            remote_instance = self._remote_instance
-
         func = cache.never_cache(fetch.get_review)
         self._review_status = func(self.skeleton_id,
                                    remote_instance=remote_instance).loc[0, 'percent_reviewed']
         return self._review_status
 
+    @inject_connection
     def get_annotations(self, remote_instance=None):
         """Retrieve annotations for neuron."""
-        if not remote_instance and not self._remote_instance:
-            logger.error('Get_annotations: Need CatmaidInstance to retrieve '
-                         'annotations. Use neuron.get_annotations( '
-                         'remote_instance = CatmaidInstance )')
-            return None
-        elif not remote_instance:
-            remote_instance = self._remote_instance
-
         func = cache.never_cache(fetch.get_annotations)
         self._annotations = func(self.skeleton_id,
                                  remote_instance=remote_instance).get(str(self.skeleton_id), [])
         return self.annotations
 
+    @inject_connection
     def get_name(self, remote_instance=None):
         """Retrieve/update name of neuron."""
-        if not remote_instance and not self._remote_instance:
-            logger.error('get_name: Need CatmaidInstance to retrieve '
-                         'annotations. Use neuron.get_annotations( '
-                         'remote_instance = CatmaidInstance )')
-            return None
-        elif not remote_instance:
-            remote_instance = self._remote_instance
-
         func = cache.never_cache(fetch.get_names)
-        self._neuron_name = func(self.skeleton_id,
-                                 remote_instance=remote_instance)[str(self.skeleton_id)]
-        return self.neuron_name
+        self._name = func(self.skeleton_id,
+                          remote_instance=remote_instance)[str(self.skeleton_id)]
+        return self.name
 
+    @inject_connection
     def reload(self, remote_instance=None):
         """Reload neuron from server.
 
@@ -605,12 +592,6 @@ class CatmaidNeuron(navis.TreeNeuron):
         annotations.
 
         """
-        if not remote_instance and not self._remote_instance:
-            logger.error('Get_update: Unable to connect to server. Please '
-                         'provide CatmaidInstance as <remote_instance>.')
-        elif not remote_instance:
-            remote_instance = self._remote_instance
-
         func = cache.never_cache(fetch.get_neuron)
         n = func(self.skeleton_id,
                  remote_instance=remote_instance)
@@ -640,7 +621,7 @@ class CatmaidNeuron(navis.TreeNeuron):
         """
         if remote_instance:
             self._remote_instance = remote_instance
-        elif server_url and api_token:
+        elif server_url:
             self._remote_instance = client.CatmaidInstance(server=server_url,
                                                            api_token=api_token,
                                                            http_user=http_user,
