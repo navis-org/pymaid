@@ -10,9 +10,6 @@
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 
-#    You should have received a copy of the GNU General Public License
-#    along
-
 """This module contains neuron and neuronlist classes returned and accepted
 by many functions within pymaid. CatmaidNeuron and CatmaidNeuronList objects
 also provided quick access to many other PyMaid functions.
@@ -672,14 +669,10 @@ class CatmaidNeuronList(navis.NeuronList):
     The easiest way to get a CatmaidNeuronList is by using
     :func:`~pymaid.get_neuron` (see examples).
 
-    Manually, a CatmaidNeuronList can constructed from a pandas DataFrame (df)
-    consisting of: df.nodes, df.connectors, df.skeleton_id, df.neuron_name,
-    df.tags for a set of neurons.
-
     Attributes
     ----------
-    skeleton_id :       np.array of str
-    neuron_name :       np.array of str
+    skeleton_id :       array of str
+    name :              array of str
     nodes :             ``pandas.DataFrame``
                         Merged node table.
     connectors :        ``pandas.DataFrame``
@@ -705,7 +698,7 @@ class CatmaidNeuronList(navis.NeuronList):
     root :              np.array of node IDs
     n_cores :           int
                         Number of cores to use. Default ``os.cpu_count()-1``.
-    _use_threading :    bool (default=True)
+    use_threading :     bool (default=True)
                         If True, will use parallel threads. Should be slightly
                         up to a lot faster depending on the numbers of cores.
                         Switch off if you experience performance issues.
@@ -849,12 +842,11 @@ class CatmaidNeuronList(navis.NeuronList):
     def get_review(self, skip_existing=False):
         """Get/update review status."""
         if self.empty:
-            logger.warning('Unable to fetch review status: CatmaidNeuronList is empty.')
+            logger.warning('CatmaidNeuronList is empty - no review status to fetch.')
             return
 
         if skip_existing:
-            to_update = [
-                n.skeleton_id for n in self.neurons if 'review_status' not in n.__dict__]
+            to_update = [n.skeleton_id for n in self.neurons if 'review_status' not in n.__dict__]
         else:
             to_update = self.skeleton_id.tolist()
 
@@ -866,6 +858,9 @@ class CatmaidNeuronList(navis.NeuronList):
                 if str(n.skeleton_id) in rev:
                     n.review_status = rev.loc[str(n.skeleton_id),
                                               'percent_reviewed']
+                else:
+                    logger.warning('No review status found for neuron '
+                                   f'{n.skeleton_id}')
 
     def set_remote_instance(self, remote_instance=None, server_url=None,
                             api_token=None, http_user=None, http_password=None):
