@@ -501,7 +501,7 @@ class CatmaidNeuron(navis.TreeNeuron):
         self._nodes = skeleton.nodes
         self._connectors = skeleton.connectors
         self._tags = skeleton.tags
-        self._neuron_name = skeleton.neuron_name
+        self._name = skeleton.neuron_name
         self.date_retrieved = datetime.datetime.now().isoformat()
 
         # Delete outdated attributes
