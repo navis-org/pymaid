@@ -592,7 +592,7 @@ class CatmaidNeuron(navis.TreeNeuron):
         func = cache.never_cache(fetch.get_neuron)
         n = func(self.skeleton_id,
                  remote_instance=remote_instance)
-        self.__init__(n, self._remote_instance, self.meta_data)
+        self.__dict__.update(n.__dict__)
 
         # Clear temporary attributes
         self._clear_temp_attr()
