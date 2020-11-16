@@ -123,7 +123,7 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False, non_overlap='raise
     track :         bool, optional
                     If True, will add new columns to node/connector table of
                     union neuron to keep track of original node IDs and origin:
-                    `treenode_id_before`, `parent_id_before`, `origin_skeleton`
+                    `node_id_before`, `parent_id_before`, `origin_skeleton`
     non_overlap :   "raise" | "stitch" | "skip", optional
                     Determines how to deal with non-overlapping fragments. If
                     "raise" will raise an exception. If "stitch" will try
@@ -250,8 +250,8 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False, non_overlap='raise
                 break
 
         # Now collapse minion nodes that are within distance limits into master
-        to_clps = minion.nodes.loc[nn_dist <= limit, 'treenode_id'].values
-        clps_into = master.nodes.loc[nn_ix[nn_dist <= limit], 'treenode_id'].values
+        to_clps = minion.nodes.loc[nn_dist <= limit, 'node_id'].values
+        clps_into = master.nodes.loc[nn_ix[nn_dist <= limit], 'node_id'].values
 
         # Generate a map: minion node -> master node to collapse into
         clps_map = dict(zip(to_clps, clps_into))
@@ -265,7 +265,7 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False, non_overlap='raise
         graph_utils.reroot_neuron(minion, to_clps[0], inplace=True)
 
         # Collapse nodes by first dropping all collapsed nodes
-        minion.nodes = minion.nodes.loc[~minion.nodes.treenode_id.isin(to_clps)]
+        minion.nodes = minion.nodes.loc[~minion.nodes.node_id.isin(to_clps)]
         # Make independent of original table to prevent warnings
         minion.nodes = minion.nodes.copy()
 
@@ -295,17 +295,17 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False, non_overlap='raise
         master.tags.update({k: v for k, v in tags.items() if k not in master.tags})
 
         # Last but not least: merge connector tables
-        new_tn = minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
-                                       'treenode_id'].map(clps_map)
+        new_tn = minion.connectors.loc[minion.connectors.node_id.isin(to_clps),
+                                       'node_id'].map(clps_map)
 
         if track:
             minion.connectors['old_treenode'] = None
-            minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
-                                  'old_treenode'] = minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
-                                                                          'treenode_id']
+            minion.connectors.loc[minion.connectors.node_id.isin(to_clps),
+                                  'old_treenode'] = minion.connectors.loc[minion.connectors.node_id.isin(to_clps),
+                                                                          'node_id']
 
-        minion.connectors.loc[minion.connectors.treenode_id.isin(to_clps),
-                              'treenode_id'] = new_tn
+        minion.connectors.loc[minion.connectors.node_id.isin(to_clps),
+                              'node_id'] = new_tn
         master.connectors = pd.concat([master.connectors, minion.connectors],
                                       axis=0,
                                       sort=True,
@@ -322,7 +322,7 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False, non_overlap='raise
     # Keep track of old IDs
     if track:
         # List of nodes merged into this node
-        union.nodes['treenodes_merged'] = union.nodes.treenode_id.map(all_clps_nodes)
+        union.nodes['treenodes_merged'] = union.nodes.node_id.map(all_clps_nodes)
 
     # Return the last survivor
     return union
@@ -378,7 +378,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         """Helper function that walks from a treenode to the neurons root and
         returns the first parent that will not be removed.
         """
-        this_nodes = x.nodes.set_index('treenode_id')
+        this_nodes = x.nodes.set_index('node_id')
         while True:
             this_parent = this_nodes.loc[tn, 'parent_id']
             if this_parent not in to_remove:
@@ -438,18 +438,18 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
         # Rewire connectors before we subset
         if preserve_connectors:
             # Get connectors that will be disconnected
-            lost_cn = x.connectors[x.connectors.treenode_id.isin(to_remove)]
+            lost_cn = x.connectors[x.connectors.node_id.isin(to_remove)]
 
             # Map to a remaining treenode
             # IMPORTANT: we do currently not account for the possibility that
             # we might be removing the root segment
-            new_tn = [_find_next_remaining_parent(tn) for tn in lost_cn.treenode_id.values]
-            x.connectors.loc[x.connectors.treenode_id.isin(to_remove), 'treenode_id'] = new_tn
+            new_tn = [_find_next_remaining_parent(tn) for tn in lost_cn.node_id.values]
+            x.connectors.loc[x.connectors.node_id.isin(to_remove), 'node_id'] = new_tn
 
         # Subset to remaining nodes - skip the last node in each segment
         graph_utils.subset_neuron(x,
-                                  subset=x.nodes[~x.nodes.treenode_id.isin(
-                                      to_remove)].treenode_id.values,
+                                  subset=x.nodes[~x.nodes.node_id.isin(
+                                      to_remove)].node_id.values,
                                   keep_disc_cn=preserve_connectors,
                                   inplace=True)
 
@@ -467,8 +467,7 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
                 to_remove = list(dist_graph.nodes)
             elif how == 'proximal':
                 # Invert dist_graph
-                to_remove = x.nodes[~x.nodes.treenode_id.isin(
-                    dist_graph.nodes)].treenode_id.values
+                to_remove = x.nodes[~x.nodes.node_id.isin(dist_graph.nodes)].node_id.values
                 # Make sure the tagged treenode is there too
                 to_remove += [x.tags[tag][0]]
 
@@ -477,19 +476,19 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
             # Rewire connectors before we subset
             if preserve_connectors:
                 # Get connectors that will be disconnected
-                lost_cn = x.connectors[x.connectors.treenode_id.isin(
+                lost_cn = x.connectors[x.connectors.node_id.isin(
                     to_remove)]
 
                 # Map to a remaining treenode
                 # IMPORTANT: we do currently not account for the possibility
                 # that we might be removing the root segment
-                new_tn = [_find_next_remaining_parent(tn) for tn in lost_cn.treenode_id.values]
-                x.connectors.loc[x.connectors.treenode_id.isin(to_remove), 'treenode_id'] = new_tn
+                new_tn = [_find_next_remaining_parent(tn) for tn in lost_cn.node_id.values]
+                x.connectors.loc[x.connectors.node_id.isin(to_remove), 'node_id'] = new_tn
 
             # Subset to remaining nodes
             graph_utils.subset_neuron(x,
-                                      subset=x.nodes[~x.nodes.treenode_id.isin(
-                                          to_remove)].treenode_id.values,
+                                      subset=x.nodes[~x.nodes.node_id.isin(
+                                          to_remove)].node_id.values,
                                       keep_disc_cn=preserve_connectors,
                                       inplace=True)
 
@@ -576,7 +575,7 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     data = remote_instance.fetch(url)
 
     # Turn stuff into DataFrames for easier sifting/sorting
-    nodes = pd.DataFrame(data[0], columns=['treenode_id', 'parent_id',
+    nodes = pd.DataFrame(data[0], columns=['node_id', 'parent_id',
                                            'user_id', 'x', 'y', 'z', 'radius',
                                            'confidence', 'creation_timestamp',
                                            'modified_timestamp', 'ordering_by'])
@@ -584,11 +583,11 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     nodes.loc[~nodes.parent_id.isnull(), 'parent_id'] = nodes.loc[~nodes.parent_id.isnull(), 'parent_id'].map(int)
     nodes.loc[nodes.parent_id.isnull(), 'parent_id'] = None
 
-    connectors = pd.DataFrame(data[1], columns=['treenode_id', 'connector_id',
+    connectors = pd.DataFrame(data[1], columns=['node_id', 'connector_id',
                                                 'relation', 'x', 'y', 'z',
                                                 'creation_timestamp',
                                                 'modified_timestamp'])
-    # This is a dictionary with {'tag': [[treenode_id, date_tagged], ...]}
+    # This is a dictionary with {'tag': [[node_id, date_tagged], ...]}
     tags = data[2]
     annotations = pd.DataFrame(data[4], columns=['annotation_id',
                                                  'annotated_timestamp'])
@@ -636,19 +635,19 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     x.tags = before_tags
 
     # We might end up with multiple disconnected pieces - I don't yet know why
-    x.nodes.loc[~x.nodes.parent_id.isin(x.nodes.treenode_id), 'parent_id'] = None
+    x.nodes.loc[~x.nodes.parent_id.isin(x.nodes.node_id), 'parent_id'] = None
 
     # If there is more than one root, we have to remove the disconnected
     # pieces and keep only the "oldest branch".
     # The theory for doing this is: if a node shows up as "root" and the very
     # next step is that it is a child to another node, we should consider
     # it a not-yet connected branch that needs to be removed.
-    roots = x.nodes[x.nodes.parent_id.isnull()].treenode_id.tolist()
+    roots = x.nodes[x.nodes.parent_id.isnull()].node_id.tolist()
     if len(roots) > 1:
         after_nodes = nodes[nodes.modified_timestamp > target]
         for r in roots:
             # Find the next version of this node
-            nv = after_nodes[(after_nodes.treenode_id == r)]
+            nv = after_nodes[(after_nodes.node_id == r)]
             # If this node is not a root anymore in its next iteration, it's
             # not the "real" one
             if not nv.empty and nv.iloc[-1].parent_id is not None:
@@ -666,10 +665,10 @@ def time_machine(x, target, inplace=False, remote_instance=None):
         else:
             keep = sorted(subgraphs, key=lambda x: len(x), reverse=True)[0]
 
-        x.nodes = x.nodes[x.nodes.treenode_id.isin(keep)].copy()
+        x.nodes = x.nodes[x.nodes.node_id.isin(keep)].copy()
 
     # Remove connectors where the treenode does not even exist yet
-    x.connectors = x.connectors[x.connectors.treenode_id.isin(x.nodes.treenode_id)]
+    x.connectors = x.connectors[x.connectors.node_id.isin(x.nodes.node_id)]
 
     # Take care of connectors where the treenode might exist but was not yet linked
     links = fetch.get_connector_links(x.skeleton_id)
@@ -677,11 +676,11 @@ def time_machine(x, target, inplace=False, remote_instance=None):
     #links['creation_time'] = links.creation_time.map(localize)
     links = links[links.creation_time <= target]
     links['connector_id'] = links.connector_id.astype(int)
-    links['treenode_id'] = links.treenode_id.astype(int)
+    links['node_id'] = links.node_id.astype(int)
 
     # Get connector ID -> treenode combinations
-    l = links[['connector_id', 'treenode_id']].T.apply(tuple)
-    c = x.connectors[['connector_id', 'treenode_id']].T.apply(tuple)
+    l = links[['connector_id', 'node_id']].T.apply(tuple)
+    c = x.connectors[['connector_id', 'node_id']].T.apply(tuple)
 
     # Keep only those where connector->treenode connection is present
     x.connectors = x.connectors[c.isin(l)]
@@ -781,7 +780,7 @@ def prune_by_length(x, min_length=0, max_length=float('inf'), inplace=False):
         nodes_to_delete = [n for s in segs_to_delete for n in s[:-1]]
 
         # Subset neuron
-        nodes_to_keep = neuron.nodes[~neuron.nodes.treenode_id.isin(nodes_to_delete)].treenode_id.values
+        nodes_to_keep = neuron.nodes[~neuron.nodes.node_id.isin(nodes_to_delete)].node_id.values
         graph_utils.subset_neuron(neuron,
                                   nodes_to_keep,
                                   inplace=True)
