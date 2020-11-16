@@ -53,6 +53,12 @@ except Exception as error:
     logger.warning(str(error))
     logger.warning('Error importing pymaid.morpho:\n' + str(error))
 
+try:
+    from .connectivity import *
+except Exception as error:
+    logger.warning(str(error))
+    logger.warning('Error importing pymaid.connectivity:\n' + str(error))
+
 """
 try:
     from .snapshot import *
