@@ -1111,17 +1111,17 @@ def get_user_actions(users=None, neurons=None, start_date=None, end_date=None,
                                              remote_instance=remote_instance)
 
     # Dataframe for creation (i.e. the actual generation of the nodes)
-    creation_timestamps = node_details[['creator', 'creation_time']]
+    creation_timestamps = node_details[['creator', 'creation_time']].copy()
     creation_timestamps['action'] = 'creation'
     creation_timestamps.columns = ['user', 'timestamp', 'action']
 
     # Dataframe for edition times
-    edition_timestamps = node_details[['editor', 'edition_time']]
+    edition_timestamps = node_details[['editor', 'edition_time']].copy()
     edition_timestamps['action'] = 'edition'
     edition_timestamps.columns = ['user', 'timestamp', 'action']
 
     # DataFrame for linking
-    linking_timestamps = link_details[['creator', 'creation_time']]
+    linking_timestamps = link_details[['creator', 'creation_time']].copy()
     linking_timestamps['action'] = 'linking'
     linking_timestamps.columns = ['user', 'timestamp', 'action']
 
