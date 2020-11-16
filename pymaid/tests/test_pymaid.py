@@ -100,6 +100,9 @@ else:
         raise ImportError('Unable to import configuration file.')
 
 
+warnings.filterwarnings(action="ignore", message="unclosed", category=ResourceWarning)
+
+
 class TestModules(unittest.TestCase):
     """Test individual module import. """
 
@@ -117,7 +120,8 @@ class TestFetch(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
@@ -341,8 +345,8 @@ class TestFetch(unittest.TestCase):
 
     @try_conditions
     def test_neurons_in_volume(self):
-        self.assertIsInstance(pymaid.get_neurons_in_volume(config_test.test_volume),
-                              list)
+        self.assertIsInstance(pymaid.get_neurons_in_volume(config_test.test_volume,
+                                                           min_nodes=4000), list)
 
     @try_conditions
     def test_label_list(self):
@@ -371,7 +375,8 @@ class TestCore(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
         self.nl = pymaid.get_neuron('annotation:%s' % config_test.test_annotations[
             0], remote_instance=self.rm)
@@ -422,13 +427,10 @@ class TestCore(unittest.TestCase):
 
         self.assertIsInstance(self.nl[0], pymaid.CatmaidNeuron)
         self.assertIsInstance(self.nl[:3], pymaid.CatmaidNeuronList)
-        self.assertIsInstance(
-            self.nl[self.nl.n_nodes > 1000], pymaid.CatmaidNeuronList)
-        self.assertIsInstance(
-            self.nl[list(skids[:-1])], pymaid.CatmaidNeuronList)
+        self.assertIsInstance(self.nl[self.nl.n_nodes > 1000], pymaid.CatmaidNeuronList)
+        self.assertIsInstance(self.nl.skid[list(skids[:-1])], pymaid.CatmaidNeuronList)
         self.assertIsInstance(self.nl - self.nl[0], pymaid.CatmaidNeuronList)
-        self.assertIsInstance(
-            self.nl[0] + self.nl[1], pymaid.CatmaidNeuronList)
+        self.assertIsInstance(self.nl[0] + self.nl[1], ns.NeuronList)
         self.assertIsInstance(self.nl + self.nl[1], pymaid.CatmaidNeuronList)
 
         self.assertIsInstance(self.nl.sample(2), pymaid.CatmaidNeuronList)
@@ -465,18 +467,8 @@ class TestCore(unittest.TestCase):
 
         n.to_swc('neuron.swc')
 
-        self.assertIsInstance(pymaid.CatmaidNeuron.from_swc('neuron.swc'),
-                              pymaid.CatmaidNeuron)
-
-    @try_conditions
-    def test_json_io(self):
-        n_string = pymaid.neuron2json(self.nl[:2])
-
-        self.assertIsInstance(n_string, str)
-
-        n = pymaid.json2neuron(n_string)
-
-        self.assertIsInstance(n, pymaid.CatmaidNeuronList)
+        self.assertIsInstance(ns.read_swc('neuron.swc'),
+                              ns.TreeNeuron)
 
     @try_conditions
     def test_selection_io(self):
@@ -519,15 +511,15 @@ class TestMorpho(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
         self.nl = pymaid.get_neuron(config_test.test_skids,
                                     remote_instance=self.rm)
 
     @try_conditions
     def test_downsampling(self):
-        nl2 = self.nl.copy()
-        nl2.downsample(4)
+        nl2 = self.nl.downsample(4, inplace=False)
         self.assertLess(nl2.n_nodes.sum(), self.nl.n_nodes.sum())
 
     @try_conditions
@@ -543,11 +535,12 @@ class TestMorpho(unittest.TestCase):
     @try_conditions
     def test_axon_dendrite_split(self):
         self.assertIsInstance(ns.split_axon_dendrite(self.nl[0]),
-                              pymaid.CatmaidNeuronList)
+                              ns.NeuronList)
 
     @try_conditions
     def test_segregation_index(self):
-        self.assertIsInstance(ns.segregation_index(self.nl[0]),
+        splits = ns.split_axon_dendrite(self.nl[0])
+        self.assertIsInstance(ns.segregation_index(splits),
                               float)
 
     @try_conditions
@@ -583,9 +576,8 @@ class TestMorpho(unittest.TestCase):
 
     @try_conditions
     def test_arbor_confidence(self):
-        self.assertIsInstance(ns.arbor_confidence(self.nl[0],
-                                                  inplace=False),
-                              pymaid.CatmaidNeuron)
+        pymaid.arbor_confidence(self.nl[0], inplace=True)
+        self.assertTrue('arbor_confidence' in self.nl[0].nodes.columns)
 
     @try_conditions
     def test_remove_branches(self):
@@ -637,7 +629,8 @@ class TestGraphs(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
         self.nl = pymaid.get_neuron(config_test.test_skids[0:2],
                                     remote_instance=self.rm)
@@ -658,62 +651,59 @@ class TestGraphs(unittest.TestCase):
 
     @try_conditions
     def test_distal_to(self):
-        self.assertTrue(pymaid.distal_to(self.n, self.leaf_id, self.n.root))
-        self.assertFalse(pymaid.distal_to(self.n, self.n.root, self.leaf_id))
+        self.assertTrue(ns.distal_to(self.n, self.leaf_id, self.n.root))
+        self.assertFalse(ns.distal_to(self.n, self.n.root, self.leaf_id))
 
     @try_conditions
     def test_distance(self):
         leaf_id = self.n.nodes[self.n.nodes.type == 'end'].iloc[0].node_id
 
-        self.assertIsNotNone(pymaid.dist_between(self.n,
-                                                 leaf_id,
-                                                 self.n.root))
-        self.assertIsNotNone(pymaid.dist_between(self.n,
-                                                 self.n.root,
-                                                 leaf_id))
+        self.assertIsNotNone(ns.dist_between(self.n,
+                                             leaf_id,
+                                             self.n.root))
+        self.assertIsNotNone(ns.dist_between(self.n,
+                                             self.n.root,
+                                             leaf_id))
 
     @try_conditions
     def test_find_bp(self):
-        self.assertIsNotNone(pymaid.find_main_branchpoint(self.n,
-                                                          reroot_to_soma=False))
+        self.assertIsNotNone(ns.find_main_branchpoint(self.n,
+                                                      reroot_to_soma=False))
 
     @try_conditions
     def test_split_fragments(self):
-        self.assertIsNotNone(pymaid.split_into_fragments(self.n,
-                                                         n=2,
-                                                         reroot_to_soma=False))
+        self.assertIsNotNone(ns.split_into_fragments(self.n,
+                                                     n=2,
+                                                     reroot_to_soma=False))
 
     @try_conditions
     def test_longest_neurite(self):
-        self.assertIsNotNone(pymaid.longest_neurite(self.n,
-                                                    n=2,
-                                                    reroot_to_soma=False))
+        self.assertIsNotNone(ns.longest_neurite(self.n,
+                                                n=2,
+                                                reroot_to_soma=False))
 
     @try_conditions
     def test_cut_neuron(self):
-        dist, prox = pymaid.cut_neuron(
-            self.n,
-            self.slab_id,
-        )
+        dist, prox = ns.cut_neuron(self.n, self.slab_id)
         self.assertNotEqual(dist.nodes.shape, prox.nodes.shape)
 
         # Make sure dist and prox check out
-        self.assertTrue(pymaid.distal_to(self.n, dist.root, prox.root))
+        self.assertTrue(ns.distal_to(self.n, dist.root, prox.root))
 
     @try_conditions
     def test_subset(self):
-        self.assertIsInstance(pymaid.subset_neuron(self.n,
-                                                   self.n.segments[0]),
+        self.assertIsInstance(ns.subset_neuron(self.n,
+                                               self.n.segments[0]),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_node_sorting(self):
-        self.assertIsInstance(pymaid.node_label_sorting(self.n),
+        self.assertIsInstance(ns.node_label_sorting(self.n),
                               list)
 
 
 class TestConnectivity(unittest.TestCase):
-    """Test pymaid.plotting """
+    """Test connectivity-related functions."""
 
     def try_conditions(func):
         """Runs each test under various conditions and asserts that results
@@ -733,7 +723,8 @@ class TestConnectivity(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
         self.n = pymaid.get_neuron(config_test.test_skids[0],
                                    remote_instance=self.rm)
@@ -761,14 +752,13 @@ class TestConnectivity(unittest.TestCase):
 
     @try_conditions
     def test_group_matrix(self):
-        gr_adj = pymaid.group_matrix(self.adj,
-                                     row_groups={n: 'group1' for n in self.adj.index.values})
+        gr_adj = ns.group_matrix(self.adj,
+                                 row_groups={n: 'group1' for n in self.adj.index.values})
         self.assertIsInstance(gr_adj, pd.DataFrame)
 
     @try_conditions
     def test_connectivity_filter(self):
-        dist, prox = pymaid.cut_neuron(
-            self.n, pymaid.find_main_branchpoint(self.n))
+        dist, prox = ns.cut_neuron(self.n, ns.find_main_branchpoint(self.n))
 
         vol = pymaid.get_volume(config_test.test_volume)
 
@@ -834,7 +824,8 @@ class TestCluster(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
     @try_conditions
     def test_connectivity_cluster(self):
@@ -880,7 +871,8 @@ class TestPlot(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
         self.nl = pymaid.get_neuron(config_test.test_skids,
                                     remote_instance=self.rm)
@@ -929,7 +921,8 @@ class TestTiles(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
     def test_tiles(self):
         from pymaid import tiles
@@ -959,7 +952,8 @@ class TestUserStats(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
                                          http_user=config_test.http_user,
                                          http_password=config_test.http_pw,
-                                         api_token=config_test.token)
+                                         api_token=config_test.token,
+                                         make_global=True)
 
         self.n = pymaid.get_neuron(config_test.test_skids[0],
                                    remote_instance=self.rm)
@@ -1013,7 +1007,8 @@ class TestExamples(unittest.TestCase):
         self.rm = pymaid.CatmaidInstance(config_test.server_url,
                                          config_test.http_user,
                                          config_test.http_pw,
-                                         config_test.token)
+                                         config_test.token,
+                                         make_global=True)
 
     def test_fetch_examples(self):
         for func in pymaid.fetch.__all__:
