@@ -11,15 +11,15 @@ to specific parts of a neuron (e.g. dendrite vs axon) or to a given volume
 (e.g. the lateral horn).
 
 .. important::
-   Pymaid (like CATMAID) uses the skeleton ID to *uniquely* identify a neuron.
+   ``pymaid`` (like CATMAID) uses the skeleton ID to *uniquely* identify a neuron.
    If you break a neuron into fragments (e.g. axon + dendrites) and you pass
    both as neuronlist to a basic function (e.g. :func:`~pymaid.get_partners`),
-   pymaid ignores the fact that the same skeleton ID exists twice. This is
-   also true for functions that respect a neuron's morphology (e.g.
-   :func:`~pymaid.filter_connectivity`): *they work fine with a single fragment
-   per neuron* but if you pass multiple fragments of the same neuron, they will
-   collapse these duplicate skeleton IDs back into a single neuron. There are
-   two ways to deal with this.
+   ``pymaid`` uses only unique skeleton IDs an ignores that the same skeleton ID
+   exists twice. This is also true for functions that respect a neuron's
+   morphology (e.g :func:`~pymaid.filter_connectivity`): *they work fine with a
+   single fragment per neuron* but if you pass multiple fragments of the same
+   neuron, they will collapse these duplicate skeleton IDs back into a single
+   neuron. There are two ways to deal with this:
 
    **Option A**: run your analysis on each fragment separately and merge results
    at the end.
@@ -52,11 +52,12 @@ and compare their connectivity (duplicate skeleton IDs!)
 >>> import seaborn as sns
 >>> import matplotlib.pyplot as plt
 >>> import numpy as np
+>>> import navis
 >>> # Get a set of neurons
 >>> nl = pymaid.get_neurons('annotation:PD2a1/b1')
 >>> # Split into axon dendrite using synapse flow
 >>> nl.reroot(nl.soma)
->>> nl_split = pymaid.split_axon_dendrite(nl)
+>>> nl_split = navis.split_axon_dendrite(nl)
 >>> # Get a list of partners
 >>> cn_table = pymaid.get_partners(nl)
 >>> ds_partners = cn_table[cn_table.relation == 'downstream']
@@ -105,23 +106,12 @@ Connectivity table
     ~pymaid.get_partners
     ~pymaid.cn_table_from_connectors
 
-Graphs
-------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.neuron2nx
-    ~pymaid.neuron2igraph
-    ~pymaid.neuron2KDTree
-    ~pymaid.network2nx
-    ~pymaid.network2igraph
-
 Predict connectivity
 --------------------
 .. autosummary::
     :toctree: generated/
 
-	~pymaid.predict_connectivity
+	  ~pymaid.predict_connectivity
 
 Matrices
 --------
@@ -141,18 +131,11 @@ Clustering
     ~pymaid.cluster_by_synapse_placement
     ~pymaid.ClustResults
 
-Plotting
---------
-.. autosummary::
-    :toctree: generated/
-
-    ~pymaid.plot_network
-
 Filtering/Subsetting
 --------------------
 .. autosummary::
     :toctree: generated/
 
-	~pymaid.filter_connectivity
+	  ~pymaid.filter_connectivity
     ~pymaid.cn_table_from_connectors
     ~pymaid.adjacency_from_connectors

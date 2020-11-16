@@ -2,17 +2,15 @@
 
 Neuron objects
 ==============
+``pymaid`` is built on top of <navis `https://navis.readthedocs.io/en/latest/`>_.
+Single neurons and lists of neurons are represented in ``pymaid`` by
+:class:`pymaid.CatmaidNeuron` and :class:`pymaid.CatmaidNeuronList` which
+are subclasses of ``navis.TreeNeuron`` and ``navis.NeuronList``, respectively.
+As such, they can be plugged into any navis function that accepts their
+parent class!
 
-Single neurons and lists of neurons are represented in ``pymaid`` by:
-
-.. autosummary::
-    :toctree: generated/
-
- 	~pymaid.CatmaidNeuron
- 	~pymaid.CatmaidNeuronList
-
-They can be minimally initialized with just skeleton IDs. So you can do
-something like this::
+``CatmaidNeuron`` can be minimally initialized with just skeleton IDs. So you
+can do something like this::
 
 	>>> n = pymaid.CatmaidNeuron(16)
 	>>> n
@@ -32,7 +30,7 @@ something like this::
 
 This gives you an **empty** neuron (note ``NA`` entries) which you can
 use to retrieve more data. Ordinarily, however, you would get neurons from
-functions like :func:`~pymaid.get_neuron` that already contain some data::
+functions like :func:`pymaid.get_neuron` that already contain some data::
 
 	>>> n = pymaid.get_neuron(16)
 	>>> n
@@ -52,7 +50,7 @@ functions like :func:`~pymaid.get_neuron` that already contain some data::
 nodes, connectors and tags::
 
 	>>> n.nodes
-	   treenode_id parent_id  creator_id       x       y       z  radius  \
+	       node_id parent_id  creator_id       x       y       z  radius  \
 	0     17909304  26337791         123  355710  153742  152440      -1
 	1     26337791  26337787         117  355738  153802  152400      -1
 	2     26337787   3148134         117  355790  153922  152320      -1
@@ -67,9 +65,8 @@ nodes, connectors and tags::
 	4           5  slab
 
 
-Missing data, e.g. the review status or annotations, are either fetched and
-stored automatically upon first accessing the respective attributes (see also
-list below)::
+Missing data, e.g. the review status or annotations, are fetched on demand
+(see also list below)::
 
 	>>> n.annotations
 	['test_cremi_c',
@@ -78,8 +75,7 @@ list below)::
 	 'right',
  	 'right excitatory']
 
-Or by calling the respective function explicitly. This serves also to update
-data from the server::
+To force an update calling the respective function explicitly::
 
 	>>> n.get_annotations()
 	['test_cremi_c',
@@ -89,7 +85,7 @@ data from the server::
  	 'glomerulus DA1 right excitatory']
 
 
-Functions such as :func:`~pymaid.get_neuron` return multiple neurons as
+Functions such as :func:`pymaid.get_neuron` return multiple neurons as
 :class:`~pymaid.CatmaidNeuronList`::
 
 	>>> nl = pymaid.get_neuron([16, 27295])
@@ -103,9 +99,10 @@ Functions such as :func:`~pymaid.get_neuron` return multiple neurons as
 	0             774          823        280   2866.105439            NA  True
 	1             212          219         58   1591.519821            NA  True
 
-A :class:`~pymaid.CatmaidNeuronList` works similar to normal lists with a few
-additional perks::
+A :class:`~pymaid.CatmaidNeuronList` works similar to normal Python lists with
+a few additional perks::
 
+	>>> # Get the first (Python indices start at 0) neuron in the list
 	>>> nl[0]
 	type              <class 'pymaid.core.CatmaidNeuron'>
 	neuron_name                  PN glomerulus VA6 017 DB
@@ -119,7 +116,8 @@ additional perks::
 	review_status                                      NA
 	soma                                          2941309
 
-	>>> nl.skid[27295]
+	>>> # Get a skeleton by it's ID using the ``.idx`` indexer
+	>>> nl.idx[27295]
 	type              <class 'pymaid.core.CatmaidNeuron'>
 	neuron_name                  PN glomerulus VA6 017 DB
 	skeleton_id                                        16
@@ -132,6 +130,7 @@ additional perks::
 	review_status                                      NA
 	soma                                          2941309
 
+	>>> # Filter neurons by annotation(s)
 	>>> nl.has_annotations('glomerulus VA6')
 	<class 'pymaid.core.CatmaidNeuronList'> of 1 neurons
                  	  neuron_name skeleton_id  n_nodes  n_connectors  \
@@ -154,19 +153,24 @@ In addition to these **attributes**, both :class:`~pymaid.CatmaidNeuron` and
 :class:`~pymaid.CatmaidNeuronList` have shortcuts (called **methods**) to
 other pymaid functions. These lines of code are equivalent::
 
+	>>> # Reroot the neuron
 	>>> n.reroot(n.soma, inplace=True)
+	>>> n.root = n.soma
 	>>> pymaid.reroot_neuron(n, n.soma, inplace=True)
 
+	>>> # Plot in 3D
 	>>> n.plot3d(color='red')
 	>>> pymaid.plot3d(n, color='red')
 
-	>>> n.prune_by_volume('LH_R', inplace=True)
-	>>> pymaid.in_volume(n, 'LH_R', inplace=True)
+	>>> # Prune to the arbors inside the lateral horn volume
+	>>> lh = pymaid.get_volume("LH_R")
+	>>> n.prune_by_volume(lh, inplace=True)
+	>>> navis.in_volume(n, lh, inplace=True)
 
-The ``inplace`` parameter is part of many pymaid functions and works like that
-in the excellent pandas library. If ``inplace=True`` operations are performed
-on the original. Ff ``inplace=False`` operations are performed on a copy of the
-original which is then returned::
+The ``inplace`` parameter is part of many pymaid (and navis) functions and
+works like that in the pandas library. If ``inplace=True`` operations are
+performed on the original. If ``inplace=False`` (default) operations are
+performed on a copy of the original which is then returned::
 
 	>>> n = pymaid.get_neuron(16)
 	>>> n_lh = n.prune_by_volume('LH_R', inplace=False)
@@ -185,7 +189,7 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and
 
 - ``skeleton_id``: neurons' skeleton ID(s)
 - ``neuron_name``: neurons' name(s)
-- ``nodes``: treenode table
+- ``nodes``: node table
 - ``connectors``: connector table
 - ``presynapses``: connector table for presynapses only
 - ``postsynapses``: connector table for postsynapses only
@@ -195,12 +199,11 @@ This is a *selection* of :class:`~pymaid.CatmaidNeuron` and
 - ``annotations``: list of neurons' annotations
 - ``cable_length``: cable length(s) in nm
 - ``review_status``: review status of neuron(s)
-- ``soma``: treenode ID of soma (if applicable)
-- ``root``: root treenode ID
+- ``soma``: node ID of soma (if applicable)
+- ``root``: root node ID
 - ``segments``: list of linear segments
 - ``graph``: NetworkX graph representation of the neuron
 - ``igraph``: iGraph representation of the neuron (if library available)
-- ``dps``: Dotproduct representation of the neuron
 
 All attributes are accessible through auto-completion.
 
