@@ -3673,7 +3673,7 @@ def get_user_list(remote_instance=None):
 @cache.undo_on_error
 def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
               remove_isolated=False, remote_instance=None):
-    """Retrieves paths between two sets of neurons.
+    """Fetch paths between two sets of neurons.
 
     Parameters
     ----------
@@ -3684,7 +3684,7 @@ def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
 
                         1. list of skeleton ID(s) (int or str)
                         2. list of neuron name(s) (str, exact match)
-                        3. an annotation: e.g. 'annotation:PN right'
+                        3. an annotation as e.g. 'annotation:PN right'
                         4. CatmaidNeuron or CatmaidNeuronList object
 
     n_hops :            int | list | range, optional
@@ -3741,18 +3741,22 @@ def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
     sources = utils.eval_skids(sources, remote_instance=remote_instance)
     targets = utils.eval_skids(targets, remote_instance=remote_instance)
 
-    if not isinstance(targets, (list, np.ndarray)):
-        targets = [targets]
+    targets = utils._make_iterable(targets).astype(int)
+    sources = utils._make_iterable(sources).astype(int)
 
-    if not isinstance(sources, (list, np.ndarray)):
-        sources = [sources]
+    if isinstance(n_hops, (int, np.int)):
+        n_hops = [n_hops]
 
-    n_hops = utils._make_iterable(n_hops)
+    if not utils._is_iterable(n_hops):
+        raise TypeError('Expected `n_hops` to be iterable or integer, got '
+                        f'"{type(n_hops)}"')
 
-    response = []
     if min(n_hops) <= 0:
         raise ValueError('n_hops must not be <= 0')
 
+    # We need to query to endpoints:
+    # First get the neurons involved
+    response = []
     url = remote_instance._get_graph_dps_url()
     for h in range(1, max(n_hops) + 1):
         if h == 1:
@@ -3773,10 +3777,14 @@ def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
         # Response is just a set of skeleton IDs
         response += remote_instance.fetch(url, post=post_data)
 
-    response = list(set(response))
+    # Get unique edges
+    skids = np.unique(np.asarray(response).astype(int))
+
+    # Now get edges between those neurons
+    edges = get_edges(skids, remote_instance=remote_instance)
 
     # Turn neurons into an NetworkX graph
-    g = ns.network2nx(response, threshold=min_synapses)
+    g = ns.network2nx(edges, threshold=min_synapses)
 
     # Get all paths between sources and targets
     all_paths = [p for s in sources for t in targets for p in
