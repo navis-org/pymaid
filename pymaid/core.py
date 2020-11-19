@@ -437,6 +437,21 @@ class CatmaidNeuron(navis.TreeNeuron):
         self._tags = v
 
     @property
+    def connector_tags(self):
+        """Connector tags."""
+        if not hasattr(self, '_connector_tags'):
+            if not self._lazy_loading:
+                return 'NA'
+            self.get_connector_tags()
+        return self._connector_tags
+
+    @connector_tags.setter
+    def connector_tags(self, v):
+        if not isinstance(v, dict):
+            raise TypeError(f'Expected connector tags as dict, got {type(v)}')
+        self._connector_tags = v
+
+    @property
     def type(self) -> str:
         """Return type."""
         return 'CatmaidNeuron'
@@ -511,24 +526,16 @@ class CatmaidNeuron(navis.TreeNeuron):
 
         return
 
+    @inject_connection
     def get_connector_tags(self, remote_instance=None, **fetch_kwargs):
-        """
-        Get/update tags on connectors of a neuron. After running,
-        neuron.connector_tags will store a list of tag-node mappings
-        similar to neuron.tags.
-        """
-        if not remote_instance and not self._remote_instance:
-            raise Exception('get_connector_tags - Unable to connect to '
-                            'server without remote_instance. See '
-                            'help(core.CatmaidNeuron) to learn how to '
-                            'assign.')
-        elif not remote_instance:
-            remote_instance = self._remote_instance
+        """Fetch tags on connectors of a neuron.
 
-        logger.info('Retrieving connector tags...')
-        self.connector_tags = fetch.get_connector_tags(self,
-                                                       remote_instance=remote_instance)
-
+        After running, ``neuron.connector_tags`` will store a list of
+        tag->connector IDs mappings analogous to ``neuron.tags``.
+        """
+        logger.debug('Retrieving connector tags...')
+        self._connector_tags = fetch.get_connector_tags(self,
+                                                        remote_instance=remote_instance)
         return
 
     def _soma(self):
