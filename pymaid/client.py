@@ -63,8 +63,10 @@ def connect_catmaid(**kwargs):
     >>> import pymaid
     >>> # Initialize connection with stored credentials
     >>> con1 = pymaid.connect_catmaid()
+    >>> # Same server, different project
+    >>> con2 = pymaid.connect_catmaid(project_id=2)
     >>> # Different server, same credentials
-    >>> con2 = pymaid.connect_catmaid(server="https://other.catmaid.server")
+    >>> con3 = pymaid.connect_catmaid(server="https://other.catmaid.server")
 
     """
     if 'server' not in kwargs:
@@ -83,7 +85,7 @@ def connect_catmaid(**kwargs):
 
 
 class CatmaidInstance:
-    """Class giving access to a CATMAID project.
+    """Class representing connection to a CATMAID project.
 
     Holds base url, credentials and project ID. Fetches data and takes care of
     caching results. When initialised, a CatmaidInstance is made the "global"
