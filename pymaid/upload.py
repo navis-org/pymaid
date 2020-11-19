@@ -1729,10 +1729,11 @@ def add_connector(coords, check_existing=True, remote_instance=None):
                         Either single or list of [x, y, z] coordinates at which
                         to create new connectors.
     check_existing :    bool, optional
-                        If True will search the remote_instance at the location
-                        of each connector to be uploaded, and if a connector is
-                        already present, a new connector will not be created,
-                        instead the existing connector's ID will be returned.
+                        If True will search the remote_instance at the _exact_
+                        location of each connector to be uploaded, and if a
+                        connector is already present, a new connector will not
+                        be created, instead the existing connector's ID will be
+                        returned.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 

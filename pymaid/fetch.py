@@ -1464,19 +1464,26 @@ def get_connector_tags(x, remote_instance=None):
     Returns
     ---------
     dict
-                        ``{tag1: [connector1_id, connector2_id, ...], tag2: [ ... ], ...}``
+                        Dictionary mapping tags (``str``) to connector IDs
+                        (``int``)::
+
+                          {
+                           tag1: [connector1_id, connector2_id, ...],
+                           tag2: [ ... ], ...
+                           }
+
     """
     remote_instance = utils._eval_remote_instance(remote_instance)
 
-    connector_ids = utils.eval_node_ids(x, connectors=True, treenodes=False)
+    connector_ids = utils.eval_node_ids(x, connectors=True, nodes=False)
 
     connector_ids = list(set(connector_ids))
 
     remote_get_node_labels_url = remote_instance._get_node_labels_url()
 
-    POST = {'connector_ids': ','.join([str(tn) for tn in connector_ids])}
+    post = {'connector_ids': ','.join([str(tn) for tn in connector_ids])}
 
-    resp = remote_instance.fetch(remote_get_node_labels_url, post=POST)
+    resp = remote_instance.fetch(remote_get_node_labels_url, post=post)
 
     cn_tags = {}
     for cnid in resp:
