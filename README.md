@@ -2,28 +2,33 @@
 
 <img src="https://github.com/schlegelp/pyMaid/raw/master/docs/_static/favicon.png" height="30"> pymaid
 ======================================================================================================
-Collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
-Tested with CATMAID release version 2018.07.19 - if you are working with older versions you may run into issues due to API changes.
+Python-Catmaid - or pymaid - is a collection of [Python](http://www.python.org) 3 tools to interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo") servers.
+Tested with CATMAID release version 2020.02.15 - if you are working with older versions you may run into issues due to API changes.
 
 ## Documentation
 Pymaid is on [ReadTheDocs](http://pymaid.readthedocs.io/ "pymaid ReadTheDocs").
 
 ## Features
-
 * fetch data via CATMAID's API
-* custom neuron classes that perform on-demand data fetching
-* interactive 2D (matplotlib) and 3D (vispy or plotly) plotting of neurons
-* virtual neuron surgery: cutting, pruning, rerooting
-* clustering methods (e.g. by connectivity or synapse placement)
-* R bindings (e.g. for libraries [nat](https://github.com/jefferis/nat), [rcatmaid](https://github.com/jefferis/rcatmaid), [elmr](https://github.com/jefferis/elmr), [catnat](https://github.com/alexanderbates/catnat) )
-* interface with NetworkX and iGraph
 * tools to analyse user stats (e.g. time-invested, project history)
-* interface with Blender 3D
+* custom neuron classes that work with [navis](https://navis.readthedocs.io)
+* clustering methods (e.g. by connectivity or synapse placement)
 
 ## Getting started
 See the [documentation](http://pymaid.readthedocs.io/ "PyMaid ReadTheDocs") for detailed installation instructions, tutorials and examples. For the impatient:
 
-`pip install git+git://github.com/schlegelp/pymaid@master`
+```bash
+pip3 install python-catmaid
+```
+
+*Important*: there is a `pymaid` package on PyPI which has _nothing_ to do with
+this pymaid!
+
+To install bleeding edge from Github:
+
+```bash
+pip3 install git+git://github.com/schlegelp/pymaid@master
+```
 
 Alternatively click on the *launch binder* badge above to try out pymaid hosted by [mybinder](https://mybinder.org)!
 
@@ -51,4 +56,3 @@ Schlegel P, Texada MJ, Miroschnikow A, Schoofs A, Hueckesfeld S, Peters M, ... P
 *Quantitative neuroanatomy for connectomics in Drosophila.*
 Schneider-Mizell CM, Gerhard S, Longair M, Kazimiers T, Li, Feng L, Zwart M ... Cardona A.
 [link](https://elifesciences.org/articles/12059)
-
