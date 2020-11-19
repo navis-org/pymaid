@@ -10,10 +10,6 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along
-
 
 """ This module contains functions to analyse connectivity.
 """
@@ -25,7 +21,9 @@ import numpy as np
 import scipy.spatial
 import scipy.stats
 
-from . import fetch, core, intersect, utils, config, graph_utils
+from navis import graph_utils, intersect
+
+from . import fetch, core, utils, config
 
 # Set up logging
 logger = config.logger
@@ -366,18 +364,18 @@ def predict_connectivity(source, target, method='possible_contacts',
     **kwargs
                     1. For method 'possible_contacts':
                         - ``dist`` to set distance between connectors and
-                          treenodes manually.
+                          nodes manually.
                         - ``n_irq`` to set number of interquartile ranges of
                           harmonic mean. Default = 2.
 
     Notes
     -----
     Method ``possible_contacts``:
-        1. Calculating harmonic mean of distances ``d`` (connector->treenode)
+        1. Calculating harmonic mean of distances ``d`` (connector->node)
            at which onnections between neurons A and neurons B occur.
         2. For all presynapses of neurons A, check if they are within
            ``n_irq`` (default=2) interquartile range  of ``d`` of a
-           neuron B treenode.
+           neuron B node.
 
     Neurons without cable or presynapses will be assigned a predicted
     connectivity of 0.
@@ -432,16 +430,16 @@ def predict_connectivity(source, target, method='possible_contacts',
                                                   remote_instance=remote_instance)
         if cn_between.shape[0] > 0:
             cn_locs = np.vstack(cn_between.connector_loc.values)
-            tn_locs = np.vstack(cn_between.treenode2_loc.values)
+            tn_locs = np.vstack(cn_between.node2_loc.values)
 
             distances = np.sqrt(np.sum((cn_locs - tn_locs) ** 2, axis=1))
 
-            logger.info('Average connector->treenode distances: '
+            logger.info('Average connector->node distances: '
                         '{:.2f} +/- {:.2f} nm'.format(distances.mean(),
                                                       distances.std()))
         else:
             logger.warning('No existing connectors to calculate average'
-                           'connector->treenode distance found. Falling'
+                           'connector->node distance found. Falling'
                            'back to default of 1um. Use <dist> argument'
                            'to set manually.')
             distances = [1000]
@@ -562,8 +560,7 @@ def cn_table_from_connectors(x, remote_instance=None):
     multi_links = cn_details[cn_details.postsynaptic_to.apply(len) < cn_details.postsynaptic_to_node.apply(len)]
     if not multi_links.empty:
         tn_to_fetch = [tn for l in multi_links.postsynaptic_to_node for tn in l]
-        tn_to_skid = fetch.get_skid_from_treenode(tn_to_fetch,
-                                                  remote_instance=remote_instance)
+        tn_to_skid = fetch.get_skid_from_node(tn_to_fetch, remote_instance=remote_instance)
     else:
         tn_to_skid = {}
 
@@ -582,7 +579,7 @@ def cn_table_from_connectors(x, remote_instance=None):
 
         # First prepare upstream partners:
         # Get all treenodes
-        this_tn = set(n.nodes.treenode_id.values)
+        this_tn = set(n.nodes.node_id.values)
         # Prepare upstream partners
         this_us = all_pre[all_pre.connector_id.isin(n.connectors.connector_id.values)].copy()
         # Get the number of all links per connector
@@ -739,7 +736,7 @@ def adjacency_from_connectors(source, target=None, remote_instance=None):
 
         # Go over all target neurons
         for k, t in enumerate(target):
-            t_tn = set(t.nodes.treenode_id.values)
+            t_tn = set(t.nodes.node_id.values)
             t_post = t.postsynapses.connector_id.values
 
             # Extract number of connections from source to this target
@@ -1196,14 +1193,14 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
     cn_between = fetch.get_connectors_between(source_skid, target_skid,
                                               directional=True,
                                               remote_instance=remote_instance)
-    post_tn = cn_between.treenode2_id.values
+    post_tn = cn_between.node2_id.values
 
     # Make sure we have neuron to work with
     if not isinstance(t, (core.CatmaidNeuron, core.CatmaidNeuronList)):
         t = fetch.get_neuron(t, remote_instance=remote_instance)
     # If t already is a neuron, subset connectors to those that actually exists
     else:
-        post_tn = np.intersect1d(post_tn, t.nodes.treenode_id.values)
+        post_tn = np.intersect1d(post_tn, t.nodes.node_id.values)
 
     if isinstance(t, core.CatmaidNeuronList):
         t = t[0]
@@ -1218,7 +1215,7 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
     # If we are normalizing to density, include all synapses in geodesic
     # calculations
     if normalize == 'DENSITY':
-        to_calc = t.postsynapses.treenode_id.values
+        to_calc = t.postsynapses.node_id.values
     else:
         to_calc = post_tn
 
@@ -1235,7 +1232,7 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
     if normalize is None:
         norm = [1]
     elif normalize == 'DENSITY':
-        all_post = t.postsynapses.treenode_id.values
+        all_post = t.postsynapses.node_id.values
         norm = np.array([m.loc[i, j] for i, j in combinations(all_post, 2)]) / 1000
     elif normalize == 'CABLE':
         norm = [t.cable_length]

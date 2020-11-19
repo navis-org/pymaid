@@ -1,3 +1,17 @@
+#    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+#    Copyright (C) 2017 Philipp Schlegel
+#
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+
+import os
 import sys
 import urllib
 
@@ -16,10 +30,56 @@ except ImportError:
 except BaseException:
     raise
 
-__all__ = sorted(['CatmaidInstance'])
+__all__ = sorted(['CatmaidInstance', 'connect_catmaid'])
 
 # Set up logging
 logger = config.logger
+
+
+def connect_catmaid(**kwargs):
+    """Connect to CATMAID server using environmental variables.
+
+    Pulls credentials from environmental variables and feeds them to
+    :class:`~pymaid.CatmaidInstance`.
+      - ``CATMAID_SERVER`` for ``server`` (required)
+      - ``CATMAID_HTTP_USER`` for ``http_user`` (optional)
+      - ``CATMAID_HTTP_PASSWORD`` for ``http_password`` (optional)
+      - ``CATMAID_API_TOKEN`` for ``api_token`` (optional)
+
+    User ``**kwargs`` to override those.
+
+    Parameters
+    ----------
+    **kwargs
+                Keyword arguments passed to CatmaidInstance.
+
+    Returns
+    -------
+    CatmaidInstance
+
+    Examples
+    --------
+    This assumes you have stored credentials as environment variables
+    >>> import pymaid
+    >>> # Initialize connection with stored credentials
+    >>> con1 = pymaid.connect_catmaid()
+    >>> # Different server, same credentials
+    >>> con2 = pymaid.connect_catmaid(server="https://other.catmaid.server")
+
+    """
+    if 'server' not in kwargs:
+        kwargs['server'] = os.environ['CATMAID_SERVER']
+
+    if 'http_user' not in kwargs and 'CATMAID_HTTP_USER' in os.environ:
+        kwargs['http_user'] = os.environ['CATMAID_HTTP_USER']
+
+    if 'http_password' not in kwargs and 'CATMAID_HTTP_PASSWORD' in os.environ:
+        kwargs['http_password'] = os.environ['CATMAID_HTTP_PASSWORD']
+
+    if 'api_token' not in kwargs and 'CATMAID_API_TOKEN' in os.environ:
+        kwargs['api_token'] = os.environ['CATMAID_API_TOKEN']
+
+    return CatmaidInstance(**kwargs)
 
 
 class CatmaidInstance:
@@ -50,7 +110,7 @@ class CatmaidInstance:
                     ID of your project. Default = 1.
     max_threads :   int | None
                     Maximum parallel threads to be used. Note that some
-                    functions (e.g. :func:`pymaid.get_skid_from_treenode`)
+                    functions (e.g. :func:`pymaid.get_skid_from_node`)
                     override this parameter. If this is set too high, you
                     might experience connection errors when fetching data.
     set_global :    bool, optional
@@ -151,6 +211,7 @@ class CatmaidInstance:
 
         self.caching = caching
         self._cache = cache.Cache(size_limit=128)
+        self.pickle_cache = False
 
         self._session = requests.Session()
         self._future_session = FuturesSession(session=self._session,
@@ -160,6 +221,32 @@ class CatmaidInstance:
 
         if make_global:
             self.make_global()
+
+    def __getstate__(self):
+        """Get state (used e.g. for pickling).
+
+        Note that by default we clear the cache on purpose to speed up
+        pickling. This is particularly relevant as remote instances are often
+        attached to neurons which produces a lot of overhead.
+
+        """
+        state = {k: v for k, v in self.__dict__.items() if not callable(v)}
+
+        # Empty cache (or rather replace cache with empty Cache)
+        if not getattr(self, 'pickle_cache', False):
+            if '_cache' in state:
+                state['_cache'] = cache.Cache(size_limit=128)
+
+        return state
+
+    def __setstate__(self, d):
+        """Set state (used e.g. for pickling)."""
+        self.__dict__ = d
+
+        # There are issues with pickling/copying the FutureSession and we have
+        # to effectively re-create it from scratch.
+        self._future_session = FuturesSession(session=self._session,
+                                              max_workers=self.max_threads)
 
     def update_credentials(self):
         """Update session headers."""
@@ -527,17 +614,17 @@ class CatmaidInstance:
         """Generate URL to get list of available image stacks for the project."""
         return self.make_url(self.project_id, 'stacks', **GET)
 
-    def _get_treenode_info_url(self, tn_id, **GET):
-        """Generate url for retrieving skeleton info from treenodes."""
+    def _get_single_node_info_url(self, tn_id, **GET):
+        """Generate url for retrieving skeleton info for a single node."""
         return self.make_url(self.project_id, 'treenodes', tn_id, 'info',
                              **GET)
 
-    def _update_treenode_radii(self, **GET):
-        """Generate url for updating treenode radii (POST)."""
+    def _update_node_radii(self, **GET):
+        """Generate url for updating node radii (POST)."""
         return self.make_url(self.project_id, 'treenodes', 'radius', **GET)
 
     def _get_node_labels_url(self, **GET):
-        """Generate url for retrieving treenode infos (POST)."""
+        """Generate url for retrieving node infos (POST)."""
         return self.make_url(self.project_id, 'labels-for-nodes', **GET)
 
     def _get_skeleton_nodes_url(self, skid, **GET):
@@ -581,7 +668,7 @@ class CatmaidInstance:
         Either pre- or postsynaptic to a set of neurons - GET request Format::
 
             {'links': [skeleton_id, connector_id, x,y,z, S(?), confidence,
-                       creator, treenode_id, creation_date ], 'tags':[] }
+                       creator, node_id, creation_date ], 'tags':[] }
 
         """
         return self.make_url(self.project_id, 'connectors', 'links/', **GET)
@@ -685,10 +772,10 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'annotations', 'query-targets',
                              **GET)
 
-    def _get_skid_from_tnid(self, treenode_id, **GET):
-        """Generate url to retrieve the skeleton id to a single treenode id.
+    def _get_skid_from_tnid(self, node_id, **GET):
+        """Generate url to retrieve the skeleton ID to a single node ID.
         """
-        return self.make_url(self.project_id, 'skeleton', 'node', treenode_id,
+        return self.make_url(self.project_id, 'skeleton', 'node', node_id,
                              'node_count', **GET)
 
     def _get_node_list_url(self, **GET):
@@ -696,12 +783,12 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'node', 'list', **GET)
 
     def _get_node_info_url(self, **GET):
-        """Generate url for retrieving user info on a single node (POST)."""
+        """Generate url for retrieving user info on nodes (POST)."""
         return self.make_url(self.project_id, 'node', 'user-info', **GET)
 
-    def _treenode_add_tag_url(self, treenode_id, **GET):
-        """Generate url for adding labels (tags) to a given treenode (POST)."""
-        return self.make_url(self.project_id, 'label', 'treenode', treenode_id,
+    def _node_add_tag_url(self, node_id, **GET):
+        """Generate url for adding labels (tags) to a given node (POST)."""
+        return self.make_url(self.project_id, 'label', 'treenode', node_id,
                              'update', **GET)
 
     def _delete_neuron_url(self, neuron_id, **GET):
@@ -709,18 +796,18 @@ class CatmaidInstance:
         return self.make_url(self.project_id, 'neuron', neuron_id, 'delete',
                              **GET)
 
-    def _delete_treenode_url(self, **GET):
-        """Generate url for deleting treenodes."""
+    def _delete_node_url(self, **GET):
+        """Generate url for deleting nodes."""
         return self.make_url(self.project_id, 'treenode', 'delete', **GET)
 
     def _delete_connector_url(self, **GET):
         """Generate url for deleting connectors."""
         return self.make_url(self.project_id, 'connector', 'delete', **GET)
 
-    def _connector_add_tag_url(self, treenode_id, **GET):
-        """Generate url for adding labels (tags) to a treenode (POST)."""
+    def _connector_add_tag_url(self, node_id, **GET):
+        """Generate url for adding labels (tags) to a node (POST)."""
         return self.make_url(self.project_id, 'label', 'connector',
-                             treenode_id, 'update', **GET)
+                             node_id, 'update', **GET)
 
     def _get_compact_skeleton_url(self, skid, connector_flag=1, tag_flag=1,
                                   **GET):
@@ -750,9 +837,9 @@ class CatmaidInstance:
 
         The difference between this function and get_compact_skeleton is
         that the connectors contain the whole chain from the skeleton of
-        interest to the partner skeleton: contains [treenode_id,
+        interest to the partner skeleton: contains [node_id,
         confidence_to_connector, connector_id, confidence_from_connector,
-        connected_treenode_id, connected_skeleton_id, relation1, relation2]
+        connected_node_id, connected_skeleton_id, relation1, relation2]
         relation1 = 1 means presynaptic (this neuron is upstream), 0 means
         postsynaptic (this neuron is downstream)
 
@@ -791,8 +878,8 @@ class CatmaidInstance:
         """Generate url to to get n-th order partners for a set of neurons."""
         return self.make_url(self.project_id, 'graph', 'circlesofhell', **GET)
 
-    def _get_treenode_table_url(self, **GET):
-        """Generate url to get treenode table (POST)."""
+    def _get_node_table_url(self, **GET):
+        """Generate url to get node table (POST)."""
         return self.make_url(self.project_id, 'treenodes', 'compact-detail',
                              **GET)
 
@@ -845,17 +932,17 @@ class CatmaidInstance:
         """Generate url for rerooting skeletons."""
         return self.make_url(self.project_id, 'skeleton', 'reroot', **GET)
 
-    def _create_treenode_url(self, **GET):
-        """Generate url for generating treenodes."""
+    def _create_node_url(self, **GET):
+        """Generate url for generating nodes."""
         return self.make_url(self.project_id, 'treenode', 'create', **GET)
 
     def _get_neuron_cable_url(self, **GET):
         """Generate url for fetching neuron cable lengths."""
         return self.make_url(self.project_id, 'skeletons', 'cable-length', **GET)
 
-    def _update_node_confidence_url(self, treenode_id, **GET):
+    def _update_node_confidence_url(self, node_id, **GET):
         """Generate url for fetching neuron cable lengths."""
-        return self.make_url(self.project_id, 'treenodes', treenode_id, 'confidence', **GET)
+        return self.make_url(self.project_id, 'treenodes', node_id, 'confidence', **GET)
 
     def _get_connectivity_counts_url(self, **GET):
         """Generate url for fetching connectivity counts (POST)."""

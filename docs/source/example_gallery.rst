@@ -6,6 +6,13 @@ These examples are small code snippets meant to illustrate certain pymaid
 functions. As per usual: have a look at the :ref:`API reference <api>` to
 find out details about a given function.
 
+
+.. topic:: Check this out
+
+   Pymaid is built on top of `navis <https://navis.readthedocs.io>`_ and
+   navis functions can be used with ``CatmaidNeurons`` and ``CatmaidNeuronLists``.
+   Please check out the navis `tutorials <https://navis.readthedocs.io/en/latest/source/gallery.html>`_.
+
 .. raw:: html
 
    <div class="container-fluid">
@@ -22,7 +29,6 @@ find out details about a given function.
 
    Overview <neurons>
    Indexing NeuronLists <indexing_neuronlists>
-   NeuronList math <neuronlist_math>
    Parsing skeleton IDs <parsing_skids>
 
 .. raw:: html
@@ -40,10 +46,6 @@ find out details about a given function.
    :maxdepth: 1
 
    Basics <plotting>
-   2D plots <plotting_2d>
-   3D plots <plotting_3d>
-   Depth coloring <depth_coloring>
-   Highlight connectors <highlight_connectors>
    EM image data <tiles.ipynb>
 
 .. raw:: html
@@ -62,12 +64,6 @@ find out details about a given function.
    :maxdepth: 1
 
    Basics <morph_analysis.ipynb>
-   Cutting <cutting_neurons>
-   Resampling <resample_neurons>
-   Despiking <despike_neurons>
-   Smoothing <smooth_neurons>
-   Pruning <prune_neurons>
-
 
 .. raw:: html
 
@@ -101,9 +97,7 @@ find out details about a given function.
 .. toctree::
    :maxdepth: 1
 
-   Pymaid & Blender3D <blender>
-   Pymaid & Cytoscape <python2cytoscape>
-   Pymaid & R <rmaid_doc>
+   Cytoscape <python2cytoscape>
 
 .. raw:: html
 

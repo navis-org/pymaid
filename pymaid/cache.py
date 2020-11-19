@@ -11,9 +11,7 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along
+
 
 """ This module contains classes and decorators to set up a basic cache
 for responses from the CATMAID server.
@@ -120,7 +118,7 @@ class Cache(OrderedDict):
     def update_responses(self, urls, posts, responses):
         """Update cached responses.
 
-        Only overwrites reponses not already cached.
+        Only overwrites responses not already cached.
 
         """
         if isinstance(posts, type(None)):
