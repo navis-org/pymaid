@@ -136,6 +136,8 @@ class CatmaidNeuron:
                         Timestamp of data retrieval.
     tags :              dict
                         Treenode tags.
+    connector_tags :    dict
+                        Connector tags.
     annotations :       list
                         This neuron's annotations.
     graph :             ``network.DiGraph``
@@ -295,6 +297,7 @@ class CatmaidNeuron:
                           'nodes', 'annotations', 'partners', 'review_status',
                           'connectors', 'presynapses', 'postsynapses',
                           'gap_junctions', 'soma', 'root', 'tags',
+                          'connector_tags',
                           'n_presynapses', 'n_postsynapses', 'n_connectors',
                           'bbox']
 
@@ -353,6 +356,9 @@ class CatmaidNeuron:
         elif key == 'tags':
             self.get_skeleton()
             return self.tags
+        elif key == 'connector_tags':
+            self.get_connector_tags()
+            return self.connector_tags
         elif key == 'sampling_resolution':
             return self.n_nodes / self.cable_length
         elif key == 'n_open_ends':
@@ -520,6 +526,28 @@ class CatmaidNeuron:
             graph_utils.classify_nodes(self)
 
         return
+
+
+    def get_connector_tags(self, remote_instance=None, **fetch_kwargs):
+        """
+        Get/update tags on connectors of a neuron. After running,
+        neuron.connector_tags will store a list of tag-node mappings
+        similar to neuron.tags.
+        """
+        if not remote_instance and not self._remote_instance:
+            raise Exception('get_connector_tags - Unable to connect to '
+                            'server without remote_instance. See '
+                            'help(core.CatmaidNeuron) to learn how to '
+                            'assign.')
+        elif not remote_instance:
+            remote_instance = self._remote_instance
+
+        logger.info('Retrieving connector tags...')
+        self.connector_tags = fetch.get_connector_tags(self,
+                                                       remote_instance=remote_instance)
+
+        return
+
 
     def _clear_temp_attr(self, exclude=[]):
         """Clear temporary attributes."""
@@ -1630,7 +1658,7 @@ class CatmaidNeuronList:
             return (self.__len__(),)
         elif key in ['n_nodes', 'n_connectors', 'n_presynapses',
                      'n_postsynapses', 'n_open_ends', 'n_end_nodes',
-                     'cable_length', 'tags', 'igraph', 'soma', 'root',
+                     'cable_length', 'igraph', 'soma', 'root',
                      'segments', 'graph', 'n_branch_nodes', 'dps',
                      'sampling_resolution']:
             self.get_skeletons(skip_existing=True)

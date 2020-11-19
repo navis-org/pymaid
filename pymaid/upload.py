@@ -298,8 +298,9 @@ def transfer_neuron(x, source_instance, target_instance, move_tags=False,
 
 @cache.never_cache
 def upload_neuron(x, import_tags=False, import_annotations=False,
-                  import_connectors=False, skeleton_id=None, neuron_id=None,
-                  force_id=False, source_id=None, source_project_id=None,
+                  import_connectors=False, reuse_existing_connectors=True,
+                  skeleton_id=None, neuron_id=None, force_id=False,
+                  source_id=None, source_project_id=None,
                   source_url=None, source_type=None, remote_instance=None):
     """Export (upload) neurons to CatmaidInstance.
 
@@ -317,6 +318,14 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                          If True will upload annotations from ``x.annotations``.
     import_connectors :  bool, optional
                          If True will upload connectors from ``x.connectors``.
+    reuse_existing_connectors : bool, optional
+                         Only matters when import_connectors is True.
+                         If True will look in the remote_instance at the
+                         location of each of ``x``'s connectors, and if
+                         present, ``x`` will be linked to that existing
+                         connector instead of a new (duplicate) connector being
+                         created at that location. If False all of
+                         ``x.connectors`` are uploaded as new.
     skeleton_id :        int, optional
                          Use this to set the Id of the new skeleton(s). If not
                          provided will will generate a new ID upon export.
@@ -557,6 +566,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
         # First create new connectors
         cn_resp = add_connector(connectors_no_duplicates[['x', 'y', 'z']].values,
+                                check_existing=reuse_existing_connectors,
                                 remote_instance=remote_instance)
 
         resp['connector_response'] = cn_resp
@@ -579,6 +589,20 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         ln_resp = link_connector(links, remote_instance=remote_instance)
 
         resp['link_response'] = ln_resp
+
+        if import_tags and getattr(x, 'connector_tags', {}):
+            # Map old to new connectors
+            cn_tags = {t: [cn_map[n] for n in v] for t, v in x.connector_tags.items()}
+            # Invert connector tag dictionary: map connctor ID -> list of tags
+            ctags = {}
+            for t in cn_tags:
+                ctags.update({n: ctags.get(n, []) + [t] for n in cn_tags[t]})
+
+            resp['connector_tags'] = add_tags(list(ctags.keys()),
+                                              ctags,
+                                              'CONNECTOR',
+                                              override_existing=True,
+                                              remote_instance=remote_instance)
 
     return resp
 
@@ -1689,7 +1713,7 @@ def add_treenode(coords, parent_id=None, radius=-1, confidence=5,
 
 
 @cache.never_cache
-def add_connector(coords, remote_instance=None):
+def add_connector(coords, check_existing=True, remote_instance=None):
     """Create connector(s) at given location.
 
     Parameters
@@ -1697,6 +1721,11 @@ def add_connector(coords, remote_instance=None):
     coords :            list-like
                         Either single or list of [x, y, z] coordinates at which
                         to create new connectors.
+    check_existing :    bool, optional
+                        If True will search the remote_instance at the location
+                        of each connector to be uploaded, and if a connector is
+                        already present, a new connector will not be created,
+                        instead the existing connector's ID will be returned.
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
 
@@ -1713,8 +1742,8 @@ def add_connector(coords, remote_instance=None):
                         Use this to add treenodes.
 
     """
-    remote_instance = utils._eval_remote_instance(remote_instance)
-
+    remote_instance = utils._eval_remote_instance(remote_instance)    
+    resp = []
     if not utils._is_iterable(coords[0]):
         coords = [coords]
 
@@ -1722,16 +1751,53 @@ def add_connector(coords, remote_instance=None):
 
     if coords.shape[1] != 3:
         raise ValueError('Expected x/y/z coordinates, got {}'.format(coords.shape[1]))
+    if check_existing:
+        already_existing = []  # list of bool, order corresponds to 'coord' argument
+        existing_resp = []  # building return values for existing connectors
+        # Preparing for upload of new connectors
+        create_connector_url = remote_instance._create_connector_url()
+        create_urls = []
+        create_post = []
 
-    url = [remote_instance._create_connector_url()] * coords.shape[0]
+        for coord in coords:
+            existing_connector = fetch.get_connectors_in_bbox(
+                [[coord[0], coord[0]+1],
+                 [coord[1], coord[1]+1],
+                 [coord[2], coord[2]+1]],
+                ret='IDS',
+                remote_instance=remote_instance
+            )
+            
+            if len(existing_connector) == 0:
+                already_existing.append(False)
+                create_urls.append(create_connector_url)
+                create_post.append({'pid': remote_instance.project_id, 
+                                    'confidence': 5,
+                                    'x': coord[0],
+                                    'y': coord[1],
+                                    'z': coord[2]})
+            else:
+                already_existing.append(True)
+                existing_resp.append({'connector_id': existing_connector[0][0]})
 
-    post = [{'pid': remote_instance.project_id,
-             'confidence': 5,
-             'x': c[0],
-             'y': c[1],
-             'z': c[2]} for c in coords]
+        # Create only the connectors that didn't already exist. Save server response
+        created_resp = remote_instance.fetch(create_urls, post=create_post,
+                                             desc='Creating connectors')
 
-    resp = remote_instance.fetch(url, post=post, desc='Creating connectors')
+        # Interleave existing_resp and created_resp to make a complete server resp
+        # with an order that matches the input 'coord' argument
+        resp = [existing_resp.pop(0) if e else created_resp.pop(0)
+                for e in already_existing]
+    else:
+        url = [remote_instance._create_connector_url()] * coords.shape[0]
+
+        post = [{'pid': remote_instance.project_id,
+                'confidence': 5,
+                'x': c[0],
+                'y': c[1],
+                'z': c[2]} for c in coords]
+
+        resp = remote_instance.fetch(url, post=post, desc='Creating connectors')
 
     if 'error' in resp:
         logger.error('Error adding connector(s). See server response for details.')

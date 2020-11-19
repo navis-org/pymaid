@@ -58,6 +58,7 @@ from .intersect import in_volume
 __all__ = sorted(['get_annotation_details', 'get_annotation_id',
                   'get_annotation_list', 'get_annotations', 'get_arbor',
                   'get_connector_details', 'get_connectors',
+                  'get_connector_tags',
                   'get_contributor_statistics', 'get_edges', 'get_history',
                   'get_logs', 'get_names', 'get_neuron',
                   'get_neurons', 'get_neurons_in_bbox',
@@ -1435,6 +1436,42 @@ def get_connector_details(x, remote_instance=None):
                       )
 
     return df
+
+
+@cache.undo_on_error
+def get_connector_tags(x, remote_instance=None):
+    """Retrieve tags on sets of connectors.
+
+    Parameters
+    ----------
+    x :                 list of connector IDs | CatmaidNeuron | CatmaidNeuronList
+                        Connector ID(s) to retrieve details for. If
+                        CatmaidNeuron/List, will use their connectors.
+    remote_instance :   CatmaidInstance, optional
+                        If not passed directly, will try using global.
+
+    Returns
+    ---------
+    dict
+                        ``{tag1: [connector1_id, connector2_id, ...], tag2: [ ... ], ...}``
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    connector_ids = utils.eval_node_ids(x, connectors=True, treenodes=False)
+
+    connector_ids = list(set(connector_ids))
+
+    remote_get_node_labels_url = remote_instance._get_node_labels_url()
+
+    POST = {'connector_ids': ','.join([str(tn) for tn in connector_ids])}
+
+    resp = remote_instance.fetch(remote_get_node_labels_url, post=POST)
+
+    cn_tags = {}
+    for cnid in resp:
+        cn_tags.update({tag: cn_tags.get(tag, []) + [int(cnid)] for tag in resp[cnid]})
+
+    return cn_tags
 
 
 @cache.undo_on_error
