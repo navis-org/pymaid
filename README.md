@@ -45,10 +45,10 @@ Jarrell TA, Wang Y, Bloniarz AE, Brittin CA, Xu M, Thomson JN, Albertson DG, Hal
 [link](http://science.sciencemag.org/content/337/6093/437.long)
 3. **Comparison of neurons based on synapse distribution**: eLife. doi: 10.7554/eLife.16799
 *Synaptic transmission parallels neuromodulation in a central food-intake circuit.*
-Schlegel P, Texada MJ, Miroschnikow A, Schoofs A, Hückesfeld S, Peters M, … Pankratz MJ.
+Schlegel P, Texada MJ, Miroschnikow A, Schoofs A, Hueckesfeld S, Peters M, ... Pankratz MJ.
 [link](https://elifesciences.org/content/5/e16799)
 4. **Synapse flow centrality and segregation index**: eLife. doi: 10.7554/eLife.12059
 *Quantitative neuroanatomy for connectomics in Drosophila.*
-Schneider-Mizell CM, Gerhard S, Longair M, Kazimiers T, Li, Feng L, Zwart M … Cardona A.
+Schneider-Mizell CM, Gerhard S, Longair M, Kazimiers T, Li, Feng L, Zwart M ... Cardona A.
 [link](https://elifesciences.org/articles/12059)
 

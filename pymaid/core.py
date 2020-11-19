@@ -142,6 +142,8 @@ class CatmaidNeuron(navis.TreeNeuron):
                         Timestamp of data retrieval.
     tags :              dict
                         Node tags.
+    connector_tags :    dict
+                        Connector tags.
     annotations :       list
                         This neuron's annotations.
     graph :             ``network.DiGraph``
@@ -506,6 +508,26 @@ class CatmaidNeuron(navis.TreeNeuron):
 
         if 'type' not in self.nodes:
             navis.classify_nodes(self)
+
+        return
+
+    def get_connector_tags(self, remote_instance=None, **fetch_kwargs):
+        """
+        Get/update tags on connectors of a neuron. After running,
+        neuron.connector_tags will store a list of tag-node mappings
+        similar to neuron.tags.
+        """
+        if not remote_instance and not self._remote_instance:
+            raise Exception('get_connector_tags - Unable to connect to '
+                            'server without remote_instance. See '
+                            'help(core.CatmaidNeuron) to learn how to '
+                            'assign.')
+        elif not remote_instance:
+            remote_instance = self._remote_instance
+
+        logger.info('Retrieving connector tags...')
+        self.connector_tags = fetch.get_connector_tags(self,
+                                                       remote_instance=remote_instance)
 
         return
 
