@@ -10,6 +10,14 @@ What's new?
    * - Version
      - Date
      -
+   * - 2.0.0
+     - x/x/x
+     - This release marks a huge break in the way pymaid works: it is now
+       fully dependent on and compatible with `navis <https://navis.readthedocs.io/en/latest/>`_.
+       - :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` are now subclasses of ``navis.TreeNeuron`` and ``navis.NeuronList``, respectively
+       - all functions not specific to CATMAID have been removed in favour of the equivalent ``navis`` function
+       - for consistency, all use of ``treenode`` have been replace with ``node``: for example, the ``treenode_id`` column in node tables is now ``node_id``
+       - API docs and tutorials have been updated to use navis functions instead
    * - 1.1.0
      - 4/4/20
      - - changed argument names, types and order for :class:`CATMAIDInstance` to facilitate connecting to public Catmaid servers
@@ -41,7 +49,7 @@ What's new?
    * - 0.98
      - 21/06/19
      - - new functions: :func:`~pymaid.join_nodes`, :func:`~pymaid.link_connector`, :func:`~pymaid.join_skeletons`, :func:`~pymaid.replace_skeleton`, :func:`~pymaid.link_connector`, :func:`~pymaid.delete_nodes`, :func:`~pymaid.add_connector`
-       - reworked ``get_treenodes_by_tag()`` and renamed to :func:`~pymaid.find_treenodes`
+       - reworked ``get_nodes_by_tag()`` and renamed to :func:`~pymaid.find_nodes`
    * - 0.97
      - 21/06/19
      - - new functions: :func:`~pymaid.upload_volume`, :func:`~pymaid.shared_partners`
@@ -86,7 +94,7 @@ What's new?
      - 20/09/18
      - - vispy 3d viewer overhaul: prettier, better picking, new shortcuts
        - indexing of :class:`~pymaid.CatmaidNeuronList` via ``.skid[]`` now returns results in order of query
-       - new function: :func:`~pymaid.find_treenodes`
+       - new function: :func:`~pymaid.find_nodes`
        - new function: :func:`~pymaid.connection_density`
        - improved :func:`~pymaid.split_axon_dendrite`
        - improved :func:`~pymaid.to_swc` and :func:`~pymaid.from_swc`
@@ -105,7 +113,7 @@ What's new?
        - :func:`~pymaid.from_swc` now imports multiple SWCs at a time
        - major improvements to caching system
        - by default, progress bars will now vanish after completion
-       - followed changes in CATMAID API regarding treenode tables
+       - followed changes in CATMAID API regarding node tables
        - various bugfixes
    * - 0.88
      - 29/07/18
@@ -129,7 +137,7 @@ What's new?
        - fixed a bug when using regex to query for neurons that led to duplicate skeleton IDs being returned
    * - 0.85
      - 13/07/18
-     - - fixed a series of critical bugs in :func:`~pymaid.plot3d`, :func:`pymaid.Volume.combine`, :func:`~pymaid.cut_neuron`, :func:`pymaid.CatmaidNeuronList.remove_duplicates`,  :func:`~pymaid.get_skid_from_treenode` and :func:`~pymaid.neuron2json`
+     - - fixed a series of critical bugs in :func:`~pymaid.plot3d`, :func:`pymaid.Volume.combine`, :func:`~pymaid.cut_neuron`, :func:`pymaid.CatmaidNeuronList.remove_duplicates`,  :func:`~pymaid.get_skid_from_node` and :func:`~pymaid.neuron2json`
        - :func:`~pymaid.cut_neuron` now accepts multiple cut nodes
        - improved depth coloring in :func:`~pymaid.plot2d`
        - added depth coloring to :func:`~pymaid.plot2d` with method '3d' - see :doc:`here <depth_coloring>` for examples

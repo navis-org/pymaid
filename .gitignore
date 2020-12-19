@@ -6,7 +6,7 @@ __pycache__/
 *$py.class
 *.pyc
 
-# Test config 
+# Test config
 /pymaid/tests/config_test.py
 
 # Coverage
@@ -30,7 +30,7 @@ env/
 build/
 generated/
 develop-eggs/
-#dist/
+dist/
 downloads/
 eggs/
 .eggs/

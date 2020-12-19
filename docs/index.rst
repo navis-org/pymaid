@@ -1,5 +1,5 @@
-pymaid: neuron analysis toolbox
-===============================
+pymaid: a Python-CATMAID interface
+==================================
 
 .. raw:: html
 
@@ -7,14 +7,12 @@ pymaid: neuron analysis toolbox
       <div class="row">
          <div class="col-lg-6">
 
-Pymaid is a Python library for **visualisation** and **analysis** of **neuron data**
-generated with `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_. It allows you to
-fetch, analyse and plot neuron morpholgy and connectivity from a CATMAID server.
+``pymaid`` (short for "Python-CATMAID") is a Python library for fetching,
+analyzing and visualisating data generated with
+`CATMAID <http://catmaid.readthedocs.io/en/stable/>`_.
 
-The package is stable but I recommend watching its
-`Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
-Make sure that your ``pymaid.__version__`` is up-to-date and check out the
-:ref:`release notes <whats_new>`.
+``pymaid`` is built on top of `navis <https://navis.readthedocs.io/en/latest/>`_
+and is fully compatible with its functions.
 
 For a brief introduction to the library, you can read the
 :ref:`tutorial <tutorial>`. Visit the
@@ -28,6 +26,10 @@ and bug reports are very welcome and best placed in
 `issues <https://github.com/schlegelp/PyMaid/issues>`_.
 If you have any questions, please don't hesitate: pms70@cam.ac.uk
 
+The package is stable but I recommend watching its
+`Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
+Make sure that your ``pymaid.__version__`` is up-to-date and check out the
+:ref:`release notes <whats_new>`.
 
 .. raw:: html
 
@@ -62,14 +64,10 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
                </div>
                <div class="panel-body">
 
-* data fetching directly from CATMAID server
-* 2D (matplotlib) and 3D (vispy or plotly) plotting
-* virtual neuron surgery (cutting, stitching, pruning, rerooting)
-* R bindings (e.g. for libraries nat, nat.nblast and elmr)
-* interface with Blender 3D and Cytoscape
-* import/export from/to SWC
-* EM image data processing
-* data snapshots
+* fetch data directly from CATMAID server
+* write data (e.g. annotations, tags, neurons) to the server
+* fully compatible with `navis <https://navis.readthedocs.io/en/latest/>`_
+* high-level functions to analyze e.g. connectivity
 
 .. raw:: html
 
@@ -78,4 +76,3 @@ If you have any questions, please don't hesitate: pms70@cam.ac.uk
          </div>
       </div>
    </div>
-

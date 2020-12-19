@@ -42,6 +42,8 @@ MOCK_MODULES = ['sklearn',
 
                 'pandas',
 
+                'pint',
+
                 'bpy', 'bmesh',
 
                 'pyoctree',
@@ -148,8 +150,11 @@ extensions = [
     #'sphinx.ext.mathjax', # mathjax is interactive and configurable but can also misbehave when rendering - switched to imgmath instead
     'sphinx.ext.imgmath',
     'matplotlib.sphinxext.plot_directive',
+    'sphinx.ext.intersphinx'
     #'numpydoc'
 ]
+
+intersphinx_mapping = {'navis': ('https://navis.readthedocs.io/en/latest/', None)}
 
 # Include the example source for plots in API docs
 plot_include_source = True

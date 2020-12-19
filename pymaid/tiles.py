@@ -10,9 +10,6 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along
 
 import gc
 import math
@@ -70,7 +67,7 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     # Prepare treenode table to be indexed by treenode_id
-    this_tn = x.nodes.set_index('treenode_id')
+    this_tn = x.nodes.set_index('node_id')
 
     # Iterate over neuron's segments
     bboxes = []
@@ -121,9 +118,9 @@ def crop_neuron(x, output, dimensions=(1000, 1000), interpolate_z_res=40,
 
     # Generate tile job
     job = TileLoader(bboxes,
-                    zoom_level=0,
-                    coords='NM',
-                    remote_instance=remote_instance)
+                     zoom_level=0,
+                     coords='NM',
+                     remote_instance=remote_instance)
 
     return job
 
@@ -208,8 +205,8 @@ class TileLoader:
     >>> job.load_in_memory()
     >>> # Render image
     >>> ax = job.render_im(slider=False, figsize=(12, 12))
-    >>> # Add treenodes
-    >>> job.render_nodes(ax, treenodes=True, connectors=False)
+    >>> # Add nodes
+    >>> job.render_nodes(ax, nodes=True, connectors=False)
     >>> # Add scalebar
     >>> job.scalebar(size=1000, ax=ax, label=False)
     >>> # Show
@@ -229,7 +226,7 @@ class TileLoader:
                  **fetch_kwargs):
         """Initialise class."""
         if coords not in ['PIXEL', 'NM']:
-            raise ValueError('Coordinates need to be "PIXEL" or "NM".')
+            raise ValueError('Coordinates need to be "PIXEL" or "NM", got "{}"'.format(coords))
 
         # Convert single bbox to multiple bounding boxes
         if isinstance(bbox, np.ndarray):
@@ -688,7 +685,7 @@ class TileLoader:
                     verticalalignment='center',
                     **label_kws)
 
-    def render_nodes(self, ax, treenodes=True, connectors=True, slice_ix=None,
+    def render_nodes(self, ax, nodes=True, connectors=True, slice_ix=None,
                      tn_color='yellow', cn_color='none', tn_ec=None,
                      cn_ec='orange', skid_include=[], cn_include=[], tn_kws={},
                      cn_kws={}):
@@ -711,7 +708,7 @@ class TileLoader:
                         List of connector IDs to include.
         tn_kws :        dict, optional
                         Keywords passed to ``matplotlib.pyplot.scatter`` for
-                        treenodes.
+                        nodes.
         cn_kws :        dict, optional
                         Keywords passed to ``matplotlib.pyplot.scatter`` for
                         connectors.
@@ -741,8 +738,8 @@ class TileLoader:
 
         # Filter to only this Z
         self.nodes = self.nodes[self.nodes.z == slice_info['nm_z']]
-        self.connectors = self.connectors[self.connectors.z ==
-                                          slice_info['nm_z']]
+        self.connectors = self.connectors[self.connectors.z
+                                          == slice_info['nm_z']]
 
         # Filter to fit bounding box
         self.nodes = self.nodes[
@@ -759,7 +756,7 @@ class TileLoader:
              slice_info['nm_bot'])
         ]
 
-        logger.debug('Retrieved {} treenodes and {} connectors'.format(
+        logger.debug('Retrieved {} nodes and {} connectors'.format(
             self.nodes.shape[0],
             self.connectors.shape[0]
         ))
@@ -773,7 +770,7 @@ class TileLoader:
             self.connectors = self.connectors[self.connectors.skeleton_id.isin(
                 cn_include)]
 
-        logger.debug('{} treenodes and {} connectors after filtering'.format(
+        logger.debug('{} nodes and {} connectors after filtering'.format(
             self.nodes.shape[0],
             self.connectors.shape[0]
         ))
@@ -824,7 +821,7 @@ class TileLoader:
             self.connectors['ec'] = [
                 cn_ec for x in range(self.connectors.shape[0])]
 
-        if treenodes:
+        if nodes:
             if tn_ec:
                 tn_ec = self.nodes.ec.values
             ax.scatter(self.nodes.x.values, self.nodes.y.values,
@@ -902,7 +899,6 @@ class TileLoader:
 
         return url
 
-
     def _to_x_index(self, x, enforce_bounds=True):
         """Convert a real world position to a x pixel position.
 
@@ -944,12 +940,12 @@ class TileLoader:
 
         """
         # Get nodes that have a parent in our list
-        has_parent = nodes[nodes.parent_id.isin(nodes.treenode_id)]
+        has_parent = nodes[nodes.parent_id.isin(nodes.node_id)]
 
         # Get treenode and parent section
         tn_section = has_parent.z.values / self.resolution_z
-        pn_section = nodes.set_index(
-            'treenode_id').loc[has_parent.parent_id.values, 'z'].values / self.resolution_z
+        pn_section = nodes.set_index('node_id').loc[has_parent.parent_id.values,
+                                                    'z'].values / self.resolution_z
 
         # Get distance in sections
         sec_dist = np.absolute(tn_section - pn_section)
@@ -957,8 +953,8 @@ class TileLoader:
         # Get those that have more than one section in between them
         to_interpolate = has_parent[sec_dist > 1]
         tn_locs = to_interpolate[['x', 'y', 'z']].values
-        pn_locs = nodes.set_index('treenode_id').loc[to_interpolate.parent_id, [
-            'x', 'y', 'z']].values
+        pn_locs = nodes.set_index('node_id').loc[to_interpolate.parent_id,
+                                                 ['x', 'y', 'z']].values
         distances = sec_dist[sec_dist > 1].astype(int)
         skids = to_interpolate.skeleton_id.values
 
