@@ -557,8 +557,8 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
     # Make sure to not access `.annotations` directly to not trigger
     # fetching annotations
-    if import_annotations and 'annotations' in x.__dict__:
-        an = x.__dict__.get('annotations', [])
+    if import_annotations and '_annotations' in x.__dict__:
+        an = x.__dict__.get('_annotations', [])
         resp['annotations'] = add_annotations(resp['skeleton_id'], an,
                                               remote_instance=remote_instance)
 
@@ -587,7 +587,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
         # Link connectors
         links = [[resp['node_id_map'][n.node_id],
                   cn_map[n.connector_id],
-                  rl_map[n.relation]] for n in x.connectors.itertuples()]
+                  rl_map[n.type]] for n in x.connectors.itertuples()]
 
         ln_resp = link_connector(links, remote_instance=remote_instance)
 
@@ -1750,7 +1750,7 @@ def add_connector(coords, check_existing=True, remote_instance=None):
                         Use this to add nodes.
 
     """
-    remote_instance = utils._eval_remote_instance(remote_instance)    
+    remote_instance = utils._eval_remote_instance(remote_instance)
     resp = []
     if not utils._is_iterable(coords[0]):
         coords = [coords]
@@ -1759,9 +1759,11 @@ def add_connector(coords, check_existing=True, remote_instance=None):
 
     if coords.shape[1] != 3:
         raise ValueError('Expected x/y/z coordinates, got {}'.format(coords.shape[1]))
+
     if check_existing:
         already_existing = []  # list of bool, order corresponds to 'coord' argument
         existing_resp = []  # building return values for existing connectors
+
         # Preparing for upload of new connectors
         create_connector_url = remote_instance._create_connector_url()
         create_urls = []
@@ -1775,11 +1777,11 @@ def add_connector(coords, check_existing=True, remote_instance=None):
                 ret='IDS',
                 remote_instance=remote_instance
             )
-            
+
             if len(existing_connector) == 0:
                 already_existing.append(False)
                 create_urls.append(create_connector_url)
-                create_post.append({'pid': remote_instance.project_id, 
+                create_post.append({'pid': remote_instance.project_id,
                                     'confidence': 5,
                                     'x': coord[0],
                                     'y': coord[1],
@@ -1800,10 +1802,10 @@ def add_connector(coords, check_existing=True, remote_instance=None):
         url = [remote_instance._create_connector_url()] * coords.shape[0]
 
         post = [{'pid': remote_instance.project_id,
-                'confidence': 5,
-                'x': c[0],
-                'y': c[1],
-                'z': c[2]} for c in coords]
+                 'confidence': 5,
+                 'x': c[0],
+                 'y': c[1],
+                 'z': c[2]} for c in coords]
 
         resp = remote_instance.fetch(url, post=post, desc='Creating connectors')
 
