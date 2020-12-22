@@ -24,7 +24,7 @@ pip3 install python-catmaid
 *Important*: there is a `pymaid` package on PyPI which has _nothing_ to do with
 this pymaid!
 
-To install bleeding edge from Github:
+To install the bleeding edge from Github:
 
 ```bash
 pip3 install git+git://github.com/schlegelp/pymaid@master

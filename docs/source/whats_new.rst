@@ -11,7 +11,7 @@ What's new?
      - Date
      -
    * - 2.0.0
-     - x/x/x
+     - 21/11/20
      - This release marks a huge break in the way pymaid works: it is now
        fully dependent on and compatible with `navis <https://navis.readthedocs.io/en/latest/>`_.
        - :class:`~pymaid.CatmaidNeuron` and :class:`~pymaid.CatmaidNeuronList` are now subclasses of ``navis.TreeNeuron`` and ``navis.NeuronList``, respectively
