@@ -1,7 +1,7 @@
-navis~=0.2
+navis>=0.2
 numpy>=1.16.3
 networkx>=2.4
-pandas~=1.0
+pandas>=1.0
 requests-futures>=0.9.9
 requests>=2.21.0
 setuptools>=41.0.1
