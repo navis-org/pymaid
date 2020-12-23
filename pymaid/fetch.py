@@ -967,8 +967,7 @@ def get_skid_from_node(node_ids, remote_instance=None):
 
 
 @cache.undo_on_error
-def get_node_table(x, include_details=True, convert_ts=True,
-                       remote_instance=None):
+def get_node_table(x, include_details=True, convert_ts=True, remote_instance=None):
     """Retrieve node table(s) for a list of neurons.
 
     Parameters
@@ -1036,9 +1035,14 @@ def get_node_table(x, include_details=True, convert_ts=True,
         this_df = pd.DataFrame(nl[0],
                                columns=['node_id', 'parent_node_id',
                                         'confidence', 'x', 'y', 'z', 'radius',
-                                        'creator', 'last_edited'],
-                               dtype=object
+                                        'creator', 'last_edited']
                                )
+
+        # Parent IDs can be `None` here - we will set them to -1
+        this_df.loc[this_df.parent_node_id.isnull(), 'parent_node_id'] = -1
+        this_df['parent_node_id'] = this_df.parent_node_id.astype(int)
+
+        # Keep track of skeleton ID
         this_df['skeleton_id'] = x[i]
 
         if include_details:
@@ -1058,8 +1062,8 @@ def get_node_table(x, include_details=True, convert_ts=True,
     # Concatenate all DataFrames
     tn_table = pd.concat(all_tables, axis=0, ignore_index=True)
 
-    # Replace creator_id with their login
-    tn_table['creator'] = tn_table.creator.map(user_dict)
+    # Replace creator_id with their login and make it a categorical
+    tn_table['creator'] = tn_table.creator.map(user_dict).astype('category')
 
     # Replace timestamp with datetime object
     if convert_ts:
