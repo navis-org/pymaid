@@ -310,7 +310,7 @@ def cable_overlap(a, b, dist=2, method='min'):
             # Add length of vector (for convenience)
             dps['vec_length'] = (dps.vector ** 2).apply(sum).apply(math.sqrt)
 
-            x.dps = dps
+            x._dps = dps
 
     with config.tqdm(total=len(a), desc='Calc. overlap',
                      disable=config.pbar_hide,
@@ -322,30 +322,30 @@ def cable_overlap(a, b, dist=2, method='min'):
             tA = trees.get(nA.skeleton_id, None)
             if not tA:
                 trees[nA.skeleton_id] = tA = scipy.spatial.cKDTree(
-                    np.vstack(nA.dps.point), leafsize=10)
+                    np.vstack(nA._dps.point), leafsize=10)
 
             for nB in b:
                 # Get cKDTree for nB
                 tB = trees.get(nB.skeleton_id, None)
                 if not tB:
                     trees[nB.skeleton_id] = tB = scipy.spatial.cKDTree(
-                        np.vstack(nB.dps.point), leafsize=10)
+                        np.vstack(nB._dps.point), leafsize=10)
 
                 # Query nB -> nA
-                distA, ixA = tA.query(np.vstack(nB.dps.point),
+                distA, ixA = tA.query(np.vstack(nB._dps.point),
                                       k=1,
                                       distance_upper_bound=dist,
                                       workers=-1
                                       )
                 # Query nA -> nB
-                distB, ixB = tB.query(np.vstack(nA.dps.point),
+                distB, ixB = tB.query(np.vstack(nA._dps.point),
                                       k=1,
                                       distance_upper_bound=dist,
                                       workers=-1
                                       )
 
-                nA_in_dist = nA.dps.loc[ixA[distA != float('inf')]]
-                nB_in_dist = nB.dps.loc[ixB[distB != float('inf')]]
+                nA_in_dist = nA._dps.loc[ixA[distA != float('inf')]]
+                nB_in_dist = nB._dps.loc[ixB[distB != float('inf')]]
 
                 if nA_in_dist.empty:
                     overlap = 0
