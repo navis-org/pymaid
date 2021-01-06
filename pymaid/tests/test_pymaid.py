@@ -437,7 +437,7 @@ class TestCore(unittest.TestCase):
 
     @try_conditions
     def test_neuron_attributes(self):
-        attr = ['graph', 'simple', 'dps', 'annotations', 'partners',
+        attr = ['graph', 'simple', 'annotations', 'partners',
                 'review_status', 'nodes', 'connectors', 'presynapses',
                 'postsynapses', 'gap_junctions', 'segments', 'soma',
                 'root', 'tags', 'n_open_ends', 'n_end_nodes', 'n_connectors',
