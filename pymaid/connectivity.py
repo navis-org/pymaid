@@ -13,6 +13,7 @@
 
 """ This module contains functions to analyse connectivity.
 """
+import math
 
 from itertools import combinations
 
@@ -242,8 +243,6 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 def cable_overlap(a, b, dist=2, method='min'):
     """Calculate the amount of cable of neuron A within distance of neuron B.
 
-    Uses dotproduct representation of a neuron!
-
     Parameters
     ----------
     a,b :       CatmaidNeuron | CatmaidNeuronList
@@ -290,6 +289,28 @@ def cable_overlap(a, b, dist=2, method='min'):
 
     matrix = pd.DataFrame(np.zeros((a.shape[0], b.shape[0])),
                           index=a.skeleton_id, columns=b.skeleton_id)
+
+    # Generate simple dotprops for each neuron
+    for nl in [a, b]:
+        for x in nl:
+            # Node locs
+            tn_locs = x.nodes[x.nodes.parent_id >= 0][['x', 'y', 'z']].values
+            # Parent locs
+            pn_locs = x.nodes.set_index('node_id', inplace=False).loc[x.nodes[x.nodes.parent_id >= 0].parent_id][['x', 'y', 'z']].values
+
+            # Get centers between each pair of locs
+            centers = tn_locs + (pn_locs - tn_locs) / 2
+
+            # Get vector between points
+            vec = pn_locs - tn_locs
+
+            dps = pd.DataFrame([[c, v] for c, v in zip(centers, vec)],
+                               columns=['point', 'vector'])
+
+            # Add length of vector (for convenience)
+            dps['vec_length'] = (dps.vector ** 2).apply(sum).apply(math.sqrt)
+
+            x.dps = dps
 
     with config.tqdm(total=len(a), desc='Calc. overlap',
                      disable=config.pbar_hide,
