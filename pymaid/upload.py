@@ -2041,7 +2041,7 @@ def push_new_root(new_root, no_prompt=False, remote_instance=None):
               'right':  n.x + 2500,
               'top':    n.y - 2500,
               'bottom': n.y + 2500,
-              'z1':     n.z,
+              'z1':     n.z - 40,
               'z2':     n.z + 40,
               'treenode_ids[0]': int(n.node_id)}
     url = remote_instance._get_node_list_url(**params)
@@ -2165,7 +2165,7 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
                   'right':  n.x + 2500,
                   'top':    n.y - 2500,
                   'bottom': n.y + 2500,
-                  'z1':     n.z,
+                  'z1':     n.z - 40,
                   'z2':     n.z + 40}
         if 'node' in node_type.lower():
             params['treenode_ids[0]'] = int(n.node_id)
