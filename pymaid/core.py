@@ -151,8 +151,6 @@ class CatmaidNeuron(navis.TreeNeuron):
     igraph :            ``igraph.Graph``
                         iGraph representation of this neuron. Returns ``None``
                         if igraph library not installed.
-    dps :               ``pandas.DataFrame``
-                        Dotproduct representation of this neuron.
     review_status :     int
                         This neuron's review status.
     n_connectors :      int
