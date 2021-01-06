@@ -335,13 +335,13 @@ def cable_overlap(a, b, dist=2, method='min'):
                 distA, ixA = tA.query(np.vstack(nB.dps.point),
                                       k=1,
                                       distance_upper_bound=dist,
-                                      n_jobs=-1
+                                      workers=-1
                                       )
                 # Query nA -> nB
                 distB, ixB = tB.query(np.vstack(nA.dps.point),
                                       k=1,
                                       distance_upper_bound=dist,
-                                      n_jobs=-1
+                                      workers=-1
                                       )
 
                 nA_in_dist = nA.dps.loc[ixA[distA != float('inf')]]
@@ -493,7 +493,7 @@ def predict_connectivity(source, target, method='possible_contacts',
                 dist, ix = tree.query(s.presynapses[['x', 'y', 'z']].values,
                                       k=1,
                                       distance_upper_bound=dist_threshold,
-                                      n_jobs=-1
+                                      workers=-1
                                       )
 
                 # Calculate possible contacts

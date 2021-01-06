@@ -698,7 +698,7 @@ class TestGraphs(unittest.TestCase):
 
     @try_conditions
     def test_node_sorting(self):
-        self.assertIsInstance(ns.node_label_sorting(self.n),
+        self.assertIsInstance(ns.graph.node_label_sorting(self.n),
                               list)
 
 
