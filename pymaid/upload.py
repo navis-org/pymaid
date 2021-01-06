@@ -1901,11 +1901,13 @@ def delete_neuron(x, no_prompt=False, remote_instance=None):
 
     .. danger::
 
-        **Use this with EXTREME caution as this is irreversible!**
+        **Use this with EXTREME caution as this is irreversible!** Your only
+        chance to recover accidentally deleted neurons is asking a server
+        admin for help.
 
     Important
     ---------
-    Deletes a neuron if (and only if!) two things are the case:
+    Deletes a neuron if (and only if!) two conditions are met:
 
      1. You own all nodes of the skeleton making up the neuron in question.
      2. The neuron is not annotated by other users.
