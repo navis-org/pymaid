@@ -46,26 +46,41 @@ for mod_name in MOCK_MODULES:
 import pymaid
 #from pymaid import cytoscape
 
+from subprocess import check_call as sh
+
+def convert_nb(nbname, execute=False):
+    """Remove tags."""
+    if execute:
+        # Execute the notebook
+        sh(["jupyter", "nbconvert", "--to", "notebook",
+        "--execute", "--inplace", nbname])
+
+    # Convert to .rst for Sphinx
+    sh(["jupyter", "nbconvert", "--to", "rst", nbname,
+        "--TagRemovePreprocessor.remove_cell_tags={'hide'}",
+        "--TagRemovePreprocessor.remove_input_tags={'hide-input'}",
+        "--TagRemovePreprocessor.remove_all_outputs_tags={'hide-output'}"])
+
+    if execute:
+        # Clear notebook output
+        sh(["jupyter", "nbconvert", "--to", "notebook", "--inplace",
+            "--ClearOutputPreprocessor.enabled=True", nbname])
+
+    # Touch the .rst file so it has a later modify time than the source
+    sh(["touch", nbname.replace('.ipynb', '') + ".rst"])
+
 
 # -- Make execution numbers in Jupyter notebooks ascending -------------------
 source_path = os.path.dirname(os.path.abspath(__file__)) + '/source'
-all_nb = [f for f in os.listdir(source_path) if f.endswith('.ipynb')]
+all_nb = list()
+for (dirpath, dirnames, filenames) in os.walk(source_path):
+    # Skip checkpoints
+    if 'checkpoint' in dirpath:
+        continue
+    all_nb += [os.path.join(dirpath, file) for file in filenames if file.endswith('.ipynb')]
 
 for nb in all_nb:
-    with open(os.path.join(source_path, nb), 'r') as f:
-        data = json.load(f)
-        i = 1
-        for c in data['cells']:
-            if c['cell_type'] == 'code':
-                if 'execution_count' in c:
-                    c['execution_count'] = i
-                for o in c['outputs']:
-                    if 'execution_count' in o:
-                        o['execution_count'] = i
-                i += 1
-
-    with open(os.path.join(source_path, nb), 'w') as f:
-        json.dump(data, f, indent=3)
+    convert_nb(nb)
 
 # -- General configuration ------------------------------------------------
 
