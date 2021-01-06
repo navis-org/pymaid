@@ -38,14 +38,14 @@ find out details about a given function.
             </div>
             <div class="panel panel-default">
                <div class="panel-heading">
-                  <h3 class="panel-title">Plotting</h3>
+                  <h3 class="panel-title">Visualization</h3>
                </div>
                <div class="panel-body">
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-   Basics <plotting>
+   Plotting <plotting>
    EM image data <tiles.ipynb>
 
 .. raw:: html
@@ -61,9 +61,9 @@ find out details about a given function.
                <div class="panel-body">
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
-   Basics <morph_analysis.ipynb>
+   Morphological analyses <morph_analysis.ipynb>
 
 .. raw:: html
 
@@ -90,6 +90,23 @@ find out details about a given function.
          <div class="col-md-3">
             <div class="panel panel-default">
                <div class="panel-heading">
+                  <h3 class="panel-title">CATMAID</h3>
+               </div>
+               <div class="panel-body">
+
+.. toctree::
+   :maxdepth: 2
+
+   Fetching data <fetching_data>
+   Pushing data <pushing_data>
+
+.. raw:: html
+
+
+               </div>
+            </div>
+            <div class="panel panel-default">
+               <div class="panel-heading">
                   <h3 class="panel-title">Interfaces</h3>
                </div>
                <div class="panel-body">
@@ -98,6 +115,7 @@ find out details about a given function.
    :maxdepth: 1
 
    Cytoscape <python2cytoscape>
+
 
 .. raw:: html
 
