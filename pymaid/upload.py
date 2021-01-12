@@ -1771,9 +1771,9 @@ def add_connector(coords, check_existing=True, remote_instance=None):
 
         for coord in coords:
             existing_connector = fetch.get_connectors_in_bbox(
-                [[coord[0], coord[0]+1],
-                 [coord[1], coord[1]+1],
-                 [coord[2], coord[2]+1]],
+                [[coord[0]-1, coord[0]+1],
+                 [coord[1]-1, coord[1]+1],
+                 [coord[2]-1, coord[2]+1]],
                 ret='IDS',
                 remote_instance=remote_instance
             )
