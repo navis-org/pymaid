@@ -1508,6 +1508,10 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
     if any([not isinstance(v, numbers.Number) for v in radii.values()]):
         raise ValueError('New radii must be numerical.')
 
+    # We have to force node IDs to integer to avoid np.int32 and np.in64 as
+    # these upset json.dumps() later on
+    radii = {int(n): r for n, r in radii.items()}
+
     update_radii_url = remote_instance._update_node_radii()
 
     # We need to provide a state for each node
@@ -1531,7 +1535,7 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
         update_post.update({"state": [(k, edition_times[str(k)]) for k in this_chunk]})
 
         # We have to explicitly convert the state in a json string because passing
-        # it to requests as "post" will fuck this up otherwise
+        # it to requests as "post" will f*** this up otherwise
         update_post['state'] = json.dumps(update_post['state'])
 
         this_resp = remote_instance.fetch(update_radii_url, post=update_post,
