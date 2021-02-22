@@ -1052,7 +1052,7 @@ def get_node_table(x, include_details=True, convert_ts=True, remote_instance=Non
 
             reviewer_dict = {}
             for r in nl[1]:
-                reviewer_dict[r[0]] = reviewer_dict.get(r[0], []) + [user_dict[r[1]]]
+                reviewer_dict[r[0]] = reviewer_dict.get(r[0], []) + [user_dict.get(r[1])]
 
             this_df['reviewers'] = this_df.node_id.map(reviewer_dict)
             this_df['tags'] = this_df.node_id.map(tag_dict)
@@ -1582,9 +1582,10 @@ def get_connectors_between(a, b, directional=True, remote_instance=None):
                                'node2_loc'])
 
     # Get user list and replace IDs with logins
-    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
-    df['creator1'] = [user_list.loc[u, 'login'] for u in df.creator1.values]
-    df['creator2'] = [user_list.loc[u, 'login'] for u in df.creator2.values]
+    user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
+    df['creator1'] = df['creator1'].map(user_dict)
+    df['creator2'] = df['creator2'].map(user_dict)
 
     return df
 
@@ -1704,7 +1705,7 @@ def get_user_annotations(x, remote_instance=None):
     try:
         ids = [int(e) for e in x]
     except BaseException:
-        ids = [user_list.set_index('login').loc[e, 'user_id'] for e in x]
+        ids = user_list.set_index('login').loc[x, 'id'].values
 
     # This works with neuron_id NOT skeleton_id
     # neuron_id can be requested via neuron_names
@@ -1812,13 +1813,14 @@ def get_annotation_details(x, remote_instance=None):
                                                               desc='Get annot')]
 
     # Get user list
-    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+    user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
 
     # Add skeleton ID and user login
     for i, s in enumerate(skids):
         for an in annotations[i]:
             an.insert(1, s)
-            an.append(user_list.loc[an[4], 'login'])
+            an.append(user_dict.get(an[4]))
 
     # Now flatten the list of lists
     annotations = [an for sublist in annotations for an in sublist]
@@ -2620,10 +2622,11 @@ def get_review_details(x, remote_instance=None):
     node_dict = {n[0]: {u[0]: datetime.datetime.strptime(
         u[1][:16], '%Y-%m-%dT%H:%M') for u in n[2]} for n in node_list}
 
-    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+    user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
 
     df = pd.DataFrame.from_dict(node_dict, orient='index').fillna(np.nan)
-    df.columns = user_list.loc[df.columns, 'login'].values
+    df.columns = df.columns.map(user_dict)
     df['skeleton_id'] = [tn_to_skid[tn] for tn in df.index.values]
     df.index.name = 'node_id'
     df = df.reset_index(drop=False)
@@ -2816,7 +2819,8 @@ def get_contributor_statistics(x, separate=False, max_threads=500,
                'review_contributors', 'multiuser_review_minutes',
                'construction_minutes', 'min_review_minutes']
 
-    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+    user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
 
     if not separate:
         with config.tqdm(total=len(x), desc='Contr. stats',
@@ -2836,13 +2840,13 @@ def get_contributor_statistics(x, separate=False, max_threads=500,
                                                    post=get_statistics_postdata))
 
         # Now generate DataFrame
-        node_contributors = {user_list.loc[int(u), 'login']: sum([st['node_contributors'][u] for st in stats if u in st[
+        node_contributors = {user_dict.get(int(u)): sum([st['node_contributors'][u] for st in stats if u in st[
             'node_contributors']]) for st in stats for u in st['node_contributors']}
-        pre_contributors = {user_list.loc[int(u), 'login']: sum([st['pre_contributors'][u] for st in stats if u in st[
+        pre_contributors = {user_dict.get(int(u)): sum([st['pre_contributors'][u] for st in stats if u in st[
             'pre_contributors']]) for st in stats for u in st['pre_contributors']}
-        post_contributors = {user_list.loc[int(u), 'login']: sum([st['post_contributors'][u] for st in stats if u in st[
+        post_contributors = {user_dict.get(int(u)): sum([st['post_contributors'][u] for st in stats if u in st[
             'post_contributors']]) for st in stats for u in st['post_contributors']}
-        review_contributors = {user_list.loc[int(u), 'login']: sum([st['review_contributors'][u] for st in stats if u in st[
+        review_contributors = {user_dict.get(int(u)): sum([st['review_contributors'][u] for st in stats if u in st[
             'review_contributors']]) for st in stats for u in st['review_contributors']}
 
         df = pd.Series([
@@ -2873,15 +2877,15 @@ def get_contributor_statistics(x, separate=False, max_threads=500,
         df = pd.DataFrame([[
             s,
             stats[i]['n_nodes'],
-            {user_list.loc[int(u), 'login']: stats[i]['node_contributors'][u]
+            {user_dict.get(int(u)): stats[i]['node_contributors'][u]
                 for u in stats[i]['node_contributors']},
             stats[i]['n_pre'],
-            {user_list.loc[int(u), 'login']: stats[i]['pre_contributors'][u]
+            {user_dict.get(int(u)): stats[i]['pre_contributors'][u]
                 for u in stats[i]['pre_contributors']},
             stats[i]['n_post'],
-            {user_list.loc[int(u), 'login']: stats[i]['post_contributors'][u]
+            {user_dict.get(int(u)): stats[i]['post_contributors'][u]
                 for u in stats[i]['post_contributors']},
-            {user_list.loc[int(u), 'login']: stats[i]['review_contributors'][u]
+            {user_dict.get(int(u)): stats[i]['review_contributors'][u]
                 for u in stats[i]['review_contributors']},
             stats[i]['multiuser_review_minutes'],
             stats[i]['construction_minutes'],
@@ -4274,9 +4278,10 @@ def get_transactions(range_start=None, range_length=25, remote_instance=None):
 
     df = pd.DataFrame.from_dict(data['transactions'])
 
-    user_list = get_user_list(remote_instance=remote_instance).set_index('id')
+    user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
 
-    df['user'] = [user_list.loc[uid, 'login'] for uid in df.user_id.values]
+    df['user'] = df.user_id.map(user_dict)
 
     df['execution_time'] = [datetime.datetime.strptime(
         d[:16], '%Y-%m-%dT%H:%M') for d in df['execution_time'].values]
