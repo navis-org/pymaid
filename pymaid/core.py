@@ -287,6 +287,24 @@ class CatmaidNeuron(navis.TreeNeuron):
 
         return res
 
+    def __mul__(self, other):
+        """Implement multiplication for coordinates (nodes, connectors)."""
+        # Exclude missing radii from multiplication
+        is_missing = self.nodes.radius == -1
+        n = super().__mul__(other)
+        n.nodes.loc[is_missing, 'radius'] = -1
+
+        return n
+
+    def __truediv__(self, other):
+        """Implement division for coordinates (nodes, connectors)."""
+        # Exclude missing radii from division
+        is_missing = self.nodes.radius == -1
+        n = super().__mul__(other)
+        n.nodes.loc[is_missing, 'radius'] = -1
+
+        return n
+
     def __hash__(self):
         # DO NOT REMOVE THIS! When defining __eq__ in subclass, _hash__ will
         # not be inherited and we have to explicitly define it
