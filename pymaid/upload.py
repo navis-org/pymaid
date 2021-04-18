@@ -469,11 +469,18 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                              'with a given skeleton or neuron ID.')
 
         node = x.nodes.iloc[0]
-        resp = add_node(coords=node[['x', 'y', 'z']].values,
-                        parent_id=None,
-                        radius=node.radius,
-                        confidence=node.confidence if node.confidence else None,
-                        remote_instance=remote_instance)
+
+        vars = dict(coords=node[['x', 'y', 'z']].values,
+                    parent_id=None,
+                    remote_instance=remote_instance)
+
+        if hasattr(node, 'confidence'):
+            vars['confidence'] = node.confidence if node.confidence else None
+
+        if hasattr(node, 'radius'):
+            vars['radius'] = node.radius
+
+        resp = add_node(**vars)
 
         # If error is returned
         if 'error' in resp:
