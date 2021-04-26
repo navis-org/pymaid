@@ -1539,7 +1539,7 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
         update_post.update({"treenode_radii[{}]".format(i): k for i, k in enumerate(this_chunk.values())})
 
         # State has to be provided as {'state': [(node_id, edition_time), ..]}
-        update_post.update({"state": [(k, edition_times[str(k)]) for k in this_chunk]})
+        update_post.update({"state": [(int(k), edition_times[str(k)]) for k in this_chunk]})
 
         # We have to explicitly convert the state in a json string because passing
         # it to requests as "post" will f*** this up otherwise
