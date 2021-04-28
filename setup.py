@@ -24,6 +24,11 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/schlegelp/pymaid',
+    project_urls={
+     "Documentation": "http://pymaid.readthedocs.io",
+     "Source": "https://github.com/schlegelp/pymaid",
+     "Changelog": "https://pymaid.readthedocs.io/en/latest/source/whats_new.html",
+    },
     author='Philipp Schlegel',
     author_email='pms70@cam.ac.uk',
     keywords='CATMAID interface neuron navis',
