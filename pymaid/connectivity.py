@@ -243,6 +243,8 @@ def filter_connectivity(x, restrict_to, remote_instance=None):
 def cable_overlap(a, b, dist=2, method='min'):
     """Calculate the amount of cable of neuron A within distance of neuron B.
 
+    DEPCRECATED! PLEASE USE `navis.cable_overlap` INSTEAD!
+
     Parameters
     ----------
     a,b :       CatmaidNeuron | CatmaidNeuronList
@@ -270,104 +272,11 @@ def cable_overlap(a, b, dist=2, method='min'):
                 ...
 
     """
-    # Convert distance to nm
-    dist *= 1000
-
-    if not isinstance(a, (core.CatmaidNeuron, core.CatmaidNeuronList)) or not isinstance(b, (core.CatmaidNeuron, core.CatmaidNeuronList)):
-        raise TypeError('Need to pass CatmaidNeurons')
-
-    if isinstance(a, core.CatmaidNeuron):
-        a = core.CatmaidNeuronList(a)
-
-    if isinstance(b, core.CatmaidNeuron):
-        b = core.CatmaidNeuronList(b)
-
-    allowed_methods = ['min', 'max', 'avg']
-    if method not in allowed_methods:
-        raise ValueError('Unknown method "{0}". Allowed methods: "{0}"'.format(
-            method, ','.join(allowed_methods)))
-
-    matrix = pd.DataFrame(np.zeros((a.shape[0], b.shape[0])),
-                          index=a.skeleton_id, columns=b.skeleton_id)
-
-    # Generate simple dotprops for each neuron
-    for nl in [a, b]:
-        for x in nl:
-            # Node locs
-            tn_locs = x.nodes[x.nodes.parent_id >= 0][['x', 'y', 'z']].values
-            # Parent locs
-            pn_locs = x.nodes.set_index('node_id', inplace=False).loc[x.nodes[x.nodes.parent_id >= 0].parent_id][['x', 'y', 'z']].values
-
-            # Get centers between each pair of locs
-            centers = tn_locs + (pn_locs - tn_locs) / 2
-
-            # Get vector between points
-            vec = pn_locs - tn_locs
-
-            dps = pd.DataFrame([[c, v] for c, v in zip(centers, vec)],
-                               columns=['point', 'vector'])
-
-            # Add length of vector (for convenience)
-            dps['vec_length'] = (dps.vector ** 2).apply(sum).apply(math.sqrt)
-
-            x._dps = dps
-
-    with config.tqdm(total=len(a), desc='Calc. overlap',
-                     disable=config.pbar_hide,
-                     leave=config.pbar_leave) as pbar:
-        # Keep track of KDtrees
-        trees = {}
-        for nA in a:
-            # Get cKDTree for nA
-            tA = trees.get(nA.skeleton_id, None)
-            if not tA:
-                trees[nA.skeleton_id] = tA = scipy.spatial.cKDTree(
-                    np.vstack(nA._dps.point), leafsize=10)
-
-            for nB in b:
-                # Get cKDTree for nB
-                tB = trees.get(nB.skeleton_id, None)
-                if not tB:
-                    trees[nB.skeleton_id] = tB = scipy.spatial.cKDTree(
-                        np.vstack(nB._dps.point), leafsize=10)
-
-                # Query nB -> nA
-                distA, ixA = tA.query(np.vstack(nB._dps.point),
-                                      k=1,
-                                      distance_upper_bound=dist,
-                                      workers=-1
-                                      )
-                # Query nA -> nB
-                distB, ixB = tB.query(np.vstack(nA._dps.point),
-                                      k=1,
-                                      distance_upper_bound=dist,
-                                      workers=-1
-                                      )
-
-                nA_in_dist = nA._dps.loc[ixA[distA != float('inf')]]
-                nB_in_dist = nB._dps.loc[ixB[distB != float('inf')]]
-
-                if nA_in_dist.empty:
-                    overlap = 0
-                elif method == 'avg':
-                    overlap = (nA_in_dist.vec_length.sum() +
-                               nB_in_dist.vec_length.sum()) / 2
-                elif method == 'max':
-                    overlap = max(nA_in_dist.vec_length.sum(),
-                                  nB_in_dist.vec_length.sum())
-                elif method == 'min':
-                    overlap = min(nA_in_dist.vec_length.sum(),
-                                  nB_in_dist.vec_length.sum())
-
-                matrix.at[nA.skeleton_id, nB.skeleton_id] = overlap
-
-            pbar.update(1)
-
-    # Convert to um
-    matrix /= 1000
-
-    return matrix
-
+    raise DeprecationWarning('This function has been moved to `navis`. Please '
+                             'use `navis.cable_overlap` as drop-in replacement.'
+                             ' Note that the navis function will return '
+                             'in the same units as the neuron - i.e. typically '
+                             'nanometers for CatmaidNeurons.')
 
 def predict_connectivity(source, target, method='possible_contacts',
                          remote_instance=None, **kwargs):
