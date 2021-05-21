@@ -539,7 +539,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
 
     .. math::
 
-        f(i_{s},j_{k}) = \\exp(\\frac{-d^{2}_{sk}}{2\\sigma^{2}}) \\exp(\\frac{|n(i_{s})-n(j_{k})|}{n(i_{s})+n(j_{k})})
+        f(i_{s},j_{k}) = \\exp(\\frac{-d^{2}_{sk}}{2\\sigma^{2}}) \\exp(-\\frac{|n(i_{s})-n(j_{k})|}{n(i_{s})+n(j_{k})})
 
     The synapse similarity score for neurons i and j being the average
     of :math:`f(i_{s},j_{k})` over all synapses s of i. Synapse k is the
