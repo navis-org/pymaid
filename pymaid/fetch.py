@@ -3981,29 +3981,15 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
             logger.error("Unknown volume type: %s" % mesh_type)
             raise Exception("Unknown volume type: %s" % mesh_type)
 
-        # For some reason, in this format vertices occur multiple times - we
-        # have to collapse that to get a clean mesh
-        final_faces = []
-        final_vertices = []
-
-        for t in faces:
-            this_faces = []
-            for v in t:
-                if vertices[v] not in final_vertices:
-                    final_vertices.append(vertices[v])
-
-                this_faces.append(final_vertices.index(vertices[v]))
-
-            final_faces.append(this_faces)
-
-        logger.debug('Volume type: %s' % mesh_type)
-        logger.debug('# of vertices after clean-up: %i' % len(final_vertices))
-        logger.debug('# of faces after clean-up: %i' % len(final_faces))
-
+        # In this format vertices are not unique - i.e. a given vertex defined
+        # by its x/y/z position shows up as many times as it participates in
+        # a face.
+        # Fortunately, navis.Volume being a subclass of trimesh.Trimesh takes
+        # care of the deduplication
         v = ns.Volume(name=mesh_name,
                       volume_id=mesh_id,
-                      vertices=final_vertices,
-                      faces=final_faces,
+                      vertices=vertices,
+                      faces=faces,
                       color=color)
 
         volumes[mesh_name] = v
