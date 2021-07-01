@@ -300,7 +300,7 @@ class CatmaidNeuron(navis.TreeNeuron):
         """Implement division for coordinates (nodes, connectors)."""
         # Exclude missing radii from division
         is_missing = self.nodes.radius == -1
-        n = super().__mul__(other)
+        n = super().__truediv__(other)
         n.nodes.loc[is_missing, 'radius'] = -1
 
         return n
