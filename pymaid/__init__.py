@@ -1,5 +1,5 @@
-__version__ = "2.0.5"
-__version_vector__ = (2, 0, 5)
+__version__ = "2.0.6"
+__version_vector__ = (2, 0, 6)
 
 from . import config
 
