@@ -509,7 +509,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
 
         # Keep SWC node map
         swc_map = ns.write_swc(x,
-                               filename=f,
+                               filepath=f,
                                export_connectors=False,
                                labels=False,
                                return_node_map=True)
