@@ -28,9 +28,8 @@ jobs:
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install flybrains --no-deps
-        pip install pathos
-        pip install pytest coveralls
+        pip install pathos imageio
+        pip install pytest coveralls pytest-cov
     - name: Install pymaid
       run: pip install -e .
     - run: pip install python-igraph
