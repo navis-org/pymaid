@@ -838,14 +838,14 @@ def get_time_invested(x, mode='SUM', by='USER', minimum_actions=10,
     # Change user ID to login
     if by == 'USER':
         if mode == 'SUM2':
-            node_details['creator'] = node_details.creator.map(user_dict)
-            node_details['editor'] = node_details.editor.map(user_dict)
+            node_details['creator'] = node_details.creator.map(lambda x: user_dict.get(x, f'Anonymous{x}'))
+            node_details['editor'] = node_details.editor.map(lambda x: user_dict.get(x, f'Anonymous{x}'))
 
-            link_details['creator'] = link_details.creator.map(user_dict)
+            link_details['creator'] = link_details.creator.map(lambda x: user_dict.get(x, f'Anonymous{x}'))
 
-        creation_timestamps['group'] = creation_timestamps.group.map(user_dict)
-        edition_timestamps['group'] = edition_timestamps.group.map(user_dict)
-        review_timestamps['group'] = review_timestamps.group.map(user_dict)
+        creation_timestamps['group'] = creation_timestamps.group.map(lambda x: user_dict.get(x, f'Anonymous{x}'))
+        edition_timestamps['group'] = edition_timestamps.group.map(lambda x: user_dict.get(x, f'Anonymous{x}'))
+        review_timestamps['group'] = review_timestamps.group.map(lambda x: user_dict.get(x, f'Anonymous{x}'))
 
     # Merge all timestamps
     all_timestamps = pd.concat([creation_timestamps,
