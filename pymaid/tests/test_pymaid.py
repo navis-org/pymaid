@@ -1,39 +1,30 @@
-""" Test suite for pymaid
+""" Test suite for pymaid.
 
-This test suite requires a bunch of variables that need to either defined
-as environment variables or in a config_test.py file
+For testing we are by default using the publicly hosted CATMAID instance of
+Virtual Fly Brain (https://fafb.catmaid.virtualflybrain.org/).
 
-    #Catmaid server url
-    server_url = ''
+You can switch the CATMAID instance and the neurons, volumes and annotations
+used for testing by setting environment variables. For example:
 
-    #Http user
-    http_user = ''
-
-    #Http password
-    http_pw = ''
-
-    #Auth token
-    token = ''
-
-    # Test skeleton IDs
-    test_skids = []
-
-    # Test annotations
-    test_annotations = []
-
-    # Test CATMAID volume
-    test_volume = ''
-
-If you use environmental variables, give lists as comma-separated strings.
-
+PYMAID_TEST_SERVER_URL="https://fafb.catmaid.virtualflybrain.org/""
+PYMAID_TEST_HTTP_USER="user"
+PYMAID_TEST_HTTP_PW="password"
+PYMAID_TEST_TOKEN="123456"
+PYMAID_TEST_ANNOTATIONS="annotation1,annotation2"
+PYMAID_TEST_SKIDS="16,32,300"
+PYMAID_TEST_VOLUME="LH_R"
+PYMAID_TEST_STACK_ID="1"
 
 Examples
 --------
 
 From terminal:
+>>> pytest
+
+Or:
 >>> python test_pymaid.py
 
-From shell:
+From the interactive shell:
 >>> import unittest
 >>> import test_pymaid
 >>> suite = unittest.TestLoader().loadTestsFromModule(test_pymaid)
@@ -76,29 +67,38 @@ pymaid.set_loggers('ERROR')
 # Deactivate progress bars
 pymaid.set_pbars(hide=True)
 
+# Collect test configuration
+class conf:
+    pass
+config_test = conf()
+
+
+def try_environ(name, key, default, dtype=None):
+    if key in os.environ:
+        value = os.environ[key]
+
+        if isinstance(default, (list, set, tuple)):
+            value = value.split(',')
+            if dtype:
+                value = [dtype(v) for v in value]
+        elif dtype:
+            value = dtype(value)
+
+        setattr(config_test, name, value)
+    else:
+        setattr(config_test, name, default)
+
+
 # Try getting credentials from environment variable
-required_variables = ['server_url', 'http_user', 'http_pw', 'token',
-                      'test_skids', 'test_annotations', 'test_volume']
-
-if False not in [v in os.environ for v in required_variables]:
-    class conf:
-        pass
-    config_test = conf()
-
-    for v in ['server_url', 'http_user', 'http_pw', 'token', 'test_volume']:
-        setattr(config_test, v, os.environ[v])
-
-    for v in ['test_skids', 'test_annotations']:
-        setattr(config_test, v, os.environ[v].split(','))
-else:
-    missing = [v for v in required_variables if v not in os.environ]
-    print('Missing environment variables:', ', '.join(missing))
-    print('Falling back to config_test.py')
-    try:
-        import config_test
-    except ImportError:
-        raise ImportError('Unable to import configuration file.')
-
+try_environ('server_url', 'PYMAID_TEST_SERVER_URL', 'https://fafb.catmaid.virtualflybrain.org/')
+try_environ('http_user', 'PYMAID_TEST_HTTP_USER', None)
+try_environ('http_pw', 'PYMAID_TEST_HTTP_PW', None)
+try_environ('token', 'PYMAID_TEST_TOKEN', None)
+try_environ('test_annotations', 'PYMAID_TEST_ANNOTATIONS',
+            ['Paper: Dolan and Belliart-Guérin et al. 2018', 'Paper: Wang et al 2020a'])
+try_environ('test_skids', 'PYMAID_TEST_SKIDS',[16, 1299740, 4744251])
+try_environ('test_volume', 'PYMAID_TEST_VOLUME', 'LH_R')
+try_environ('test_stack_id', 'PYMAID_TEST_STACK_ID', 1, dtype=int)
 
 warnings.filterwarnings(action="ignore", message="unclosed", category=ResourceWarning)
 
@@ -568,13 +568,6 @@ class TestMorpho(unittest.TestCase):
                               pymaid.CatmaidNeuron)
 
     @try_conditions
-    def test_tortuosity(self):
-        self.assertIsInstance(ns.tortuosity(self.nl[0]),
-                              float)
-        self.assertIsInstance(ns.tortuosity(self.nl),
-                              pd.DataFrame)
-
-    @try_conditions
     def test_arbor_confidence(self):
         pymaid.arbor_confidence(self.nl[0], inplace=True)
         self.assertTrue('arbor_confidence' in self.nl[0].nodes.columns)
@@ -668,19 +661,19 @@ class TestGraphs(unittest.TestCase):
     @try_conditions
     def test_find_bp(self):
         self.assertIsNotNone(ns.find_main_branchpoint(self.n,
-                                                      reroot_to_soma=False))
+                                                      reroot_soma=False))
 
     @try_conditions
     def test_split_fragments(self):
         self.assertIsNotNone(ns.split_into_fragments(self.n,
                                                      n=2,
-                                                     reroot_to_soma=False))
+                                                     reroot_soma=False))
 
     @try_conditions
     def test_longest_neurite(self):
         self.assertIsNotNone(ns.longest_neurite(self.n,
                                                 n=2,
-                                                reroot_to_soma=False))
+                                                reroot_soma=False))
 
     @try_conditions
     def test_cut_neuron(self):
@@ -778,7 +771,7 @@ class TestConnectivity(unittest.TestCase):
 
     @try_conditions
     def test_calc_overlap(self):
-        self.assertIsInstance(pymaid.cable_overlap(self.n, self.nB),
+        self.assertIsInstance(ns.cable_overlap(self.n, self.nB),
                               pd.DataFrame)
 
     @try_conditions
@@ -928,7 +921,7 @@ class TestTiles(unittest.TestCase):
         from pymaid import tiles
         # Generate the job
         job = tiles.TileLoader([119000, 119500, 36000, 36500, 4050],
-                               stack_id=5,
+                               stack_id=config_test.test_stack_id,
                                coords='PIXEL')
         # Load, stich and crop the required EM image tiles
         job.load_in_memory()
@@ -973,19 +966,23 @@ class TestUserStats(unittest.TestCase):
                                                        remote_instance=self.rm),
                               pd.DataFrame)
 
+    """
     def test_team_contributions(self):
         ds = self.n.downsample(20, inplace=False)
-        ul = pymaid.get_user_list().set_index('id')
-        teams = {'test_team' : [ul.loc[u, 'login'] for u in ds.nodes.creator_id.unique()]}
+        ul = pymaid.get_user_list(remote_instance=self.rm).set_index('id').login.to_dict()
+        teams = {'test_team': [ul.get(u, f'Anonymous{i}') for i, u in enumerate(ds.nodes.creator_id.unique())]}
         self.assertIsInstance(pymaid.get_team_contributions(teams,
                                                             neurons=ds,
                                                             remote_instance=self.rm),
                               pd.DataFrame)
 
+    """
+
     def test_user_contributions(self):
         self.assertIsInstance(pymaid.get_user_contributions(
             config_test.test_skids, remote_instance=self.rm), pd.DataFrame)
 
+"""
     def test_user_actions(self):
         # Get a day on which a random user has done some work
         last_week = datetime.date.today() - datetime.timedelta(days=7)
@@ -997,7 +994,7 @@ class TestUserStats(unittest.TestCase):
                                                end_date=datetime.date.today())
 
         self.assertIsInstance(user_actions, pd.DataFrame)
-
+"""
 
 """
 class TestExamples(unittest.TestCase):
