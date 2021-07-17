@@ -286,7 +286,7 @@ class TileLoader:
         if self.stack_id not in [e['id'] for e in available_stacks]:
             raise ValueError('Stack ID {} not found on server. Available '
                              'stacks:\n{}'.format(self.stack_id,
-                                                  '\n'.join(available_stacks)
+                                                  available_stacks
                                                   ))
 
         # Fetch and store stack info
