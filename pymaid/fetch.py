@@ -543,12 +543,12 @@ def get_partners_in_volume(x, volume, syn_threshold=None, min_size=2,
     logger.info('Collecting additional info for {0} neurons'.format(
         len(df.skeleton_id.unique())))
     review = get_review(df.skeleton_id.unique(),
-                        remote_instance=remote_instance).set_index('skeleton_id')
+                        remote_instance=remote_instance)
+    num_nodes = review.set_index('skeleton_id').total_node_count.to_dict()
+    names = get_names(df.skeleton_id.unique(), remote_instance=remote_instance)
 
-    df['neuron_name'] = [review.loc[str(s), 'neuron_name']
-                         for s in df.skeleton_id.values]
-    df['num_nodes'] = [review.loc[str(s), 'total_node_count']
-                       for s in df.skeleton_id.values]
+    df['neuron_name'] = df.skeleton_id.map(names)
+    df['num_nodes'] = df.skeleton_id.map(num_nodes)
     df['total'] = df[x].sum(axis=1)
 
     # Filter for min size
@@ -1701,6 +1701,7 @@ def get_user_annotations(x, remote_instance=None):
 
     # Get user list
     user_list = get_user_list(remote_instance=remote_instance)
+    user_dict = user_list.set_index('id').login.to_dict()
 
     try:
         ids = [int(e) for e in x]
@@ -1726,7 +1727,7 @@ def get_user_annotations(x, remote_instance=None):
     # Add user login
     for i, u in enumerate(ids):
         for an in annotations[i]:
-            an.append(user_list.set_index('id').loc[u, 'login'])
+            an.append(user_dict.get(u, 'Anonymous'))
 
     # Now flatten the list of lists
     annotations = [an for sublist in annotations for an in sublist]
@@ -3041,19 +3042,20 @@ def get_history(start_date=(datetime.date.today() - datetime.timedelta(days=7)).
 
     user_list = get_user_list(remote_instance=remote_instance).set_index('id')
     user_list.index = user_list.index.astype(str)
+    user_dict = user_list.login.to_dict()
 
     df = pd.Series([
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_cable_length', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.loc[u, 'login'] for u in stats['stats_table'].keys()],
+                     index=[user_dict.get(u, f'Anonymous{i}') for i, u in enumerate(stats['stats_table'].keys())],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_treenodes', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.loc[u, 'login'] for u in stats['stats_table'].keys()],
+                     index=[user_dict.get(u, f'Anonymous{i}') for i, u in enumerate(stats['stats_table'].keys())],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_connectors', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.loc[u, 'login'] for u in stats['stats_table'].keys()],
+                     index=[user_dict.get(u, f'Anonymous{i}') for i, u in enumerate(stats['stats_table'].keys())],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         pd.DataFrame([_constructor_helper(stats['stats_table'][u], 'new_reviewed_nodes', stats['days']) for u in stats['stats_table']],
-                     index=[user_list.loc[u, 'login'] for u in stats['stats_table'].keys()],
+                     index=[user_dict.get(u, f'Anonymous{i}') for i, u in enumerate(stats['stats_table'].keys())],
                      columns=pd.to_datetime([datetime.datetime.strptime(d, '%Y%m%d').date() for d in stats['days']])),
         user_list.reset_index(drop=True)
     ],
