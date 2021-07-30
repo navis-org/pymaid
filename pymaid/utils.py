@@ -278,9 +278,9 @@ def eval_skids(x, remote_instance=None, warn_duplicates=True):
     remote_instance = _eval_remote_instance(remote_instance,
                                             raise_error=False)
 
-    if isinstance(x, (int, np.int64, np.int32, np.int)):
+    if isinstance(x, (int, np.int64, np.int32)):
         return [str(x)]
-    elif isinstance(x, (str, np.str)):
+    elif isinstance(x, str):
         try:
             int(x)
             return [str(x)]
@@ -421,9 +421,9 @@ def eval_node_ids(x, connectors=True, nodes=True):
                     List containing nodes as strings.
 
     """
-    if isinstance(x, (int, np.int64, np.int32, np.int)):
+    if isinstance(x, (int, np.int64, np.int32)):
         return [x]
-    elif isinstance(x, (str, np.str)):
+    elif isinstance(x, str):
         try:
             return [int(x)]
         except BaseException:
