@@ -3721,13 +3721,37 @@ def get_user_list(remote_instance=None):
 
     user_list = remote_instance.fetch(remote_instance._get_user_list_url())
 
-    columns = ['id', 'login', 'full_name', 'first_name', 'last_name', 'color']
+    # It appears that for public CATMAID instances (like VFB) where the users
+    # are masked, the user-list endpoint can return just a single dictionary
+    # instead of a list of dicts.
+    if isinstance(user_list, dict):
+        user_list = [user_list]
 
-    df = pd.DataFrame([[e[c] for c in columns] for e in user_list],
-                      columns=columns
-                      )
+    # The user list can contain different entries
+    # Here we define alternative field names
+    columns = [('id', 'userid'),
+               ('login', 'username'),
+               ('full_name', 'long_name'),
+               ('first_name', ),
+               ('last_name', ),
+               ('color', )]
 
-    df.sort_values(['login'], inplace=True)
+    data = []
+    for user in user_list:
+        row = []
+        for col in columns:
+            value = None
+            for key in col:
+                if key in user:
+                    value = user[key]
+                    print(key, value)
+                    break
+            row.append(value)
+        data.append(row)
+
+    df = pd.DataFrame(data, columns=[c[0] for c in columns])
+
+    df.sort_values(['login', 'id'], inplace=True)
     df.reset_index(inplace=True, drop=True)
 
     return df
