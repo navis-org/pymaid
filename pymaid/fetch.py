@@ -3744,7 +3744,6 @@ def get_user_list(remote_instance=None):
             for key in col:
                 if key in user:
                     value = user[key]
-                    print(key, value)
                     break
             row.append(value)
         data.append(row)
