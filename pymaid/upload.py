@@ -1559,8 +1559,8 @@ def update_radii(radii, chunk_size=1000, remote_instance=None):
             else:
                 resp[r] = resp.get(r, []) + [v]
 
-    errors = [k for k, v in resp.items() if 'error' in v]
-    if errors:
+    if 'errors' in resp and len(resp['errors']):
+        errors = resp['errors']
         logger.error('{} errors when updating radii. See server response for details'.format(len(errors)))
 
     return resp
