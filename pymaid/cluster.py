@@ -531,7 +531,7 @@ def cluster_by_synapse_placement(x, sigma=2000, omega=2000, mu_score=True,
     """Cluster neurons based on their synapse placement.
 
     Distances score is calculated by calculating for each synapse of
-    neuron A: (1) the distance to the closest (eucledian) synapse in neuron B
+    neuron A: (1) the Eucledian distance to the closest synapse in neuron B
     and (2) comparing the synapse density around synapse A and B.
     This is type-sensitive: presynapses will only be matched with presynapses,
     post with post, etc. The formula is described in

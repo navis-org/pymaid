@@ -8,7 +8,7 @@ pymaid: a Python-CATMAID interface
          <div class="col-lg-6">
 
 ``pymaid`` (short for "Python-CATMAID") is a Python library for fetching,
-analyzing and visualisating data generated with
+analyzing and visualizing data generated with
 `CATMAID <http://catmaid.readthedocs.io/en/stable/>`_.
 
 ``pymaid`` is built on top of `navis <https://navis.readthedocs.io/en/latest/>`_
@@ -18,7 +18,7 @@ For a brief introduction to the library, you can read the
 :ref:`tutorial <tutorial>`. Visit the
 :ref:`installation page <installing>` page to see how to download the
 package. You can browse the :ref:`example gallery <example_gallery>` and
-:ref:`API reference <api>` to see what you can do with pymaid.
+:ref:`API reference <api>` to learn what you can do with pymaid.
 
 Pymaid is licensed under the GNU GPL v3+ license. The source code is hosted
 at `Github <https://github.com/schlegelp/PyMaid>`_. Feedback, feature requests
