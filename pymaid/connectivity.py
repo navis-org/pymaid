@@ -1151,7 +1151,7 @@ def connection_density(s, t, method='MEDIAN', normalize='DENSITY',
 
     # Get geodesic distances
     m = graph_utils.geodesic_matrix(t,
-                                    tn_ids=to_calc,
+                                    to_calc,
                                     directed=False,
                                     weight='weight')
 
