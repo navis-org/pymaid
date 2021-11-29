@@ -68,8 +68,12 @@ pymaid.set_loggers('ERROR')
 pymaid.set_pbars(hide=True)
 
 # Collect test configuration
+
+
 class conf:
     pass
+
+
 config_test = conf()
 
 
@@ -96,7 +100,7 @@ try_environ('http_pw', 'PYMAID_TEST_HTTP_PW', None)
 try_environ('token', 'PYMAID_TEST_TOKEN', None)
 try_environ('test_annotations', 'PYMAID_TEST_ANNOTATIONS',
             ['Paper: Dolan and Belliart-Guérin et al. 2018', 'Paper: Wang et al 2020a'])
-try_environ('test_skids', 'PYMAID_TEST_SKIDS',[16, 1299740, 4744251])
+try_environ('test_skids', 'PYMAID_TEST_SKIDS', [16, 1299740, 4744251])
 try_environ('test_volume', 'PYMAID_TEST_VOLUME', 'LH_R')
 try_environ('test_stack_id', 'PYMAID_TEST_STACK_ID', 1, dtype=int)
 
@@ -546,25 +550,25 @@ class TestMorpho(unittest.TestCase):
     @try_conditions
     def test_bending_flow(self):
         self.assertIsInstance(ns.bending_flow(self.nl[0]),
-                              type(None))
+                              pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_flow_centrality(self):
         self.assertIsInstance(ns.flow_centrality(self.nl[0]),
-                              type(None))
+                              pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_stitching(self):
-        self.assertIsInstance(ns.stitch_neurons(self.nl[:2],
-                                                method='NONE'),
+        self.assertIsInstance(ns.stitch_skeletons(self.nl[:2],
+                                                  method='NONE'),
                               pymaid.CatmaidNeuron)
-        self.assertIsInstance(ns.stitch_neurons(self.nl[:2],
-                                                method='LEAFS'),
+        self.assertIsInstance(ns.stitch_skeletons(self.nl[:2],
+                                                  method='LEAFS'),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
     def test_averaging(self):
-        self.assertIsInstance(ns.average_neurons(self.nl[:2]),
+        self.assertIsInstance(ns.average_skeletons(self.nl[:2]),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
@@ -590,8 +594,8 @@ class TestMorpho(unittest.TestCase):
 
     @try_conditions
     def test_despike_neuron(self):
-        self.assertIsInstance(ns.despike_neuron(self.nl[0],
-                                                inplace=False),
+        self.assertIsInstance(ns.despike_skeleton(self.nl[0],
+                                                  inplace=False),
                               pymaid.CatmaidNeuron)
 
     @try_conditions
@@ -677,7 +681,7 @@ class TestGraphs(unittest.TestCase):
 
     @try_conditions
     def test_cut_neuron(self):
-        dist, prox = ns.cut_neuron(self.n, self.slab_id)
+        dist, prox = ns.cut_skeleton(self.n, self.slab_id)
         self.assertNotEqual(dist.nodes.shape, prox.nodes.shape)
 
         # Make sure dist and prox check out
@@ -745,13 +749,13 @@ class TestConnectivity(unittest.TestCase):
 
     @try_conditions
     def test_group_matrix(self):
-        gr_adj = ns.group_matrix(self.adj,
-                                 row_groups={n: 'group1' for n in self.adj.index.values})
+        gr_adj = pymaid.group_matrix(self.adj,
+                                     row_groups={n: 'group1' for n in self.adj.index.values})
         self.assertIsInstance(gr_adj, pd.DataFrame)
 
     @try_conditions
     def test_connectivity_filter(self):
-        dist, prox = ns.cut_neuron(self.n, ns.find_main_branchpoint(self.n))
+        dist, prox = ns.cut_skeleton(self.n, ns.find_main_branchpoint(self.n))
 
         vol = pymaid.get_volume(config_test.test_volume)
 
@@ -981,6 +985,7 @@ class TestUserStats(unittest.TestCase):
     def test_user_contributions(self):
         self.assertIsInstance(pymaid.get_user_contributions(
             config_test.test_skids, remote_instance=self.rm), pd.DataFrame)
+
 
 """
     def test_user_actions(self):
