@@ -447,11 +447,11 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
             x.connectors.loc[x.connectors.node_id.isin(to_remove), 'node_id'] = new_tn
 
         # Subset to remaining nodes - skip the last node in each segment
-        graph_utils.subset_neuron(x,
-                                  subset=x.nodes[~x.nodes.node_id.isin(
-                                      to_remove)].node_id.values,
-                                  keep_disc_cn=preserve_connectors,
-                                  inplace=True)
+        navis.subset_neuron(x,
+                            subset=x.nodes[~x.nodes.node_id.isin(
+                                           to_remove)].node_id.values,
+                            keep_disc_cn=preserve_connectors,
+                            inplace=True)
 
         if not inplace:
             return x
@@ -486,11 +486,11 @@ def remove_tagged_branches(x, tag, how='segment', preserve_connectors=False,
                 x.connectors.loc[x.connectors.node_id.isin(to_remove), 'node_id'] = new_tn
 
             # Subset to remaining nodes
-            graph_utils.subset_neuron(x,
-                                      subset=x.nodes[~x.nodes.node_id.isin(
-                                          to_remove)].node_id.values,
-                                      keep_disc_cn=preserve_connectors,
-                                      inplace=True)
+            navis.subset_neuron(x,
+                                subset=x.nodes[~x.nodes.node_id.isin(
+                                    to_remove)].node_id.values,
+                                keep_disc_cn=preserve_connectors,
+                                inplace=True)
 
         if not inplace:
             return x
@@ -544,10 +544,10 @@ def time_machine(x, target, inplace=False, remote_instance=None):
         return core.CatmaidNeuronList([time_machine(n, target,
                                                     inplace=inplace,
                                                     remote_instance=remote_instance)
-                                  for n in config.tqdm(x,
-                                                       'Traveling time',
-                                                       disable=config.pbar_hide,
-                                                       leave=config.pbar_leave)])
+                                       for n in config.tqdm(x,
+                                                            'Traveling time',
+                                                            disable=config.pbar_hide,
+                                                            leave=config.pbar_leave)])
 
     if not isinstance(x, core.CatmaidNeuron):
         x = fetch.get_neuron(x, remote_instance=remote_instance)
@@ -781,9 +781,7 @@ def prune_by_length(x, min_length=0, max_length=float('inf'), inplace=False):
 
         # Subset neuron
         nodes_to_keep = neuron.nodes[~neuron.nodes.node_id.isin(nodes_to_delete)].node_id.values
-        graph_utils.subset_neuron(neuron,
-                                  nodes_to_keep,
-                                  inplace=True)
+        navis.subset_neuron(neuron, nodes_to_keep, inplace=True)
 
     if not inplace:
         return neuron
