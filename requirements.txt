@@ -1,4 +1,4 @@
-navis>=0.5.3
+navis>=1.0.0
 numpy>=1.16.3
 networkx>=2.4
 pandas>=1.0

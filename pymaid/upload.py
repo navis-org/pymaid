@@ -2016,7 +2016,7 @@ def push_new_root(new_root, no_prompt=False, remote_instance=None):
 
     See Also
     --------
-    :func:`~navis.reroot_neuron`
+    :func:`~navis.reroot_skeleton`
                         Use to reroot a local CatmaidNeuron.
 
     """
@@ -2144,9 +2144,9 @@ def delete_nodes(node_ids, node_type, no_prompt=False, remote_instance=None):
 
     See Also
     --------
-    :func:`~navis.delete_neuron`
+    :func:`~pymaid.delete_neuron`
                         Use to delete entire neurons.
-    :func:`~navis.update_nodes`
+    :func:`~pymaid.update_nodes`
                         Use to move neurons
 
     """
@@ -2301,7 +2301,7 @@ def move_nodes(new_locs, node_type, no_prompt=False, remote_instance=None):
 
     See Also
     --------
-    :func:`~navis.delete_nodes`
+    :func:`~pymaid.delete_nodes`
                         Use to delete nodes.
 
     """

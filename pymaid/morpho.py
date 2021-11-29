@@ -240,7 +240,7 @@ def union_neurons(*x, limit=1, base_neuron=None, track=False, non_overlap='raise
             # ... or stitch up neurons using mst and break the loop...
             elif non_overlap.lower() == 'stitch':
                 logger.warning(msg + " Stitching.")
-                x = navis.stitch_neurons(x, method='LEAFS', master=base_skid)
+                x = navis.stitch_skeletons(x, method='LEAFS', master=base_skid)
                 x = core.CatmaidNeuronList(x)
                 break
             # ... or just skip remaining fragments
