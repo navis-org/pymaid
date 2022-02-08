@@ -413,7 +413,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
                 logger.warning('Import cancelled.')
                 return
 
-            x = ns.heal_fragmented_neuron(x, min_size=0, inplace=False)
+            x = ns.heal_skeleton(x, min_size=0, inplace=False)
 
         resp = {n.id: upload_neuron(n,
                                     neuron_id=vars['neuron_id'][i],
@@ -449,7 +449,7 @@ def upload_neuron(x, import_tags=False, import_annotations=False,
     if x.n_skeletons > 1:
         logger.warning('Neuron has multiple disconnected skeletons. Will heal'
                        ' fragments before import!')
-        x = ns.heal_fragmented_neuron(x, min_size=0, inplace=False)
+        x = ns.heal_skeleton(x, min_size=0, inplace=False)
 
     if source_type and source_type not in ['skeleton', 'segmentation']:
         raise ValueError('Expected source_type to be "skeleton" or '
