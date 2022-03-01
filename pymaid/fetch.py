@@ -245,32 +245,15 @@ def get_neuron(x, with_connectors=True, with_tags=True, with_history=False,
         else:
             logger.warning(msg)
 
-    # Convert data to appropriate dtypes
-    node_dtypes = {'node_id': np.int32,
-                   'parent_id': np.int32,
-                   'creator_id': 'category',
-                   'x': np.float32,
-                   'y': np.float32,
-                   'z': np.float32,
-                   'radius': np.float32,
-                   'confidence': 'category'}
-
-    cn_dtypes = {'node_id': np.int32,
-                 'type': 'category',
-                 'connector_id': np.int32,
-                 'x': np.float32,
-                 'y': np.float32,
-                 'z': np.float32}
-
     def make_node_table(x):
         """Generate node table (incl. correct data types)."""
         df = pd.DataFrame(x,  columns=node_cols).fillna(-1)  # do not remove fillna
-        return df.astype(node_dtypes)
+        return df.astype(config.node_dtypes)
 
     def make_cn_table(x):
         """Generate connector table (incl. correct data types)."""
         df = pd.DataFrame(x,  columns=cn_cols)
-        return df.astype(cn_dtypes)
+        return df.astype(config.connector_dtypes)
 
     # Generate DataFrame containing all neurons
     df = pd.DataFrame([[names[str(x[i])],  # neuron name

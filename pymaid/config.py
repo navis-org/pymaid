@@ -12,6 +12,9 @@
 #    GNU General Public License for more details.
 
 import logging
+
+import numpy as np
+
 logger = logging.getLogger('pymaid')
 logger.setLevel(logging.INFO)
 if len(logger.handlers) == 0:
@@ -34,6 +37,22 @@ use_igraph = True
 
 # Default color for neurons
 default_color = (.95, .65, .04)
+
+# Default data types for nodes and connectors
+node_dtypes = {'node_id': np.int64,
+               'parent_id': np.int64,
+               'creator_id': 'category',
+               'x': np.float32,
+               'y': np.float32,
+               'z': np.float32,
+               'radius': np.float32,
+               'confidence': 'category'}
+connector_dtypes = {'node_id': np.int64,
+                    'type': 'category',
+                    'connector_id': np.int64,
+                    'x': np.float32,
+                    'y': np.float32,
+                    'z': np.float32}
 
 
 def _type_of_script():
