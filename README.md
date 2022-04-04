@@ -32,7 +32,7 @@ this pymaid!
 To install the bleeding edge from Github:
 
 ```bash
-pip3 install git+git://github.com/schlegelp/pymaid@master
+pip3 install git+https://github.com/schlegelp/pymaid@master
 ```
 
 Alternatively click on the *launch binder* badge above to try out pymaid hosted by [mybinder](https://mybinder.org)!

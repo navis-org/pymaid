@@ -41,7 +41,7 @@ version:
 
 ::
 
-  pip3 install git+git://github.com/schlegelp/pymaid@master
+  pip3 install git+https://github.com/schlegelp/pymaid@master
 
 
 **Installing from source**
