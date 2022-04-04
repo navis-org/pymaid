@@ -11,7 +11,7 @@ Installation instructions come in two flavours:
 .. topic:: By the way
 
    You can try pymaid without having to install **anything**! Simply follow this
-   link to `Binder <https://mybinder.org/v2/gh/schlegelp/pymaid/master?urlpath=tree>`_:
+   link to `Binder <https://mybinder.org/v2/gh/navis-org/pymaid/master?urlpath=tree>`_:
    they are kindly hosting a Jupyter notebook server with the most up-to-date version
    of pymaid. Just navigate and open ``examples/start_here.ipynb`` to have
    a crack at it!
@@ -41,7 +41,7 @@ version:
 
 ::
 
-  pip3 install git+https://github.com/schlegelp/pymaid@master
+  pip3 install git+https://github.com/navis-org/pymaid@master
 
 
 **Installing from source**
@@ -49,7 +49,7 @@ version:
 Instead of using PIP to install from Github, you can also install manually:
 
 1. Download the source (e.g a ``tar.gz`` file from
-   https://github.com/schlegelp/PyMaid/tree/master/dist)
+   https://github.com/navis-org/pymaid/tree/master/dist)
 
 2. Unpack and change directory to the source directory
    (the one with ``setup.py``).

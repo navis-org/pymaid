@@ -1,4 +1,4 @@
-#    This script is part of pymaid (http://www.github.com/schlegelp/pymaid).
+#    This script is part of pymaid (http://www.github.com/navis-org/pymaid).
 #    Copyright (C) 2017 Philipp Schlegel
 #
 #   This program is free software: you can redistribute it and/or modify

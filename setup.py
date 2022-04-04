@@ -23,10 +23,10 @@ setup(
     description='Python interface to CATMAID servers',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/schlegelp/pymaid',
+    url='https://github.com/navis-org/pymaid',
     project_urls={
      "Documentation": "http://pymaid.readthedocs.io",
-     "Source": "https://github.com/schlegelp/pymaid",
+     "Source": "https://github.com/navis-org/pymaid",
      "Changelog": "https://pymaid.readthedocs.io/en/latest/source/whats_new.html",
     },
     author='Philipp Schlegel',

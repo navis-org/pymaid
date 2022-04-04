@@ -2,7 +2,7 @@ Troubleshooting
 ===============
 
 You've encountered a problem? See if you can find it in below table. If not,
-please get in touch via `issues <https://github.com/schlegelp/PyMaid/issues>`_
+please get in touch via `issues <https://github.com/navis-org/pymaid/issues>`_
 on Github.
 
 .. list-table::

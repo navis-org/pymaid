@@ -21,13 +21,13 @@ package. You can browse the :ref:`example gallery <example_gallery>` and
 :ref:`API reference <api>` to learn what you can do with pymaid.
 
 Pymaid is licensed under the GNU GPL v3+ license. The source code is hosted
-at `Github <https://github.com/schlegelp/PyMaid>`_. Feedback, feature requests
+at `Github <https://github.com/navis-org/pymaid>`_. Feedback, feature requests
 and bug reports are very welcome and best placed in
-`issues <https://github.com/schlegelp/PyMaid/issues>`_.
+`issues <https://github.com/navis-org/pymaid/issues>`_.
 If you have any questions, please don't hesitate: pms70@cam.ac.uk
 
 The package is stable but I recommend watching its
-`Github repository <https://github.com/schlegelp/PyMaid>`_ for updates.
+`Github repository <https://github.com/navis-org/pymaid>`_ for updates.
 Make sure that your ``pymaid.__version__`` is up-to-date and check out the
 :ref:`release notes <whats_new>`.
 

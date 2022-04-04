@@ -1,6 +1,6 @@
-[![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Tests](https://github.com/schlegelp/pymaid/actions/workflows/run-tests.yml/badge.svg)](https://github.com/schlegelp/pymaid/actions/workflows/run-tests.yml) [![Coverage Status](https://coveralls.io/repos/github/schlegelp/pyMaid/badge.svg?branch=master)](https://coveralls.io/github/schlegelp/pyMaid?branch=master) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/schlegelp/pyMaid/master?urlpath=tree) [![DOI](https://zenodo.org/badge/78551448.svg)](https://zenodo.org/badge/latestdoi/78551448)
+[![Documentation Status](https://readthedocs.org/projects/pymaid/badge/?version=latest)](http://pymaid.readthedocs.io/en/latest/?badge=latest) [![Tests](https://github.com/navis-org/pymaid/actions/workflows/run-tests.yml/badge.svg)](https://github.com/navis-org/pymaid/actions/workflows/run-tests.yml) [![Coverage Status](https://coveralls.io/repos/github/navis-org/pymaid/badge.svg?branch=master)](https://coveralls.io/github/navis-org/pymaid?branch=master) [![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/navis-org/pymaid/master?urlpath=tree) [![DOI](https://zenodo.org/badge/78551448.svg)](https://zenodo.org/badge/latestdoi/78551448)
 
-<img src="https://github.com/schlegelp/pyMaid/raw/master/docs/_static/favicon.png" height="30"> pymaid
+<img src="https://github.com/navis-org/pymaid/raw/master/docs/_static/favicon.png" height="30"> pymaid
 ======================================================================================================
 Python-Catmaid - or "pymaid" - is a [Python](http://www.python.org) 3 library to
 interface with [CATMAID](https://github.com/catmaid/CATMAID "CATMAID Repo")
@@ -32,7 +32,7 @@ this pymaid!
 To install the bleeding edge from Github:
 
 ```bash
-pip3 install git+https://github.com/schlegelp/pymaid@master
+pip3 install git+https://github.com/navis-org/pymaid@master
 ```
 
 Alternatively click on the *launch binder* badge above to try out pymaid hosted by [mybinder](https://mybinder.org)!
