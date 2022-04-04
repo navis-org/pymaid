@@ -189,7 +189,7 @@ class CatmaidInstance:
     """
 
     def __init__(self, server, api_token, http_user=None, http_password=None,
-                 project_id=1, max_threads=100, make_global=True, caching=True):
+                 project_id=1, max_threads=10, make_global=True, caching=True):
         # Catch too many backslashes
         if server.endswith('/'):
             server = server[:-1]
