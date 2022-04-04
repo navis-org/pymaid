@@ -10,6 +10,15 @@ What's new?
    * - Version
      - Date
      -
+   * - 2.1.0
+     - 04/04/22
+     - With this release we mainly follow some renamed functions in ``navis`` but
+       we also make pymaid play more nicely with public CATMAID instances and
+       of course fix a couple bugs.
+       One important thing to mention is that the default `max_threads` for
+       :class:`pymaid.CatmaidInstance` is now 10 (down from 100). This also
+       applies to :func:`pymaid.connect_catmaid`. If your internet can handle
+       more connections, feel free to up it back to 100.
    * - 2.0.0
      - 21/11/20
      - This release marks a huge break in the way pymaid works: it is now
