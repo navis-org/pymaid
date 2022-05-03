@@ -14,7 +14,6 @@
 #    You should have received a copy of the GNU General Public License
 #    along
 
-import collections
 import itertools
 import os
 import six
@@ -23,6 +22,8 @@ import warnings
 
 import pandas as pd
 import numpy as np
+
+from collections.abc import Iterable
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -159,7 +160,7 @@ def _make_iterable(x, force_type=None):
     For dicts, keys will be turned into array.
 
     """
-    if not isinstance(x, collections.Iterable) or isinstance(x, six.string_types):
+    if not isinstance(x, Iterable) or isinstance(x, six.string_types):
         x = [x]
 
     if isinstance(x, dict) or isinstance(x, set):
@@ -188,7 +189,7 @@ def _make_non_iterable(x):
 def _is_iterable(x):
     """Check is input is iterable but not str, dictionary or pandas DataFrame.
     """
-    if isinstance(x, collections.Iterable) and not isinstance(x, (six.string_types, pd.DataFrame)):
+    if isinstance(x, Iterable) and not isinstance(x, (six.string_types, pd.DataFrame)):
         return True
     else:
         return False
