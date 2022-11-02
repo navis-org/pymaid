@@ -1928,12 +1928,10 @@ def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -
     if q.startswith("/"):
         re_str = q[1:]
         filt = names.str.match(re_str)
-    # If allow partial just use the raw string
-    elif allow_partial:
-        filt = names.str.contains(q)
-    # If exact match
     else:
-        filt = names.str == q
+        filt = names.str.contains(q, regex=False)
+        if not allow_partial:
+            filt = np.logical_and(filt, names.str.len() == len(q))
 
     return filt
 

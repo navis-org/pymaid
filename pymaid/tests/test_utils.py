@@ -18,13 +18,13 @@ def test_filter_by_query_partial(query):
     assert list(out) == [False, True, False, False]
 
 
-@pytest.mark.parametrize("query", ["sp.*e", "~sp.*e", "annotation:sp.*e"])
+@pytest.mark.parametrize("query", ["/sp.*e", "~/sp.*e", "annotation:/sp.*e"])
 def test_filter_by_query_re(query):
     out = filter_by_query(NAMES, query)
     assert list(out) == [False, True, False, False]
 
 
-def test_filter_by_query_220(query):
+def test_filter_by_query_220():
     """Issue #220: special characters break exact name matches
 
     https://github.com/navis-org/pymaid/issues/220
