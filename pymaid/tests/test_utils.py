@@ -15,7 +15,7 @@ def test_filter_by_query_exact(query):
 @pytest.mark.parametrize("query", ["ad", "~ad", "annotation:ad"])
 def test_filter_by_query_partial(query):
     out = filter_by_query(NAMES, query, allow_partial=True)
-    assert list(out) == [False, True, False, False, False]
+    assert list(out) == [False, True, False, False]
 
 
 @pytest.mark.parametrize("query", ["sp.*e", "~sp.*e", "annotation:sp.*e"])
