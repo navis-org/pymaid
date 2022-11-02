@@ -1912,6 +1912,9 @@ def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -
     pd.Series of bool
         Which names match the given query
     """
+    if not isinstance(names, pd.Series):
+        names = pd.Series(names, dtype=str)
+
     if query.startswith("annotation:"):
         logger.warning('Removing unexpected "annotation:" prefix from "%s"', query)
         query = query[11:]

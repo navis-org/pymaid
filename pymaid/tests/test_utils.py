@@ -23,3 +23,15 @@ def test_filter_by_query_re(query):
     out = filter_by_query(NAMES, query)
     assert list(out) == [False, True, False, False]
 
+
+def test_filter_by_query_220(query):
+    """Issue #220: special characters break exact name matches
+
+    https://github.com/navis-org/pymaid/issues/220
+    """
+    out = filter_by_query(
+        pd.Series(["*potato", "*spade", "*orange", "*bears"]),
+        "*spade",
+    )
+    assert list(out) == [False, True, False, False]
+
