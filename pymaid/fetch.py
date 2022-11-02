@@ -1894,22 +1894,23 @@ def get_annotations(x, remote_instance=None):
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
 
 
-def filter_by_query(names: pd.Series[str], query: str, allow_partial: bool = False):
-    """_summary_
+def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -> pd.Series:
+    """Get a logical index series into a series of strings based on a query.
 
     Parameters
     ----------
-    names : pd.Series[str]
+    names : pd.Series of str
         Dataframe column of strings to filter
     query : str
-        _description_
-    allow_partial : bool
-        _description_
+        Query string. leading "~" and "annotation:" will be ignored.
+        Leading "/" will mean the remainder is used as a regex.
+    allow_partial : bool, default False
+        For non-regex queries, whether to check that the query is an exact match or just contained in the name.
 
     Returns
     -------
-    _type_
-        _description_
+    pd.Series of bool
+        Which names match the given query
     """
     if query.startswith("annotation:"):
         logger.warning('Removing unexpected "annotation:" prefix from "%s"', query)
@@ -1930,6 +1931,7 @@ def filter_by_query(names: pd.Series[str], query: str, allow_partial: bool = Fal
     # If exact match
     else:
         filt = names.str == q
+
     return filt
 
 
