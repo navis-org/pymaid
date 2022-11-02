@@ -1894,9 +1894,48 @@ def get_annotations(x, remote_instance=None):
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
 
 
+def filter_by_query(names: pd.Series[str], query: str, allow_partial: bool = False):
+    """_summary_
+
+    Parameters
+    ----------
+    names : pd.Series[str]
+        Dataframe column of strings to filter
+    query : str
+        _description_
+    allow_partial : bool
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    if query.startswith("annotation:"):
+        logger.warning('Removing unexpected "annotation:" prefix from "%s"', query)
+        query = query[11:]
+
+    if query.startswith('~'):
+        logger.warning('Removing "~" prefix (without negating) from "%s"', query)
+        query = query[1:]
+
+    q = query.strip()
+    # use a regex
+    if q.startswith("/"):
+        re_str = q[1:]
+        filt = names.str.match(re_str)
+    # If allow partial just use the raw string
+    elif allow_partial:
+        filt = names.str.contains(q)
+    # If exact match
+    else:
+        filt = names.str == q
+    return filt
+
+
 @cache.wipe_and_retry
 def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
-                      remote_instance=None):
+                    remote_instance=None):
     """Retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
@@ -1930,31 +1969,10 @@ def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
     annotations = utils._make_iterable(annotations)
     annotation_ids = {}
     for an in annotations:
-        # This is just to catch misunderstandings with parsing skeleton IDs
-        if an.startswith('annotation:'):
-            logger.warning('Removing unexpected "annotation:" prefix.')
-            an = an[11:]
-
-        # Strip whitespaces
-        an = an.strip()
-
-        # Strip tilde -> consider that people might use e.g. "~/VA6" for NOT
-        # VA6
-        if an.startswith('~'):
-            an = an[1:]
-
-        # '/' indicates regex
-        if an.startswith('/'):
-            re_str = an[1:]
-        # If allow partial just use the raw string
-        elif allow_partial:
-            re_str = an
-        # If exact match, encode this in regex
-        else:
-            re_str = '^{}$'.format(an)
+        filt = filter_by_query(an_list.name, an, allow_partial)
 
         # Search for matches
-        res = an_list[an_list.name.str.match(re_str)].set_index('name').id.to_dict()
+        res = an_list[filt].set_index('name').id.to_dict()
         if not res:
             logger.warning('No annotation found for "{}"'.format(an))
         annotation_ids.update(res)
