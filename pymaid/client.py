@@ -36,6 +36,40 @@ __all__ = sorted(['CatmaidInstance', 'connect_catmaid'])
 logger = config.logger
 
 
+def load_env(**kwargs):
+    """Load a dict from os.environ.
+
+    Keyword arg keys will be upper-cased and prefixed with 'CATMAID_'.
+    Keyword arg values should be functions applied to the environment variable value,
+    if it exists (e.g. `int` to cast it to an integer).
+
+    Note that environment variables which are set, but empty,
+    will still be treated as zero-length strings.
+
+    Returns
+    -------
+    dict[str, Any]
+        The given key names and their transformed values, if set.
+    """
+    out = dict()
+    for key, fn in kwargs.items():
+        var_name = "CATMAID_" + key.upper()
+        val = os.environ.get(var_name)
+        if val is None:
+            continue
+        out[key] = fn(val)
+
+    return out
+
+
+def parse_bool(s: str) -> bool:
+    try:
+        return bool(int(s))
+    except ValueError:
+        pass
+    return s.lower() == "true"
+
+
 def connect_catmaid(**kwargs):
     """Connect to CATMAID server using environmental variables.
 
@@ -69,19 +103,7 @@ def connect_catmaid(**kwargs):
     >>> con3 = pymaid.connect_catmaid(server="https://other.catmaid.server")
 
     """
-    if 'server' not in kwargs:
-        kwargs['server'] = os.environ['CATMAID_SERVER']
-
-    if 'http_user' not in kwargs and 'CATMAID_HTTP_USER' in os.environ:
-        kwargs['http_user'] = os.environ['CATMAID_HTTP_USER']
-
-    if 'http_password' not in kwargs and 'CATMAID_HTTP_PASSWORD' in os.environ:
-        kwargs['http_password'] = os.environ['CATMAID_HTTP_PASSWORD']
-
-    if 'api_token' not in kwargs and 'CATMAID_API_TOKEN' in os.environ:
-        kwargs['api_token'] = os.environ['CATMAID_API_TOKEN']
-
-    return CatmaidInstance(**kwargs)
+    return CatmaidInstance.from_environment(**kwargs)
 
 
 class CatmaidInstance:
@@ -223,6 +245,47 @@ class CatmaidInstance:
 
         if make_global:
             self.make_global()
+
+    @classmethod
+    def from_environment(cls, **kwargs):
+        """Construct CatmaidInstance from environment variables.
+
+        See :class:`pymaid.CatmaidInstance` for list of arguments.
+        Environment variables' names should be upper-cased and prefixed with "CATMAID_":
+        for example, the argument ``server`` would be contained in the environment variable ``CATMAID_SERVER``.
+
+        Unset environment variables will be ignored.
+        Boolean values should be ``1`` or ``true`` (case insensitive).
+
+        Environment variables can be supplemented or overridden by keyword arguments to this function.
+
+        Returns
+        -------
+        CatmaidInstance
+
+        Examples
+        --------
+        This assumes you have stored credentials as environment variables
+        >>> import pymaid
+        >>> # Initialize connection with stored credentials
+        >>> con1 = pymaid.connect_catmaid()
+        >>> # Same server, different project
+        >>> con2 = pymaid.connect_catmaid(project_id=2)
+        >>> # Different server, same credentials
+        >>> con3 = pymaid.connect_catmaid(server="https://other.catmaid.server")
+        """
+        d = load_env(
+            server=str,
+            api_token=str,
+            http_user=str,
+            http_password=str,
+            project_id=int,
+            max_threads=int,
+            set_global=parse_bool,
+            caching=parse_bool,
+        )
+        d.update(kwargs)
+        return cls(**d)
 
     def __getstate__(self):
         """Get state (used e.g. for pickling).
@@ -658,6 +721,9 @@ class CatmaidInstance:
     def _get_remove_annotations_url(self, **GET):
         """Generate url to remove annotations to skeleton IDs (POST)."""
         return self.make_url(self.project_id, 'annotations', 'remove', **GET)
+
+    def _get_annotation_graph_url(self):
+        return self.make_url(self.project_id, 'annotationdiagram', 'nx_json')
 
     def _get_connectivity_url(self, **GET):
         """Generate url for retrieving connectivity (POST)."""

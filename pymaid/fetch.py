@@ -57,7 +57,8 @@ from navis import in_volume
 
 
 __all__ = sorted(['get_annotation_details', 'get_annotation_id',
-                  'get_annotation_list', 'get_annotations', 'get_arbor',
+                  'get_annotation_list', 'get_annotations', 'get_annotation_graph',
+                  'get_arbor',
                   'get_connector_details', 'get_connectors',
                   'get_connector_tags',
                   'get_contributor_statistics', 'get_edges', 'get_history',
@@ -1892,6 +1893,87 @@ def get_annotations(x, remote_instance=None):
     except BaseException:
         raise Exception(
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
+
+
+@cache.undo_on_error
+def get_annotation_graph(annotations_by_id=False, skeletons_by_id=True, remote_instance=None) -> nx.DiGraph:
+    """Get a networkx DiGraph of (meta)annotations and skeletons.
+
+    Can be slow for large projects.
+
+    Nodes in the graph have data:
+
+    Skeletons have
+    - id
+    - is_skeleton = True
+    - neuron_id (different to the skeleton ID)
+    - name
+
+    Annotations have
+    - id
+    - name
+    - is_skeleton = False
+
+    Edges in the graph have
+    - is_meta_annotation (whether it is between two annotations)
+
+    Parameters
+    ----------
+    annotations_by_id : bool, default False
+        Whether to index nodes representing annotations by their integer ID
+        (uses name by default)
+    skeletons_by_id : bool, default True
+        whether to index nodes representing skeletons by their integer ID
+        (True by default, otherwise uses the neuron name)
+    remote_instance : optional CatmaidInstance
+
+    Returns
+    -------
+    networkx.DiGraph
+    """
+    remote_instance: CatmaidInstance = utils._eval_remote_instance(remote_instance)
+
+    query_url = remote_instance.make_url(remote_instance.project_id, "annotations", "query-targets")
+    post = {
+        "with_annotations": True,
+    }
+    data = remote_instance.fetch(query_url, post)
+
+    g = nx.DiGraph()
+    for e in data["entities"]:
+        is_meta_ann = False
+        if e.get("type") == "neuron":
+            skids = e.get("skeleton_ids", [])
+            if len(skids) != 1:
+                logger.warning("Neuron with id %s is modelled by %s skeletons, ignoring", e["id"], len(skids))
+                continue
+            node_id = skids[0]
+            node_data = {
+                "name": e["name"],
+                "neuron_id": e["id"],
+                "is_skeleton": True,
+                "id": skids[0],
+            }
+            node_id = node_data["id"] if skeletons_by_id else node_data["name"]
+        else:
+            node_data = {
+                "is_skeleton": False,
+                "id": e["id"],
+                "name": e["name"],
+            }
+            node_id = node_data["id"] if annotations_by_id else node_data["name"]
+            is_meta_ann = True
+
+        g.add_node(node_id, **node_data)
+
+        for ann in e.get("annotations", []):
+            g.add_edge(
+                ann["name"],
+                node_id,
+                is_meta_annotation=is_meta_ann,
+            )
+
+    return g
 
 
 def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -> pd.Series:
