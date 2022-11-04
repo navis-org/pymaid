@@ -1915,13 +1915,10 @@ def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -
     if not isinstance(names, pd.Series):
         names = pd.Series(names, dtype=str)
 
-    if query.startswith("annotation:"):
-        logger.warning('Removing unexpected "annotation:" prefix from "%s"', query)
-        query = query[11:]
-
-    if query.startswith('~'):
-        logger.warning('Removing "~" prefix (without negating) from "%s"', query)
-        query = query[1:]
+    for prefix in ["annotation:", "~"]:
+        if query.startswith(prefix):
+            logger.warning("Removing '%s' prefix from '%s'", prefix, query)
+            query = query[len(prefix):]
 
     q = query.strip()
     # use a regex
