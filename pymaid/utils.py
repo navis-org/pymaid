@@ -723,10 +723,12 @@ class DataFrameBuilder:
 
     def _check_len(self, row: tp.Collection):
         """Raise an error if row is of incorrect length.
+
         Parameters
         ----------
         row : Collection
             Row to be added (as dict or sequence).
+
         Raises
         ------
         ValueError
@@ -739,10 +741,12 @@ class DataFrameBuilder:
 
     def append_row(self, row: tp.Sequence):
         """Append a sequence to the rows.
+
         Parameters
         ----------
         row : Sequence
             Must be same length as number of columns.
+
         Returns
         -------
         self
@@ -754,10 +758,12 @@ class DataFrameBuilder:
 
     def append_dict(self, row: tp.Dict[tp.Hashable, tp.Any]):
         """Append a dict to the rows.
+
         Parameters
         ----------
         row : dict[tp.Hashable, tp.Any]
             Keys must match columns.
+
         Returns
         -------
         self
@@ -769,11 +775,13 @@ class DataFrameBuilder:
 
     def build(self, index_col=None) -> pd.DataFrame:
         """Build the dataframe.
+
         Parameters
         ----------
         index_col : Hashable, optional
             Which column to use as the index, by default None
             (i.e. numeric index in insertion order).
+
         Returns
         -------
         pandas.DataFrame
