@@ -52,11 +52,12 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 
-from . import core, utils, config, cache
+from .. import core, utils, config, cache
 from navis import in_volume
+from .landmarks import get_landmarks, get_landmark_groups
 
 
-__all__ = sorted(['get_annotation_details', 'get_annotation_id',
+__all__ = ['get_annotation_details', 'get_annotation_id',
                   'get_annotation_list', 'get_annotations', 'get_annotation_graph',
                   'get_arbor',
                   'get_connector_details', 'get_connectors',
@@ -85,7 +86,10 @@ __all__ = sorted(['get_annotation_details', 'get_annotation_id',
                   'get_import_info',
                   'get_origin', 'get_skids_by_origin',
                   'get_sampler', 'get_sampler_domains', 'get_sampler_counts',
-                  'get_skeleton_change'])
+                  'get_skeleton_change',
+                  'get_landmarks',
+                  'get_landmark_groups',
+    ]
 
 # Set up logging
 logger = config.logger

@@ -19,6 +19,7 @@ import os
 import six
 import sys
 import warnings
+import typing as tp
 
 import pandas as pd
 import numpy as np
@@ -204,7 +205,7 @@ def _eval_conditions(x):
     return [i for i in x if not i.startswith('~')], [i[1:] for i in x if i.startswith('~')]
 
 
-def _eval_remote_instance(remote_instance, raise_error=True):
+def _eval_remote_instance(remote_instance, raise_error=True) -> client.CatmaidInstance:
     """Evaluates remote instance.
 
     If input is None, checks for globally defined remote instances as fall
@@ -709,3 +710,87 @@ def to_float(x):
         return None
     except BaseException:
         raise
+
+
+class DataFrameBuilder:
+    def __init__(
+        self, columns: tp.Sequence[tp.Hashable], dtypes: tp.Optional[tp.Sequence] = None
+    ):
+        self.columns: dict[tp.Hashable, list] = {c: [] for c in columns}
+        self.dtypes: tp.Optional[list] = list(dtypes) if dtypes else None
+        if dtypes is not None and len(dtypes) != len(self.columns):
+            raise ValueError()
+
+    def _check_len(self, row: tp.Collection):
+        """Raise an error if row is of incorrect length.
+        Parameters
+        ----------
+        row : Collection
+            Row to be added (as dict or sequence).
+        Raises
+        ------
+        ValueError
+            If row length does not match number of columns.
+        """
+        if len(row) != len(self.columns):
+            raise ValueError(
+                f"Row length ({len(row)}) does not match number of columns ({len(self.columns)})"
+            )
+
+    def append_row(self, row: tp.Sequence):
+        """Append a sequence to the rows.
+        Parameters
+        ----------
+        row : Sequence
+            Must be same length as number of columns.
+        Returns
+        -------
+        self
+        """
+        self._check_len(row)
+        for item, col in zip(row, self.columns.values()):
+            col.append(item)
+        return self
+
+    def append_dict(self, row: dict[tp.Hashable, tp.Any]):
+        """Append a dict to the rows.
+        Parameters
+        ----------
+        row : dict[tp.Hashable, tp.Any]
+            Keys must match columns.
+        Returns
+        -------
+        self
+        """
+        self._check_len(row)
+        for k, v in row.items():
+            self.columns[k].append(v)
+        return self
+
+    def build(self, index_col=None) -> pd.DataFrame:
+        """Build the dataframe.
+        Parameters
+        ----------
+        index_col : Hashable, optional
+            Which column to use as the index, by default None
+            (i.e. numeric index in insertion order).
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        cols = dict()
+        index = None
+
+        for idx, (k, v) in enumerate(self.columns.items()):
+            dtype = self.dtypes[idx] if self.dtypes else None
+            v2 = pd.Series(v, dtype=dtype, name=k)
+            if k == index_col:
+                index = v2
+            else:
+                cols[k] = v2
+
+        df = pd.DataFrame.from_dict(cols)
+        if index is not None:
+            df.index = index
+
+        return df
