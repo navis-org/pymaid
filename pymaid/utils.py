@@ -752,7 +752,7 @@ class DataFrameBuilder:
             col.append(item)
         return self
 
-    def append_dict(self, row: tp.Dictict[tp.Hashable, tp.Any]):
+    def append_dict(self, row: tp.Dict[tp.Hashable, tp.Any]):
         """Append a dict to the rows.
         Parameters
         ----------
