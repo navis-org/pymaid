@@ -57,7 +57,8 @@ from navis import in_volume
 
 
 __all__ = sorted(['get_annotation_details', 'get_annotation_id',
-                  'get_annotation_list', 'get_annotations', 'get_arbor',
+                  'get_annotation_list', 'get_annotations', 'get_annotation_graph',
+                  'get_arbor',
                   'get_connector_details', 'get_connectors',
                   'get_connector_tags',
                   'get_contributor_statistics', 'get_edges', 'get_history',
@@ -1894,9 +1895,129 @@ def get_annotations(x, remote_instance=None):
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
 
 
+@cache.undo_on_error
+def get_annotation_graph(annotations_by_id=False, skeletons_by_id=True, remote_instance=None) -> nx.DiGraph:
+    """Get a networkx DiGraph of (meta)annotations and skeletons.
+
+    Can be slow for large projects.
+
+    Nodes in the graph have data:
+
+    Skeletons have
+    - id
+    - is_skeleton = True
+    - neuron_id (different to the skeleton ID)
+    - name
+
+    Annotations have
+    - id
+    - name
+    - is_skeleton = False
+
+    Edges in the graph have
+    - is_meta_annotation (whether it is between two annotations)
+
+    Parameters
+    ----------
+    annotations_by_id : bool, default False
+        Whether to index nodes representing annotations by their integer ID
+        (uses name by default)
+    skeletons_by_id : bool, default True
+        whether to index nodes representing skeletons by their integer ID
+        (True by default, otherwise uses the neuron name)
+    remote_instance : optional CatmaidInstance
+
+    Returns
+    -------
+    networkx.DiGraph
+    """
+    remote_instance: CatmaidInstance = utils._eval_remote_instance(remote_instance)
+
+    query_url = remote_instance.make_url(remote_instance.project_id, "annotations", "query-targets")
+    post = {
+        "with_annotations": True,
+    }
+    data = remote_instance.fetch(query_url, post)
+
+    g = nx.DiGraph()
+    for e in data["entities"]:
+        is_meta_ann = False
+        if e.get("type") == "neuron":
+            skids = e.get("skeleton_ids", [])
+            if len(skids) != 1:
+                logger.warning("Neuron with id %s is modelled by %s skeletons, ignoring", e["id"], len(skids))
+                continue
+            node_id = skids[0]
+            node_data = {
+                "name": e["name"],
+                "neuron_id": e["id"],
+                "is_skeleton": True,
+                "id": skids[0],
+            }
+            node_id = node_data["id"] if skeletons_by_id else node_data["name"]
+        else:
+            node_data = {
+                "is_skeleton": False,
+                "id": e["id"],
+                "name": e["name"],
+            }
+            node_id = node_data["id"] if annotations_by_id else node_data["name"]
+            is_meta_ann = True
+
+        g.add_node(node_id, **node_data)
+
+        for ann in e.get("annotations", []):
+            g.add_edge(
+                ann["name"],
+                node_id,
+                is_meta_annotation=is_meta_ann,
+            )
+
+    return g
+
+
+def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -> pd.Series:
+    """Get a logical index series into a series of strings based on a query.
+
+    Parameters
+    ----------
+    names : pd.Series of str
+        Dataframe column of strings to filter
+    query : str
+        Query string. leading "~" and "annotation:" will be ignored.
+        Leading "/" will mean the remainder is used as a regex.
+    allow_partial : bool, default False
+        For non-regex queries, whether to check that the query is an exact match or just contained in the name.
+
+    Returns
+    -------
+    pd.Series of bool
+        Which names match the given query
+    """
+    if not isinstance(names, pd.Series):
+        names = pd.Series(names, dtype=str)
+
+    for prefix in ["annotation:", "~"]:
+        if query.startswith(prefix):
+            logger.warning("Removing '%s' prefix from '%s'", prefix, query)
+            query = query[len(prefix):]
+
+    q = query.strip()
+    # use a regex
+    if q.startswith("/"):
+        re_str = q[1:]
+        filt = names.str.match(re_str)
+    else:
+        filt = names.str.contains(q, regex=False)
+        if not allow_partial:
+            filt = np.logical_and(filt, names.str.len() == len(q))
+
+    return filt
+
+
 @cache.wipe_and_retry
 def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
-                      remote_instance=None):
+                    remote_instance=None):
     """Retrieve the annotation ID for single or list of annotation(s).
 
     Parameters
@@ -1930,31 +2051,10 @@ def get_annotation_id(annotations, allow_partial=False, raise_not_found=True,
     annotations = utils._make_iterable(annotations)
     annotation_ids = {}
     for an in annotations:
-        # This is just to catch misunderstandings with parsing skeleton IDs
-        if an.startswith('annotation:'):
-            logger.warning('Removing unexpected "annotation:" prefix.')
-            an = an[11:]
-
-        # Strip whitespaces
-        an = an.strip()
-
-        # Strip tilde -> consider that people might use e.g. "~/VA6" for NOT
-        # VA6
-        if an.startswith('~'):
-            an = an[1:]
-
-        # '/' indicates regex
-        if an.startswith('/'):
-            re_str = an[1:]
-        # If allow partial just use the raw string
-        elif allow_partial:
-            re_str = an
-        # If exact match, encode this in regex
-        else:
-            re_str = '^{}$'.format(an)
+        filt = filter_by_query(an_list.name, an, allow_partial)
 
         # Search for matches
-        res = an_list[an_list.name.str.match(re_str)].set_index('name').id.to_dict()
+        res = an_list[filt].set_index('name').id.to_dict()
         if not res:
             logger.warning('No annotation found for "{}"'.format(an))
         annotation_ids.update(res)
