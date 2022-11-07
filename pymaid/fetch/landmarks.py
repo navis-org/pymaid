@@ -5,23 +5,29 @@ import pandas as pd
 from ..utils import _eval_remote_instance, DataFrameBuilder
 
 
-def get_landmarks(with_locations=True, remote_instance=None) -> tp.Tuple[pd.DataFrame, tp.Optional[pd.DataFrame]]:
+def get_landmarks(
+    with_locations=True, remote_instance=None
+) -> tp.Tuple[
+    pd.DataFrame,
+    tp.Optional[pd.DataFrame]
+]:
     """Get all landmarks from CATMAID, optionall with locations associated with them.
-
-    Returns a 2-tuple.
 
     Parameters
     ----------
     with_locations : bool, optional
-        Whether to also return a location table, by default True
+        Whether to also return a location table,
+        by default True
     remote_instance : pymaid.CatmaidInstance, optional
 
     Returns
     -------
-    tuple of (DataFrame, optional DataFrame)
-        The first element is a DataFrame with columns landmark_id, name, user_id, project_id, creation_time, edition_time.
+    2-tuple of (DataFrame, optional DataFrame)
+        The first element is a DataFrame with columns
+        landmark_id, name, user_id, project_id, creation_time, edition_time.
 
-        The second element is optionally a DataFrame with columns location_id, x, y, z, landmark_id.
+        The second element is optionally a DataFrame with columns
+        location_id, x, y, z, landmark_id.
 
     Examples
     --------
@@ -76,20 +82,28 @@ def get_landmarks(with_locations=True, remote_instance=None) -> tp.Tuple[pd.Data
         return landmarks, None
 
 
-def get_landmark_groups(with_locations=False, with_members=False, remote_instance=None) -> tp.Tuple[pd.DataFrame, tp.Optional[pd.DataFrame], tp.Optional[tp.Dict[int, tp.List[int]]]]:
+def get_landmark_groups(
+    with_locations=False, with_members=False, remote_instance=None
+) -> tp.Tuple[
+    pd.DataFrame,
+    tp.Optional[pd.DataFrame],
+    tp.Optional[tp.Dict[int, tp.List[int]]]
+]:
     """Get the landmark groups, optionally with IDs of their members and locations.
 
     Parameters
     ----------
     with_locations : bool, optional
-        Return a DataFrame of locations associated with group members, by default False
+        Return a DataFrame of locations associated with group members,
+        by default False
     with_members : bool, optional
-        Return a dict of group IDs to landmark IDs, by default False
+        Return a dict of group IDs to landmark IDs,
+        by default False
     remote_instance : pymaid.CatmaidInstance, optional
 
     Returns
     -------
-    3-tuple of (pd.DataFrame, optional pd.DataFrame, optional dict[int, int])
+    3-tuple of (dataframe, optional dataframe, optional dict[int, int])
         The first element is a DataFrame with columns group_id, name, user_id, project_id, creation_time, edition_time.
 
         The second element is optionally a DataFrame with columns location_id, x, y, z, group_id.
