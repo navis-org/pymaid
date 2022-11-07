@@ -135,6 +135,16 @@ Functions to fetch volumes (meshes):
 
     pymaid.get_volume
 
+Landmarks
+---------
+Functions to fetch data about landmarks.
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.get_landmarks
+    pymaid.get_landmark_groups
+
 Reconstruction samplers
 -----------------------
 Functions for reconstruction samplers:
