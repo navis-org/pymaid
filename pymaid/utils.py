@@ -716,7 +716,7 @@ class DataFrameBuilder:
     def __init__(
         self, columns: tp.Sequence[tp.Hashable], dtypes: tp.Optional[tp.Sequence] = None
     ):
-        self.columns: dict[tp.Hashable, list] = {c: [] for c in columns}
+        self.columns: tp.Dict[tp.Hashable, list] = {c: [] for c in columns}
         self.dtypes: tp.Optional[list] = list(dtypes) if dtypes else None
         if dtypes is not None and len(dtypes) != len(self.columns):
             raise ValueError()
@@ -752,7 +752,7 @@ class DataFrameBuilder:
             col.append(item)
         return self
 
-    def append_dict(self, row: dict[tp.Hashable, tp.Any]):
+    def append_dict(self, row: tp.Dictict[tp.Hashable, tp.Any]):
         """Append a dict to the rows.
         Parameters
         ----------
