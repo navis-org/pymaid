@@ -214,17 +214,13 @@ Optional
 
     pip3 install ujson
 
-
-
-Advanced users: more speed with iGraph
---------------------------------------
-
-By default pymaid uses the `NetworkX <https://networkx.github.io>`_ graph
-library for most of the computationally expensive function. NetworkX is
-written in pure Python, well maintained and easy to install.
-
-If you need that extra bit of speed, consider manually installing
-`iGraph <http://igraph.org/>`_. It is written in C and therefore very fast. If
-available, pymaid will use iGraph over NetworkX. iGraph is difficult to
-install though because you have to install the C core first and then its
-Python bindings, ``python-igraph``.
+`igraph <http://igraph.org/>`_
+  By default pymaid uses the `NetworkX <https://networkx.github.io>`_ graph
+  library for most of the computationally expensive functions. NetworkX is
+  written in pure Python, well maintained and easy to install. If you need
+  that extra bit of speed, consider installing igraph. It is written in C and
+  therefore very fast. If available, pymaid will use igraph over NetworkX.
+  
+  ::
+  
+    pip3 install igraph
