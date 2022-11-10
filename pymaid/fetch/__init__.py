@@ -1929,6 +1929,11 @@ def _entities_to_ann_graph(data, annotations_by_id=False, skeletons_by_id=True):
             node_id = node_data[ann_ref]
             is_meta_ann = True
 
+        anns = e.get("annotations", [])
+        if not anns:
+            g.add_node(node_id, **node_data)
+            continue
+
         for ann in e.get("annotations", []):
             g.add_edge(
                 ann[ann_ref],
