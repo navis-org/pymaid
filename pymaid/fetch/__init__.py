@@ -1935,7 +1935,7 @@ def get_annotation_graph(annotations_by_id=False, skeletons_by_id=True, remote_i
     -------
     networkx.DiGraph
     """
-    remote_instance: CatmaidInstance = utils._eval_remote_instance(remote_instance)
+    remote_instance = utils._eval_remote_instance(remote_instance)
 
     query_url = remote_instance.make_url(remote_instance.project_id, "annotations", "query-targets")
     post = {
@@ -1943,36 +1943,39 @@ def get_annotation_graph(annotations_by_id=False, skeletons_by_id=True, remote_i
     }
     data = remote_instance.fetch(query_url, post)
 
+    ann_ref = "id" if annotations_by_id else "name"
+    skel_ref = "id" if skeletons_by_id else "name"
+
     g = nx.DiGraph()
     for e in data["entities"]:
         is_meta_ann = False
+
         if e.get("type") == "neuron":
-            skids = e.get("skeleton_ids", [])
+            skids = e.get("skeleton_ids") or []
             if len(skids) != 1:
                 logger.warning("Neuron with id %s is modelled by %s skeletons, ignoring", e["id"], len(skids))
                 continue
-            node_id = skids[0]
             node_data = {
                 "name": e["name"],
                 "neuron_id": e["id"],
                 "is_skeleton": True,
                 "id": skids[0],
             }
-            node_id = node_data["id"] if skeletons_by_id else node_data["name"]
-        else:
+            node_id = node_data[skel_ref]
+        else:  # is an annotation
             node_data = {
                 "is_skeleton": False,
                 "id": e["id"],
                 "name": e["name"],
             }
-            node_id = node_data["id"] if annotations_by_id else node_data["name"]
+            node_id = node_data[ann_ref]
             is_meta_ann = True
 
         g.add_node(node_id, **node_data)
 
         for ann in e.get("annotations", []):
             g.add_edge(
-                ann["name"],
+                ann[ann_ref],
                 node_id,
                 is_meta_annotation=is_meta_ann,
             )
