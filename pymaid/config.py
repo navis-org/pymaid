@@ -12,18 +12,26 @@
 #    GNU General Public License for more details.
 
 import logging
+import os
 
 import numpy as np
 
 logger = logging.getLogger('pymaid')
-logger.setLevel(logging.INFO)
-if len(logger.handlers) == 0:
-    sh = logging.StreamHandler()
-    sh.setLevel(logging.DEBUG)
-    # Create formatter and add it to the handlers
-    formatter = logging.Formatter('%(levelname)-5s : %(message)s (%(name)s)')
-    sh.setFormatter(formatter)
-    logger.addHandler(sh)
+
+def default_logging():
+    logger.setLevel(logging.INFO)
+    if len(logger.handlers) == 0:
+        sh = logging.StreamHandler()
+        sh.setLevel(logging.DEBUG)
+        # Create formatter and add it to the handlers
+        formatter = logging.Formatter('%(levelname)-5s : %(message)s (%(name)s)')
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
+
+
+if os.environ.get("NAVIS_SKIP_LOG_SETUP", "").lower() != "true":
+    default_logging()
+
 
 # Default settings for progress bars
 pbar_hide = False
