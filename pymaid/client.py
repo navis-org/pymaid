@@ -33,7 +33,7 @@ except BaseException:
 __all__ = sorted(['CatmaidInstance', 'connect_catmaid'])
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 
 def load_env(**kwargs):

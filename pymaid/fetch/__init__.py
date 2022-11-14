@@ -92,7 +92,7 @@ __all__ = ['get_annotation_details', 'get_annotation_id',
     ]
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 
 @cache.undo_on_error

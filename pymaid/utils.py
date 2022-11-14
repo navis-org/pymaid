@@ -33,7 +33,7 @@ with warnings.catch_warnings():
 from . import core, fetch, config, client
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 __all__ = ['set_loggers', 'set_pbars', 'eval_skids', 'clear_cache', 'shorten_name']
 

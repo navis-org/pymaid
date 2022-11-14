@@ -62,7 +62,7 @@ import numpy as np
 from . import core, fetch, utils, config
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 __all__ = ['get_user_contributions', 'get_time_invested', 'get_user_actions',
            'get_team_contributions', 'get_user_stats']

@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from . import fetch, core, utils, config
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 __all__ = sorted(['cluster_by_connectivity', 'cluster_by_synapse_placement',
                   'cluster_xyz', 'ClustResults'])

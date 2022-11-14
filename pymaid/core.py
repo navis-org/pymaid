@@ -83,7 +83,7 @@ except ImportError:
 __all__ = ['CatmaidNeuron', 'CatmaidNeuronList', 'Dotprops', 'Volume']
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 
 def inject_connection(func):

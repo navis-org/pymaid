@@ -49,7 +49,7 @@ __all__ = sorted(['add_annotations', 'remove_annotations',
                   'delete_volume', 'set_nodes_reviewed'])
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 
 @cache.never_cache

@@ -27,7 +27,7 @@ from navis import graph_utils, intersect
 from . import fetch, core, utils, config
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 __all__ = sorted(['filter_connectivity', 'cable_overlap',
                   'predict_connectivity', 'adjacency_matrix', 'group_matrix',

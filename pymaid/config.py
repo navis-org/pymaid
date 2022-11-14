@@ -29,8 +29,16 @@ def default_logging():
         logger.addHandler(sh)
 
 
-if os.environ.get("NAVIS_SKIP_LOG_SETUP", "").lower() != "true":
+NAVIS_SKIP_LOG_SETUP = os.environ.get("NAVIS_SKIP_LOG_SETUP", "").lower() == "true"
+
+if not NAVIS_SKIP_LOG_SETUP:
     default_logging()
+
+
+def get_logger(module_name: str):
+    if NAVIS_SKIP_LOG_SETUP:
+        return logging.getLogger(module_name)
+    return logger
 
 
 # Default settings for progress bars
