@@ -3,7 +3,7 @@ __version_vector__ = (2, 2, 1)
 
 from . import config
 
-logger = config.logger
+logger = config.get_logger(__name__)
 
 # Flatten namespace by importing contents of all modules of pymaid
 from .fetch import *

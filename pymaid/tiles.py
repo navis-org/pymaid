@@ -26,7 +26,7 @@ from requests_futures.sessions import FuturesSession
 from . import fetch, core, utils, config
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 try:
     import imageio

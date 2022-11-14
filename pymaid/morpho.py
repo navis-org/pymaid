@@ -25,7 +25,7 @@ from navis import graph_utils, graph
 from . import fetch, core, utils, config
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 __all__ = sorted(['arbor_confidence', 'remove_tagged_branches', 'time_machine',
                   'union_neurons', 'prune_by_length'])

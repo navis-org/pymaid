@@ -26,7 +26,7 @@ from collections import OrderedDict
 from . import utils, config
 
 # Set up logging
-logger = config.logger
+logger = config.get_logger(__name__)
 
 
 class Cache(OrderedDict):
