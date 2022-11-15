@@ -28,7 +28,10 @@ from collections.abc import Iterable
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    import vispy.visuals
+    try:
+        from vispy.visuals import Visual
+    except ImportError:
+        Visual = None
 
 from . import core, fetch, config, client
 
@@ -531,7 +534,11 @@ def _parse_objects(x, remote_instance=None):
     skdata = core.CatmaidNeuronList(neuron_obj, make_copy=False)
 
     # Collect visuals
-    visuals = [ob for ob in x if isinstance(ob, vispy.visuals.Visual)]
+    if Visual not None:
+        visuals = [ob for ob in x if isinstance(ob, Visual)]
+    else:
+        # Best guess if vispy not installed
+        visuals = [ob for ob in x if 'Visual' in str(type(x)) and 'vispy' in str(type(x))]
 
     # Collect dotprops
     dotprops = [ob for ob in x if isinstance(ob, core.Dotprops)]
