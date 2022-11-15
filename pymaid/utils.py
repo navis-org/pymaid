@@ -534,7 +534,7 @@ def _parse_objects(x, remote_instance=None):
     skdata = core.CatmaidNeuronList(neuron_obj, make_copy=False)
 
     # Collect visuals
-    if Visual not None:
+    if Visual is not None:
         visuals = [ob for ob in x if isinstance(ob, Visual)]
     else:
         # Best guess if vispy not installed
