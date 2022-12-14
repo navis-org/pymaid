@@ -46,6 +46,7 @@ Functions related to searching for neurons and fetching their 3D skeletons:
     pymaid.get_skids_by_name
     pymaid.get_skids_by_origin
     pymaid.get_skeleton_change
+    pymaid.get_skeleton_ids
 
 Annotations
 -----------
