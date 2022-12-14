@@ -55,6 +55,7 @@ import pandas as pd
 from .. import core, utils, config, cache
 from navis import in_volume
 from .landmarks import get_landmarks, get_landmark_groups
+from .skeletons import get_skeleton_ids
 
 
 __all__ = ['get_annotation_details', 'get_annotation_id',
@@ -89,6 +90,7 @@ __all__ = ['get_annotation_details', 'get_annotation_id',
                   'get_skeleton_change',
                   'get_landmarks',
                   'get_landmark_groups',
+                  'get_skeleton_ids',
     ]
 
 # Set up logging
