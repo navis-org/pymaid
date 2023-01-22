@@ -115,7 +115,7 @@ What's new?
        - various bugfixes
    * - 0.89
      - 14/08/18
-     - - new function: :func:`~pymaid.cytoscape.watch_network` constantly pushes updates Cytoscape
+     - - new function: ``pymaid.cytoscape.watch_network`` constantly pushes updates to Cytoscape
        - new function: :func:`~pymaid.get_nth_partners` returns neurons connected via n hops
        - by default, :func:`~pymaid.plot3d` now chooses the backend automatically: vispy for terminal sessions, plotly for Jupyter notebook/lab
        - :func:`~pymaid.get_skids_by_annotation` now accepts negative search criteria
