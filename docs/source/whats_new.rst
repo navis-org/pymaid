@@ -10,6 +10,9 @@ What's new?
    * - Version
      - Date
      -
+   * - Next
+     - In progress
+     - - signature of :func:`pymaid.get_annotation_graph` changed, allowing it to represent all semantic entities.
    * - 2.1.0
      - 04/04/22
      - With this release we mainly follow some renamed functions in ``navis`` but
