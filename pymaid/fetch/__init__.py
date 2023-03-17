@@ -1902,7 +1902,6 @@ def get_annotations(x, remote_instance=None):
             'No annotations retrieved. Make sure that the skeleton IDs exist.')
 
 
-
 def filter_by_query(names: pd.Series, query: str, allow_partial: bool = False) -> pd.Series:
     """Get a logical index series into a series of strings based on a query.
 
