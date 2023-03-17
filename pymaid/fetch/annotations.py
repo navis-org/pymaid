@@ -104,7 +104,7 @@ def neurons_to_skeletons(
 
         skids = data["skeleton_ids"]
         if len(skids) == 0:
-            logger.warning("Neuron %s is modelled by 0 skeletons; skipping")
+            logger.warning("Neuron %s is modelled by 0 skeletons; skipping", data["id"])
             nodes_to_replace[node_id]  # ensure this exists
             continue
 
@@ -143,6 +143,8 @@ EntityType = Literal["neuron", "annotation", "volume", "skeleton"]
 
 @cache.undo_on_error
 def _get_entities(entity_types, remote_instance):
+    logger.info("Fetching entity graph; may be slow")
+
     remote_instance = utils._eval_remote_instance(remote_instance)
     post = {
         "with_annotations": True,

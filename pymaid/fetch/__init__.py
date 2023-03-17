@@ -56,7 +56,7 @@ from .. import core, utils, config, cache
 from navis import in_volume
 from .landmarks import get_landmarks, get_landmark_groups
 from .skeletons import get_skeleton_ids
-from .annnotations import get_annotation_graph
+from .annotations import get_annotation_graph
 
 
 __all__ = ['get_annotation_details', 'get_annotation_id',
