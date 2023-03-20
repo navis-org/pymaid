@@ -1,4 +1,3 @@
-from collections.abc import Iterable
 import sys
 from typing import (
     Optional,
@@ -11,6 +10,23 @@ from typing import (
     Any,
 )
 from collections import defaultdict
+
+# From 3.9, typing.Iterable is deprecated
+# in favour of collections.abc.Iterable.
+# collections.abc.Iterable can be used for isinstance checks,
+# but not for type annotation until 3.9.
+if sys.version_info < (3, 9):
+    # use this for type annotation
+    from typing import Iterable as TIterable
+
+    # use this for isinstance checks
+    from collections.abc import Iterable
+else:
+    # use this for both
+    from collections.abc import Iterable
+
+    TIterable = Iterable
+
 from itertools import chain
 import warnings
 
@@ -241,26 +257,27 @@ def neurons_to_skeletons(
 # todo: replace with strenum
 if sys.version_info >= (3, 8):
     from typing import Literal
+
     EntityType = Literal["neuron", "annotation", "volume", "skeleton"]
 else:
     EntityType = str
 
 
-def join_ids(ids: Iterable[int]) -> str:
+def join_ids(ids: TIterable[int]) -> str:
     return ",".join(str(n) for n in ids)
 
 
-def join_id_sets(id_sets: Iterable[Iterable[int]]) -> List[str]:
+def join_id_sets(id_sets: TIterable[TIterable[int]]) -> List[str]:
     return [join_ids(ids) for ids in id_sets]
 
 
 @cache.undo_on_error
 def _get_entities(
-    types: Optional[Iterable[str]] = None,
+    types: Optional[TIterable[str]] = None,
     with_annotations: Optional[bool] = None,
-    annotated_with: Optional[Iterable[Iterable[int]]] = None,
-    not_annotated_with: Optional[Iterable[Iterable[int]]] = None,
-    sub_annotated_with: Optional[Iterable[int]] = None,
+    annotated_with: Optional[TIterable[TIterable[int]]] = None,
+    not_annotated_with: Optional[TIterable[TIterable[int]]] = None,
+    sub_annotated_with: Optional[TIterable[int]] = None,
     *,
     remote_instance=None,
 ):
@@ -309,7 +326,7 @@ def map_nested(nested, mapping):
 
 
 def _get_annotation_ids(
-    *ann_lols: Iterable[Iterable[Union[int, str]]], remote_instance=None
+    *ann_lols: TIterable[TIterable[Union[int, str]]], remote_instance=None
 ) -> List[List[List[int]]]:
     nested, flattened = to_nested_and_flat(ann_lols)
     id_mapping = {None: None}
@@ -330,11 +347,11 @@ def _get_annotation_ids(
 
 
 def get_entity_graph(
-    types: Optional[Iterable[EntityType]] = None,
+    types: Optional[TIterable[EntityType]] = None,
     by_name=False,
-    annotated_with: Optional[Iterable[Iterable[Union[int, str]]]] = None,
-    not_annotated_with: Optional[Iterable[Iterable[Union[int, str]]]] = None,
-    expand_subannotations: Optional[Iterable[Union[int, str]]] = None,
+    annotated_with: Optional[TIterable[TIterable[Union[int, str]]]] = None,
+    not_annotated_with: Optional[TIterable[TIterable[Union[int, str]]]] = None,
+    expand_subannotations: Optional[TIterable[Union[int, str]]] = None,
     *,
     remote_instance=None,
 ) -> nx.DiGraph:
