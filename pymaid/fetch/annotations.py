@@ -315,14 +315,16 @@ def _get_annotation_ids(
     id_mapping = {None: None}
     names = []
     for name_or_id in flattened:
+        if name_or_id is None:
+            continue
         if isinstance(name_or_id, str):
             names.append(name_or_id)
         else:
             id_mapping[name_or_id] = name_or_id
 
-    ann_ids = get_annotation_id(names, remote_instance=remote_instance)
-
-    id_mapping.update((n, int(aid)) for n, aid in ann_ids.items())
+    if names:
+        ann_ids = get_annotation_id(names, remote_instance=remote_instance)
+        id_mapping.update((n, int(aid)) for n, aid in ann_ids.items())
 
     return map_nested(nested, id_mapping)
 
@@ -332,7 +334,7 @@ def get_entity_graph(
     by_name=False,
     annotated_with: Optional[Iterable[Iterable[Union[int, str]]]] = None,
     not_annotated_with: Optional[Iterable[Iterable[Union[int, str]]]] = None,
-    sub_annotated_with: Optional[Iterable[Union[int, str]]] = None,
+    expand_subannotations: Optional[Iterable[Union[int, str]]] = None,
     *,
     remote_instance=None,
 ) -> nx.DiGraph:
@@ -392,7 +394,7 @@ def get_entity_graph(
     not_annotated_with: Optional[Iterable[Iterable[Union[int, str]]]], default None
         If not None, only include entites NOT annotated with these.
         See ``annotated_with`` for more usage details.
-    sub_annotated_with: Optional[Iterable[Union[int, str]]], default None
+    expand_subannotations: Optional[Iterable[Union[int, str]]], default None
         Which annotations in the ``annotated_with``, ``not_annotated_with``
         sets to expand into all their sub-annotations (each as an OR group).
     remote_instance : optional CatmaidInstance
@@ -434,7 +436,7 @@ def get_entity_graph(
     ) = _get_annotation_ids(
         annotated_with,
         not_annotated_with,
-        sub_annotated_with,
+        expand_subannotations,
         remote_instance=remote_instance,
     )
 
