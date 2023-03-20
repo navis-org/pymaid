@@ -2,7 +2,6 @@ from collections.abc import Iterable
 import sys
 from typing import (
     Optional,
-    Literal,
     Callable,
     List,
     DefaultDict,
@@ -241,6 +240,7 @@ def neurons_to_skeletons(
 # todo: update when 3.7 is dropped
 # todo: replace with strenum
 if sys.version_info >= (3, 8):
+    from typing import Literal
     EntityType = Literal["neuron", "annotation", "volume", "skeleton"]
 else:
     EntityType = str
