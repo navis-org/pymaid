@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+import sys
 from typing import (
     Optional,
     Literal,
@@ -237,8 +238,12 @@ def neurons_to_skeletons(
     return g
 
 
+# todo: update when 3.7 is dropped
 # todo: replace with strenum
-EntityType = Literal["neuron", "annotation", "volume", "skeleton"]
+if sys.version_info >= (3, 8):
+    EntityType = Literal["neuron", "annotation", "volume", "skeleton"]
+else:
+    EntityType = str
 
 
 def join_ids(ids: Iterable[int]) -> str:
