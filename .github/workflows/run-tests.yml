@@ -5,7 +5,11 @@ on: [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-${{ matrix.python-version }}-${{ matrix.igraph }}
+      cancel-in-progress: true
     strategy:
+      fail-fast: false
       matrix:
         python-version:
           - '3.7'
@@ -14,11 +18,11 @@ jobs:
           - '3.10'
         igraph: ["igraph", "no-igraph"]
     steps:
-      # This cancels any such job that is still runnning
-    - name: Cancel Previous Runs
-      uses: styfle/cancel-workflow-action@0.6.0
-      with:
-        access_token: ${{ github.token }}
+    #   # This cancels any such job that is still runnning
+    # - name: Cancel Previous Runs
+    #   uses: styfle/cancel-workflow-action@0.6.0
+    #   with:
+    #     access_token: ${{ github.token }}
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
