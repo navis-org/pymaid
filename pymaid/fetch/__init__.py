@@ -3749,7 +3749,7 @@ def get_paths(sources, targets, n_hops=2, min_synapses=1, return_graph=False,
     targets = utils._make_iterable(targets).astype(int)
     sources = utils._make_iterable(sources).astype(int)
 
-    if isinstance(n_hops, (int, np.int)):
+    if isinstance(n_hops, (int, np.integer)):
         n_hops = [n_hops]
 
     if not utils._is_iterable(n_hops):
