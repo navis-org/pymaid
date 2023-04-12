@@ -59,6 +59,8 @@ Functions to fetch annotations:
     pymaid.get_annotations
     pymaid.get_annotation_details
     pymaid.get_user_annotations
+    pymaid.get_annotation_id
+    pymaid.get_entity_graph
 
 Nodes
 -----

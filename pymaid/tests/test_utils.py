@@ -1,4 +1,4 @@
-from pymaid.fetch import filter_by_query
+from pymaid.fetch.annotations import filter_by_query
 import pandas as pd
 import pytest
 
