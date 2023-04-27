@@ -10,7 +10,7 @@ What's new?
    * - Version
      - Date
      -
-   * - 2.3.0
+   * - 2.4.0
      - 27/05/23
      - - :func:`pymaid.get_annotation_graph` deprecated in favour of the new
          :func:`pymaid.get_entity_graph`.
