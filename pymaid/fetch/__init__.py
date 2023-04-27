@@ -93,6 +93,7 @@ __all__ = ['get_annotation_details', 'get_annotation_id',
                   'get_landmarks',
                   'get_landmark_groups',
                   'get_skeleton_ids',
+                  'get_nearest_node'
     ]
 
 # Set up logging
@@ -4726,3 +4727,41 @@ def get_skeleton_change(x, chunk_size=50, remote_instance=None):
             pbar.update(len(ch))
 
     return change
+
+
+
+
+@cache.undo_on_error
+def get_nearest_node(x, y, z, skeleton_id=None, neuron_id=None, remote_instance=None):
+    """Get split and merge history of skeletons.
+
+    Parameters
+    ----------
+    x :                     X coordinate of query location.
+    y :                     Y coordinate of query location.
+    z :                     Z coordinate of query location.
+    skeleton_id :           Result treenode has to be in this skeleton. (optional)
+    neuron_id :             Result treenode has to be in  this neuron. (optional, altenrate to skeleton_id)
+    remote_instance :       CatmaidInstance, optional
+                            If not passed directly, will try using global.
+
+    Returns
+    -------
+    node
+                            Nearest node.
+
+    """
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    GET = {'x': x, 'y': y, 'z': z}
+
+    if skeleton_id:
+        GET['skeleton_id'] = skeleton_id
+    if neuron_id:
+        GET['neuron_id'] = neuron_id
+
+    url = remote_instance._get_nearest_node_url(**GET)
+
+    resp = remote_instance.fetch(url, disable_pbar=True)
+
+    return resp
