@@ -54,7 +54,7 @@ import pandas as pd
 
 from .. import core, utils, config, cache
 from navis import in_volume
-from .landmarks import get_landmarks, get_landmark_groups
+from .landmarks import get_landmarks, get_landmark_groups, LandmarkMatcher, CrossProjectLandmarkMatcher
 from .skeletons import get_skeleton_ids
 from .annotations import get_annotation_graph, get_entity_graph, get_annotation_id
 from .stack import get_stacks, get_stack_info, get_mirror_info
@@ -91,8 +91,8 @@ __all__ = ['get_annotation_details', 'get_annotation_id',
                   'get_origin', 'get_skids_by_origin',
                   'get_sampler', 'get_sampler_domains', 'get_sampler_counts',
                   'get_skeleton_change',
-                  'get_landmarks',
-                  'get_landmark_groups',
+                  'get_landmarks', 'get_landmark_groups',
+                  'LandmarkMatcher', 'CrossProjectLandmarkMatcher',
                   'get_skeleton_ids',
                   'get_stacks', 'get_stack_info', 'get_mirror_info',
     ]
