@@ -13,6 +13,7 @@ psutil>=5.4.3
 #extra: extras
 fuzzywuzzy[speedup]~=0.17.0
 ujson~=1.35
+zarr
 
 # diskcache>=4.0.0
 
