@@ -83,6 +83,19 @@ def filter_by_query(
 
 
 @cache.wipe_and_retry
+def get_annotation_table(remote_instance=None):
+
+    remote_instance = utils._eval_remote_instance(remote_instance)
+
+    logger.debug("Retrieving list of annotations...")
+
+    remote_annotation_list_url = remote_instance._get_annotation_list()
+    an_list = remote_instance.fetch(remote_annotation_list_url)
+
+    return pd.DataFrame.from_records(an_list["annotations"])
+
+
+@cache.wipe_and_retry
 def get_annotation_id(
     annotations, allow_partial=False, raise_not_found=True, remote_instance=None
 ):
@@ -106,6 +119,7 @@ def get_annotation_id(
                         ``{'annotation_name': 'annotation_id', ...}``
 
     """
+    an_list = get_annotation_table()
     remote_instance = utils._eval_remote_instance(remote_instance)
 
     logger.debug("Retrieving list of annotations...")
