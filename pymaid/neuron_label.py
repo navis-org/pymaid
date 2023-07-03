@@ -23,7 +23,7 @@ __all__ = [
 logger = get_logger(__name__)
 
 
-component_re = re.compile(r"%(?P<idx>\d+)(\{(?P<sep>.*)\})?")
+component_re = re.compile(r"%(?P<idx>\d+|f)(\{(?P<sep>.*)\})?")
 whitespace_re = re.compile(r"\s+")
 
 DEFAULT_SEP = ", "
@@ -201,10 +201,13 @@ def parse_components(
         joiners.append(dedup_whitespace(fmt[last_end : component.start()]))
         last_end = component.end()
         d = component.groupdict()
+        idx_str = d["idx"]
+        idx = None if idx_str == "f" else int(idx_str)
+
         components.append(
             (
                 fmt[component.start() : component.end()],
-                int(d["idx"]),
+                idx,
                 d.get("sep", None),
             )
         )
@@ -318,12 +321,18 @@ class NeuronLabeller:
         for joiner, (raw, idx, sep) in zip(joiners, components):
             to_join.append(joiner.lstrip() or " " if lstrip_next else joiner)
 
-            if idx >= len(self.components):
-                to_join.append(raw)
-                continue
-
-            comp = self.components[idx]
-            value = comp.label(nrn, sep)
+            if idx is None:
+                value = ""
+                for comp in reversed(self.components):
+                    value = comp.label(nrn, sep)
+                    if value:
+                        to_join.append(value)
+                        break
+            elif idx >= len(self.components):
+                value = raw
+            else:
+                comp = self.components[idx]
+                value = comp.label(nrn, sep)
 
             if self.trim_empty and not value:
                 to_join.append(to_join.pop().rstrip())
