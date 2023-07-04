@@ -252,7 +252,7 @@ def annotations_by_user(
     ann_table = get_annotation_table(remote_instance=remote_instance)
     out = set()
 
-    for aname, _aid, users in ann_table.itertuples():
+    for aname, _aid, users in ann_table.itertuples(index=False):
         for user_info in users:
             if user_info[key] == user:
                 out.add(aname)
