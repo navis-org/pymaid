@@ -247,7 +247,8 @@ def annotations_by_user(
     if isinstance(user, str):
         key = "name"
     else:
-        key = int(user)
+        key = "id"
+        user = int(user)
 
     ann_table = get_annotation_table(remote_instance=remote_instance)
     out = set()
