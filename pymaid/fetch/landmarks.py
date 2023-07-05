@@ -26,11 +26,11 @@ def get_landmarks(
 
     Returns
     -------
-    2-tuple of (DataFrame, optional DataFrame)
-        The first element is a DataFrame with columns
+    landmarks : pd.DataFrame
+        DataFrame with columns
         landmark_id, name, user_id, project_id, creation_time, edition_time.
-
-        The second element is optionally a DataFrame with columns
+    locations : pd.DataFrame, optional (default None)
+        DataFrame with columns
         location_id, x, y, z, landmark_id.
 
     Examples
@@ -108,12 +108,14 @@ def get_landmark_groups(
 
     Returns
     -------
-    3-tuple of (dataframe, optional dataframe, optional dict[int, int])
-        The first element is a DataFrame with columns group_id, name, user_id, project_id, creation_time, edition_time.
-
-        The second element is optionally a DataFrame with columns location_id, x, y, z, group_id.
-
-        The third element is optionally a dict mapping group ID to a list of landmark IDs (members of that group).
+    groups : pd.DataFrame
+        A DataFrame with columns
+        group_id, name, user_id, project_id, creation_time, edition_time.
+    locations : pd.DataFrame, optional (default None)
+        A DataFrame with columns
+        location_id, x, y, z, group_id.
+    members : dict[int, int], optional (default None)
+        A dict mapping group ID to a list of landmark IDs (members of that group).
 
     Examples
     --------
