@@ -48,6 +48,19 @@ Functions related to searching for neurons and fetching their 3D skeletons:
     pymaid.get_skeleton_change
     pymaid.get_skeleton_ids
 
+
+Neuron labels
+^^^^^^^^^^^^^
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.neuron_label.NeuronLabeller
+    pymaid.neuron_label.SkeletonId
+    pymaid.neuron_label.NeuronName
+    pymaid.neuron_label.Annotations
+    pymaid.neuron_label.ThinNeuron
+
 Annotations
 -----------
 Functions to fetch annotations:

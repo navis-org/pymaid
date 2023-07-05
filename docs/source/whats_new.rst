@@ -10,6 +10,10 @@ What's new?
    * - Version
      - Date
      -
+   * - Next
+     - n/a
+     - - :class:`pymaid.neuron_label.NeuronLabeller` added for labelling neurons
+         like in the CATMAID frontend.
    * - 2.4.0
      - 27/05/23
      - - :func:`pymaid.get_annotation_graph` deprecated in favour of the new
