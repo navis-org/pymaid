@@ -179,9 +179,9 @@ Functions to fetch information about the image stacks CATMAID knows about.
 .. autosummary::
     :toctree: generated/
 
-    pymaid.fetch.stacks.get_stacks
-    pymaid.fetch.stacks.get_stack_info
-    pymaid.fetch.stacks.get_mirror_info
+    pymaid.get_stacks
+    pymaid.get_stack_info
+    pymaid.get_mirror_info
 
 Image data (tiles)
 ------------------
