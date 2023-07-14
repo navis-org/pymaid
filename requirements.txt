@@ -13,8 +13,12 @@ psutil>=5.4.3
 #extra: extras
 fuzzywuzzy[speedup]~=0.17.0
 ujson~=1.35
+
+#extra: stacks
 zarr
-pydantic
+fsspec[http]
+pydantic>=2
+xarray[parallel]
 imageio
 
 # diskcache>=4.0.0

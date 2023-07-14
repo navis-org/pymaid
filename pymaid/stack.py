@@ -1,13 +1,14 @@
 from __future__ import annotations
 from io import BytesIO
-from typing import Literal, Optional, Sequence, Type, TypeVar, Generic, TypedDict, Union
+from typing import Literal, Optional, Sequence, Type, TypeVar, Union
 import numpy as np
 from abc import ABC
+from enum import IntEnum
 from numpy.typing import DTypeLike, ArrayLike
 import zarr
 from pydantic import BaseModel
-from pydantic.tools import parse_obj_as
 from dask import array as da
+import xarray as xr
 from . import utils
 from zarr.storage import BaseStore
 import json
@@ -16,9 +17,41 @@ import requests
 import imageio.v3 as iio
 
 Dimension = Literal["x", "y", "z"]
-Orientation = Literal["xy", "xz", "zy"]
+# Orientation = Literal["xy", "xz", "zy"]
 HALF_PX = 0.5
 ENDIAN = "<" if sys.byteorder == "little" else ">"
+
+
+class Orientation(IntEnum):
+    XY = 0
+    # todo: check these
+    XZ = 1
+    ZY = 2
+
+    def __bool__(self) -> bool:
+        return True
+
+    def full_orientation(self, reverse=False) -> tuple[Dimension, Dimension, Dimension]:
+        out = [
+            ("x", "y", "z"),
+            ("x", "z", "y"),
+            ("z", "y", "x"),
+        ][self.value]
+        if reverse:
+            out = out[::-1]
+        return out
+
+    @classmethod
+    def from_dims(cls, dims: Sequence[Dimension]):
+        pair = (dims[0].lower(), dims[1].lower())
+        out = {
+            ("x", "y"): cls.XY,
+            ("x", "z"): cls.XZ,
+            ("z", "y"): cls.ZY,
+        }.get(pair)
+        if out is None:
+            raise ValueError(f"Unknown dimensions: {dims}")
+        return out
 
 
 class MirrorInfo(BaseModel):
@@ -35,35 +68,98 @@ class MirrorInfo(BaseModel):
 N = TypeVar("N", int, float)
 
 
-class Coord(TypedDict, Generic[N]):
-    x: N
-    y: N
-    z: N
-
-
 class StackInfo(BaseModel):
     sid: int
     pid: int
     ptitle: str
     stitle: str
-    downsample_factors: list[Coord[float]]
+    downsample_factors: Optional[list[dict[Dimension, float]]]
     num_zoom_levels: int
-    translation: Coord[float]
-    resolution: Coord[float]
-    dimension: Coord[int]
+    translation: dict[Dimension, float]
+    resolution: dict[Dimension, float]
+    dimension: dict[Dimension, int]
     comment: str
     description: str
-    metadata: str
+    metadata: Optional[str]
     broken_slices: dict[int, int]
     mirrors: list[MirrorInfo]
     orientation: Orientation
     attribution: str
-    canary_location: Coord[int]
-    placeholder_colour: dict[str, float]  # actually {r g b a}
+    canary_location: dict[Dimension, int]
+    placeholder_color: dict[str, float]  # actually {r g b a}
+
+    def get_downsample(self, scale_level=0) -> dict[Dimension, float]:
+        """Get the downsample factors for a given scale level.
+
+        If the downsample factors are explicit in the stack info,
+        use that value.
+        Otherwise, use the CATMAID default:
+        scale by a factor of 2 per scale level.
+        If number of scale levels is known,
+        ensure the scale level exists.
+
+        Parameters
+        ----------
+        scale_level : int, optional
+
+        Returns
+        -------
+        dict[Dimension, float]
+
+        Raises
+        ------
+        IndexError
+            If the scale level is known not to exist
+        """
+        if self.downsample_factors is not None:
+            return self.downsample_factors[scale_level]
+        if self.num_zoom_levels > 0 and scale_level >= self.num_zoom_levels:
+            raise IndexError("list index out of range")
+
+        first, second, slicing = self.orientation.full_orientation()
+        return {first: 2**scale_level, second: 2**scale_level, slicing: 1}
+
+    def to_coords(self, scale_level: int = 0) -> dict[Dimension, np.ndarray]:
+        dims = self.orientation.full_orientation()
+        # todo: not sure if this is desired?
+        dims = dims[::-1]
+
+        downsamples = self.get_downsample(scale_level)
+
+        out: dict[Dimension, np.ndarray] = dict()
+        for d in dims:
+            c = np.arange(self.dimension[d], dtype=float)
+            c *= self.resolution[d]
+            c *= downsamples[d]
+            c += self.translation[d]
+            out[d] = c
+        return out
+
+
+def select_cli(prompt: str, options: dict[int, str]) -> Optional[int]:
+    out = None
+    print(prompt)
+    for k, v in sorted(options.items()):
+        print(f"\t{k}.\t{v}")
+    p = "Type number and press enter (empty to cancel): "
+    while out is None:
+        result_str = input(p).strip()
+        if not result_str:
+            break
+        try:
+            result = int(result_str)
+        except ValueError:
+            print("Not an integer, try again")
+            continue
+        if result not in options:
+            print("Not a valid option, try again")
+            continue
+        out = result
+    return out
 
 
 def to_array(
-    coord: Union[Coord[N], ArrayLike],
+    coord: Union[dict[Dimension, N], ArrayLike],
     dtype: DTypeLike = np.float64,
     order: Sequence[Dimension] = ("z", "y", "x"),
 ) -> np.ndarray:
@@ -72,12 +168,13 @@ def to_array(
     return np.asarray(coord, dtype=dtype)
 
 
-class TileStore(BaseStore, ABC):
+class JpegStore(BaseStore, ABC):
     """
     Must include instance variable 'fmt',
     which is a format string with variables:
     image_base, zoom_level, file_extension, row, col, slice_idx
     """
+
     tile_source_type: int
     fmt: str
     _writeable = False
@@ -103,18 +200,25 @@ class TileStore(BaseStore, ABC):
         else:
             self.session = session
 
-        order = full_orientation[self.stack_info.orientation]
-        self.metadata_payload = json.dumps(
+        order = self.stack_info.orientation.full_orientation(reverse=True)
+        self.metadata_bytes = json.dumps(
             {
                 "zarr_format": 2,
-                "shape": to_array(stack_info.dimension, order, int).tolist(),
-                "chunks": [mirror_info.tile_width, mirror_info.tile_height, 1],
+                "shape": to_array(stack_info.dimension, int, order).tolist(),
+                "chunks": [1, mirror_info.tile_height, mirror_info.tile_width],
                 "dtype": ENDIAN + "u1",
                 "compressor": None,
                 "fill_value": 0,
                 "order": "C",
                 "filters": None,
                 "dimension_separator": ".",
+            }
+        ).encode()
+        self.attrs_bytes = json.dumps(
+            {
+                "stack_info": self.stack_info.model_dump(),
+                "mirror_info": self.mirror_info.model_dump(),
+                "scale_level": self.zoom_level,
             }
         ).encode()
 
@@ -129,6 +233,7 @@ class TileStore(BaseStore, ABC):
 
     def _format_url(self, row: int, col: int, slice_idx: int) -> str:
         return self.fmt.format(
+            image_base=self.mirror_info.image_base,
             zoom_level=self.zoom_level,
             slice_idx=slice_idx,
             row=row,
@@ -136,49 +241,107 @@ class TileStore(BaseStore, ABC):
             file_extension=self.mirror_info.file_extension,
         )
 
+    def __delitem__(self, __key) -> None:
+        raise NotImplementedError()
+
+    def __iter__(self):
+        raise NotImplementedError()
+
+    def __len__(self) -> int:
+        raise NotImplementedError()
+
+    def __setitem__(self, __key, __value) -> None:
+        raise NotImplementedError()
+
     def __getitem__(self, key):
         last = key.split("/")[-1]
         if last == ".zarray":
-            return self.metadata_payload
+            return self.metadata_bytes
+        elif last == ".zattrs":
+            return self.attrs_bytes
+
         # todo: check order
-        slice_idx, col, row = (int(i) for i in last.split("."))
+        slice_idx, row, col = (int(i) for i in last.split("."))
         url = self._format_url(row, col, slice_idx)
         response = self.session.get(url)
         if response.status_code == 404:
             return self.empty
         response.raise_for_status()
+        ext = self.mirror_info.file_extension.split("?")[0]
+        if not ext.startswith("."):
+            ext = "." + ext
         arr = iio.imread(
             BytesIO(response.content),
-            extension=self.mirror_info.file_extension,
+            extension=ext,
             mode="L",
         )
         return arr.tobytes()
 
-    def to_array(self) -> zarr.Array:
+    def to_zarr_array(self) -> zarr.Array:
         return zarr.open_array(self, "r")
 
-    def to_dask(self) -> da.Array:
-        return da.from_zarr(self.to_array())
+    def to_dask_array(self) -> xr.DataArray:
+        # todo: transpose?
+        as_zarr = self.to_zarr_array()
+        return da.from_zarr(as_zarr)
+
+    def to_xarray(self) -> xr.DataArray:
+        as_dask = self.to_dask_array()
+        return xr.DataArray(
+            as_dask,
+            coords=self.stack_info.to_coords(self.zoom_level),
+            dims=self.stack_info.orientation.full_orientation(True),
+        )
 
 
-class TileStore1(TileStore):
+class TileStore1(JpegStore):
     tile_source_type = 1
     fmt = "{image_base}{slice_idx}/{row}_{col}_{zoom_level}.{file_extension}"
 
 
-class TileStore4(TileStore):
+class TileStore4(JpegStore):
     tile_source_type = 4
     fmt = "{image_base}{slice_idx}/{zoom_level}/{row}_{col}.{file_extension}"
 
 
-class TileStore5(TileStore):
+class TileStore5(JpegStore):
     tile_source_type = 5
     fmt = "{image_base}{zoom_level}/{slice_idx}/{row}/{col}.{file_extension}"
 
 
-tile_stores: dict[int, Type[TileStore]] = {
-    t.tile_source_type: t for t in [TileStore1, TileStore4, TileStore5]
+# class TileStore10(JpegStore):
+#     tile_source_type = 10
+#     fmt = "{image_base}.{file_extension}"
+
+#     # todo: manually change quality?
+
+#     def _format_url(self, row: int, col: int, slice_idx: int) -> str:
+#         s = self.fmt.format(
+#             image_base=self.mirror_info.image_base,
+#             file_extension=self.mirror_info.file_extension,
+#         )
+#         s = s.replace("%SCALE_DATASET%", f"s{self.zoom_level}")
+#         s = s.replace("%AXIS_0%", str(col * self.mirror_info.tile_width))
+#         s = s.replace("%AXIS_1%", str(row * self.mirror_info.tile_height))
+#         s = s.replace("%AXIS_2%", str(slice_idx))
+#         return s
+
+
+tile_stores: dict[int, Type[JpegStore]] = {
+    t.tile_source_type: t for t in [
+        TileStore1, TileStore4, TileStore5,
+        # TileStore10
+    ]
 }
+supported_sources = {11}.union(tile_stores)
+
+
+def select_stack(remote_instance=None) -> Optional[int]:
+    cm = utils._eval_remote_instance(remote_instance)
+    url = cm.make_url(cm.project_id, "stacks")
+    stacks = cm.fetch(url)
+    options = {s["id"]: s["title"] for s in stacks}
+    return select_cli("Select stack:", options)
 
 
 class Stack:
@@ -194,8 +357,9 @@ class Stack:
         cls, stack_id: int, mirror_id: Optional[int] = None, remote_instance=None
     ):
         cm = utils._eval_remote_instance(remote_instance)
-        info = cm.make_url("stack", stack_id, "info")
-        sinfo = parse_obj_as(StackInfo, info)
+        url = cm.make_url(cm.project_id, "stack", stack_id, "info")
+        info = cm.fetch(url)
+        sinfo = StackInfo.model_validate(info)
         return cls(sinfo, mirror_id)
 
     def _get_mirror_info(self, mirror_id: Optional[int] = None) -> MirrorInfo:
@@ -211,26 +375,56 @@ class Stack:
         )
 
     def set_mirror(self, mirror_id: int):
-        self.mirror_id = self._get_mirror_info(mirror_id)
+        self.mirror_info = self._get_mirror_info(mirror_id)
 
-    def _res_for_scale(self, scale_level: int) -> np.ndarray:
-        return to_array(self.stack_info.resolution) * to_array(
-            self.stack_info.downsample_factors[scale_level]
-        )
+    def select_mirror(self):
+        options = {
+            m.id: m.title
+            for m in self.stack_info.mirrors
+            if m.tile_source_type in supported_sources
+        }
+        if not options:
+            print("No mirrors with supported tile source type")
+            return
 
-    def _from_array(self, arr, scale_level: int) -> ImageVolume:
-        return ImageVolume(
-            arr,
-            self.stack_info.translation,
-            self._res_for_scale(scale_level),
-            self.stack_info.orientation,
+        result = select_cli(
+            f"Select mirror for stack '{self.stack_info.stitle}':",
+            options,
         )
+        if result is not None:
+            self.set_mirror(result)
 
     def get_scale(
         self, scale_level: int, mirror_id: Optional[int] = None
-    ) -> ImageVolume:
+    ) -> xr.DataArray:
+        """Get an xarray.DataArray representing th given scale level.
+
+        Note that depending on the metadata available,
+        missing scale levels may throw different errors.
+
+        Parameters
+        ----------
+        scale_level : int
+            0 for full resolution
+        mirror_id : Optional[int], optional
+            By default the one set on the class.
+
+        Returns
+        -------
+        xr.DataArray
+
+        Raises
+        ------
+        ValueError
+            Scale level does not exist, according to metadata
+        NotImplementedError
+            Unknown tile source type for this mirror
+        """
         mirror_info = self._get_mirror_info(mirror_id)
-        if scale_level > self.stack_info.num_zoom_levels:
+        if (
+            self.stack_info.num_zoom_levels > 0
+            and scale_level > self.stack_info.num_zoom_levels
+        ):
             raise ValueError(
                 f"Scale level {scale_level} does not exist "
                 f"for stack {self.stack_info.sid} "
@@ -240,7 +434,7 @@ class Stack:
         if mirror_info.tile_source_type in tile_stores:
             store_class = tile_stores[mirror_info.tile_source_type]
             store = store_class(self.stack_info, mirror_info, scale_level, None)
-            return self._from_array(store.to_dask(), scale_level)
+            return store.to_xarray()
         elif mirror_info.tile_source_type == 11:
             formatted = mirror_info.image_base.replace(
                 "%SCALE_DATASET%", f"s{scale_level}"
@@ -248,65 +442,28 @@ class Stack:
             *components, transpose_str = formatted.split("/")
             transpose = [int(t) for t in transpose_str.split("_")]
 
-            store = zarr.N5FSStore("/".join(components))
-            arr = zarr.open_array(store, "r")
-            darr = da.from_zarr(arr).transpose(transpose)
-            return self._from_array(darr, scale_level)
+            container_comp = []
+            arr_comp = []
+            this = container_comp
+            for comp in components:
+                this.append(comp)
+                if comp.lower().endswith(".n5"):
+                    this = arr_comp
+
+            if not arr_comp:
+                raise ValueError("N5 container must have '.n5' suffix")
+
+            store = zarr.N5FSStore("/".join(container_comp))
+            container = zarr.open(store, "r")
+            as_zarr = container["/".join(arr_comp)]
+            # todo: check this transpose
+            as_dask = da.from_zarr(as_zarr).transpose(transpose)
+            return xr.DataArray(
+                as_dask,
+                coords=self.stack_info.to_coords(scale_level),
+                dims=self.stack_info.orientation.full_orientation(True),
+            )
 
         raise NotImplementedError(
             f"Tile source type {mirror_info.tile_source_type} not implemented"
         )
-
-
-full_orientation: dict[Orientation, Sequence[Dimension]] = {
-    "xy": "xyz",
-    "xz": "xzy",
-    "zy": "zyx",
-}
-
-
-class ImageVolume:
-    def __init__(self, array, offset, resolution, orientation: Orientation):
-        self.array = array
-        self.offset = offset
-        self.resolution = resolution
-        self.offset = to_array(offset, dtype="float64")
-        self.resolution = to_array(resolution, dtype="float64")
-        self.orientation = orientation
-
-    @property
-    def full_orientation(self):
-        return full_orientation[self.orientation]
-
-    @property
-    def offset_oriented(self):
-        return to_array(self.offset, "float64", self.full_orientation)
-
-    @property
-    def resolution_oriented(self):
-        return to_array(self.resolution, "float64", self.full_orientation)
-
-    def __getitem__(self, selection):
-        return self.array.__getitem__(selection)
-
-    def get_roi(
-        self, offset: Coord[float], shape: Coord[float]
-    ) -> tuple[Coord[float], np.ndarray]:
-        order = self.full_orientation
-        offset_o = to_array(offset, order=order)
-        shape_o = to_array(shape, order=order)
-        mins = (offset_o / self.resolution - self.offset - HALF_PX).astype("uint64")
-        maxes = np.ceil(
-            (offset_o + shape_o) / self.resolution - self.offset - HALF_PX
-        ).astype("uint64")
-        slicing = tuple(slice(mi, ma) for mi, ma in zip(mins, maxes))
-        # todo: finalise orientation
-        actual_offset = Coord(
-            **{
-                d: m
-                for d, m in zip(
-                    order, mins * self.resolution_oriented + self.offset_oriented
-                )
-            }
-        )
-        return actual_offset, self[slicing]
