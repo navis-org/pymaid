@@ -253,6 +253,13 @@ class JpegStore(BaseStore, ABC):
     def __setitem__(self, __key, __value) -> None:
         raise NotImplementedError()
 
+    def _resolve_broken_slices(self, slice_idx: int) -> int:
+        while True:
+            incr = self.stack_info.broken_slices.get(slice_idx)
+            if incr is None:
+                return slice_idx
+            slice_idx += incr
+
     def __getitem__(self, key):
         last = key.split("/")[-1]
         if last == ".zarray":
@@ -262,6 +269,8 @@ class JpegStore(BaseStore, ABC):
 
         # todo: check order
         slice_idx, row, col = (int(i) for i in last.split("."))
+        slice_idx = self._resolve_broken_slices(slice_idx)
+
         url = self._format_url(row, col, slice_idx)
         response = self.session.get(url)
         if response.status_code == 404:
@@ -436,6 +445,9 @@ class Stack:
             store = store_class(self.stack_info, mirror_info, scale_level, None)
             return store.to_xarray()
         elif mirror_info.tile_source_type == 11:
+            # do we need to handle broken slices here?
+            # or is that metadata just telling the frontend to skip regions which exist
+            # (as fill values) in the N5?
             formatted = mirror_info.image_base.replace(
                 "%SCALE_DATASET%", f"s{scale_level}"
             )
