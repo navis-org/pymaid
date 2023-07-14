@@ -19,6 +19,7 @@ What's new?
      - 27/05/23
      - - :func:`pymaid.get_annotation_graph` deprecated in favour of the new
          :func:`pymaid.get_entity_graph`.
+       - :func:`pymaid.get_stacks`, :func:`pymaid.get_stack_info`, :func:`pymaid.get_mirror_info` functions for getting information about image data
    * - 2.1.0
      - 04/04/22
      - With this release we mainly follow some renamed functions in ``navis`` but

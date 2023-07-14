@@ -172,6 +172,17 @@ Functions for reconstruction samplers:
     pymaid.get_sampler_domains
     pymaid.get_sampler_counts
 
+Image metadata
+--------------
+Functions to fetch information about the image stacks CATMAID knows about.
+
+.. autosummary::
+    :toctree: generated/
+
+    pymaid.fetch.stacks.get_stacks
+    pymaid.fetch.stacks.get_stack_info
+    pymaid.fetch.stacks.get_mirror_info
+
 Image data (tiles)
 ------------------
 Functions to fetch and process image data. Note that this is not imported at
