@@ -17,7 +17,6 @@ ujson~=1.35
 #extra: stacks
 zarr
 fsspec[http]
-pydantic>=2
 xarray[parallel]
 imageio
 

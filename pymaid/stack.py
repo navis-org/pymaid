@@ -1,139 +1,32 @@
 from __future__ import annotations
 from io import BytesIO
-from typing import Literal, Optional, Sequence, Type, TypeVar, Union
-import numpy as np
+from typing import Any, Literal, Optional, Sequence, Type, Union
 from abc import ABC
-from enum import IntEnum
+import sys
+
+import numpy as np
 from numpy.typing import DTypeLike, ArrayLike
 import zarr
-from pydantic import BaseModel
 from dask import array as da
 import xarray as xr
-from . import utils
 from zarr.storage import BaseStore
 import json
-import sys
 import requests
 import imageio.v3 as iio
+
+from . import utils
+from .fetch.stack import (
+    StackInfo,
+    MirrorInfo,
+    get_stacks,
+    get_stack_info,
+    get_mirror_info,
+)
 
 Dimension = Literal["x", "y", "z"]
 # Orientation = Literal["xy", "xz", "zy"]
 HALF_PX = 0.5
 ENDIAN = "<" if sys.byteorder == "little" else ">"
-
-
-class Orientation(IntEnum):
-    XY = 0
-    # todo: check these
-    XZ = 1
-    ZY = 2
-
-    def __bool__(self) -> bool:
-        return True
-
-    def full_orientation(self, reverse=False) -> tuple[Dimension, Dimension, Dimension]:
-        out = [
-            ("x", "y", "z"),
-            ("x", "z", "y"),
-            ("z", "y", "x"),
-        ][self.value]
-        if reverse:
-            out = out[::-1]
-        return out
-
-    @classmethod
-    def from_dims(cls, dims: Sequence[Dimension]):
-        pair = (dims[0].lower(), dims[1].lower())
-        out = {
-            ("x", "y"): cls.XY,
-            ("x", "z"): cls.XZ,
-            ("z", "y"): cls.ZY,
-        }.get(pair)
-        if out is None:
-            raise ValueError(f"Unknown dimensions: {dims}")
-        return out
-
-
-class MirrorInfo(BaseModel):
-    id: int
-    title: str
-    image_base: str
-    tile_width: int
-    tile_height: int
-    tile_source_type: int
-    file_extension: str
-    position: int
-
-
-N = TypeVar("N", int, float)
-
-
-class StackInfo(BaseModel):
-    sid: int
-    pid: int
-    ptitle: str
-    stitle: str
-    downsample_factors: Optional[list[dict[Dimension, float]]]
-    num_zoom_levels: int
-    translation: dict[Dimension, float]
-    resolution: dict[Dimension, float]
-    dimension: dict[Dimension, int]
-    comment: str
-    description: str
-    metadata: Optional[str]
-    broken_slices: dict[int, int]
-    mirrors: list[MirrorInfo]
-    orientation: Orientation
-    attribution: str
-    canary_location: dict[Dimension, int]
-    placeholder_color: dict[str, float]  # actually {r g b a}
-
-    def get_downsample(self, scale_level=0) -> dict[Dimension, float]:
-        """Get the downsample factors for a given scale level.
-
-        If the downsample factors are explicit in the stack info,
-        use that value.
-        Otherwise, use the CATMAID default:
-        scale by a factor of 2 per scale level.
-        If number of scale levels is known,
-        ensure the scale level exists.
-
-        Parameters
-        ----------
-        scale_level : int, optional
-
-        Returns
-        -------
-        dict[Dimension, float]
-
-        Raises
-        ------
-        IndexError
-            If the scale level is known not to exist
-        """
-        if self.downsample_factors is not None:
-            return self.downsample_factors[scale_level]
-        if self.num_zoom_levels > 0 and scale_level >= self.num_zoom_levels:
-            raise IndexError("list index out of range")
-
-        first, second, slicing = self.orientation.full_orientation()
-        return {first: 2**scale_level, second: 2**scale_level, slicing: 1}
-
-    def to_coords(self, scale_level: int = 0) -> dict[Dimension, np.ndarray]:
-        dims = self.orientation.full_orientation()
-        # todo: not sure if this is desired?
-        dims = dims[::-1]
-
-        downsamples = self.get_downsample(scale_level)
-
-        out: dict[Dimension, np.ndarray] = dict()
-        for d in dims:
-            c = np.arange(self.dimension[d], dtype=float)
-            c *= self.resolution[d]
-            c *= downsamples[d]
-            c += self.translation[d]
-            out[d] = c
-        return out
 
 
 def select_cli(prompt: str, options: dict[int, str]) -> Optional[int]:
@@ -159,7 +52,7 @@ def select_cli(prompt: str, options: dict[int, str]) -> Optional[int]:
 
 
 def to_array(
-    coord: Union[dict[Dimension, N], ArrayLike],
+    coord: Union[dict[Dimension, Any], ArrayLike],
     dtype: DTypeLike = np.float64,
     order: Sequence[Dimension] = ("z", "y", "x"),
 ) -> np.ndarray:
@@ -223,8 +116,8 @@ class JpegStore(BaseStore, ABC):
         ).encode()
         self.attrs_bytes = json.dumps(
             {
-                "stack_info": self.stack_info.model_dump(),
-                "mirror_info": self.mirror_info.model_dump(),
+                "stack_info": self.stack_info.to_jso(),
+                "mirror_info": self.mirror_info.to_jso(),
                 "scale_level": self.zoom_level,
             }
         ).encode()
@@ -301,7 +194,7 @@ class JpegStore(BaseStore, ABC):
         as_dask = self.to_dask_array()
         return xr.DataArray(
             as_dask,
-            coords=self.stack_info.to_coords(self.zoom_level),
+            coords=self.stack_info.get_coords(self.zoom_level),
             dims=self.stack_info.orientation.full_orientation(True),
         )
 
@@ -352,10 +245,8 @@ supported_sources = {11}.union(tile_stores)
 
 
 def select_stack(remote_instance=None) -> Optional[int]:
-    cm = utils._eval_remote_instance(remote_instance)
-    url = cm.make_url(cm.project_id, "stacks")
-    stacks = cm.fetch(url)
-    options = {s["id"]: s["title"] for s in stacks}
+    stacks = get_stacks(remote_instance)
+    options = {s.id: s.title for s in stacks}
     return select_cli("Select stack:", options)
 
 
@@ -372,9 +263,7 @@ class Stack:
         cls, stack_id: int, mirror_id: Optional[int] = None, remote_instance=None
     ):
         cm = utils._eval_remote_instance(remote_instance)
-        url = cm.make_url(cm.project_id, "stack", stack_id, "info")
-        info = cm.fetch(url)
-        sinfo = StackInfo.model_validate(info)
+        sinfo = get_stack_info(stack_id, cm)
         return cls(sinfo, mirror_id)
 
     def _get_mirror_info(self, mirror_id: Optional[int] = None) -> MirrorInfo:
@@ -382,12 +271,8 @@ class Stack:
             if self.mirror_info is None:
                 raise ValueError("No default mirror ID set")
             return self.mirror_info
-        for mirror in self.stack_info.mirrors:
-            if mirror.id == mirror_id:
-                return mirror
-        raise ValueError(
-            f"Mirror ID {mirror_id} not found for stack {self.stack_info.sid}"
-        )
+
+        return get_mirror_info(self.stack_info, mirror_id)
 
     def set_mirror(self, mirror_id: int):
         self.mirror_info = self._get_mirror_info(mirror_id)
@@ -478,7 +363,7 @@ class Stack:
             as_dask = da.from_zarr(as_zarr).transpose(transpose)
             return xr.DataArray(
                 as_dask,
-                coords=self.stack_info.to_coords(scale_level),
+                coords=self.stack_info.get_coords(scale_level),
                 dims=self.stack_info.orientation.full_orientation(True),
             )
 
