@@ -200,6 +200,13 @@ class JpegStore(BaseStore, ABC):
         else:
             self.session = session
 
+        brok_sl = {int(k): int(k) + v for k, v in self.stack_info.broken_slices.items()}
+        self.broken_slices = dict()
+        for k, v in brok_sl.items():
+            while v in brok_sl:
+                v = brok_sl[v]
+            self.broken_slices[k] = v
+
         order = self.stack_info.orientation.full_orientation(reverse=True)
         self.metadata_bytes = json.dumps(
             {
@@ -254,11 +261,7 @@ class JpegStore(BaseStore, ABC):
         raise NotImplementedError()
 
     def _resolve_broken_slices(self, slice_idx: int) -> int:
-        while True:
-            incr = self.stack_info.broken_slices.get(slice_idx)
-            if incr is None:
-                return slice_idx
-            slice_idx += incr
+        return self.broken_slices.get(slice_idx, slice_idx)
 
     def __getitem__(self, key):
         last = key.split("/")[-1]
@@ -337,8 +340,11 @@ class TileStore5(JpegStore):
 
 
 tile_stores: dict[int, Type[JpegStore]] = {
-    t.tile_source_type: t for t in [
-        TileStore1, TileStore4, TileStore5,
+    t.tile_source_type: t
+    for t in [
+        TileStore1,
+        TileStore4,
+        TileStore5,
         # TileStore10
     ]
 }
