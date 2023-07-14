@@ -245,39 +245,85 @@ supported_sources = {11}.union(tile_stores)
 
 
 def select_stack(remote_instance=None) -> Optional[int]:
+    """"""
     stacks = get_stacks(remote_instance)
     options = {s.id: s.title for s in stacks}
     return select_cli("Select stack:", options)
 
 
 class Stack:
-    def __init__(self, stack_info: StackInfo, mirror_id: Optional[int] = None):
+    """Class representing a CATMAID stack of images.
+
+    Stacks are usually a scale pyramid.
+    This class can, for certain stack mirror types,
+    allow access to individual scale levels as arrays
+    which can be queried in voxel or world coordinates.
+    """
+    def __init__(self, stack_info: StackInfo, mirror: Optional[Union[int, str]] = None):
+        """The :func:`Stack.from_catmaid` constructor may be more convenient.
+
+        Parameters
+        ----------
+        stack_info : StackInfo
+        mirror_id : Optional[int], optional
+        """
         self.stack_info = stack_info
         self.mirror_info: Optional[MirrorInfo] = None
 
-        if mirror_id is not None:
-            self.set_mirror(mirror_id)
+        if mirror is not None:
+            self.set_mirror(mirror)
+
+    @classmethod
+    def select_from_catmaid(cls, remote_instance=None):
+        """Interactively select a stack and mirror from those available.
+
+        Parameters
+        ----------
+        remote_instance : CatmaidInstance, optional
+            By default global.
+        """
+        stacks = get_stacks(remote_instance)
+        options = {s.id: s.title for s in stacks}
+        sid = select_cli("Select stack:", options)
+        if not sid:
+            return None
+        out = cls.from_catmaid(sid, remote_instance=remote_instance)
+        out.select_mirror()
+        return out
 
     @classmethod
     def from_catmaid(
-        cls, stack_id: int, mirror_id: Optional[int] = None, remote_instance=None
+        cls, stack: Union[str, int], mirror: Optional[Union[int, str]] = None, remote_instance=None
     ):
-        cm = utils._eval_remote_instance(remote_instance)
-        sinfo = get_stack_info(stack_id, cm)
-        return cls(sinfo, mirror_id)
+        """Fetch relevant data from CATMAID and build a Stack.
 
-    def _get_mirror_info(self, mirror_id: Optional[int] = None) -> MirrorInfo:
-        if mirror_id is None:
+        Parameters
+        ----------
+        stack : Union[str, int]
+            Integer stack ID or string stack title.
+        mirror : Optional[int, str], optional
+            Integer mirror ID or string mirror title, by default None
+        remote_instance : CatmaidInstance, optional
+            By default global.
+        """
+        sinfo = get_stack_info(stack, remote_instance)
+        return cls(sinfo, mirror)
+
+    def _get_mirror_info(self, mirror: Optional[Union[int, str]] = None) -> MirrorInfo:
+        if mirror is None:
             if self.mirror_info is None:
                 raise ValueError("No default mirror ID set")
             return self.mirror_info
 
-        return get_mirror_info(self.stack_info, mirror_id)
+        return get_mirror_info(self.stack_info, mirror)
 
-    def set_mirror(self, mirror_id: int):
-        self.mirror_info = self._get_mirror_info(mirror_id)
+    def set_mirror(self, mirror: Union[int, str]):
+        """Set the mirror using its int ID or str title."""
+        self.mirror_info = self._get_mirror_info(mirror)
 
     def select_mirror(self):
+        """Interactively select a mirror from those available.
+        """
         options = {
             m.id: m.title
             for m in self.stack_info.mirrors
@@ -312,6 +358,7 @@ class Stack:
         Returns
         -------
         xr.DataArray
+            Can be queried in voxel or world space.
 
         Raises
         ------

@@ -183,19 +183,22 @@ Functions to fetch information about the image stacks CATMAID knows about.
     pymaid.get_stack_info
     pymaid.get_mirror_info
 
-Image data (tiles)
+Image data (tiles and N5 volumes)
 ------------------
 Functions to fetch and process image data. Note that this is not imported at
 top level but has to be imported explicitly::
 
   >>> from pymaid import tiles
   >>> help(tiles.crop_neuron)
+  >>> from pymaid.stack import Stack
+  >>> help(Stack)
 
 .. autosummary::
     :toctree: generated/
 
     pymaid.tiles.TileLoader
     pymaid.tiles.crop_neuron
+    pymaid.stack.Stack
 
 .. _api_misc:
 
