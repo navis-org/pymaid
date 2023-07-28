@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import cache
-from typing import Optional, Union
+from typing import Optional, Union, List, Tuple
 import re
 
 import networkx as nx
@@ -38,7 +38,7 @@ class ThinNeuron:
         self,
         skeleton_id: Optional[int] = None,
         name: Optional[str] = None,
-        annotations: Optional[list[str]] = None,
+        annotations: Optional[List[str]] = None,
         remote_instance: Optional[CatmaidInstance] = None,
     ) -> None:
         """
@@ -51,7 +51,7 @@ class ThinNeuron:
             If None, determined from name.
         name : Optional[str], optional
             If None, determined from skeleton ID.
-        annotations : Optional[list[str]], optional
+        annotations : Optional[List[str]], optional
             If None, determined from skeleton ID or name.
         remote_instance : Optional[CatmaidInstance], optional
             If None, uses global instance.
@@ -90,7 +90,7 @@ class ThinNeuron:
         return self._name
 
     @property
-    def annotations(self) -> list[str]:
+    def annotations(self) -> List[str]:
         if self._annotations is None:
             skid = self.skeleton_id
             skid_to_anns = pymaid.get_annotations(skid)
@@ -155,8 +155,8 @@ class Annotations(LabelComponent):
         super().__init__()
 
     def _filter_by_author(
-        self, annotations: list[str], remote_instance: CatmaidInstance
-    ) -> list[str]:
+        self, annotations: List[str], remote_instance: CatmaidInstance
+    ) -> List[str]:
         if self.annotator_name is None or not annotations:
             return annotations
 
@@ -166,8 +166,8 @@ class Annotations(LabelComponent):
         return [a for a in annotations if a in allowed]
 
     def _filter_by_annotation(
-        self, annotations: list[str], remote_instance: CatmaidInstance
-    ) -> list[str]:
+        self, annotations: List[str], remote_instance: CatmaidInstance
+    ) -> List[str]:
         if self.annotated_with is None or not annotations:
             return annotations
 
@@ -193,7 +193,7 @@ def dedup_whitespace(s: str):
 @cache
 def parse_components(
     fmt: str,
-) -> tuple[list[str], list[tuple[str, int, Optional[str]]]]:
+) -> Tuple[List[str], List[Tuple[str, int, Optional[str]]]]:
     joiners = []
     components = []
     last_end = 0
@@ -264,7 +264,7 @@ class NeuronLabeller:
     """Class for calculating neurons' labels, as used in the CATMAID frontend."""
     def __init__(
         self,
-        components: Optional[list[LabelComponent]] = None,
+        components: Optional[List[LabelComponent]] = None,
         fmt="%0",
         trim_empty=True,
         remove_neighboring_duplicates=True,
@@ -273,7 +273,7 @@ class NeuronLabeller:
 
         Parameters
         ----------
-        components : list[LabelComponent], optional
+        components : List[LabelComponent], optional
             The label components as used in CATMAID's user settings.
             See `SkeletonId`, `NeuronName`, and `Annotations`.
             First component should be ``SkeletonId()`` for compatibility with CATMAID.

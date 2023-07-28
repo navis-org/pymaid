@@ -391,7 +391,7 @@ def get_entity_graph(
 
     Neurons additionally have
 
-    - skeleton_ids: list[int]
+    - skeleton_ids: List[int]
 
     Skeletons additionally have
 

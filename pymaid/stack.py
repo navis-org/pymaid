@@ -29,7 +29,7 @@ HALF_PX = 0.5
 ENDIAN = "<" if sys.byteorder == "little" else ">"
 
 
-def select_cli(prompt: str, options: dict[int, str]) -> Optional[int]:
+def select_cli(prompt: str, options: Dict[int, str]) -> Optional[int]:
     out = None
     print(prompt)
     for k, v in sorted(options.items()):
@@ -52,7 +52,7 @@ def select_cli(prompt: str, options: dict[int, str]) -> Optional[int]:
 
 
 def to_array(
-    coord: Union[dict[Dimension, Any], ArrayLike],
+    coord: Union[Dict[Dimension, Any], ArrayLike],
     dtype: DTypeLike = np.float64,
     order: Sequence[Dimension] = ("z", "y", "x"),
 ) -> np.ndarray:
@@ -232,7 +232,7 @@ class TileStore5(JpegStore):
 #         return s
 
 
-tile_stores: dict[int, Type[JpegStore]] = {
+tile_stores: Dict[int, Type[JpegStore]] = {
     t.tile_source_type: t
     for t in [
         TileStore1,

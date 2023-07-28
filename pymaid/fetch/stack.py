@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union, Literal, Sequence
+from typing import Any, Optional, Union, Literal, Sequence, Tuple, Dict, List
 import numpy as np
 from ..utils import _eval_remote_instance
 from ..client import CatmaidInstance
@@ -17,7 +17,7 @@ class Orientation(IntEnum):
     def __bool__(self) -> bool:
         return True
 
-    def full_orientation(self, reverse=False) -> tuple[Dimension, Dimension, Dimension]:
+    def full_orientation(self, reverse=False) -> Tuple[Dimension, Dimension, Dimension]:
         out = [
             ("x", "y", "z"),
             ("x", "z", "y"),
@@ -48,7 +48,7 @@ class StackSummary:
     comment: str
 
 
-def get_stacks(remote_instance: Optional[CatmaidInstance] = None) -> list[StackSummary]:
+def get_stacks(remote_instance: Optional[CatmaidInstance] = None) -> List[StackSummary]:
     """Get summary of all stacks in the project.
 
     Parameters
@@ -95,23 +95,23 @@ class StackInfo:
     pid: int
     ptitle: str
     stitle: str
-    downsample_factors: Optional[list[dict[Dimension, float]]]
+    downsample_factors: Optional[List[Dict[Dimension, float]]]
     num_zoom_levels: int
-    translation: dict[Dimension, float]
-    resolution: dict[Dimension, float]
-    dimension: dict[Dimension, int]
+    translation: Dict[Dimension, float]
+    resolution: Dict[Dimension, float]
+    dimension: Dict[Dimension, int]
     comment: str
     description: str
     metadata: Optional[str]
-    broken_slices: dict[int, int]
-    mirrors: list[MirrorInfo]
+    broken_slices: Dict[int, int]
+    mirrors: List[MirrorInfo]
     orientation: Orientation
     attribution: str
-    canary_location: dict[Dimension, int]
+    canary_location: Dict[Dimension, int]
     placeholder_color: Color
 
     @classmethod
-    def from_jso(cls, sinfo: dict[str, Any]):
+    def from_jso(cls, sinfo: Dict[str, Any]):
         sinfo["orientation"] = Orientation(sinfo["orientation"])
         sinfo["placeholder_color"] = Color(**sinfo["placeholder_color"])
         sinfo["mirrors"] = [MirrorInfo(**m) for m in sinfo["mirrors"]]
@@ -120,7 +120,7 @@ class StackInfo:
     def to_jso(self):
         return asdict(self)
 
-    def get_downsample(self, scale_level=0) -> dict[Dimension, float]:
+    def get_downsample(self, scale_level=0) -> Dict[Dimension, float]:
         """Get the downsample factors for a given scale level.
 
         If the downsample factors are explicit in the stack info,
@@ -151,13 +151,13 @@ class StackInfo:
         first, second, slicing = self.orientation.full_orientation()
         return {first: 2**scale_level, second: 2**scale_level, slicing: 1}
 
-    def get_coords(self, scale_level: int = 0) -> dict[Dimension, np.ndarray]:
+    def get_coords(self, scale_level: int = 0) -> Dict[Dimension, np.ndarray]:
         dims = self.orientation.full_orientation()
         dims = dims[::-1]
 
         downsamples = self.get_downsample(scale_level)
 
-        out: dict[Dimension, np.ndarray] = dict()
+        out: Dict[Dimension, np.ndarray] = dict()
         for d in dims:
             c = np.arange(self.dimension[d], dtype=float)
             c *= self.resolution[d]
