@@ -12,6 +12,7 @@ What's new?
      -
    * - Next
      - n/a
+     - BREAKING: Drop python 3.7 support.
      - - :class:`pymaid.neuron_label.NeuronLabeller` added for labelling neurons
          like in the CATMAID frontend.
    * - 2.4.0

@@ -41,14 +41,13 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
 
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
     install_requires=requirements,
     extras_require={'extras': ['fuzzywuzzy[speedup]~=0.17.0',
                                'ujson~=1.35']},
-    python_requires='>=3.6',
+    python_requires='>=3.8',
     zip_safe=False
 )
