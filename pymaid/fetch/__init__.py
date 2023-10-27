@@ -4733,7 +4733,7 @@ def get_skeleton_change(x, chunk_size=50, remote_instance=None):
 
 @cache.undo_on_error
 def get_nearest_node(x, y, z, skeleton_id=None, neuron_id=None, remote_instance=None):
-    """Get split and merge history of skeletons.
+    """Get the node nearest to a query point. Optionally restricted to a single skeleton.
 
     Parameters
     ----------
@@ -4741,7 +4741,7 @@ def get_nearest_node(x, y, z, skeleton_id=None, neuron_id=None, remote_instance=
     y :                     Y coordinate of query location.
     z :                     Z coordinate of query location.
     skeleton_id :           Result treenode has to be in this skeleton. (optional)
-    neuron_id :             Result treenode has to be in  this neuron. (optional, altenrate to skeleton_id)
+    neuron_id :             Result treenode has to be in this neuron. (optional, altenrate to skeleton_id)
     remote_instance :       CatmaidInstance, optional
                             If not passed directly, will try using global.
 
