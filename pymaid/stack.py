@@ -270,6 +270,12 @@ class Stack:
     This class can, for certain stack mirror types,
     allow access to individual scale levels as arrays
     which can be queried in voxel or world coordinates.
+
+    HTTP requests to fetch stack data are often configured
+    differently for different stack mirrors and tile source types.
+    For most non-public mirrors, you will need to define a function
+    which creats an object to make these requests:
+    see the ``my_stack.set_mirror_session_factory()`` method.
     """
     def __init__(
         self,
@@ -434,12 +440,12 @@ class Stack:
 
         if mirror_info.tile_source_type in tile_stores:
             store_class = tile_stores[mirror_info.tile_source_type]
-            fac = self._get_session_factory(
+            session = self._get_session_factory(
                 mirror_info.id,
                 requests.Session,
-            )
+            )()
             store = store_class(
-                self.stack_info, mirror_info, scale_level, fac()
+                self.stack_info, mirror_info, scale_level, session
             )
             return store.to_xarray()
         elif mirror_info.tile_source_type == 11:
