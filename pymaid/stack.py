@@ -1,6 +1,11 @@
+"""Access to image data as xarray.DataArrays.
+
+CATMAID's image source conventions are documented here
+https://catmaid.readthedocs.io/en/stable/tile_sources.html
+"""
 from __future__ import annotations
 from io import BytesIO
-from typing import Any, Literal, Optional, Sequence, Type, Union
+from typing import Any, Callable, Literal, Optional, Sequence, Type, Union, Dict
 from abc import ABC
 import sys
 
@@ -13,6 +18,8 @@ from zarr.storage import BaseStore
 import json
 import requests
 import imageio.v3 as iio
+
+from pymaid.client import CatmaidInstance
 
 from . import utils
 from .fetch.stack import (
@@ -61,7 +68,7 @@ def to_array(
     return np.asarray(coord, dtype=dtype)
 
 
-class JpegStore(BaseStore, ABC):
+class ImageIoStore(BaseStore, ABC):
     """
     Must include instance variable 'fmt',
     which is a format string with variables:
@@ -79,7 +86,7 @@ class JpegStore(BaseStore, ABC):
         stack_info: StackInfo,
         mirror_info: MirrorInfo,
         zoom_level: int,
-        session: Optional[requests.Session] = None,
+        session: Union[requests.Session, CatmaidInstance, None] = None,
     ) -> None:
         if mirror_info.tile_source_type != self.tile_source_type:
             raise ValueError("Mismatched tile source type")
@@ -87,11 +94,12 @@ class JpegStore(BaseStore, ABC):
         self.mirror_info = mirror_info
         self.zoom_level = zoom_level
 
-        if session is None:
-            cm = utils._eval_remote_instance(None)
-            self.session = cm._session
-        else:
+        if isinstance(session, CatmaidInstance):
+            self.session = session._session
+        elif isinstance(session, requests.Session):
             self.session = session
+        elif session is None:
+            session = requests.Session()
 
         brok_sl = {int(k): int(k) + v for k, v in self.stack_info.broken_slices.items()}
         self.broken_slices = dict()
@@ -199,22 +207,26 @@ class JpegStore(BaseStore, ABC):
         )
 
 
-class TileStore1(JpegStore):
+class TileStore1(ImageIoStore):
+    """File-based image stack."""
     tile_source_type = 1
     fmt = "{image_base}{slice_idx}/{row}_{col}_{zoom_level}.{file_extension}"
 
 
-class TileStore4(JpegStore):
+class TileStore4(ImageIoStore):
+    """File-based image stack with zoom level directories."""
     tile_source_type = 4
     fmt = "{image_base}{slice_idx}/{zoom_level}/{row}_{col}.{file_extension}"
 
 
-class TileStore5(JpegStore):
+class TileStore5(ImageIoStore):
+    """Directory-based image stack with zoom, z, and row directories."""
     tile_source_type = 5
     fmt = "{image_base}{zoom_level}/{slice_idx}/{row}/{col}.{file_extension}"
 
 
-# class TileStore10(JpegStore):
+# class TileStore10(ImageIoStore):
+#     """H2N5 tile stack."""
 #     tile_source_type = 10
 #     fmt = "{image_base}.{file_extension}"
 
@@ -232,7 +244,7 @@ class TileStore5(JpegStore):
 #         return s
 
 
-tile_stores: Dict[int, Type[JpegStore]] = {
+tile_stores: Dict[int, Type[ImageIoStore]] = {
     t.tile_source_type: t
     for t in [
         TileStore1,
@@ -259,7 +271,11 @@ class Stack:
     allow access to individual scale levels as arrays
     which can be queried in voxel or world coordinates.
     """
-    def __init__(self, stack_info: StackInfo, mirror: Optional[Union[int, str]] = None):
+    def __init__(
+        self,
+        stack_info: StackInfo,
+        mirror: Optional[Union[int, str]] = None,
+    ):
         """The :func:`Stack.from_catmaid` constructor may be more convenient.
 
         Parameters
@@ -269,9 +285,38 @@ class Stack:
         """
         self.stack_info = stack_info
         self.mirror_info: Optional[MirrorInfo] = None
+        self.mirror_session_factory: Dict[int, Callable[[], Any]] = dict()
 
         if mirror is not None:
             self.set_mirror(mirror)
+
+    def set_mirror_session_factory(
+        self, mirror: Union[int, str, None], factory: Callable[[], Any]
+    ):
+        """Set functions which construct the session for fetching image data, per mirror.
+
+        For most tile stacks, this is a
+        `requests.Session <https://requests.readthedocs.io/en/latest/api/#requests.Session>`_.
+        See ``get_remote_instance_session`` to use the session from a given
+        ``CatmaidInstance`` (including the global).
+
+        For N5 (tile source 11), this is a
+        `aiohttp.ClientSession <https://docs.aiohttp.org/en/stable/client_reference.html#aiohttp.ClientSession>`_.
+
+        Parameters
+        ----------
+        mirror : Union[int, str, None]
+            Mirror, as integer ID, string name, or None to use the one defined on the class.
+        factory : Callable[[], Any]
+            Function which creates a session of the appropriate type.
+            For example, to re-use the ``requests.Session`` from the
+            global ``CatmaidInstance`` for mirror with ID 1, use
+            ``my_stack.set_mirror_instance_factory(1, get_remote_instance_session)``.
+            To use HTTP basic auth for an N5 stack mirror (tile source 11) with ID 2, use
+            ``my_stack.set_mirror_instance_factor(2, lambda: aiohttp.ClientSession(auth=aiohttp.BasicAuth("myusername", "mypassword")))``.
+        """
+        minfo = self._get_mirror_info(mirror)
+        self.mirror_session_factory[minfo.id] = factory
 
     @classmethod
     def select_from_catmaid(cls, remote_instance=None):
@@ -340,6 +385,15 @@ class Stack:
         if result is not None:
             self.set_mirror(result)
 
+    def _get_session_factory(self, mirror_id: int, default: Optional[Callable[[], Any]]=None):
+        try:
+            return self.mirror_session_factory[mirror_id]
+        except KeyError:
+            if default is None:
+                raise
+            else:
+                return default
+
     def get_scale(
         self, scale_level: int, mirror_id: Optional[int] = None
     ) -> xr.DataArray:
@@ -380,40 +434,67 @@ class Stack:
 
         if mirror_info.tile_source_type in tile_stores:
             store_class = tile_stores[mirror_info.tile_source_type]
-            store = store_class(self.stack_info, mirror_info, scale_level, None)
+            fac = self._get_session_factory(
+                mirror_info.id,
+                requests.Session,
+            )
+            store = store_class(
+                self.stack_info, mirror_info, scale_level, fac()
+            )
             return store.to_xarray()
         elif mirror_info.tile_source_type == 11:
-            # do we need to handle broken slices here?
-            # or is that metadata just telling the frontend to skip regions which exist
-            # (as fill values) in the N5?
-            formatted = mirror_info.image_base.replace(
-                "%SCALE_DATASET%", f"s{scale_level}"
-            )
-            *components, transpose_str = formatted.split("/")
-            transpose = [int(t) for t in transpose_str.split("_")]
-
-            container_comp = []
-            arr_comp = []
-            this = container_comp
-            for comp in components:
-                this.append(comp)
-                if comp.lower().endswith(".n5"):
-                    this = arr_comp
-
-            if not arr_comp:
-                raise ValueError("N5 container must have '.n5' suffix")
-
-            store = zarr.N5FSStore("/".join(container_comp))
-            container = zarr.open(store, "r")
-            as_zarr = container["/".join(arr_comp)]
-            # todo: check this transpose
-            as_dask = da.from_zarr(as_zarr).transpose(transpose)
-            return xr.DataArray(
-                as_dask,
-                coords=self.stack_info.get_coords(scale_level),
-                dims=self.stack_info.orientation.full_orientation(True),
-            )
+            return self._get_n5(mirror_info, scale_level)
 
         raise NotImplementedError(
             f"Tile source type {mirror_info.tile_source_type} not implemented"
         )
+
+    def _get_n5(
+        self,
+        mirror_info: MirrorInfo,
+        scale_level: int,
+    ) -> xr.DataArray:
+        if mirror_info.tile_source_type != 11:
+            raise ValueError("Mirror info not from an N5 tile source")
+        formatted = mirror_info.image_base.replace(
+            "%SCALE_DATASET%", f"s{scale_level}"
+        )
+        *components, transpose_str = formatted.split("/")
+        transpose = [int(t) for t in transpose_str.split("_")]
+
+        container_comp = []
+        arr_comp = []
+        this = container_comp
+        for comp in components:
+            this.append(comp)
+            if comp.lower().endswith(".n5"):
+                this = arr_comp
+
+        if not arr_comp:
+            raise ValueError("N5 container must have '.n5' suffix")
+
+        kwargs = dict()
+        fac = self._get_session_factory(mirror_info.id, None)
+        if fac is not None:
+            kwargs["get_client"] = fac
+
+        store = zarr.N5FSStore("/".join(container_comp), **kwargs)
+
+        container = zarr.open(store, "r")
+        as_zarr = container["/".join(arr_comp)]
+        # todo: check this transpose
+        as_dask = da.from_zarr(as_zarr).transpose(transpose)
+        return xr.DataArray(
+            as_dask,
+            coords=self.stack_info.get_coords(scale_level),
+            dims=self.stack_info.orientation.full_orientation(True),
+        )
+
+
+def get_remote_instance_session(remote_instance: Optional[CatmaidInstance] = None):
+    """Get the ``requests.Session`` from the given ``CatmaidInstance``.
+
+    If ``None`` is given, use the global ``CatmaidInstance``.
+    """
+    cm = utils._eval_remote_instance(remote_instance)
+    return cm._session
