@@ -114,7 +114,7 @@ def get_landmark_groups(
     locations : pd.DataFrame, optional (default None)
         A DataFrame with columns
         location_id, x, y, z, group_id.
-    members : dict[int, int], optional (default None)
+    members : dict[int, list[int]], optional (default None)
         A dict mapping group ID to a list of landmark IDs (members of that group).
 
     Examples

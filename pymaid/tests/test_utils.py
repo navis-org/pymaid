@@ -34,4 +34,3 @@ def test_filter_by_query_220():
         "*spade",
     )
     assert list(out) == [False, True, False, False]
-
