@@ -11,13 +11,8 @@ import sys
 
 import numpy as np
 from numpy.typing import DTypeLike, ArrayLike
-import zarr
-from dask import array as da
-import xarray as xr
-from zarr.storage import BaseStore
 import json
 import requests
-import imageio.v3 as iio
 
 from pymaid.client import CatmaidInstance
 
@@ -29,6 +24,20 @@ from .fetch.stack import (
     get_stack_info,
     get_mirror_info,
 )
+
+try:
+    import aiohttp
+    from dask import array as da
+    import imageio.v3 as iio
+    import xarray as xr
+    import zarr
+    from zarr.storage import BaseStore
+except ImportError as e:
+    raise ImportError(
+        'Optional dependencies for stack viewing are not available. '
+        'Make sure the appropriate extra is installed: `pip install navis[stacks]`. '
+        f'Original error: "{str(e)}"'
+    )
 
 Dimension = Literal["x", "y", "z"]
 # Orientation = Literal["xy", "xz", "zy"]
@@ -230,11 +239,10 @@ class TileStore5(ImageIoStore):
 #     tile_source_type = 10
 #     fmt = "{image_base}.{file_extension}"
 
-#     # todo: manually change quality?
-
 #     def _format_url(self, row: int, col: int, slice_idx: int) -> str:
 #         s = self.fmt.format(
 #             image_base=self.mirror_info.image_base,
+#             # todo: manually change quality?
 #             file_extension=self.mirror_info.file_extension,
 #         )
 #         s = s.replace("%SCALE_DATASET%", f"s{self.zoom_level}")
@@ -253,7 +261,8 @@ tile_stores: Dict[int, Type[ImageIoStore]] = {
         # TileStore10
     ]
 }
-supported_sources = {11}.union(tile_stores)
+source_client_types = {k: (requests.Session,) for k in tile_stores}
+source_client_types[11] = (aiohttp.ClientSession,)
 
 
 def select_stack(remote_instance=None) -> Optional[int]:
@@ -275,7 +284,7 @@ class Stack:
     differently for different stack mirrors and tile source types.
     For most non-public mirrors, you will need to define a function
     which creats an object to make these requests:
-    see the ``my_stack.set_mirror_session_factory()`` method.
+    see the ``my_stack.set_mirror_session()`` method.
     """
     def __init__(
         self,
@@ -291,13 +300,13 @@ class Stack:
         """
         self.stack_info = stack_info
         self.mirror_info: Optional[MirrorInfo] = None
-        self.mirror_session_factory: Dict[int, Callable[[], Any]] = dict()
+        self.mirror_session: Dict[int, Any] = dict()
 
         if mirror is not None:
             self.set_mirror(mirror)
 
-    def set_mirror_session_factory(
-        self, mirror: Union[int, str, None], factory: Callable[[], Any]
+    def set_mirror_session(
+        self, mirror: Union[int, str, None], session,
     ):
         """Set functions which construct the session for fetching image data, per mirror.
 
@@ -313,16 +322,16 @@ class Stack:
         ----------
         mirror : Union[int, str, None]
             Mirror, as integer ID, string name, or None to use the one defined on the class.
-        factory : Callable[[], Any]
-            Function which creates a session of the appropriate type.
+        session : Callable[[], Any]
+            HTTP session of the appropriate type.
             For example, to re-use the ``requests.Session`` from the
             global ``CatmaidInstance`` for mirror with ID 1, use
-            ``my_stack.set_mirror_instance_factory(1, get_remote_instance_session)``.
+            ``my_stack.set_mirror_instance(1, get_remote_instance_session())``.
             To use HTTP basic auth for an N5 stack mirror (tile source 11) with ID 2, use
-            ``my_stack.set_mirror_instance_factor(2, lambda: aiohttp.ClientSession(auth=aiohttp.BasicAuth("myusername", "mypassword")))``.
+            ``my_stack.set_mirror_instance_factor(2, aiohttp.ClientSession(auth=aiohttp.BasicAuth("myusername", "mypassword")))``.
         """
         minfo = self._get_mirror_info(mirror)
-        self.mirror_session_factory[minfo.id] = factory
+        self.mirror_session[minfo.id] = session
 
     @classmethod
     def select_from_catmaid(cls, remote_instance=None):
@@ -378,7 +387,7 @@ class Stack:
         options = {
             m.id: m.title
             for m in self.stack_info.mirrors
-            if m.tile_source_type in supported_sources
+            if m.tile_source_type in source_client_types
         }
         if not options:
             print("No mirrors with supported tile source type")
@@ -391,9 +400,9 @@ class Stack:
         if result is not None:
             self.set_mirror(result)
 
-    def _get_session_factory(self, mirror_id: int, default: Optional[Callable[[], Any]]=None):
+    def _get_session(self, mirror_id: int, default: Optional[Any]=None):
         try:
-            return self.mirror_session_factory[mirror_id]
+            return self.mirror_session[mirror_id]
         except KeyError:
             if default is None:
                 raise
@@ -440,10 +449,11 @@ class Stack:
 
         if mirror_info.tile_source_type in tile_stores:
             store_class = tile_stores[mirror_info.tile_source_type]
-            session = self._get_session_factory(
+            session = self._get_session(
                 mirror_info.id,
-                requests.Session,
-            )()
+                requests.Session(),
+            )
+            check_session_type(session, mirror_info.tile_source_type)
             store = store_class(
                 self.stack_info, mirror_info, scale_level, session
             )
@@ -480,9 +490,10 @@ class Stack:
             raise ValueError("N5 container must have '.n5' suffix")
 
         kwargs = dict()
-        fac = self._get_session_factory(mirror_info.id, None)
-        if fac is not None:
-            kwargs["get_client"] = fac
+        session = self._get_session(mirror_info.id, None)
+        if session is not None:
+            check_session_type(session, 11)
+            kwargs["get_client"] = lambda: session
 
         store = zarr.N5FSStore("/".join(container_comp), **kwargs)
 
@@ -494,6 +505,15 @@ class Stack:
             as_dask,
             coords=self.stack_info.get_coords(scale_level),
             dims=self.stack_info.orientation.full_orientation(True),
+        )
+
+
+def check_session_type(session, tile_source_type: int):
+    expected = source_client_types[tile_source_type]
+    if not isinstance(session, expected):
+        raise ValueError(
+            f"Incorrect HTTP client type for tile source {tile_source_type}. "
+            f"Got {type(session)} but expected one of {expected}."
         )
 
 
