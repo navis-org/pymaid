@@ -1,11 +1,11 @@
-"""Access to image data as xarray.DataArrays.
+"""Access to image data as ``xarray.DataArray``s.
 
 CATMAID's image source conventions are documented here
 https://catmaid.readthedocs.io/en/stable/tile_sources.html
 """
 from __future__ import annotations
 from io import BytesIO
-from typing import Any, Callable, Literal, Optional, Sequence, Type, Union, Dict
+from typing import Any, Literal, Optional, Sequence, Type, Union, Dict
 from abc import ABC
 import sys
 
@@ -282,9 +282,14 @@ class Stack:
 
     HTTP requests to fetch stack data are often configured
     differently for different stack mirrors and tile source types.
-    For most non-public mirrors, you will need to define a function
-    which creats an object to make these requests:
+    For most non-public mirrors, you will need to set the object to make these requests:
     see the ``my_stack.set_mirror_session()`` method.
+
+    See the ``my_stack.get_scale()`` method for getting an
+    `xarray.DataArray <https://docs.xarray.dev/en/stable/generated/xarray.DataArray.html#xarray.DataArray>`_
+    representing that scale level.
+    This can be queried in stack/ voxel or project/ world coordinates,
+    efficiently sliced and transposed etc..
     """
     def __init__(
         self,
@@ -412,7 +417,7 @@ class Stack:
     def get_scale(
         self, scale_level: int, mirror_id: Optional[int] = None
     ) -> xr.DataArray:
-        """Get an xarray.DataArray representing th given scale level.
+        """Get an xarray.DataArray representing the given scale level.
 
         Note that depending on the metadata available,
         missing scale levels may throw different errors.
