@@ -35,7 +35,7 @@ try:
 except ImportError as e:
     raise ImportError(
         'Optional dependencies for stack viewing are not available. '
-        'Make sure the appropriate extra is installed: `pip install navis[stacks]`. '
+        'Make sure the appropriate extra is installed: `pip install pymaid[stack]`. '
         f'Original error: "{str(e)}"'
     )
 

@@ -14,7 +14,7 @@ psutil>=5.4.3
 fuzzywuzzy[speedup]~=0.17.0
 ujson~=1.35
 
-#extra: stacks
+#extra: stack
 zarr
 fsspec[http]
 xarray[parallel]
