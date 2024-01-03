@@ -1,3 +1,4 @@
+import itertools
 from setuptools import setup, find_packages
 import re
 from pathlib import Path
@@ -15,6 +16,7 @@ else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
 install_requires, extras_require = parse_requirement_files(Path("requirements.txt"))
+extras_require["all"] = list(set(itertools.chain.from_iterable(extras_require.values())))
 
 setup(
     name='python-catmaid',
