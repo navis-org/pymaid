@@ -4,6 +4,7 @@ CATMAID's image source conventions are documented here
 https://catmaid.readthedocs.io/en/stable/tile_sources.html
 """
 from __future__ import annotations
+from functools import wraps
 from io import BytesIO
 from typing import Any, Literal, Optional, Sequence, Type, Union, Dict
 from abc import ABC
@@ -45,11 +46,18 @@ HALF_PX = 0.5
 ENDIAN = "<" if sys.byteorder == "little" else ">"
 
 
+@wraps(print)
+def eprint(*args, **kwargs):
+    """Thin wrapper around ``print`` which defaults to stderr"""
+    kwargs.setdefault("file", sys.stderr)
+    return print(*args, **kwargs)
+
+
 def select_cli(prompt: str, options: Dict[int, str]) -> Optional[int]:
     out = None
-    print(prompt)
+    eprint(prompt)
     for k, v in sorted(options.items()):
-        print(f"\t{k}.\t{v}")
+        eprint(f"\t{k}.\t{v}")
     p = "Type number and press enter (empty to cancel): "
     while out is None:
         result_str = input(p).strip()
@@ -58,10 +66,10 @@ def select_cli(prompt: str, options: Dict[int, str]) -> Optional[int]:
         try:
             result = int(result_str)
         except ValueError:
-            print("Not an integer, try again")
+            eprint("Not an integer, try again")
             continue
         if result not in options:
-            print("Not a valid option, try again")
+            eprint("Not a valid option, try again")
             continue
         out = result
     return out
@@ -397,7 +405,7 @@ class Stack:
             if m.tile_source_type in source_client_types
         }
         if not options:
-            print("No mirrors with supported tile source type")
+            eprint("No mirrors with supported tile source type")
             return
 
         result = select_cli(
