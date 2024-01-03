@@ -264,6 +264,8 @@ tile_stores: Dict[int, Type[ImageIoStore]] = {
 source_client_types = {k: (requests.Session,) for k in tile_stores}
 source_client_types[11] = (aiohttp.ClientSession,)
 
+Client = Union[requests.Session, aiohttp.ClientSession]
+
 
 def select_stack(remote_instance=None) -> Optional[int]:
     """"""
@@ -311,7 +313,7 @@ class Stack:
             self.set_mirror(mirror)
 
     def set_mirror_session(
-        self, mirror: Union[int, str, None], session,
+        self, mirror: Union[int, str, None], session: Client,
     ):
         """Set functions which construct the session for fetching image data, per mirror.
 
@@ -327,7 +329,7 @@ class Stack:
         ----------
         mirror : Union[int, str, None]
             Mirror, as integer ID, string name, or None to use the one defined on the class.
-        session : Callable[[], Any]
+        session : Union[requests.Session, aiohttp.ClientSession]
             HTTP session of the appropriate type.
             For example, to re-use the ``requests.Session`` from the
             global ``CatmaidInstance`` for mirror with ID 1, use
