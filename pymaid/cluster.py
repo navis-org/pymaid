@@ -400,7 +400,7 @@ def _calc_connectivity_matching_index(neuronA, neuronB, connectivity,
 
     if vertex_score:
         # We only need the columns for neuronA and neuronB
-        this_cn = total[[neuronA, neuronB]]
+        this_cn = total[[neuronA, neuronB]].astype(float)
 
         # Get min and max between both neurons
         this_max = np.max(this_cn, axis=1)
