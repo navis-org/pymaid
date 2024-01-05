@@ -918,9 +918,9 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
     df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
     if convert_ts:
-        df['creation_time'] = pd.to_datetime(df.creation_time)
-        df['edition_time'] = pd.to_datetime(df.edition_time)
-        df['review_times'] = df.review_times.apply(lambda x: [pd.to_datetime(d)
+        df['creation_time'] = pd.to_datetime(df.creation_time, format="ISO8601")
+        df['edition_time'] = pd.to_datetime(df.edition_time, format="ISO8601")
+        df['review_times'] = df.review_times.apply(lambda x: [pd.to_datetime(d, format="ISO8601")
                                                               for d in x])
 
     return df
@@ -1360,8 +1360,8 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
         df = df[df.connector_id.isin(x.connectors.connector_id)]
 
     # Convert to timestamps
-    df['creation_time'] = pd.to_datetime(df.creation_time)
-    df['edition_time'] = pd.to_datetime(df.edition_time)
+    df['creation_time'] = pd.to_datetime(df.creation_time, format="ISO8601")
+    df['edition_time'] = pd.to_datetime(df.edition_time, format="ISO8601")
 
     if with_tags:
         return df, tags
@@ -4613,7 +4613,7 @@ def get_sampler(x=None, remote_instance=None):
 
     # Convert timestamps
     df['creation_time'] = pd.to_datetime(df.creation_time, unit='s', utc=True)
-    df['edition_time'] = pd.to_datetime(df.creaedition_timetion_time, unit='s', utc=True)
+    df['edition_time'] = pd.to_datetime(df.edition_time, unit='s', utc=True)
 
     return df
 
@@ -4646,7 +4646,7 @@ def get_sampler_domains(sampler, remote_instance=None):
 
     # Convert timestamps
     df['creation_time'] = pd.to_datetime(df.creation_time, unit='s', utc=True)
-    df['edition_time'] = pd.to_datetime(df.creaedition_timetion_time, unit='s', utc=True)
+    df['edition_time'] = pd.to_datetime(df.edition_time, unit='s', utc=True)
 
     return df
 
