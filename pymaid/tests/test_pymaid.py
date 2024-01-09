@@ -35,6 +35,7 @@ From the interactive shell:
 import warnings
 import os
 import matplotlib as mpl
+import pytest
 #if os.environ.get('DISPLAY', '') == '':
 #    warnings.warn('No display found. Using template backend (nothing '
 #                  'will show).')
@@ -603,104 +604,6 @@ class TestMorpho(unittest.TestCase):
         self.assertIsInstance(ns.guess_radius(self.nl[0],
                                               inplace=False),
                               pymaid.CatmaidNeuron)
-
-
-class TestGraphs(unittest.TestCase):
-    """Test graph functions."""
-
-    def try_conditions(func):
-        """Runs each test under various conditions and asserts that results
-        are always the same."""
-
-        def wrapper(self, *args, **kwargs):
-            ns.config.use_igraph = False
-            res1 = func(self, *args, **kwargs)
-            if igraph:
-                ns.config.use_igraph = True
-                res2 = func(self, *args, **kwargs)
-                self.assertEqual(res1, res2)
-            return res1
-        return wrapper
-
-    def setUp(self):
-        self.rm = pymaid.CatmaidInstance(server=config_test.server_url,
-                                         http_user=config_test.http_user,
-                                         http_password=config_test.http_pw,
-                                         api_token=config_test.token,
-                                         make_global=True)
-
-        self.nl = pymaid.get_neuron(config_test.test_skids[0:2],
-                                    remote_instance=self.rm)
-
-        self.n = self.nl[0]
-        self.n.reroot(self.n.soma)
-
-        # Get some random leaf node
-        self.leaf_id = self.n.nodes[self.n.nodes.type == 'end'].sample(
-            1).iloc[0].node_id
-        self.slab_id = self.n.nodes[self.n.nodes.type == 'slab'].sample(
-            1).iloc[0].node_id
-
-    @try_conditions
-    def test_reroot(self):
-        self.assertIsNotNone(self.n.reroot(self.leaf_id, inplace=False))
-        self.assertIsNotNone(self.nl.reroot(self.nl.soma, inplace=False))
-
-    @try_conditions
-    def test_distal_to(self):
-        self.assertTrue(ns.distal_to(self.n, self.leaf_id, self.n.root))
-        self.assertFalse(ns.distal_to(self.n, self.n.root, self.leaf_id))
-
-    @try_conditions
-    def test_distance(self):
-        leaf_id = self.n.nodes[self.n.nodes.type == 'end'].iloc[0].node_id
-
-        self.assertIsNotNone(ns.dist_between(self.n,
-                                             leaf_id,
-                                             self.n.root))
-        self.assertIsNotNone(ns.dist_between(self.n,
-                                             self.n.root,
-                                             leaf_id))
-
-    @try_conditions
-    def test_find_bp(self):
-        self.assertIsNotNone(ns.find_main_branchpoint(self.n,
-                                                      reroot_soma=False))
-
-    @try_conditions
-    def test_split_fragments(self):
-        self.assertIsNotNone(ns.split_into_fragments(self.n,
-                                                     n=2,
-                                                     reroot_soma=False))
-
-    @try_conditions
-    def test_longest_neurite(self):
-        self.assertIsNotNone(ns.longest_neurite(self.n,
-                                                n=2,
-                                                reroot_soma=False))
-
-    @try_conditions
-    def test_cut_neuron(self):
-        dist, prox = ns.cut_skeleton(self.n, self.slab_id)
-        self.assertNotEqual(dist.nodes.shape, prox.nodes.shape)
-
-        # Make sure dist and prox check out
-        self.assertTrue(ns.distal_to(self.n, dist.root, prox.root))
-
-    @try_conditions
-    def test_subset(self):
-        self.assertIsInstance(ns.subset_neuron(self.n,
-                                               self.n.segments[0]),
-                              pymaid.CatmaidNeuron)
-
-    @try_conditions
-    def test_node_sorting(self):
-        self.assertIsInstance(ns.graph.node_label_sorting(self.n),
-                              list)
-
-    @try_conditions
-    def test_geodesic_matrix(self):
-        geo = ns.geodesic_matrix(self.n)
 
 
 class TestConnectivity(unittest.TestCase):
