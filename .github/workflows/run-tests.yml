@@ -41,6 +41,8 @@ jobs:
       run: pip install -e .
     - run: pip install python-igraph
       if: ${{ matrix.igraph == 'igraph' }}
+    - name: Report dependency versions
+      run: pip freeze -r requirements.txt
     - name: Test
       run: |
         pytest --cov=./ --verbose
