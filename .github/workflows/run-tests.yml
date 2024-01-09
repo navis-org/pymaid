@@ -12,10 +12,9 @@ jobs:
       fail-fast: false
       matrix:
         python-version:
-          - '3.7'
-          - '3.8'
           - '3.9'
           - '3.10'
+          - '3.11'
         igraph: ["igraph", "no-igraph"]
     steps:
     #   # This cancels any such job that is still runnning
@@ -42,6 +41,8 @@ jobs:
       run: pip install -e .
     - run: pip install python-igraph
       if: ${{ matrix.igraph == 'igraph' }}
+    - name: Report dependency versions
+      run: pip freeze -r requirements.txt
     - name: Test
       run: |
         pytest --cov=./ --verbose

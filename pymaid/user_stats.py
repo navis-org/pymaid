@@ -365,7 +365,7 @@ def get_team_contributions(teams, neurons=None, remote_instance=None):
 
         # Add column with just the date and make it the index
         all_ts['date'] = all_ts.timestamp.values.astype('datetime64[D]')
-        all_ts.index = pd.to_datetime(all_ts.date)
+        all_ts.index = pd.to_datetime(all_ts.date, format="ISO8601")
 
         # Fill in teams for each timestamp based on user + date
         all_ts['team'] = None

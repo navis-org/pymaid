@@ -698,6 +698,10 @@ class TestGraphs(unittest.TestCase):
         self.assertIsInstance(ns.graph.node_label_sorting(self.n),
                               list)
 
+    @try_conditions
+    def test_geodesic_matrix(self):
+        geo = ns.geodesic_matrix(self.n)
+
 
 class TestConnectivity(unittest.TestCase):
     """Test connectivity-related functions."""
