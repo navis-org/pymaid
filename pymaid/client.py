@@ -692,6 +692,10 @@ class CatmaidInstance:
         """Generate url for retrieving node infos (POST)."""
         return self.make_url(self.project_id, 'labels-for-nodes', **GET)
 
+    def _get_nearest_node_url(self, **GET):
+        """Generate url for retrieving nearest node."""
+        return self.make_url(self.project_id, 'nodes', 'nearest', **GET)
+
     def _get_skeleton_nodes_url(self, skid, **GET):
         """Generate url for retrieving skeleton nodes.
 
