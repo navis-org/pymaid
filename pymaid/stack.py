@@ -293,7 +293,9 @@ class Stack:
     HTTP requests to fetch stack data are often configured
     differently for different stack mirrors and tile source types.
     For most non-public mirrors, you will need to set the object to make these requests:
-    see the ``my_stack.set_mirror_session()`` method.
+    see the ``my_stack.set_mirror_session()`` method;
+    if you just need to set HTTP Basic authentication headers,
+    see the ``my_stack.set_mirror_auth()`` convenience method.
 
     See the ``my_stack.get_scale()`` method for getting an
     `xarray.DataArray <https://docs.xarray.dev/en/stable/generated/xarray.DataArray.html#xarray.DataArray>`_
@@ -320,8 +322,42 @@ class Stack:
         if mirror is not None:
             self.set_mirror(mirror)
 
+    def set_mirror_auth(self, mirror: Union[int, str, None, MirrorInfo], http_user: str, http_password: str):
+        """Set the HTTP Basic credentials for a particular stack mirror.
+
+        This will replace any other session configured for that mirror.
+
+        For more fine-grained control (e.g. setting other headers),
+        or to re-use the session object from a ``CatmaidInstance``,
+        see ``my_stack.set_mirror_session()``.
+
+        Parameters
+        ----------
+        mirror : Union[int, str, None, MirrorInfo]
+            Mirror, as MirrorInfo, intger ID, string title, or None (use default)
+        http_user : str
+            HTTP Basic username
+        http_password : str
+            HTTP Basic password
+
+        Raises
+        ------
+        ValueError
+            If the given mirror is not supported.
+        """
+        minfo = self._get_mirror_info(mirror)
+        if minfo.tile_source_type == 11:
+            s = aiohttp.ClientSession(auth=aiohttp.BasicAuth(http_user, http_password))
+            return self.set_mirror_session(mirror, s)
+        elif minfo.tile_source_type in source_client_types:
+            s = requests.Session()
+            s.auth = (http_user, http_password)
+            return self.set_mirror_session(mirror, s)
+        else:
+            raise ValueError("Mirror's tile source type is unsupported: %s", minfo.tile_source_type)
+
     def set_mirror_session(
-        self, mirror: Union[int, str, None], session: Client,
+        self, mirror: Union[int, str, None, MirrorInfo], session: Client,
     ):
         """Set functions which construct the session for fetching image data, per mirror.
 
@@ -345,6 +381,7 @@ class Stack:
             To use HTTP basic auth for an N5 stack mirror (tile source 11) with ID 2, use
             ``my_stack.set_mirror_instance_factor(2, aiohttp.ClientSession(auth=aiohttp.BasicAuth("myusername", "mypassword")))``.
         """
+
         minfo = self._get_mirror_info(mirror)
         self.mirror_session[minfo.id] = session
 
@@ -384,7 +421,10 @@ class Stack:
         sinfo = get_stack_info(stack, remote_instance)
         return cls(sinfo, mirror)
 
-    def _get_mirror_info(self, mirror: Optional[Union[int, str]] = None) -> MirrorInfo:
+    def _get_mirror_info(self, mirror: Union[int, str, None, MirrorInfo] = None) -> MirrorInfo:
+        if isinstance(mirror, MirrorInfo):
+            return mirror
+
         if mirror is None:
             if self.mirror_info is None:
                 raise ValueError("No default mirror ID set")
