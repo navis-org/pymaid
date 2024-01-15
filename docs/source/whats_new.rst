@@ -15,6 +15,8 @@ What's new?
      - BREAKING: Drop python 3.7 support.
      - - :class:`pymaid.neuron_label.NeuronLabeller` added for labelling neurons
          like in the CATMAID frontend.
+       - :func:`pymaid.get_stacks`, :func:`pymaid.get_stack_info`, :func:`pymaid.get_mirror_info` functions for getting information about image data
+       - :class:`pymaid.stack.Stack` class for accessing N5 and JPEG tile image data as a :class:`xarray.DataArray`
    * - 2.4.0
      - 27/05/23
      - - :func:`pymaid.get_annotation_graph` deprecated in favour of the new
