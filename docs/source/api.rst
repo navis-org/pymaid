@@ -160,6 +160,8 @@ Functions to fetch data about landmarks.
 
     pymaid.get_landmarks
     pymaid.get_landmark_groups
+    pymaid.LandmarkMatcher
+    pymaid.CrossProjectLandmarkMatcher
 
 Reconstruction samplers
 -----------------------

@@ -809,3 +809,35 @@ class DataFrameBuilder:
             df.index = index
 
         return df
+
+
+def clean_points(
+    df: pd.DataFrame, fmt: tp.Union[str, tp.Callable[[str], tp.Hashable]], dims="xyz"
+) -> pd.DataFrame:
+    """Extract points from a dataframe.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Dataframe, some of whose columns represent points.
+    fmt : tp.Union[str, tp.Callable[[str], tp.Hashable]]
+        Either a format string (e.g. ``"point_{}_1"``),
+        or a callable which takes a string and returns a column name.
+        When a dimension name (like ``"x"``) is passed to the format string,
+        or the callable, the result should be the name of a column in ``df``.
+    dims : str, optional
+        Dimension name order, by default "xyz"
+
+    Returns
+    -------
+    pd.DataFrame
+        The column index will be the dimensions given in ``dims``.
+        Call ``.to_numpy()`` to convert into a numpy array.
+    """
+    if isinstance(fmt, str):
+        fmt_c = lambda s: fmt.format(s)
+    else:
+        fmt_c = fmt
+
+    cols = {fmt_c(d): d for d in dims}
+    return df[list(cols)].rename(columns=cols)

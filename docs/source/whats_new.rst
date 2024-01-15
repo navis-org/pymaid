@@ -17,6 +17,9 @@ What's new?
          like in the CATMAID frontend.
        - :func:`pymaid.get_stacks`, :func:`pymaid.get_stack_info`, :func:`pymaid.get_mirror_info` functions for getting information about image data
        - :class:`pymaid.stack.Stack` class for accessing N5 and JPEG tile image data as a :class:`xarray.DataArray`
+     - - :class:`pymaid.LandmarkMatcher` and :class:`pymaid.CrossProjectLandmarkMatcher`
+       for matching paired landmarks for use in transformations within a project
+       (e.g. left-right or segmental) or between projects (e.g. different animals)
    * - 2.4.0
      - 27/05/23
      - - :func:`pymaid.get_annotation_graph` deprecated in favour of the new
