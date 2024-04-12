@@ -19,9 +19,9 @@
 #
 import os
 import re
+import sys
 import numpydoc
 import sphinx_bootstrap_theme
-import json
 
 import matplotlib as mpl
 mpl.use("Agg")
@@ -29,15 +29,17 @@ mpl.use("Agg")
 import matplotlib.sphinxext.plot_directive
 import matplotlib.pyplot as plt
 
-import sys
-sys.path.insert(0, os.path.abspath('.'))
-sys.path.insert(0, os.path.abspath('..'))
-sys.path.insert(0, os.path.abspath('../..'))
+# import sys
+# sys.path.insert(0, os.path.abspath('.'))
+# sys.path.insert(0, os.path.abspath('..'))
+# sys.path.insert(0, os.path.abspath('../..'))
 
 import mock
-MOCK_MODULES = ['py2cytoscape.data.cyrest_client.CyRestClient',
-                'rpy2.robjects.packages.importr'
-                'rpy2.robjects.pandas2ri',
+MOCK_MODULES = ['aiohttp',
+                'dask', 'dask.array', 'da',
+                'imageio', 'imageio.v3', 'iio',
+                'xarray', 'xr',
+                #'zarr', 'zarr.storage', 'zarr.storage.BaseStore', # can't mock Zarr for some reason
                 'rpy2.robjects.numpy2ri',
                 'rpy2.robjects.conversion.localconverter']
 
@@ -45,6 +47,8 @@ for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = mock.Mock()
 
 import pymaid
+import pymaid.stack
+import pymaid.neuron_label
 #from pymaid import cytoscape
 
 from subprocess import check_call as sh

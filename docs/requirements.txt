@@ -3,5 +3,5 @@ ipykernel>=5.1.0
 nbsphinx>=0.4.2
 numpydoc>=0.9.1
 sphinx_bootstrap_theme>=0.7.1
-mock
 PyQt5~=5.13.0
+zarr
