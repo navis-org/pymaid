@@ -1225,14 +1225,16 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 
     # Map hardwire connector type ID to their type name
     # ATTENTION: "attachment" can be part of any connector type
-    rel_ids = {r['relation_id']: r for r in config.link_types}
+    rel_ids = {r['relation_id']: r for r in config.get_link_types(remote_instance)}
 
     # Get connector type IDs
     cn_ids = {k: v[0][3] for k, v in data['partners'].items()}
 
-    # Map type ID to relation (also note conversion of connector ID to integer)
-    cn_type = {int(k): rel_ids.get(v, {'type': 'unknown'})['type']
-               for k, v in cn_ids.items()}
+    # Map type ID to relation; also note:
+    # 1. Conversion of connector ID to integer)
+    # 2. We're using the "name" field of the relation - this used to be "type" but
+    #    on VFB CATMAID "type" is always "Synaptic" while name can be "Presynaptic" or "Postsynaptic"
+    cn_type = {int(k): rel_ids.get(v, {}).get('name', 'unknown') for k, v in cn_ids.items()}
 
     # Map connector ID to connector type
     df['type'] = df.connector_id.map(cn_type)
@@ -1314,7 +1316,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
     df_collection = []
     tags = {}
 
-    link_types = [l['relation'] for l in config.link_types]
+    link_types = [l['relation'] for l in config.get_link_types(remote_instance)]
 
     with config.tqdm(desc='Fetching links', total=len(skids),
                      disable=config.pbar_hide,
