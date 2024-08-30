@@ -1336,7 +1336,7 @@ def link_connector(links, remote_instance=None):
                             (node_id, connector_id, 'presynaptic_to') will make node presynaptic to connector
                             (node_id, connector_id, 'postsynaptic_to') will make node postsynaptic to connector
 
-                        See ``pymaid.config.link_types`` for allowed `relation`.
+                        See ``pymaid.config.get_link_types(remote_instance)`` for allowed `relation`.
 
     remote_instance :   CatmaidInstance, optional
                         If not passed directly, will try using global.
@@ -1368,7 +1368,7 @@ def link_connector(links, remote_instance=None):
                          '(node_id, connector_id, relation)')
 
     # Make sure all relations are correct
-    ALLOWED_RELATIONS = [l['relation'] for l in config.link_types]
+    ALLOWED_RELATIONS = [l['relation'] for l in config.get_link_types(remote_instance)]
     if any([l[2] not in ALLOWED_RELATIONS for l in links]):
         raise ValueError('Tuple relationships must be either: {}'.format(', '.join(ALLOWED_RELATIONS)))
 
