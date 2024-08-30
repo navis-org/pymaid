@@ -1230,9 +1230,11 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
     # Get connector type IDs
     cn_ids = {k: v[0][3] for k, v in data['partners'].items()}
 
-    # Map type ID to relation (also note conversion of connector ID to integer)
-    cn_type = {int(k): rel_ids.get(v, {'type': 'unknown'})['type']
-               for k, v in cn_ids.items()}
+    # Map type ID to relation; also note:
+    # 1. Conversion of connector ID to integer)
+    # 2. We're using the "name" field of the relation - this used to be "type" but
+    #    on VFB CATMAID "type" is always "Synaptic" while name can be "Presynaptic" or "Postsynaptic"
+    cn_type = {int(k): rel_ids.get(v, {}).get('name', 'unknown') for k, v in cn_ids.items()}
 
     # Map connector ID to connector type
     df['type'] = df.connector_id.map(cn_type)
