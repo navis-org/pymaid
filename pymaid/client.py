@@ -609,6 +609,10 @@ class CatmaidInstance:
     def __deepcopy__(self):
         return self.copy()
 
+    def __hash__(self):
+        """Hash based on server, api_token, http user, http password and project_id."""
+        return hash((self.server, self.api_token, self.http_user, self.http_password, self.project_id))
+
     def copy(self):
         """Returns a copy of this CatmaidInstance. Does not copy cache."""
         return CatmaidInstance(server=self.server,
