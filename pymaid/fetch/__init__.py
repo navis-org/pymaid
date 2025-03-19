@@ -1717,8 +1717,15 @@ def get_user_annotations(x, remote_instance=None):
                              iDisplayLength=iDisplayLength))
 
     # Get data
-    annotations = [e['aaData'] for e in remote_instance.fetch(
-                   url_list, post=postdata, desc='Get annot')]
+    data = remote_instance.fetch(url_list, post=postdata, desc='Get annot')
+
+    # Extract annotations
+    # Depending on the CATMAID server version the key might be
+    # "aaData" (older) or just "data" (newer)
+    if "aaData" in data[0]:
+        annotations = [e['aaData'] for e in data]
+    else:
+        annotations = [e['data'] for e in data]
 
     # Add user login
     for i, u in enumerate(ids):
@@ -1805,9 +1812,14 @@ def get_annotation_details(x, remote_instance=None):
         postdata.append(dict(neuron_id=int(nid)))
 
     # Get data
-    annotations = [e['aaData'] for e in remote_instance.fetch(url_list,
-                                                              post=postdata,
-                                                              desc='Get annot')]
+    data = remote_instance.fetch(url_list, post=postdata, desc='Get annot')
+
+    # Depending on the CATMAID server version the key might be
+    # "aaData" (older) or just "data" (newer)
+    if "aaData" in data[0]:
+        annotations = [e['aaData'] for e in data]
+    else:
+        annotations = [e['data'] for e in data]
 
     # Get user list
     user_list = get_user_list(remote_instance=remote_instance)
@@ -2654,8 +2666,14 @@ def get_logs(operations=[], entries=50, display_start=0, search="",
                              'search_freetext': search}
 
         remote_get_logs_url = remote_instance._get_logs_url()
-        logs += remote_instance.fetch(remote_get_logs_url,
-                                      post=get_logs_postdata)['aaData']
+        this_log = remote_instance.fetch(remote_get_logs_url, post=get_logs_postdata)
+
+        # Depending on the CATMAID server version the key might be
+        # "aaData" (older) or just "data" (newer)
+        if "aaData" in this_log:
+            logs += this_log['aaData']
+        else:
+            logs += this_log['data']
 
     df = pd.DataFrame(logs,
                       columns=['user', 'operation', 'timestamp',
@@ -3866,7 +3884,12 @@ def get_volume(volume_name=None, color=(120, 120, 120, .6), combine_vols=False,
     get_volumes_url = remote_instance._get_volumes()
     response = remote_instance.fetch(get_volumes_url)
 
-    all_vols = pd.DataFrame(response['data'], columns=response['columns'])
+    # Depending on the CATMAID server version the key might be
+    # "aaData" (older) or just "data" (newer)
+    if 'aaData' in response:
+        all_vols = pd.DataFrame(response['aaData'], columns=response['columns'])
+    else:
+        all_vols = pd.DataFrame(response['data'], columns=response['columns'])
 
     if isinstance(volume_name, type(None)):
         return all_vols
