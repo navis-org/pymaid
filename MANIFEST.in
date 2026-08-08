@@ -1,0 +1,4 @@
+include README.md
+include LICENSE
+# setup.py parses this at build time, so it must be in the sdist
+include requirements.txt
